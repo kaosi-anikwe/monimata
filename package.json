@@ -1,0 +1,19 @@
+{
+  "name": "monimata",
+  "version": "0.0.1",
+  "license": "AGPL-3.0",
+  "private": true,
+  "scripts": {
+    "api": "nx serve api",
+    "mobile": "nx start mobile"
+  },
+  "devDependencies": {
+    "nx": "^18.0.0",
+    "@nx/js": "^18.0.0",
+    "typescript": "^5.9.2"
+  },
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ]
+}
