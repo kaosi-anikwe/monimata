@@ -29,6 +29,7 @@ from app.routers import (
     budget,
     categories,
     nudges,
+    recurring,
     reports,
     sync,
     content,
@@ -55,12 +56,16 @@ app.include_router(accounts.router, prefix="/accounts", tags=["accounts"])
 app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
 app.include_router(budget.router, prefix="/budget", tags=["budget"])
 app.include_router(categories.router, prefix="/categories", tags=["categories"])
+app.include_router(
+    categories.groups_router, prefix="/category-groups", tags=["categories"]
+)
 app.include_router(nudges.router, prefix="/nudges", tags=["nudges"])
 app.include_router(reports.router, prefix="/reports", tags=["reports"])
 app.include_router(sync.router, prefix="/sync", tags=["sync"])
 app.include_router(content.router, prefix="/content", tags=["content"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(bills.router, prefix="/bills", tags=["bills"])
+app.include_router(recurring.router, prefix="/recurring-rules", tags=["recurring"])
 
 
 @app.get("/health")
