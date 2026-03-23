@@ -91,7 +91,7 @@ class MonoClient:
         Fetch all transaction pages for an account.
         Uses pagination — keeps fetching until no next page.
         """
-        params: dict[str, str] = {}
+        params: dict[str, str | bool] = {"paginate": False}
         if start:
             params["start"] = start.strftime("%d-%m-%Y")
         if end:
@@ -99,7 +99,7 @@ class MonoClient:
 
         async with self._client() as http:
             response = await http.get(
-                f"/accounts/{mono_account_id}/transactions?paginate=false",
+                f"/accounts/{mono_account_id}/transactions",
                 params=params,
             )
             response.raise_for_status()

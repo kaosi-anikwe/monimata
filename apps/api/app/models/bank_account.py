@@ -47,7 +47,12 @@ class BankAccount(Base):
         String(20), nullable=False
     )  # "SAVINGS" | "CURRENT"
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="NGN")
-    balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)  # kobo
+    balance: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0
+    )  # kobo — last value from Mono, kept for reconciliation
+    # Balance before our earliest imported transaction (kobo).
+    # displayed_balance = starting_balance + SUM(transactions.amount)
+    starting_balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     last_synced_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
