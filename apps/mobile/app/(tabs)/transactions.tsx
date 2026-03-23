@@ -18,18 +18,18 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function TransactionsScreen() {
-    return (
-        <SafeAreaView style={s.safe}>
-            <View style={s.c}>
-                <Text style={s.t}>Transactions</Text>
-                <Text style={s.sub}>Sync a bank account to see transactions here.</Text>
-            </View>
-        </SafeAreaView>
-    );
+  return (
+    <SafeAreaView style={s.safe}>
+      <View style={s.c}>
+        <Text style={s.t}>Transactions</Text>
+        <Text style={s.sub}>Sync a bank account to see transactions here.</Text>
+      </View>
+    </SafeAreaView>
+  );
 }
 const s = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#fff' },
-    c: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
-    t: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 8 },
-    sub: { fontSize: 15, color: '#6B7280', textAlign: 'center' },
+  safe: { flex: 1, backgroundColor: '#fff' },
+  c: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
+  t: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  sub: { fontSize: 15, color: '#6B7280', textAlign: 'center' },
 });

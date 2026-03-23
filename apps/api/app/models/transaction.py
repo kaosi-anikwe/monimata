@@ -16,18 +16,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import uuid
 from datetime import date, datetime, timezone
 
-if TYPE_CHECKING:
-    from app.models.user import User
-    from app.models.bank_account import BankAccount
-    from app.models.category import Category
+from app.models.user import User
+from app.models.category import Category
+from app.models.bank_account import BankAccount
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, String, Text
 
 from app.core.database import Base
 

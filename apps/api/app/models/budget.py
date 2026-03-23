@@ -15,13 +15,18 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import uuid
+from typing import TYPE_CHECKING
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.category import Category
 
 
 class BudgetMonth(Base):

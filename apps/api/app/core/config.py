@@ -48,24 +48,18 @@ class Settings(BaseSettings):
     # ── Mono ──────────────────────────────────────────────────────────────────
     MONO_SECRET_KEY: str = ""
     MONO_WEBHOOK_SECRET: str = ""
-    MONO_BASE_URL: str = "https://api.withmono.com"
+    MONO_BASE_URL: str = "https://api.withmono.com/v2"
 
     # ── Interswitch ───────────────────────────────────────────────────────────
     INTERSWITCH_CLIENT_ID: str = ""
     INTERSWITCH_CLIENT_SECRET: str = ""
     INTERSWITCH_ENV: str = "sandbox"  # "sandbox" | "production"
 
-    @property
-    def INTERSWITCH_BASE_URL(self) -> str:
-        if self.INTERSWITCH_ENV == "production":
-            return "https://api.interswitchng.com"
-        return "https://sandbox.interswitchng.com"
+    INTERSWITCH_BASE_URL: str = (
+        "https://api-marketplace-routing.k8.isw.la/marketplace-routing/api/v1"
+    )
 
-    @property
-    def INTERSWITCH_PASSPORT_URL(self) -> str:
-        if self.INTERSWITCH_ENV == "production":
-            return "https://passport.interswitchng.com"
-        return "https://sandbox.interswitchng.com"
+    INTERSWITCH_PASSPORT_URL: str = "https://passport-v2.k8.isw.la"
 
     # ── AI / LLM ──────────────────────────────────────────────────────────────
     OPENAI_API_KEY: str = ""
@@ -77,6 +71,10 @@ class Settings(BaseSettings):
     # ── Encryption ────────────────────────────────────────────────────────────
     # 32-byte (64-char hex) key for AES-256-GCM used on PII columns
     AES_ENCRYPTION_KEY: str = ""
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+    LOG_LEVEL: str = "INFO"  # DEBUG | INFO | WARNING | ERROR
+    LOG_DIR: str = "logs"  # relative to the working directory (apps/api)
 
     @model_validator(mode="after")
     def _require_database_url(self) -> "Settings":

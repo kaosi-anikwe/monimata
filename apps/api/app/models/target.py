@@ -15,13 +15,17 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import uuid
+from typing import TYPE_CHECKING
 from datetime import date, datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Text
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.category import Category
 
 
 class CategoryTarget(Base):

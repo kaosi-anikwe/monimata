@@ -18,6 +18,8 @@ Celery application factory.
 The broker and result backend both use Redis.
 """
 
+import sys
+
 from celery import Celery
 
 from app.core.config import settings
@@ -39,6 +41,9 @@ celery_app.conf.update(
     # Retry configuration
     task_acks_late=True,
     task_reject_on_worker_lost=True,
+    # Windows: prefork pool uses Unix semaphores which Windows doesn't support.
+    # Use solo (single-threaded) on Windows; prefork is used on Linux/macOS in production.
+    worker_pool="solo" if sys.platform == "win32" else "prefork",
 )
 
 

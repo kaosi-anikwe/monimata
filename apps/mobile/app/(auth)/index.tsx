@@ -18,53 +18,53 @@
  * Welcome / Onboarding index screen.
  * Entry point for unauthenticated users.
  */
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 export default function WelcomeScreen() {
-    return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.hero}>
-                <Text style={styles.logo}>₦ MoniMata</Text>
-                <Text style={styles.tagline}>Every Kobo, Accounted For.</Text>
-                <Text style={styles.sub}>
-                    Zero-based budgeting for Nigerians — with automatic bank sync and AI-powered spending nudges.
-                </Text>
-            </View>
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.hero}>
+        <Text style={styles.logo}>₦ MoniMata</Text>
+        <Text style={styles.tagline}>Every Kobo, Accounted For.</Text>
+        <Text style={styles.sub}>
+          Zero-based budgeting for Nigerians — with automatic bank sync and AI-powered spending nudges.
+        </Text>
+      </View>
 
-            <View style={styles.actions}>
-                <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push('/(auth)/register')}>
-                    <Text style={styles.btnPrimaryText}>Get Started</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnSecondary} onPress={() => router.push('/(auth)/login')}>
-                    <Text style={styles.btnSecondaryText}>I already have an account</Text>
-                </TouchableOpacity>
-            </View>
-        </SafeAreaView>
-    );
+      <View style={styles.actions}>
+        <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push('/(auth)/register')}>
+          <Text style={styles.btnPrimaryText}>Get Started</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnSecondary} onPress={() => router.push('/(auth)/login')}>
+          <Text style={styles.btnSecondaryText}>I already have an account</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#0F7B3F', padding: 24 },
-    hero: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-    logo: { fontSize: 40, fontWeight: '800', color: '#fff', letterSpacing: -1 },
-    tagline: { fontSize: 18, fontWeight: '600', color: '#A7F3C8', textAlign: 'center' },
-    sub: { fontSize: 15, color: '#D1FAE5', textAlign: 'center', lineHeight: 22, paddingHorizontal: 16 },
-    actions: { gap: 12, paddingBottom: 8 },
-    btnPrimary: {
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        paddingVertical: 16,
-        alignItems: 'center',
-    },
-    btnPrimaryText: { color: '#0F7B3F', fontSize: 16, fontWeight: '700' },
-    btnSecondary: {
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.6)',
-        borderRadius: 14,
-        paddingVertical: 16,
-        alignItems: 'center',
-    },
-    btnSecondaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  container: { flex: 1, backgroundColor: '#0F7B3F', padding: 24 },
+  hero: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+  logo: { fontSize: 40, fontWeight: '800', color: '#fff', letterSpacing: -1 },
+  tagline: { fontSize: 18, fontWeight: '600', color: '#A7F3C8', textAlign: 'center' },
+  sub: { fontSize: 15, color: '#D1FAE5', textAlign: 'center', lineHeight: 22, paddingHorizontal: 16 },
+  actions: { gap: 12, paddingBottom: 8 },
+  btnPrimary: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  btnPrimaryText: { color: '#0F7B3F', fontSize: 16, fontWeight: '700' },
+  btnSecondary: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.6)',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  btnSecondaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

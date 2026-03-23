@@ -32,6 +32,7 @@ class BankAccountResponse(BaseModel):
     balance: int  # kobo
     last_synced_at: datetime | None
     is_active: bool
+    requires_reauth: bool
 
     model_config = {"from_attributes": True}
 

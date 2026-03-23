@@ -14,18 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-/**
- * Auth stack layout — wraps Register, Login, BVN Verify, Link Bank screens.
- */
-import { Stack } from 'expo-router';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from './authSlice';
 
-export default function AuthLayout() {
-  return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-      }}
-    />
-  );
-}
+export const store = configureStore({
+    reducer: {
+        auth: authReducer,
+    },
+});
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;

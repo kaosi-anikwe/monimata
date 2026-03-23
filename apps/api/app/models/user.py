@@ -14,14 +14,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.nudge import Nudge
+    from app.models.budget import BudgetMonth
+    from app.models.transaction import Transaction
+    from app.models.bank_account import BankAccount
+    from app.models.category import Category, CategoryGroup
 
 DEFAULT_NUDGE_SETTINGS = {
     "quiet_hours_start": "23:00",
