@@ -82,9 +82,12 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             return {"status": "skipped", "reason": "account_not_found"}
 
         # Fetch since last sync (or all available if never synced)
+        is_initial_sync = account.last_synced_at is None
         start_date = account.last_synced_at
         raw_txns = _run_async(
-            mono_client.get_transactions(mono_account_id, start=start_date)
+            mono_client.get_transactions(
+                mono_account_id, start=start_date, end=start_date
+            )
         )
 
         # Also refresh account balance
@@ -105,12 +108,14 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             if existing:
                 continue  # already imported — skip
 
-            # Check if an Interswitch transaction already covers this debit
             tx_amount = int(raw.get("amount", 0))
             tx_date_str = raw.get("date", "")
             tx_date = _parse_mono_date(tx_date_str)
+            tx_type = raw.get("type", "debit").lower()
+            signed_amount = tx_amount if tx_type == "credit" else -tx_amount
 
-            is_dupe = _find_interswitch_duplicate(db, account.id, tx_date, tx_amount)
+            # Check if an Interswitch transaction already covers this entry
+            is_dupe = _find_duplicate(db, account.id, tx_date, tx_amount)
             if is_dupe:
                 # Link mono_id to the existing Interswitch transaction instead
                 is_dupe.mono_id = mono_tx_id
@@ -122,8 +127,20 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
                 )
                 continue
 
-            tx_type = raw.get("type", "debit").lower()
-            signed_amount = tx_amount if tx_type == "credit" else -tx_amount
+            # Check if the user already recorded this manually — if so, verify/clear
+            # it by linking the Mono record instead of creating a duplicate row.
+            manual_match = _find_manual_match(db, account.id, tx_date, signed_amount)
+            if manual_match:
+                manual_match.mono_id = mono_tx_id
+                manual_match.narration = raw.get("narration") or manual_match.narration
+                manual_match.balance_after = raw.get("balance")
+                db.add(manual_match)
+                logger.info(
+                    "Cleared manual tx=%s with mono_id=%s",
+                    manual_match.id,
+                    mono_tx_id,
+                )
+                continue
 
             txn = Transaction(
                 user_id=account.user_id,
@@ -141,6 +158,28 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
 
         account.requires_reauth = False
         account.last_synced_at = datetime.now(timezone.utc)
+
+        # On the very first sync, anchor starting_balance so that:
+        #   displayed_balance = starting_balance + SUM(transactions.amount)
+        # equals Mono's reported balance at link time.
+        if is_initial_sync:
+            from sqlalchemy import func as sqlfunc
+
+            tx_sum: int = (
+                db.query(sqlfunc.sum(Transaction.amount))
+                .filter(Transaction.account_id == account.id)
+                .scalar()
+                or 0
+            )
+            account.starting_balance = account.balance - tx_sum
+            logger.info(
+                "Set starting_balance=%d for account=%s (mono_balance=%d, tx_sum=%d)",
+                account.starting_balance,
+                account.id,
+                account.balance,
+                tx_sum,
+            )
+
         db.commit()
 
         # Enqueue categorization for new transactions
@@ -162,21 +201,63 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
         db.close()
 
 
-def _parse_mono_date(date_str: str):
-    from datetime import date
+def _parse_mono_date(date_str: str) -> datetime:
+    """Parse Mono date strings to a UTC-aware datetime.
 
+    Mono may return:
+      - full ISO datetime: "2025-03-10T14:30:00.000Z" / "2025-03-10T14:30:00Z"
+      - date-only: "2025-03-10"
+
+    Date-only strings are promoted to midnight UTC so all transactions have a
+    consistent TIMESTAMPTZ representation in the database.
+    """
     if not date_str:
-        return datetime.now(timezone.utc).date()
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"):
+        return datetime.now(timezone.utc)
+    # Full datetime with milliseconds
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
         try:
-            return datetime.strptime(date_str, fmt).date()
+            return datetime.strptime(date_str, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
-    return datetime.now(timezone.utc).date()
+    # Date-only — promote to midnight UTC
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    return datetime.now(timezone.utc)
 
 
-def _find_interswitch_duplicate(db, account_id: str, tx_date, amount: int):
-    """Return an existing Interswitch transaction that matches this Mono debit (within ±100 kobo)."""
+def _find_manual_match(db, account_id: str, tx_datetime: datetime, signed_amount: int):
+    """Return an uncleared manual transaction that likely corresponds to this Mono
+    entry.  Match criteria:
+      - same account
+      - amount within ±100 kobo
+      - datetime within ±2 hours
+
+    A 2-hour window handles network/posting delays while preventing false
+    positives for users who make the same-amount purchase every day.
+    """
+    from app.models.transaction import Transaction
+    from datetime import timedelta
+
+    return (
+        db.query(Transaction)
+        .filter(
+            Transaction.account_id == account_id,
+            Transaction.source == "manual",
+            Transaction.mono_id == None,  # noqa: E711 — not yet cleared
+            Transaction.date.between(
+                tx_datetime - timedelta(hours=2), tx_datetime + timedelta(hours=2)
+            ),
+            Transaction.amount.between(signed_amount - 100, signed_amount + 100),
+        )
+        .first()
+    )
+
+
+def _find_duplicate(db, account_id: str, tx_datetime: datetime, amount: int):
+    """Return an existing Interswitch transaction that matches this Mono debit
+    (within ±100 kobo, within ±1 day to handle posting-date lag)."""
     from app.models.transaction import Transaction
     from datetime import timedelta
 
@@ -185,7 +266,9 @@ def _find_interswitch_duplicate(db, account_id: str, tx_date, amount: int):
         .filter(
             Transaction.account_id == account_id,
             Transaction.source == "interswitch",
-            Transaction.date == tx_date,
+            Transaction.date.between(
+                tx_datetime - timedelta(days=1), tx_datetime + timedelta(days=1)
+            ),
             Transaction.amount.between(-amount - 100, -amount + 100),
         )
         .first()

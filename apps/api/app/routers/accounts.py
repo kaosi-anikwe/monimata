@@ -24,11 +24,13 @@ import logging
 from typing import cast
 
 import httpx
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.database import get_db
 from app.models.user import User
+from app.models.transaction import Transaction
 from app.schemas.accounts import (
     BankAccountResponse,
     ConnectAccountRequest,
@@ -127,12 +129,26 @@ async def connect_account(
 def list_accounts(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[BankAccount]:
-    return (
+) -> list[BankAccountResponse]:
+    accounts = (
         db.query(BankAccount)
         .filter(BankAccount.user_id == current_user.id, BankAccount.is_active == True)
         .all()
     )
+
+    result: list[BankAccountResponse] = []
+    for acct in accounts:
+        computed_balance: int = acct.starting_balance + (
+            db.query(func.sum(Transaction.amount))
+            .filter(Transaction.account_id == acct.id)
+            .scalar()
+            or 0
+        )
+        resp = BankAccountResponse.model_validate(acct)
+        resp.balance = int(computed_balance)
+        result.append(resp)
+
+    return result
 
 
 # ── DELETE /accounts/{id} ─────────────────────────────────────────────────────

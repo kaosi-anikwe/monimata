@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSelector } from 'react-redux';
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MonoProvider, useMonoConnect } from '@mono.co/connect-react-native';
@@ -84,7 +85,7 @@ export default function LinkBankScreen() {
     data: {
       customer: {
         name: [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'MoniMata User',
-        email: user?.email ?? '',
+        ...(user?.email ? { email: user.email } : {}),
       },
     },
     onSuccess: (data: { getAuthCode: () => string }) => {
@@ -106,7 +107,9 @@ export default function LinkBankScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.container}>
           <View style={styles.hero}>
-            <Text style={styles.icon}>🏦</Text>
+            <Text>
+              <Ionicons name='business' size={64} color="#0F7B3F" />
+            </Text>
             <Text style={styles.title}>Link your bank account</Text>
             <Text style={styles.body}>
               Connect your GTBank, Kuda, Zenith, OPay or any Nigerian bank account.

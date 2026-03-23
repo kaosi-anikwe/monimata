@@ -21,7 +21,7 @@
  */
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ScrollView,
+  ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { z } from 'zod';
 import { router } from 'expo-router';
@@ -72,58 +72,63 @@ export default function VerifyBVNScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <View style={styles.iconWrap}>
-          <Text style={styles.icon}>🔐</Text>
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <View style={styles.iconWrap}>
+            <Text style={styles.icon}>🔐</Text>
+          </View>
 
-        <Text style={styles.title}>Verify your identity</Text>
-        <Text style={styles.body}>
-          Nigerian regulations require identity verification before linking a bank account.
-          Enter your 11-digit BVN to continue. Your BVN is never stored — only your name is
-          checked against your registration.
-        </Text>
+          <Text style={styles.title}>Verify your identity</Text>
+          <Text style={styles.body}>
+            Nigerian regulations require identity verification before linking a bank account.
+            Enter your 11-digit BVN to continue. Your BVN is never stored — only your name is
+            checked against your registration.
+          </Text>
 
-        {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
+          {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
-        <Text style={styles.label}>Bank Verification Number (BVN)</Text>
-        <Controller
-          control={control}
-          name="bvn"
-          render={({ field: { value, onChange, onBlur } }) => (
-            <TextInput
-              style={[styles.input, errors.bvn ? styles.inputError : null]}
-              value={value}
-              onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, 11))}
-              onBlur={onBlur}
-              placeholder="e.g. 12345678901"
-              keyboardType="numeric"
-              maxLength={11}
-              placeholderTextColor="#9CA3AF"
-            />
-          )}
-        />
-        <Text style={styles.hint}>
-          {bvnValue.length}/11 digits — Dial *565*0# on any network to retrieve your BVN
-        </Text>
-        {errors.bvn ? <Text style={styles.fieldError}>{errors.bvn.message}</Text> : null}
+          <Text style={styles.label}>Bank Verification Number (BVN)</Text>
+          <Controller
+            control={control}
+            name="bvn"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextInput
+                style={[styles.input, errors.bvn ? styles.inputError : null]}
+                value={value}
+                onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, 11))}
+                onBlur={onBlur}
+                placeholder="e.g. 12345678901"
+                keyboardType="numeric"
+                maxLength={11}
+                placeholderTextColor="#9CA3AF"
+              />
+            )}
+          />
+          <Text style={styles.hint}>
+            {bvnValue.length}/11 digits — Dial *565*0# on any network to retrieve your BVN
+          </Text>
+          {errors.bvn ? <Text style={styles.fieldError}>{errors.bvn.message}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.btn, (loading || bvnValue.length !== 11) && styles.btnDisabled]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={loading || bvnValue.length !== 11}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.btnText}>Verify Identity</Text>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, (loading || bvnValue.length !== 11) && styles.btnDisabled]}
+            onPress={handleSubmit(onSubmit)}
+            disabled={loading || bvnValue.length !== 11}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.btnText}>Verify Identity</Text>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipLink}>
-          <Text style={styles.skipText}>Skip for now (limited features)</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipLink}>
+            <Text style={styles.skipText}>Skip for now (limited features)</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

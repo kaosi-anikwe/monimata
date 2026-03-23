@@ -181,3 +181,6 @@ vite.config.ts.timestamp-*
 
 # VSCode settings
 .vscode/
+
+# Keystore
+*.keystore
