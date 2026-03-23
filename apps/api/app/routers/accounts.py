@@ -21,25 +21,24 @@ Bank accounts router — link Mono accounts, list, delete, sync.
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
-from typing import Any, cast
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, get_verified_user
-from app.models.bank_account import BankAccount
 from app.models.user import User
 from app.schemas.accounts import (
     BankAccountResponse,
     ConnectAccountRequest,
     SyncStatusResponse,
 )
-from app.services.mono_client import mono_client
 from app.worker.celery_app import CeleryTask
+from app.models.bank_account import BankAccount
 from app.worker.tasks import fetch_transactions
+from app.services.mono_client import mono_client
+from app.core.deps import get_current_user, get_verified_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -65,9 +64,7 @@ async def connect_account(
             detail="Could not connect bank account. Please try again.",
         )
 
-    mono_account_id: str = auth_data.get("id") or auth_data.get("account", {}).get(
-        "id", ""
-    )
+    mono_account_id: str = auth_data.get("data", {}).get("id", "")
     if not mono_account_id:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -83,7 +80,7 @@ async def connect_account(
             detail="Could not fetch account details from Mono",
         )
 
-    acct_info = account_data.get("account", account_data)
+    acct_info: dict = account_data.get("data", {}).get("account", account_data)
 
     # Check for duplicate
     existing = (
@@ -142,13 +139,14 @@ def list_accounts(
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
-def unlink_account(
+async def unlink_account(
     account_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
     account = _get_account_or_404(db, account_id, current_user.id)
-    account.is_active = False
+    await mono_client.unlink_account(account.mono_account_id)
+    db.delete(account)
     db.commit()
 
 

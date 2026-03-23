@@ -21,19 +21,19 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function BudgetScreen() {
-    return (
-        <SafeAreaView style={styles.safe}>
-            <View style={styles.container}>
-                <Text style={styles.title}>Budget</Text>
-                <Text style={styles.sub}>Coming in Phase 1 — give every Kobo a job.</Text>
-            </View>
-        </SafeAreaView>
-    );
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Budget</Text>
+        <Text style={styles.sub}>Coming in Phase 1 — give every Kobo a job.</Text>
+      </View>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#fff' },
-    container: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
-    title: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 8 },
-    sub: { fontSize: 15, color: '#6B7280', textAlign: 'center' },
+  safe: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  sub: { fontSize: 15, color: '#6B7280', textAlign: 'center' },
 });

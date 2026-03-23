@@ -21,18 +21,18 @@
 import { Tabs } from 'expo-router';
 
 export default function TabsLayout() {
-    return (
-        <Tabs
-            screenOptions={{
-                headerShown: false,
-                tabBarActiveTintColor: '#0F7B3F',
-                tabBarInactiveTintColor: '#9CA3AF',
-            }}
-        >
-            <Tabs.Screen name="index" options={{ title: 'Budget', tabBarLabel: 'Budget' }} />
-            <Tabs.Screen name="transactions" options={{ title: 'Transactions', tabBarLabel: 'Transactions' }} />
-            <Tabs.Screen name="accounts" options={{ title: 'Accounts', tabBarLabel: 'Accounts' }} />
-            <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarLabel: 'Profile' }} />
-        </Tabs>
-    );
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#0F7B3F',
+        tabBarInactiveTintColor: '#9CA3AF',
+      }}
+    >
+      <Tabs.Screen name="index" options={{ title: 'Budget', tabBarLabel: 'Budget' }} />
+      <Tabs.Screen name="transactions" options={{ title: 'Transactions', tabBarLabel: 'Transactions' }} />
+      <Tabs.Screen name="accounts" options={{ title: 'Accounts', tabBarLabel: 'Accounts' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarLabel: 'Profile' }} />
+    </Tabs>
+  );
 }

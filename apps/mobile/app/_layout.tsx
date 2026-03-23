@@ -21,47 +21,58 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { Provider } from 'react-redux';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 import { store } from '@/store';
 import { restoreSession } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
+// Keep the splash screen visible while we restore the session.
+SplashScreen.preventAutoHideAsync();
+
 const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: { retry: 2, staleTime: 1000 * 60 * 5 },
-    },
+  defaultOptions: {
+    queries: { retry: 2, staleTime: 1000 * 60 * 5 },
+  },
 });
 
 function RootNavigator() {
-    const dispatch = useAppDispatch();
-    const { isAuthenticated, loading } = useAppSelector((s) => s.auth);
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, loading } = useAppSelector((s) => s.auth);
 
-    useEffect(() => {
-        dispatch(restoreSession());
-    }, [dispatch]);
+  useEffect(() => {
+    dispatch(restoreSession());
+  }, [dispatch]);
 
-    if (loading) return null; // Splash screen remains visible
+  useEffect(() => {
+    if (!loading) {
+      SplashScreen.hideAsync();
+    }
+  }, [loading]);
 
-    return (
-        <Stack screenOptions={{ headerShown: false }}>
-            {isAuthenticated ? (
-                <Stack.Screen name="(tabs)" />
-            ) : (
-                <Stack.Screen name="(auth)" />
-            )}
-        </Stack>
-    );
+  if (loading) return null;
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      {isAuthenticated ? (
+        <Stack.Screen name="(tabs)" />
+      ) : (
+        <Stack.Screen name="(auth)" />
+      )}
+    </Stack>
+  );
 }
 
 export default function RootLayout() {
-    return (
-        <Provider store={store}>
-            <QueryClientProvider client={queryClient}>
-                <SafeAreaProvider>
-                    <RootNavigator />
-                </SafeAreaProvider>
-            </QueryClientProvider>
-        </Provider>
-    );
+  return (
+    <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <RootNavigator />
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </Provider>
+  );
 }

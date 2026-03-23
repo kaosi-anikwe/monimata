@@ -20,10 +20,10 @@ Mono API client — account linking, transaction fetching, HMAC webhook verifica
 
 from __future__ import annotations
 
-import hashlib
 import hmac
+import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 import httpx
 
@@ -47,8 +47,14 @@ def verify_mono_webhook(request_body: bytes, signature_header: str) -> bool:
 
 
 class MonoClient:
-    def __init__(self) -> None:
-        self._http = httpx.AsyncClient(
+    """
+    Mono API client.
+    Creates a fresh httpx.AsyncClient per call so it is safe to use from
+    Celery tasks that each run in their own short-lived event loop.
+    """
+
+    def _client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
             base_url=settings.MONO_BASE_URL,
             headers={
                 "mono-sec-key": settings.MONO_SECRET_KEY,
@@ -59,14 +65,21 @@ class MonoClient:
 
     async def exchange_auth_code(self, code: str) -> dict:
         """Exchange a one-time auth_code from Mono Connect SDK for an account id."""
-        response = await self._http.post("/account/auth", json={"code": code})
-        response.raise_for_status()
-        return response.json()
+        async with self._client() as http:
+            response = await http.post("/accounts/auth", json={"code": code})
+            response.raise_for_status()
+            return response.json()
 
     async def get_account(self, mono_account_id: str) -> dict:
-        response = await self._http.get(f"/accounts/{mono_account_id}")
-        response.raise_for_status()
-        return response.json()
+        async with self._client() as http:
+            response = await http.get(f"/accounts/{mono_account_id}")
+            response.raise_for_status()
+            return response.json()
+
+    async def unlink_account(self, mono_account_id: str) -> None:
+        async with self._client() as http:
+            response = await http.post(f"/accounts/{mono_account_id}/unlink")
+            response.raise_for_status()
 
     async def get_transactions(
         self,
@@ -78,44 +91,31 @@ class MonoClient:
         Fetch all transaction pages for an account.
         Uses pagination — keeps fetching until no next page.
         """
-        params: dict[str, str] = {"paginate": "true"}
+        params: dict[str, str] = {}
         if start:
             params["start"] = start.strftime("%d-%m-%Y")
         if end:
             params["end"] = end.strftime("%d-%m-%Y")
 
-        transactions: list[dict] = []
-        page = 1
-
-        while True:
-            params["page"] = str(page)
-            response = await self._http.get(
-                f"/accounts/{mono_account_id}/transactions",
+        async with self._client() as http:
+            response = await http.get(
+                f"/accounts/{mono_account_id}/transactions?paginate=false",
                 params=params,
             )
             response.raise_for_status()
             data = response.json()
 
-            page_txns = data.get("data", [])
-            transactions.extend(page_txns)
-
-            # Mono returns `paginatedData` with a `next` cursor or total pages
-            paginated = data.get("paginatedData", {})
-            total_pages = paginated.get("totalPages", 1)
-            if page >= total_pages or not page_txns:
-                break
-            page += 1
-
-        return transactions
+        return data.get("data", [])
 
     async def trigger_sync(self, mono_account_id: str) -> dict:
         """Trigger an immediate re-sync on Mono's side (manual sync)."""
-        response = await self._http.post(f"/accounts/{mono_account_id}/sync")
-        response.raise_for_status()
-        return response.json()
+        async with self._client() as http:
+            response = await http.post(f"/accounts/{mono_account_id}/sync")
+            response.raise_for_status()
+            return response.json()
 
     async def aclose(self) -> None:
-        await self._http.aclose()
+        pass  # no persistent client to close
 
 
 mono_client = MonoClient()

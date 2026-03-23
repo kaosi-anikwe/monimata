@@ -15,14 +15,14 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from app.models.user import User
-from app.models.bank_account import BankAccount
-from app.models.transaction import Transaction, TransactionSplit
-from app.models.category import CategoryGroup, Category
-from app.models.target import CategoryTarget
-from app.models.budget import BudgetMonth
-from app.models.narration_map import NarrationCategoryMap
 from app.models.nudge import Nudge
 from app.models.article import Article
+from app.models.budget import BudgetMonth
+from app.models.target import CategoryTarget
+from app.models.bank_account import BankAccount
+from app.models.category import CategoryGroup, Category
+from app.models.narration_map import NarrationCategoryMap
+from app.models.transaction import Transaction, TransactionSplit
 
 __all__ = [
     "User",

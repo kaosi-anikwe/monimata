@@ -44,9 +44,14 @@ def upgrade() -> None:
         sa.Column("password_hash", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("last_login", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("nudge_settings", postgresql.JSONB(), nullable=False, server_default=sa.text("""
-            '{"quiet_hours_start":"23:00","quiet_hours_end":"07:00","fatigue_limit":3,"enabled":true}'
-        """)),
+        sa.Column("nudge_settings", postgresql.JSONB(), nullable=False, server_default=sa.text(
+            "json_build_object("
+            "'quiet_hours_start', '23:00',"
+            "'quiet_hours_end', '07:00',"
+            "'fatigue_limit', 3,"
+            "'enabled', true"
+            ")"
+        )),
         sa.Column("onboarded", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("identity_verified", sa.Boolean(), nullable=False, server_default="false"),
     )
@@ -65,6 +70,7 @@ def upgrade() -> None:
         sa.Column("balance", sa.BigInteger(), nullable=False, server_default="0"),
         sa.Column("last_synced_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column("requires_reauth", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
     op.create_index("idx_bank_accounts_user_id", "bank_accounts", ["user_id"])

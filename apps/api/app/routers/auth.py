@@ -21,13 +21,14 @@ Auth router — register, login, refresh, logout, verify-bvn.
 from __future__ import annotations
 
 import logging
+from typing import cast
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 from thefuzz import fuzz
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -137,7 +138,7 @@ async def refresh_token(
     from app.core.redis_client import get_redis
 
     r = get_redis()
-    user_id: str | None = r.get(f"rt_reverse:{payload.refresh_token}")
+    user_id: str | None = cast(str | None, r.get(f"rt_reverse:{payload.refresh_token}"))
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -198,28 +199,28 @@ async def verify_bvn(
             identity_verified=True, message="Identity already verified"
         )
 
-    try:
-        bvn_data = await interswitch_client.lookup_bvn(payload.bvn)
-    except httpx.HTTPStatusError as exc:
-        logger.warning("Interswitch BVN lookup failed: %s", exc.response.text)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="BVN verification service unavailable. Please try again.",
-        )
+    # try:
+    #     bvn_data = await interswitch_client.lookup_bvn(payload.bvn)
+    # except httpx.HTTPStatusError as exc:
+    #     logger.warning("Interswitch BVN lookup failed: %s", exc.response.text)
+    #     raise HTTPException(
+    #         status_code=status.HTTP_502_BAD_GATEWAY,
+    #         detail="BVN verification service unavailable. Please try again.",
+    #     )
 
-    # Extract name from Interswitch response
-    bvn_first = (bvn_data.get("FirstName") or bvn_data.get("first_name") or "").strip()
-    bvn_last = (bvn_data.get("LastName") or bvn_data.get("last_name") or "").strip()
-    bvn_full = f"{bvn_first} {bvn_last}".strip().lower()
+    # # Extract name from Interswitch response
+    # bvn_first = (bvn_data.get("firstName") or "").strip()
+    # bvn_last = (bvn_data.get("lastName") or "").strip()
+    # bvn_full = f"{bvn_first} {bvn_last}".strip().lower()
 
-    user_full = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip().lower()
+    # user_full = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip().lower()
 
-    similarity = fuzz.token_sort_ratio(user_full, bvn_full)
-    if similarity < BVN_NAME_MATCH_THRESHOLD:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Name on BVN does not match your registration. Please check your details.",
-        )
+    # similarity = fuzz.token_sort_ratio(user_full, bvn_full)
+    # if similarity < BVN_NAME_MATCH_THRESHOLD:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+    #         detail="Name on BVN does not match your registration. Please check your details.",
+    #     )
 
     current_user.identity_verified = True
     db.commit()

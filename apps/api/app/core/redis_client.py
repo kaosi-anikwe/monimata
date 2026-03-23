@@ -22,16 +22,17 @@ Provides a single shared Redis connection used for:
   - Celery broker (via Celery's own connection)
 """
 
+from typing import cast
 from datetime import timedelta
 
 import redis
 
 from app.core.config import settings
 
-_redis_client: redis.Redis[str] | None = None
+_redis_client: redis.Redis | None = None
 
 
-def get_redis() -> redis.Redis[str]:
+def get_redis() -> redis.Redis:
     global _redis_client
     if _redis_client is None:
         _redis_client = redis.from_url(  # type: ignore[assignment]
@@ -55,7 +56,7 @@ def store_refresh_token(user_id: str, token: str) -> None:
 
 def get_stored_refresh_token(user_id: str) -> str | None:
     r = get_redis()
-    return r.get(f"{REFRESH_TOKEN_PREFIX}{user_id}")
+    return cast(str | None, r.get(f"{REFRESH_TOKEN_PREFIX}{user_id}"))
 
 
 def delete_refresh_token(user_id: str) -> None:

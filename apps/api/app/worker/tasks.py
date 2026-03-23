@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import List, cast
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, cast
 
 from sqlalchemy import and_, select
 
@@ -139,6 +139,7 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             db.add(txn)
             new_ids.append(txn.id)
 
+        account.requires_reauth = False
         account.last_synced_at = datetime.now(timezone.utc)
         db.commit()
 
