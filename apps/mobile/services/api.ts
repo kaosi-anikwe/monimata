@@ -20,8 +20,11 @@
  * - On 401, attempts a silent token refresh and retries once.
  * - On refresh failure, clears auth and redirects to /login.
  */
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+
+import { store } from '../store';
+import { clearAuth } from '../store/authSlice';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -33,6 +36,9 @@ const SECURE_KEYS = {
 export async function getAccessToken(): Promise<string | null> {
     return SecureStore.getItemAsync(SECURE_KEYS.ACCESS_TOKEN);
 }
+
+/** Alias used by the WatermelonDB sync service */
+export const getAuthToken = getAccessToken;
 
 export async function getRefreshToken(): Promise<string | null> {
     return SecureStore.getItemAsync(SECURE_KEYS.REFRESH_TOKEN);
@@ -115,7 +121,7 @@ api.interceptors.response.use(
         } catch (refreshError) {
             processQueue(refreshError, null);
             await clearTokens();
-            // Navigation to login screen is handled by the auth context listener
+            store.dispatch(clearAuth());
             return Promise.reject(refreshError);
         } finally {
             isRefreshing = false;

@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from app.models.transaction import Transaction
     from app.models.bank_account import BankAccount
     from app.models.category import Category, CategoryGroup
+    from app.models.recurring_rule import RecurringRule
 
 DEFAULT_NUDGE_SETTINGS = {
     "quiet_hours_start": "23:00",
@@ -85,5 +86,8 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     nudges: Mapped[list["Nudge"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    recurring_rules: Mapped[list["RecurringRule"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )

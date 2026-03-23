@@ -30,6 +30,12 @@ export function nairaToKobo(naira: number): number {
     return Math.round(naira * 100);
 }
 
+/** Convert Naira string to kobo */
+export function nairaStringToKobo(naira: string): number {
+    const n = parseFloat(naira.replace(/,/g, ''));
+    return isNaN(n) ? 0 : Math.round(n * 100);
+}
+
 /** Format kobo as a Naira string — e.g. 15000 → "₦150.00" */
 export function formatNaira(kobo: number, options?: { showSign?: boolean }): string {
     const naira = koboToNaira(kobo);
@@ -56,4 +62,23 @@ export function spentPercent(activity: number, assigned: number): number {
     if (assigned === 0) return 0;
     // activity is negative; we want magnitude of spending / assigned
     return Math.round((Math.abs(activity) / assigned) * 100);
+}
+
+export function computeNextDue(fromDate: Date | string, frequency: string, interval: number): string {
+    let d: Date;
+    if (fromDate instanceof Date) {
+        // Use the calendar date in local time, discarding the time component
+        d = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+    } else {
+        d = new Date(fromDate + 'T00:00:00');
+    }
+    switch (frequency) {
+        case 'daily': d.setDate(d.getDate() + interval); break;
+        case 'weekly': d.setDate(d.getDate() + 7 * interval); break;
+        case 'biweekly': d.setDate(d.getDate() + 14); break;
+        case 'monthly': d.setMonth(d.getMonth() + interval); break;
+        case 'yearly': d.setFullYear(d.getFullYear() + interval); break;
+        default: d.setDate(d.getDate() + 7); break;
+    }
+    return d.toISOString().slice(0, 10);
 }

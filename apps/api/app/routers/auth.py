@@ -55,6 +55,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
+from app.services.budget_logic import seed_default_categories
 from app.services.interswitch_client import interswitch_client
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,9 @@ async def register(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
         )
 
+    seed_default_categories(db, user)
+    db.commit()
+
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token()
     store_refresh_token(user.id, refresh_token)
@@ -106,8 +110,11 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenRe
     )
 
     # Constant-time check — always call verify_password even on miss to avoid timing attacks
+    # Always call verify_password (even on a miss) to prevent timing-based
+    # user enumeration. The dummy hash is a valid bcrypt hash that never matches.
+    _DUMMY_HASH = "$2b$12$notarealpasswordhashXXuu8qkFBYKNsTVMjbDSEMqhvdEoKHHunq"
     valid = verify_password(
-        payload.password, user.password_hash if user else "$2b$12$placeholder"
+        payload.password, user.password_hash if user else _DUMMY_HASH
     )
     if not user or not valid:
         raise HTTPException(

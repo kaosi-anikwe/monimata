@@ -17,7 +17,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
+
+from typing import TYPE_CHECKING
 
 from app.models.user import User
 from app.models.category import Category
@@ -25,7 +27,10 @@ from app.models.bank_account import BankAccount
 
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text
+
+if TYPE_CHECKING:
+    from app.models.recurring_rule import RecurringRule
 
 from app.core.database import Base
 
@@ -43,7 +48,7 @@ class Transaction(Base):
         UUID(as_uuid=False), ForeignKey("bank_accounts.id"), nullable=False
     )
     mono_id: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
-    date: Mapped[date] = mapped_column(Date, nullable=False)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     amount: Mapped[int] = mapped_column(
         BigInteger, nullable=False
     )  # kobo; negative=debit, positive=credit
@@ -61,6 +66,11 @@ class Transaction(Base):
     )  # "mono" | "interswitch" | "manual"
     interswitch_ref: Mapped[str | None] = mapped_column(
         Text, unique=True, nullable=True
+    )
+    recurrence_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("recurring_rules.id", ondelete="SET NULL"),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -80,6 +90,9 @@ class Transaction(Base):
     category: Mapped[Category | None] = relationship(back_populates="transactions")
     splits: Mapped[list[TransactionSplit]] = relationship(
         back_populates="transaction", cascade="all, delete-orphan"
+    )
+    recurring_rule: Mapped["RecurringRule | None"] = relationship(
+        back_populates="transactions"
     )
 
 

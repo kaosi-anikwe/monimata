@@ -20,6 +20,7 @@ from app.models.article import Article
 from app.models.budget import BudgetMonth
 from app.models.target import CategoryTarget
 from app.models.bank_account import BankAccount
+from app.models.recurring_rule import RecurringRule
 from app.models.category import CategoryGroup, Category
 from app.models.narration_map import NarrationCategoryMap
 from app.models.transaction import Transaction, TransactionSplit
@@ -33,6 +34,7 @@ __all__ = [
     "Category",
     "CategoryTarget",
     "BudgetMonth",
+    "RecurringRule",
     "NarrationCategoryMap",
     "Nudge",
     "Article",

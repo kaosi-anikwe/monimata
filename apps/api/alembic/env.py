@@ -17,6 +17,7 @@
 """
 Alembic env.py — reads DATABASE_URL from environment so alembic.ini placeholder is never used.
 """
+
 from logging.config import fileConfig
 
 from alembic import context

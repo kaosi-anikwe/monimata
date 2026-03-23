@@ -14,25 +14,103 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-/**
- * Main tabs layout — placeholder for Day 1.
- * Full budget/transactions/accounts screens are implemented in Phase 1.
- */
-import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs, useRouter, useSegments } from 'expo-router';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+function tabIcon(outline: IoniconsName, filled: IoniconsName) {
+  function TabIcon({ color, focused }: { color: string; focused: boolean }) {
+    return <Ionicons name={focused ? filled : outline} size={24} color={color} />;
+  }
+  return TabIcon;
+}
+
+/** Floating action button shown on Budget and Transactions tabs only. */
+function SharedFAB() {
+  const router = useRouter();
+  const segments = useSegments();
+  // segments[1] is the tab name: 'index' (Budget) or 'transactions'
+  const activeTab = segments[1];
+  const visible = segments.length === 1 || activeTab === 'transactions';
+  if (!visible) return null;
+
+  return (
+    <TouchableOpacity
+      style={s.fab}
+      onPress={() => router.push('/add-transaction')}
+      activeOpacity={0.85}
+    >
+      <Ionicons name="add" size={28} color="#fff" />
+    </TouchableOpacity>
+  );
+}
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#0F7B3F',
-        tabBarInactiveTintColor: '#9CA3AF',
-      }}
-    >
-      <Tabs.Screen name="index" options={{ title: 'Budget', tabBarLabel: 'Budget' }} />
-      <Tabs.Screen name="transactions" options={{ title: 'Transactions', tabBarLabel: 'Transactions' }} />
-      <Tabs.Screen name="accounts" options={{ title: 'Accounts', tabBarLabel: 'Accounts' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarLabel: 'Profile' }} />
-    </Tabs>
+    <View style={{ flex: 1 }}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: '#0F7B3F',
+          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarStyle: { borderTopColor: '#E5E7EB' },
+        }}
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Budget',
+            tabBarLabel: 'Budget',
+            tabBarIcon: tabIcon('wallet-outline', 'wallet'),
+          }}
+        />
+        <Tabs.Screen
+          name="transactions"
+          options={{
+            title: 'Transactions',
+            tabBarLabel: 'Transactions',
+            tabBarIcon: tabIcon('receipt-outline', 'receipt'),
+          }}
+        />
+        <Tabs.Screen
+          name="accounts"
+          options={{
+            title: 'Accounts',
+            tabBarLabel: 'Accounts',
+            tabBarIcon: tabIcon('business-outline', 'business'),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarLabel: 'Profile',
+            tabBarIcon: tabIcon('person-outline', 'person'),
+          }}
+        />
+      </Tabs>
+      <SharedFAB />
+    </View>
   );
 }
+
+const s = StyleSheet.create({
+  fab: {
+    position: 'absolute',
+    bottom: 82, // sits above the tab bar (~56 px) + 26 px breathing room
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#0F7B3F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+});
