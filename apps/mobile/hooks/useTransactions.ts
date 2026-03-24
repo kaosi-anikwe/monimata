@@ -82,7 +82,14 @@ export function useCreateTransaction() {
       api.post<Transaction>('/transactions/manual', body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      qc.invalidateQueries({ queryKey: queryKeys.budget("") });
+      qc.invalidateQueries({ queryKey: queryKeys.budget('') });
+      // The Celery worker categorizes the transaction and evaluates nudges
+      // asynchronously. Refresh nudges after a short delay so the badge and
+      // Nudges tab update without requiring a push notification roundtrip.
+      setTimeout(
+        () => qc.invalidateQueries({ queryKey: queryKeys.nudges() }),
+        4000,
+      );
     },
     onError: () => Alert.alert('Error', 'Could not create transaction.'),
   });

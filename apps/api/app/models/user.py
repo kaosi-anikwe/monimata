@@ -68,6 +68,9 @@ class User(Base):
     identity_verified: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    expo_push_token: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # Expo push token ("ExponentPushToken[...]"); NULL = notifications not granted
 
     # relationships
     bank_accounts: Mapped[list["BankAccount"]] = relationship(

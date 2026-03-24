@@ -68,6 +68,8 @@ export interface BillPayRequest {
   account_id: string;
   customer_mobile?: string;
   customer_email?: string;
+  /** Human-readable biller name for narration and nudge context */
+  biller_name?: string;
   category_id?: string;
 }
 

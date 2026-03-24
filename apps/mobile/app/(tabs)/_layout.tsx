@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter, useSegments } from 'expo-router';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 
+import { useNudgeUnreadCount } from '../../hooks/useNudges';
+
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 function tabIcon(outline: IoniconsName, filled: IoniconsName) {
@@ -50,6 +52,8 @@ function SharedFAB() {
 }
 
 export default function TabsLayout() {
+  const nudgeUnread = useNudgeUnreadCount();
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs
@@ -93,11 +97,21 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="nudges"
+          options={{
+            title: 'Nudges',
+            // Hidden from the tab bar — accessible via router.push('/(tabs)/nudges')
+            href: null,
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             title: 'Profile',
             tabBarLabel: 'Profile',
             tabBarIcon: tabIcon('person-outline', 'person'),
+            tabBarBadge: nudgeUnread > 0 ? nudgeUnread : undefined,
+            tabBarBadgeStyle: { backgroundColor: '#EF4444', fontSize: 10 },
           }}
         />
       </Tabs>

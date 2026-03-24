@@ -41,6 +41,11 @@ export function useTriggerSync() {
         () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
         3000,
       );
+      // Sync may categorize transactions and trigger nudges — also refresh nudges.
+      setTimeout(
+        () => qc.invalidateQueries({ queryKey: queryKeys.nudges() }),
+        6000,
+      );
     },
     onError: () => Alert.alert('Sync Failed', 'Could not start sync. Try again.'),
   });

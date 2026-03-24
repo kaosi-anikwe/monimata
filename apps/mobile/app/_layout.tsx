@@ -20,19 +20,21 @@
  */
 import { Stack } from 'expo-router';
 import { Provider } from 'react-redux';
-import { StatusBar } from "expo-status-bar"
 import { useEffect, useRef } from 'react';
+import { StatusBar } from "expo-status-bar"
+import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
-import { AppState, AppStateStatus } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
+import { AppState, AppStateStatus, Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 import { store } from '@/store';
 import database from '@/database';
 import { syncDatabase } from '@/database/sync';
 import { restoreSession } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // Keep the splash screen visible while we restore the session.
 SplashScreen.preventAutoHideAsync();
@@ -47,6 +49,9 @@ function RootNavigator() {
   const dispatch = useAppDispatch();
   const { isAuthenticated, loading } = useAppSelector((s) => s.auth);
   const appState = useRef<AppStateStatus>(AppState.currentState);
+
+  // Register for push notifications and send device token to backend
+  const { showPrePrompt, handleAllow, handleDismiss } = usePushNotifications();
 
   useEffect(() => {
     dispatch(restoreSession());
@@ -85,9 +90,106 @@ function RootNavigator() {
           <Stack.Screen name="(auth)" />
         )}
       </Stack>
+
+      {/* Pre-permission explanatory modal — shown once before the OS dialog */}
+      <Modal
+        visible={showPrePrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={handleDismiss}
+      >
+        <View style={ns.overlay}>
+          <View style={ns.card}>
+            <View style={ns.iconWrap}>
+              <Ionicons name="notifications" size={36} color="#0F7B3F" />
+            </View>
+            <Text style={ns.title}>Stay on top of your budget</Text>
+            <Text style={ns.body}>
+              MoniMata sends you nudges when your spending needs attention — so
+              you always know what&apos;s going on with your money.
+            </Text>
+
+            <View style={ns.bullets}>
+              {([
+                ['flash-outline', 'Instant alerts when a category is nearly full'],
+                ['trending-up-outline', 'Heads-up for unusually large transactions'],
+                ['bulb-outline', 'Smart tips based on your spending patterns'],
+              ] as const).map(([icon, label]) => (
+                <View key={label} style={ns.bullet}>
+                  <Ionicons name={icon} size={16} color="#0F7B3F" style={ns.bulletIcon} />
+                  <Text style={ns.bulletText}>{label}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity style={ns.allowBtn} onPress={handleAllow} activeOpacity={0.85}>
+              <Text style={ns.allowBtnText}>Enable Notifications</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={ns.laterBtn} onPress={handleDismiss}>
+              <Text style={ns.laterBtnText}>Maybe Later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
+
+const ns = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 28,
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+  },
+  iconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  body: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 18,
+  },
+  bullets: { width: '100%', marginBottom: 24, gap: 10 },
+  bullet: { flexDirection: 'row', alignItems: 'center' },
+  bulletIcon: { marginRight: 10 },
+  bulletText: { fontSize: 13, color: '#374151', flex: 1 },
+  allowBtn: {
+    backgroundColor: '#0F7B3F',
+    borderRadius: 12,
+    paddingVertical: 14,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  allowBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  laterBtn: { paddingVertical: 8 },
+  laterBtnText: { color: '#6B7280', fontSize: 14 },
+});
 
 export default function RootLayout() {
   return (

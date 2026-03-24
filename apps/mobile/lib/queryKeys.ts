@@ -35,4 +35,7 @@ export const queryKeys = {
   billers: (categoryId: string) => ['billers', categoryId] as const,
   billPaymentItems: (billerId: string) => ['bill-payment-items', billerId] as const,
   billHistory: () => ['bill-history'] as const,
+  nudges: () => ['nudges'] as const,
+  nudge: (id: string) => ['nudge', id] as const,
+  nudgeSettings: () => ['nudge-settings'] as const,
 } as const;

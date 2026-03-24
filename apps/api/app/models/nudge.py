@@ -20,7 +20,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy import Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,8 +41,14 @@ class Nudge(Base):
     )
     trigger_type: Mapped[str] = mapped_column(
         Text, nullable=False
-    )  # e.g. "threshold_80", "weekly_review"
+    )  # e.g. "threshold_80", "threshold_100", "large_single_tx", "pay_received", "bill_payment"
+    title: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # short heading shown in the notification and list card
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    context: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True, default=dict
+    )  # structured payload for the detail view — schema varies by trigger_type
     category_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False), ForeignKey("categories.id"), nullable=True
     )
