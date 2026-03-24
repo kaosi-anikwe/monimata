@@ -35,6 +35,7 @@ from app.routers import (
     content,
     webhooks,
     bills,
+    ws,
 )
 
 app = FastAPI(
@@ -66,6 +67,7 @@ app.include_router(content.router, prefix="/content", tags=["content"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(bills.router, prefix="/bills", tags=["bills"])
 app.include_router(recurring.router, prefix="/recurring-rules", tags=["recurring"])
+app.include_router(ws.router, tags=["websocket"])
 
 
 @app.get("/health")

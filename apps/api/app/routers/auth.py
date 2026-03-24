@@ -29,10 +29,12 @@ from thefuzz import fuzz
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import bearer_scheme, get_current_user
 from app.core.redis_client import (
+    blocklist_token,
     delete_refresh_token,
     get_stored_refresh_token,
     store_refresh_token,
@@ -180,8 +182,30 @@ async def refresh_token(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(current_user: User = Depends(get_current_user)) -> None:
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """
+    Invalidate both the refresh token (Redis delete) and the current access
+    token (jti blocklist, expiring when the token would have expired naturally).
+    After this returns, the access token is unusable even within its 15-min window.
+    """
+    import time as _time
+    from jose import JWTError
+
     delete_refresh_token(current_user.id)
+
+    # Blocklist the access token for its remaining lifetime.
+    try:
+        payload = decode_access_token(credentials.credentials)
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if jti and exp:
+            remaining = int(exp) - int(_time.time())
+            blocklist_token(jti, remaining)
+    except JWTError:
+        pass  # already invalid — nothing to blocklist
 
 
 # ── GET /auth/me ──────────────────────────────────────────────────────────────

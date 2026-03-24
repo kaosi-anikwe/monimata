@@ -25,6 +25,7 @@ Security utilities:
 from __future__ import annotations
 
 import os
+import uuid
 import base64
 import secrets
 from typing import Any
@@ -82,6 +83,7 @@ def create_access_token(
         "iat": now,
         "exp": expire,
         "type": "access",
+        "jti": uuid.uuid4().hex,  # unique token ID — used for the blocklist
     }
     if extra_claims:
         payload.update(extra_claims)
@@ -96,7 +98,7 @@ def create_refresh_token() -> str:
 def decode_access_token(token: str) -> dict[str, Any]:
     """
     Decode and verify an access token.
-    Raises jose.JWTError on any failure (expired, invalid signature, etc.).
+    Raises jose.JWTError on any failure (expired, invalid signature, blocklisted).
     """
     payload = jwt.decode(
         token,
@@ -106,6 +108,15 @@ def decode_access_token(token: str) -> dict[str, Any]:
     )
     if payload.get("type") != "access":
         raise JWTError("Not an access token")
+
+    # Check if the token has been explicitly revoked via logout.
+    jti = payload.get("jti")
+    if jti:
+        from app.core.redis_client import is_token_blocklisted
+
+        if is_token_blocklisted(jti):
+            raise JWTError("Token has been revoked")
+
     return payload
 
 
