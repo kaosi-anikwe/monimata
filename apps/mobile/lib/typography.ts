@@ -39,29 +39,26 @@
  * Until fonts are loaded, these styles fall back to the system sans-serif.
  */
 
-import { Platform, TextStyle } from 'react-native';
+import { TextStyle } from 'react-native';
 
 // ─── Font family helper ───────────────────────────────────────────────────────
-// Returns the correct fontFamily string for the given weight.
-// Android requires the weight to be embedded in the family name.
-// iOS + Web can use fontWeight directly with a single family name.
+// Maps a numeric weight to the fontFamily string loaded by @expo-google-fonts/plus-jakarta-sans.
+// With expo-google-fonts each variant is its own family (e.g. 'PlusJakartaSans_700Bold'),
+// so fontWeight is not needed — the family name encodes the weight on all platforms.
 
 type Weight = 300 | 400 | 500 | 600 | 700 | 800;
 
-const WEIGHT_TO_NAME: Record<Weight, string> = {
-  300: 'PlusJakartaSans-Light',
-  400: 'PlusJakartaSans-Regular',
-  500: 'PlusJakartaSans-Medium',
-  600: 'PlusJakartaSans-SemiBold',
-  700: 'PlusJakartaSans-Bold',
-  800: 'PlusJakartaSans-ExtraBold',
+const WEIGHT_TO_FAMILY: Record<Weight, string> = {
+  300: 'PlusJakartaSans_300Light',
+  400: 'PlusJakartaSans_400Regular',
+  500: 'PlusJakartaSans_500Medium',
+  600: 'PlusJakartaSans_600SemiBold',
+  700: 'PlusJakartaSans_700Bold',
+  800: 'PlusJakartaSans_800ExtraBold',
 };
 
-function ff(weight: Weight): Pick<TextStyle, 'fontFamily' | 'fontWeight'> {
-  if (Platform.OS === 'android') {
-    return { fontFamily: WEIGHT_TO_NAME[weight] };
-  }
-  return { fontFamily: 'PlusJakartaSans', fontWeight: String(weight) as TextStyle['fontWeight'] };
+function ff(weight: Weight): Pick<TextStyle, 'fontFamily'> {
+  return { fontFamily: WEIGHT_TO_FAMILY[weight] };
 }
 
 // ─── Text style presets ───────────────────────────────────────────────────────

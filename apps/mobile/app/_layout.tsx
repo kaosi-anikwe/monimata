@@ -18,12 +18,23 @@
  * Root layout — wraps the entire app in Redux, React Query, and WatermelonDB providers.
  * Triggers a WatermelonDB sync whenever the app comes to the foreground.
  */
+import {
+  PlusJakartaSans_300Light,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_400Regular_Italic,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+  PlusJakartaSans_800ExtraBold_Italic,
+  useFonts,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { Ionicons } from '@expo/vector-icons';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -225,10 +236,23 @@ const ns = StyleSheet.create({
 });
 
 function RootLayout() {
+  // Load Plus Jakarta Sans in all required weights.
+  // On font error we still render (system font fallback) so the app is usable.
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_300Light,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_400Regular_Italic,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+    PlusJakartaSans_800ExtraBold_Italic,
+  });
+
   // The database must be initialized (encryption key retrieved from keychain)
   // before <DatabaseProvider> mounts. We hold here — the splash screen is already
   // kept visible by SplashScreen.preventAutoHideAsync() above, so the user never
-  // sees a blank frame. Once the db is ready the full tree renders.
+  // sees a blank frame. Once both fonts and db are ready the full tree renders.
   const [db, setDb] = useState<Database | null>(null);
 
   useEffect(() => {
@@ -237,7 +261,7 @@ function RootLayout() {
       .catch((e) => console.error('[MoniMata] DB init failed', e));
   }, []);
 
-  if (!db) return null;
+  if (!fontsLoaded || !db) return null;
 
   return (
     <Provider store={store}>
