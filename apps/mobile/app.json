@@ -9,9 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "infoPlist": {
-        "NSCameraUsageDescription": "Yo, we need your camera."
-      }
+      "bundleIdentifier": "ng.com.monimata"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,12 +19,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "permissions": [
-        "android.permission.CAMERA",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ],
-      "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
       "package": "ng.com.monimata",
       "googleServicesFile": "google-services.json"
@@ -61,6 +59,15 @@
           "color": "#0F7B3F",
           "sounds": [],
           "iosDisplayInForeground": true
+        }
+      ],
+      "@sentry/react-native",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "desktop-technologies-limited"
         }
       ]
     ],

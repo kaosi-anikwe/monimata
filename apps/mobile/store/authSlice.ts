@@ -18,9 +18,10 @@
  * Auth Redux slice — holds minimal auth UI state.
  * Tokens themselves live in SecureStore (never in Redux).
  */
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { isAxiosError } from 'axios';
-import api, { saveTokens, clearTokens } from '@/services/api';
+
+import api, { clearTokens, saveTokens } from '@/services/api';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface AuthUser {
     id: string;
@@ -140,7 +141,7 @@ const authSlice = createSlice({
             state.user = action.payload;
             state.isAuthenticated = true;
         };
-        const setError = (state: AuthState, action: PayloadAction<any>) => {
+        const setError = (state: AuthState, action: PayloadAction<unknown>) => {
             state.loading = false;
             state.error = String(action.payload);
         };

@@ -36,8 +36,14 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Firebase — managed via EAS secrets / team secrets manager, do NOT commit
+google-services.json
+GoogleService-Info.plist
+
 app-example
 
 # generated native folders
 /ios
 /android
+
+.env.local

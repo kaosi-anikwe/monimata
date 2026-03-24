@@ -18,24 +18,43 @@
  * Root layout — wraps the entire app in Redux, React Query, and WatermelonDB providers.
  * Triggers a WatermelonDB sync whenever the app comes to the foreground.
  */
-import { Stack } from 'expo-router';
-import { Provider } from 'react-redux';
-import { useEffect, useRef } from 'react';
-import { StatusBar } from "expo-status-bar"
 import { Ionicons } from '@expo/vector-icons';
-import * as SplashScreen from 'expo-splash-screen';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
-import { AppState, AppStateStatus, Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Provider } from 'react-redux';
 
-import { store } from '@/store';
-import database from '@/database';
-import { syncDatabase } from '@/database/sync';
-import { restoreSession } from '@/store/authSlice';
+import { AppLockScreen } from '@/components/AppLockScreen';
 import { ToastProvider } from '@/components/Toast';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { initDatabase } from '@/database';
+import { syncDatabase } from '@/database/sync';
+import { useBiometricLock } from '@/hooks/useBiometricLock';
+import { useJobEvents } from '@/hooks/useJobEvents';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { initSentry, Sentry } from '@/lib/sentry';
+import { setLogoutHandler } from '@/services/api';
+import { store } from '@/store';
+import { clearAuth, restoreSession } from '@/store/authSlice';
+import { syncToCurrentMonth } from '@/store/budgetSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { Database } from '@nozbe/watermelondb';
+
+// Initialise Sentry before the app renders so the first frame is covered.
+initSentry();
+
+// Register the logout handler for the API interceptor. This breaks the circular
+// dependency api.ts → store → authSlice → api.ts by wiring the callback here,
+// after both modules are fully initialised.
+setLogoutHandler(() => store.dispatch(clearAuth()));
+
+// Database is initialised lazily inside RootLayout (in the useEffect that runs
+// before <DatabaseProvider> renders). initDatabase() generates/retrieves the
+// SQLCipher key from the OS keychain and constructs the WatermelonDB adapter.
 
 // Keep the splash screen visible while we restore the session.
 SplashScreen.preventAutoHideAsync();
@@ -53,6 +72,12 @@ function RootNavigator() {
 
   // Register for push notifications and send device token to backend
   const { showPrePrompt, handleAllow, handleDismiss } = usePushNotifications();
+
+  // WebSocket connection — real-time cache invalidation after Celery jobs.
+  useJobEvents();
+
+  // Biometric lock.
+  const { isLocked, unlock } = useBiometricLock();
 
   useEffect(() => {
     dispatch(restoreSession());
@@ -73,13 +98,20 @@ function RootNavigator() {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
         syncDatabase().catch(console.warn);
+        // Advance selectedMonth if the calendar month rolled over while backgrounded.
+        dispatch(syncToCurrentMonth());
       }
       appState.current = nextState;
     });
     return () => subscription.remove();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, dispatch]);
 
   if (loading) return null;
+
+  // Show the lock screen over all content when biometric lock is active.
+  if (isLocked && isAuthenticated) {
+    return <AppLockScreen onUnlock={unlock} />;
+  }
 
   return (
     <>
@@ -192,11 +224,25 @@ const ns = StyleSheet.create({
   laterBtnText: { color: '#6B7280', fontSize: 14 },
 });
 
-export default function RootLayout() {
+function RootLayout() {
+  // The database must be initialized (encryption key retrieved from keychain)
+  // before <DatabaseProvider> mounts. We hold here — the splash screen is already
+  // kept visible by SplashScreen.preventAutoHideAsync() above, so the user never
+  // sees a blank frame. Once the db is ready the full tree renders.
+  const [db, setDb] = useState<Database | null>(null);
+
+  useEffect(() => {
+    initDatabase()
+      .then(setDb)
+      .catch((e) => console.error('[MoniMata] DB init failed', e));
+  }, []);
+
+  if (!db) return null;
+
   return (
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <DatabaseProvider database={database}>
+        <DatabaseProvider database={db}>
           <SafeAreaProvider>
             <ToastProvider>
               <RootNavigator />
@@ -207,3 +253,7 @@ export default function RootLayout() {
     </Provider>
   );
 }
+
+// Sentry.wrap instruments the root component for performance tracing and
+// ensures uncaught promise rejections at the navigation level are captured.
+export default Sentry.wrap(RootLayout);

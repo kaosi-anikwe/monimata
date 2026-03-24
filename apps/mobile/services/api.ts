@@ -20,21 +20,41 @@
  * - On 401, attempts a silent token refresh and retries once.
  * - On refresh failure, clears auth and redirects to /login.
  */
-import * as SecureStore from 'expo-secure-store';
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import * as SecureStore from 'expo-secure-store';
 
-import { store } from '../store';
-import { clearAuth } from '../store/authSlice';
+// Callback registered by app/_layout.tsx after both this module and the Redux
+// store are initialised. Breaks the circular dependency:
+//   api.ts → store/index.ts → authSlice.ts → api.ts
+// Instead of importing the store here, the store registers itself after boot.
+let _onLogout: (() => void) | null = null;
+export function setLogoutHandler(handler: () => void): void {
+    _onLogout = handler;
+}
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+if (!BASE_URL) {
+    throw new Error(
+        '[MoniMata] EXPO_PUBLIC_API_URL is not set. ' +
+        'Create apps/mobile/.env with EXPO_PUBLIC_API_URL=https://api.monimata.ng'
+    );
+}
 
 const SECURE_KEYS = {
     ACCESS_TOKEN: 'mm_access_token',
     REFRESH_TOKEN: 'mm_refresh_token',
 } as const;
 
+// In-memory token cache — avoids a Keychain syscall on every API request.
+// undefined = not yet loaded from SecureStore
+// null      = loaded and confirmed absent
+// string    = loaded, valid token
+let _cachedAccessToken: string | null | undefined = undefined;
+
 export async function getAccessToken(): Promise<string | null> {
-    return SecureStore.getItemAsync(SECURE_KEYS.ACCESS_TOKEN);
+    if (_cachedAccessToken !== undefined) return _cachedAccessToken;
+    _cachedAccessToken = await SecureStore.getItemAsync(SECURE_KEYS.ACCESS_TOKEN);
+    return _cachedAccessToken;
 }
 
 /** Alias used by the WatermelonDB sync service */
@@ -45,6 +65,7 @@ export async function getRefreshToken(): Promise<string | null> {
 }
 
 export async function saveTokens(access: string, refresh: string): Promise<void> {
+    _cachedAccessToken = access; // update memory cache immediately
     await Promise.all([
         SecureStore.setItemAsync(SECURE_KEYS.ACCESS_TOKEN, access),
         SecureStore.setItemAsync(SECURE_KEYS.REFRESH_TOKEN, refresh),
@@ -52,6 +73,7 @@ export async function saveTokens(access: string, refresh: string): Promise<void>
 }
 
 export async function clearTokens(): Promise<void> {
+    _cachedAccessToken = null; // clear memory cache immediately
     await Promise.all([
         SecureStore.deleteItemAsync(SECURE_KEYS.ACCESS_TOKEN),
         SecureStore.deleteItemAsync(SECURE_KEYS.REFRESH_TOKEN),
@@ -114,6 +136,7 @@ api.interceptors.response.use(
             });
 
             const newAccess: string = data.access_token;
+            _cachedAccessToken = newAccess; // keep memory cache in sync
             await SecureStore.setItemAsync(SECURE_KEYS.ACCESS_TOKEN, newAccess);
             processQueue(null, newAccess);
             originalRequest.headers.Authorization = `Bearer ${newAccess}`;
@@ -121,7 +144,7 @@ api.interceptors.response.use(
         } catch (refreshError) {
             processQueue(refreshError, null);
             await clearTokens();
-            store.dispatch(clearAuth());
+            _onLogout?.();
             return Promise.reject(refreshError);
         } finally {
             isRefreshing = false;
