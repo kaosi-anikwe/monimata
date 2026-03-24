@@ -32,12 +32,13 @@
 
 import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef, useState } from 'react';
 
 import type { RootState } from '../store';
+import { useToast } from '@/components/Toast';
 import { useRegisterDevice } from './useNudges';
 
 // Show notifications as banners even when the app is in the foreground.
@@ -61,6 +62,7 @@ export interface PushNotificationConsent {
 
 export function usePushNotifications(): PushNotificationConsent {
   const router = useRouter();
+  const { confirm } = useToast();
   const registerDevice = useRegisterDevice();
   const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
   const [showPrePrompt, setShowPrePrompt] = useState(false);
@@ -79,10 +81,13 @@ export function usePushNotifications(): PushNotificationConsent {
       Notifications.addNotificationReceivedListener((notification: Notifications.Notification) => {
         const { title, body } = notification.request.content;
         if (title && body) {
-          Alert.alert(title, body, [
-            { text: 'View', onPress: () => router.push('/(tabs)/nudges') },
-            { text: 'Dismiss', style: 'cancel' },
-          ]);
+          confirm({
+            title,
+            message: body,
+            confirmText: 'View',
+            cancelText: 'Dismiss',
+            onConfirm: () => router.push('/(tabs)/nudges'),
+          });
         }
       });
 

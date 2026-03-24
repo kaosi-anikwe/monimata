@@ -33,7 +33,6 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   StyleSheet,
-  Alert,
   Modal,
   FlatList,
   Platform,
@@ -51,6 +50,7 @@ import {
   useDeleteTransaction,
   type ManualTransactionBody,
 } from '@/hooks/useTransactions';
+import { useToast } from '@/components/Toast';
 import type { BankAccount } from '@/types/account';
 import type { CategoryItem } from '@/types/category';
 import type { Transaction } from '@/types/transaction';
@@ -189,6 +189,7 @@ function ManualEditForm({
   const [showRecurrencePicker, setShowRecurrencePicker] = useState(false);
   const createRecurring = useCreateRecurringRule();
   const deactivateRecurring = useDeactivateRecurringRule();
+  const { confirm } = useToast();
 
   function handleSave() {
     const koboAmount = nairaStringToKobo(amount);
@@ -221,14 +222,13 @@ function ManualEditForm({
   }
 
   function handleDelete() {
-    Alert.alert(
-      'Delete Transaction',
-      'This will permanently remove this transaction and its budget impact. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: onDelete },
-      ],
-    );
+    confirm({
+      title: 'Delete Transaction',
+      message: 'This will permanently remove this transaction and its budget impact. Are you sure?',
+      confirmText: 'Delete',
+      confirmStyle: 'destructive',
+      onConfirm: onDelete,
+    });
   }
 
   return (
@@ -375,18 +375,13 @@ function ManualEditForm({
           <TouchableOpacity
             style={s.stopBtn}
             onPress={() => {
-              Alert.alert(
-                'Stop repeating?',
-                'Future transactions in this series will no longer be created.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Stop',
-                    style: 'destructive',
-                    onPress: () => deactivateRecurring.mutate(tx.recurrence_id!),
-                  },
-                ],
-              );
+              confirm({
+                title: 'Stop repeating?',
+                message: 'Future transactions in this series will no longer be created.',
+                confirmText: 'Stop',
+                confirmStyle: 'destructive',
+                onConfirm: () => deactivateRecurring.mutate(tx.recurrence_id!),
+              });
             }}
           >
             <Text style={s.stopBtnText}>Stop repeating</Text>

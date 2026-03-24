@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import api from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
+import { useToast } from '@/components/Toast';
 import type { RecurringRule, RecurringFrequency } from '@/types/recurring';
 
 export interface RecurringRuleBody {
@@ -62,16 +62,18 @@ export function useRecurringRule(ruleId: string | null | undefined) {
 }
 
 export function useCreateRecurringRule() {
+  const { error } = useToast();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: RecurringRuleBody) =>
       api.post<RecurringRule>('/recurring-rules', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.recurringRule("") }),
-    onError: () => Alert.alert('Error', 'Could not schedule recurring transaction.'),
+    onError: () => error('Error', 'Could not schedule recurring transaction.'),
   });
 }
 
 export function useDeactivateRecurringRule() {
+  const { error } = useToast();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ruleId: string) =>
@@ -80,15 +82,16 @@ export function useDeactivateRecurringRule() {
       qc.invalidateQueries({ queryKey: queryKeys.recurringRule("") });
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
     },
-    onError: () => Alert.alert('Error', 'Could not stop recurring transaction.'),
+    onError: () => error('Error', 'Could not stop recurring transaction.'),
   });
 }
 
 export function useDeleteRecurringRule() {
+  const { error } = useToast();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ruleId: string) => api.delete(`/recurring-rules/${ruleId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.recurringRule("") }),
-    onError: () => Alert.alert('Error', 'Could not delete recurring rule.'),
+    onError: () => error('Error', 'Could not delete recurring rule.'),
   });
 }

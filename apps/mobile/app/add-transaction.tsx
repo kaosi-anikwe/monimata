@@ -148,7 +148,7 @@ export default function AddTransactionScreen() {
 
   // Derived picker options
   const accountOptions = useMemo<PickerOption[]>(
-    () => accounts.map((a) => ({ id: a.id, label: `${a.institution} — ${a.account_name}` })),
+    () => accounts.map((a) => ({ id: a.id, label: `${a.institution} — ${a.alias ?? a.account_name}` })),
     [accounts],
   );
 
@@ -343,7 +343,7 @@ export default function AddTransactionScreen() {
             >
               <Text style={selectedAccount ? s.pickerSelected : s.pickerPlaceholder}>
                 {selectedAccount
-                  ? `${selectedAccount.institution} — ${selectedAccount.account_name}`
+                  ? selectedAccount.alias ? selectedAccount.alias : `${selectedAccount.institution} — ${selectedAccount.account_name}`
                   : 'Select account'}
               </Text>
               <Ionicons name="chevron-down" size={16} color="#9CA3AF" />

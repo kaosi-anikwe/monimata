@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { Alert } from 'react-native';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import api from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
+import { useToast } from '@/components/Toast';
 import type { Transaction, TransactionPage } from '@/types/transaction';
 
 export interface ManualTransactionBody {
@@ -52,6 +52,7 @@ export function useTransactions() {
 
 export function useRecategorize() {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: ({ txId, categoryId }: { txId: string; categoryId: string | null }) =>
       api.patch(`/transactions/${txId}`, { category_id: categoryId }),
@@ -60,7 +61,7 @@ export function useRecategorize() {
       // Recategorizing affects budget activity totals — invalidate all months
       qc.invalidateQueries({ queryKey: queryKeys.budget("") });
     },
-    onError: () => Alert.alert('Error', 'Could not update category.'),
+    onError: () => error('Error', 'Could not update category.'),
   });
 }
 
@@ -77,6 +78,7 @@ export function useTransaction(txId: string) {
 
 export function useCreateTransaction() {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (body: ManualTransactionBody) =>
       api.post<Transaction>('/transactions/manual', body),
@@ -91,12 +93,13 @@ export function useCreateTransaction() {
         4000,
       );
     },
-    onError: () => Alert.alert('Error', 'Could not create transaction.'),
+    onError: () => error('Error', 'Could not create transaction.'),
   });
 }
 
 export function useUpdateTransaction() {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: ({ txId, body }: { txId: string; body: Partial<ManualTransactionBody> & { memo?: string | null } }) =>
       api.patch<Transaction>(`/transactions/${txId}`, body),
@@ -104,18 +107,19 @@ export function useUpdateTransaction() {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: queryKeys.budget("") });
     },
-    onError: () => Alert.alert('Error', 'Could not update transaction.'),
+    onError: () => error('Error', 'Could not update transaction.'),
   });
 }
 
 export function useDeleteTransaction() {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (txId: string) => api.delete(`/transactions/${txId}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: queryKeys.budget("") });
     },
-    onError: () => Alert.alert('Error', 'Could not delete transaction.'),
+    onError: () => error('Error', 'Could not delete transaction.'),
   });
 }

@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+import { useToast } from '@/components/Toast';
 
 import api from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
@@ -39,11 +40,12 @@ export function useTarget(categoryId: string) {
 }
 
 export function useUpsertTarget(month: string) {
+  const { error } = useToast();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ categoryId, body }: { categoryId: string; body: CategoryTargetUpsert }) =>
       api.put<CategoryTarget>(`/categories/${categoryId}/target`, body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not save target.'),
+    onError: () => error('Error', 'Could not save target.'),
   });
 }

@@ -22,7 +22,7 @@
  * Set EXPO_PUBLIC_MONO_PUBLIC_KEY in apps/mobile/.env
  */
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSelector } from 'react-redux';
@@ -33,6 +33,7 @@ import { MonoProvider, useMonoConnect } from '@mono.co/connect-react-native';
 
 import api from '@/services/api';
 import type { RootState } from '@/store';
+import { useToast } from '@/components/Toast';
 
 // ── Inner component — must live inside <MonoProvider> to use the hook ────────
 
@@ -60,22 +61,20 @@ function ConnectButton({ isPending }: ConnectButtonProps) {
 
 export default function LinkBankScreen() {
   const user = useSelector((state: RootState) => state.auth.user);
+  const { success, error } = useToast();
 
   const connectMutation = useMutation({
     mutationFn: (code: string) =>
       api.post('/accounts/connect', { code }).then((r) => r.data),
     onSuccess: () => {
-      Alert.alert(
-        'Bank linked! 🎉',
-        'We are now fetching your transaction history. This may take a minute.',
-        [{ text: 'Continue', onPress: () => router.replace('/(tabs)') }],
-      );
+      success('Bank linked! 🎉', 'We are fetching your transaction history. This may take a minute.');
+      router.replace('/(tabs)');
     },
     onError: (err: unknown) => {
       const detail =
         (err as { response?: { data?: { detail?: string } } })
           ?.response?.data?.detail ?? 'Please try again.';
-      Alert.alert('Could not link account', detail);
+      error('Could not link account', detail);
     },
   });
 

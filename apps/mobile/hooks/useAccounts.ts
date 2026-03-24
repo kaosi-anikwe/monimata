@@ -14,12 +14,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import api from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
+import { useToast } from '@/components/Toast';
 import type { BankAccount } from '@/types/account';
+
+export interface AddManualAccountPayload {
+  institution: string;
+  bank_code: string;
+  account_number: string;
+  alias: string;
+  account_type?: string;
+  currency?: string;
+  balance?: number;
+}
+
+export interface UpdateBalancePayload {
+  balance: number;
+  note?: string;
+}
+
+export interface UpdateAliasPayload {
+  alias: string;
+}
+
+// ─── Queries ──────────────────────────────────────────────────────────────────
 
 export function useAccounts() {
   return useQuery({
@@ -31,8 +52,71 @@ export function useAccounts() {
   });
 }
 
+// ─── Mutations ────────────────────────────────────────────────────────────────
+
+export function useAddManualAccount() {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: (payload: AddManualAccountPayload) =>
+      api.post<BankAccount>('/accounts/manual', payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
+    onError: () => error('Could not add account', 'Check the details and try again.'),
+  });
+}
+
+export function useUpdateBalance() {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: ({ accountId, ...body }: UpdateBalancePayload & { accountId: string }) =>
+      api.patch<BankAccount>(`/accounts/${accountId}/balance`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
+    onError: () => error('Error', 'Could not update balance. Try again.'),
+  });
+}
+
+export function useUpdateAlias() {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: ({ accountId, alias }: UpdateAliasPayload & { accountId: string }) =>
+      api.patch<BankAccount>(`/accounts/${accountId}/alias`, { alias }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
+    onError: () => error('Error', 'Could not update account name. Try again.'),
+  });
+}
+
+export function useLinkMono() {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: ({ accountId, code }: { accountId: string; code: string }) =>
+      api.post<BankAccount>(`/accounts/${accountId}/link`, { code }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.accounts() });
+      setTimeout(
+        () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
+        3000,
+      );
+    },
+    onError: () => error('Error', 'Could not link account. Try again.'),
+  });
+}
+
+export function useUnlinkMono() {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: (accountId: string) => api.post(`/accounts/${accountId}/unlink`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
+    onError: () => error('Error', 'Could not disconnect Mono. Try again.'),
+  });
+}
+
 export function useTriggerSync() {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (accountId: string) => api.post(`/accounts/${accountId}/sync`),
     onSuccess: () => {
@@ -47,15 +131,22 @@ export function useTriggerSync() {
         6000,
       );
     },
-    onError: () => Alert.alert('Sync Failed', 'Could not start sync. Try again.'),
+    onError: () => error('Sync Failed', 'Could not start sync. Try again.'),
   });
 }
 
-export function useUnlinkAccount() {
+export function useDeleteAccount() {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (accountId: string) => api.delete(`/accounts/${accountId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
-    onError: () => Alert.alert('Error', 'Could not unlink account. Try again.'),
+    onError: () => error('Error', 'Could not remove account. Try again.'),
   });
 }
+
+/** @deprecated Use useUnlinkMono() + useDeleteAccount() separately. */
+export function useUnlinkAccount() {
+  return useDeleteAccount();
+}
+

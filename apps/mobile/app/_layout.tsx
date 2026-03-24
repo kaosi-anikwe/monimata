@@ -33,6 +33,7 @@ import { store } from '@/store';
 import database from '@/database';
 import { syncDatabase } from '@/database/sync';
 import { restoreSession } from '@/store/authSlice';
+import { ToastProvider } from '@/components/Toast';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
@@ -197,7 +198,9 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <DatabaseProvider database={database}>
           <SafeAreaProvider>
-            <RootNavigator />
+            <ToastProvider>
+              <RootNavigator />
+            </ToastProvider>
           </SafeAreaProvider>
         </DatabaseProvider>
       </QueryClientProvider>
