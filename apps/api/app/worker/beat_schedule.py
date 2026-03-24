@@ -27,6 +27,11 @@ celery_app.conf.beat_schedule = {
         "task": "app.worker.tasks.nightly_reconciliation",
         "schedule": crontab(hour=3, minute=0),
     },
+    # Every day at 4:00 AM WAT — recompute budget activity from transactions
+    "reconcile-budget-activity": {
+        "task": "app.worker.tasks.reconcile_budget_activity",
+        "schedule": crontab(hour=4, minute=0),
+    },
     # Every day at 7:05 AM WAT — deliver queued nudges
     "deliver-queued-nudges": {
         "task": "app.worker.tasks.deliver_queued_nudges",

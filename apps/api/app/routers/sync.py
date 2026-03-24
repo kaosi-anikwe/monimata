@@ -58,6 +58,8 @@ from app.core.deps import get_current_user
 from app.models.transaction import Transaction
 from app.models.category import Category, CategoryGroup
 from app.services.budget_logic import get_or_create_budget_month
+from app.ws_manager import notify_user
+from app.core.redis_client import check_rate_limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -458,125 +460,505 @@ def push(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """
-    Process client-side writes:
-    - budget_months: assignment changes (create or update)
-    - transactions: manual creation and category/memo updates
-
-    The server validates user_id on every record — clients cannot push records
-    for other users.
+    Process client-side writes for all six WatermelonDB tables.
+    Rate-limited to 60 pushes per user per minute.
     """
+    # ── Rate limit ────────────────────────────────────────────────────────────
+    if not check_rate_limit(
+        str(current_user.id), "sync_push", limit=60, window_seconds=60
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many sync requests. Please slow down.",
+        )
     user_id = str(current_user.id)
     changes = body.get("changes", {})
-    errors: list[str] = []
 
-    # ── budget_months push ────────────────────────────────────────────────────
-    bm_changes = changes.get("budget_months", {})
+    # ── Security pre-validation ───────────────────────────────────────────────
+    # Scan every record that carries a direct user_id field. 403 the ENTIRE
+    # push if any record targets a different user (could be an injection attempt).
+    _user_id_tables = [
+        "transactions",
+        "category_groups",
+        "categories",
+        "budget_months",
+        "recurring_rules",
+    ]
+    for _table in _user_id_tables:
+        _tbl_changes = changes.get(_table, {})
+        for _rec in _tbl_changes.get("created", []) + _tbl_changes.get("updated", []):
+            _rec_uid = _rec.get("user_id")
+            if _rec_uid is not None and _rec_uid != user_id:
+                logger.warning(
+                    "Sync push 403: record %s in %s belongs to user %s (expected %s)",
+                    _rec.get("id"),
+                    _table,
+                    _rec_uid,
+                    user_id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Forbidden: record {_rec.get('id')!r} in {_table!r} "
+                        "belongs to a different user."
+                    ),
+                )
 
-    for record in bm_changes.get("created", []) + bm_changes.get("updated", []):
-        if record.get("user_id") != user_id:
-            errors.append(f"Rejected budget_month {record.get('id')}: user_id mismatch")
-            continue
-        try:
-            bm = get_or_create_budget_month(
-                db, user_id, record["category_id"], record["month"]
+    # ── Side-effect tracking ──────────────────────────────────────────────────
+    new_tx_ids: list[str] = []  # all created transaction ids
+    new_uncategorised_tx_ids: list[str] = []  # subset with category_id == None
+    updated_tx_ids: list[str] = []  # all updated transaction ids
+    has_budget_changes = False
+    has_category_changes = False
+
+    # ── category_groups ───────────────────────────────────────────────────────
+    cg_changes = changes.get("category_groups", {})
+    for record in cg_changes.get("created", []) + cg_changes.get("updated", []):
+        existing = (
+            db.query(CategoryGroup).filter(CategoryGroup.id == record["id"]).first()
+        )
+        if existing:
+            if existing.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
+                )
+            existing.name = record.get("name", existing.name)
+            existing.sort_order = int(record.get("sort_order", existing.sort_order))
+            existing.is_hidden = bool(record.get("is_hidden", existing.is_hidden))
+            existing.updated_at = datetime.now(timezone.utc)
+        else:
+            db.add(
+                CategoryGroup(
+                    id=record["id"],
+                    user_id=user_id,
+                    name=record["name"],
+                    sort_order=int(record.get("sort_order", 0)),
+                    is_hidden=bool(record.get("is_hidden", False)),
+                )
             )
-            bm.assigned = int(record.get("assigned", bm.assigned))
-            # activity is server-owned; ignore any client-pushed activity values
-        except Exception as exc:
-            errors.append(f"budget_month {record.get('id')}: {exc}")
+        has_category_changes = True
 
-    # ── transactions push ─────────────────────────────────────────────────────
+    for record_id in cg_changes.get("deleted", []):
+        row = (
+            db.query(CategoryGroup)
+            .filter(CategoryGroup.id == record_id, CategoryGroup.user_id == user_id)
+            .first()
+        )
+        if row:
+            db.delete(row)
+            has_category_changes = True
+
+    # ── categories ────────────────────────────────────────────────────────────
+    cat_changes = changes.get("categories", {})
+    for record in cat_changes.get("created", []) + cat_changes.get("updated", []):
+        existing = db.query(Category).filter(Category.id == record["id"]).first()
+        if existing:
+            if existing.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
+                )
+            existing.name = record.get("name", existing.name)
+            existing.group_id = record.get("group_id", existing.group_id)
+            existing.sort_order = int(record.get("sort_order", existing.sort_order))
+            existing.is_hidden = bool(record.get("is_hidden", existing.is_hidden))
+            existing.updated_at = datetime.now(timezone.utc)
+        else:
+            db.add(
+                Category(
+                    id=record["id"],
+                    user_id=user_id,
+                    group_id=record["group_id"],
+                    name=record["name"],
+                    sort_order=int(record.get("sort_order", 0)),
+                    is_hidden=bool(record.get("is_hidden", False)),
+                )
+            )
+        has_category_changes = True
+
+    for record_id in cat_changes.get("deleted", []):
+        row = (
+            db.query(Category)
+            .filter(Category.id == record_id, Category.user_id == user_id)
+            .first()
+        )
+        if row:
+            db.delete(row)
+            has_category_changes = True
+
+    # ── budget_months ─────────────────────────────────────────────────────────
+    bm_changes = changes.get("budget_months", {})
+    for record in bm_changes.get("created", []) + bm_changes.get("updated", []):
+        # Look up by client-supplied ID first (idempotency on duplicate push).
+        existing = db.query(BudgetMonth).filter(BudgetMonth.id == record["id"]).first()
+        if existing:
+            if existing.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
+                )
+            existing.assigned = int(record.get("assigned", existing.assigned))
+            existing.updated_at = datetime.now(timezone.utc)
+        else:
+            # A server-generated row may already exist for the same
+            # (user, category, month) with a different UUID.  Update it so the
+            # server's canonical ID is preserved; the client reconciles on the
+            # next pull.
+            conflict = (
+                db.query(BudgetMonth)
+                .filter(
+                    BudgetMonth.user_id == user_id,
+                    BudgetMonth.category_id == record["category_id"],
+                    BudgetMonth.month == record["month"],
+                )
+                .first()
+            )
+            if conflict:
+                conflict.assigned = int(record.get("assigned", conflict.assigned))
+                conflict.updated_at = datetime.now(timezone.utc)
+            else:
+                db.add(
+                    BudgetMonth(
+                        id=record["id"],
+                        user_id=user_id,
+                        category_id=record["category_id"],
+                        month=record["month"],
+                        assigned=int(record.get("assigned", 0)),
+                        activity=0,  # activity is server-owned; never trust client
+                    )
+                )
+        has_budget_changes = True
+
+    for record_id in bm_changes.get("deleted", []):
+        row = (
+            db.query(BudgetMonth)
+            .filter(BudgetMonth.id == record_id, BudgetMonth.user_id == user_id)
+            .first()
+        )
+        if row:
+            db.delete(row)
+            has_budget_changes = True
+
+    # ── category_targets ──────────────────────────────────────────────────────
+    # Ownership is through the category (targets have no direct user_id column).
+    # The DB has UNIQUE(category_id) — upsert by category_id, not by the
+    # client-supplied id, to prevent duplicate-key violations when the client
+    # sends a new target UUID for a category that already has one server-side.
+    ct_changes = changes.get("category_targets", {})
+    for record in ct_changes.get("created", []) + ct_changes.get("updated", []):
+        # Verify the referenced category belongs to current user.
+        owning_category = (
+            db.query(Category)
+            .filter(
+                Category.id == record["category_id"],
+                Category.user_id == user_id,
+            )
+            .first()
+        )
+        if owning_category is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Forbidden: category {record.get('category_id')!r} "
+                    "not found for this user."
+                ),
+            )
+
+        target_date_val = None
+        if record.get("target_date"):
+            from datetime import date as _date
+
+            try:
+                target_date_val = _date.fromisoformat(record["target_date"])
+            except (ValueError, TypeError):
+                target_date_val = None
+
+        # Look up existing target by category_id (the unique key), not by the
+        # client-supplied primary key, to avoid creating duplicates.
+        existing = (
+            db.query(CategoryTarget)
+            .filter(CategoryTarget.category_id == record["category_id"])
+            .first()
+        )
+        if existing:
+            existing.frequency = record.get("frequency", existing.frequency)
+            existing.behavior = record.get("behavior", existing.behavior)
+            existing.target_amount = int(
+                record.get("target_amount", existing.target_amount)
+            )
+            existing.day_of_week = record.get("day_of_week", existing.day_of_week)
+            existing.day_of_month = record.get("day_of_month", existing.day_of_month)
+            if "target_date" in record:
+                existing.target_date = target_date_val
+            existing.repeats = bool(record.get("repeats", existing.repeats))
+            existing.updated_at = datetime.now(timezone.utc)
+        else:
+            db.add(
+                CategoryTarget(
+                    id=record["id"],
+                    category_id=record["category_id"],
+                    frequency=record["frequency"],
+                    behavior=record.get("behavior", "set_aside"),
+                    target_amount=int(record["target_amount"]),
+                    day_of_week=record.get("day_of_week"),
+                    day_of_month=record.get("day_of_month"),
+                    target_date=target_date_val,
+                    repeats=bool(record.get("repeats", False)),
+                )
+            )
+        has_category_changes = True
+
+    for record_id in ct_changes.get("deleted", []):
+        row = (
+            db.query(CategoryTarget)
+            .filter(CategoryTarget.id == record_id)
+            .join(CategoryTarget.category)
+            .filter(Category.user_id == user_id)
+            .first()
+        )
+        if row:
+            db.delete(row)
+            has_category_changes = True
+
+    # ── recurring_rules ───────────────────────────────────────────────────────
+    rr_changes = changes.get("recurring_rules", {})
+    for record in rr_changes.get("created", []) + rr_changes.get("updated", []):
+        from datetime import date as _date
+
+        next_due_val = None
+        if record.get("next_due"):
+            try:
+                next_due_val = _date.fromisoformat(record["next_due"])
+            except (ValueError, TypeError):
+                next_due_val = None
+
+        ends_on_val = None
+        if record.get("ends_on"):
+            try:
+                ends_on_val = _date.fromisoformat(record["ends_on"])
+            except (ValueError, TypeError):
+                ends_on_val = None
+
+        existing = (
+            db.query(RecurringRule).filter(RecurringRule.id == record["id"]).first()
+        )
+        if existing:
+            if existing.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
+                )
+            existing.frequency = record.get("frequency", existing.frequency)
+            existing.interval = int(record.get("interval", existing.interval))
+            existing.day_of_week = record.get("day_of_week", existing.day_of_week)
+            existing.day_of_month = record.get("day_of_month", existing.day_of_month)
+            if next_due_val is not None:
+                existing.next_due = next_due_val
+            if "ends_on" in record:
+                existing.ends_on = ends_on_val
+            existing.is_active = bool(record.get("is_active", existing.is_active))
+            if "template" in record:
+                existing.template = record["template"]
+            existing.updated_at = datetime.now(timezone.utc)
+        else:
+            if next_due_val is None:
+                logger.warning(
+                    "Skipping recurring_rule %s: missing or invalid next_due",
+                    record.get("id"),
+                )
+                continue
+            db.add(
+                RecurringRule(
+                    id=record["id"],
+                    user_id=user_id,
+                    frequency=record["frequency"],
+                    interval=int(record.get("interval", 1)),
+                    day_of_week=record.get("day_of_week"),
+                    day_of_month=record.get("day_of_month"),
+                    next_due=next_due_val,
+                    ends_on=ends_on_val,
+                    is_active=bool(record.get("is_active", True)),
+                    template=record.get("template", {}),
+                )
+            )
+
+    for record_id in rr_changes.get("deleted", []):
+        row = (
+            db.query(RecurringRule)
+            .filter(RecurringRule.id == record_id, RecurringRule.user_id == user_id)
+            .first()
+        )
+        if row:
+            db.delete(row)
+
+    # ── transactions ──────────────────────────────────────────────────────────
     tx_changes = changes.get("transactions", {})
 
     for record in tx_changes.get("created", []):
-        if record.get("user_id") != user_id:
-            errors.append(f"Rejected transaction {record.get('id')}: user_id mismatch")
-            continue
+        # Only manual transactions may be created from the client.
         if not record.get("is_manual"):
-            errors.append(
-                f"Rejected transaction {record.get('id')}: only manual transactions can be pushed as created"
+            logger.warning(
+                "Rejected push-create of non-manual transaction id=%s", record.get("id")
             )
             continue
-        try:
-            existing = (
-                db.query(Transaction).filter(Transaction.id == record["id"]).first()
-            )
-            if existing:
-                continue  # already exists (duplicate push)
-            tx = Transaction(
-                id=record["id"],
-                user_id=user_id,
-                account_id=record["account_id"],
-                date=datetime.fromtimestamp(record["date"] / 1000, tz=timezone.utc),
-                amount=int(record["amount"]),
-                narration=record.get("narration", "Manual"),
-                type=record.get("type", "debit"),
-                category_id=record.get("category_id"),
-                memo=record.get("memo"),
-                is_manual=True,
-                source="manual",
-            )
-            db.add(tx)
-            if tx.category_id:
-                month_str = tx.date.strftime("%Y-%m")
-                bm = get_or_create_budget_month(
-                    db, user_id, str(tx.category_id), month_str
-                )
-                bm.activity += tx.amount
-        except Exception as exc:
-            errors.append(f"transaction create {record.get('id')}: {exc}")
+
+        existing = db.query(Transaction).filter(Transaction.id == record["id"]).first()
+        if existing:
+            continue  # idempotent duplicate push
+
+        tx_date = datetime.fromtimestamp(record["date"] / 1000, tz=timezone.utc)
+        tx = Transaction(
+            id=record["id"],
+            user_id=user_id,
+            account_id=record["account_id"],
+            date=tx_date,
+            amount=int(record["amount"]),
+            narration=record.get("narration", "Manual"),
+            type=record.get("type", "debit"),
+            category_id=record.get("category_id"),
+            memo=record.get("memo"),
+            is_manual=True,
+            is_split=bool(record.get("is_split", False)),
+            source="manual",
+            recurrence_id=record.get("recurrence_id"),
+        )
+        db.add(tx)
+
+        if tx.category_id:
+            month_str = tx_date.strftime("%Y-%m")
+            bm = get_or_create_budget_month(db, user_id, str(tx.category_id), month_str)
+            bm.activity += tx.amount
+            has_budget_changes = True
+
+        new_tx_ids.append(record["id"])
+        if tx.category_id is None:
+            new_uncategorised_tx_ids.append(record["id"])
 
     for record in tx_changes.get("updated", []):
-        if record.get("user_id") != user_id:
-            errors.append(f"Rejected transaction {record.get('id')}: user_id mismatch")
-            continue
-        try:
-            tx = (
-                db.query(Transaction)
-                .filter(Transaction.id == record["id"], Transaction.user_id == user_id)
-                .first()
+        tx = (
+            db.query(Transaction)
+            .filter(Transaction.id == record["id"], Transaction.user_id == user_id)
+            .first()
+        )
+        if tx is None:
+            logger.warning(
+                "Sync push: transaction %s not found for user %s — skipping",
+                record.get("id"),
+                user_id,
             )
-            if tx is None:
-                errors.append(f"transaction {record.get('id')} not found")
-                continue
-            # For manual transactions allow editing more fields;
-            # Mono-sourced transactions are limited to category + memo only.
-            if tx.is_manual:
-                if "type" in record:
-                    tx.type = record["type"]
-                    # Keep amount sign consistent with type
-                    if record["type"] == "debit" and tx.amount > 0:
-                        tx.amount = -abs(tx.amount)
-                    elif record["type"] == "credit" and tx.amount < 0:
-                        tx.amount = abs(tx.amount)
-                if "date" in record:
-                    tx.date = datetime.fromtimestamp(
-                        record["date"] / 1000, tz=timezone.utc
-                    )
-                if "account_id" in record:
-                    tx.account_id = record["account_id"]
-                if "narration" in record:
-                    tx.narration = record["narration"]
-                if "amount" in record:
-                    tx.amount = int(record["amount"])
-            # category_id and memo are editable on all transactions
-            if "category_id" in record:
-                tx.category_id = record["category_id"]
-            if "memo" in record:
-                tx.memo = record["memo"]
-            tx.updated_at = datetime.now(timezone.utc)
-        except Exception as exc:
-            errors.append(f"transaction update {record.get('id')}: {exc}")
+            continue
 
+        # Manual transactions: all mutable fields are editable.
+        # Mono/Interswitch transactions: only category_id and memo.
+        if tx.is_manual:
+            if "type" in record:
+                tx.type = record["type"]
+            if "date" in record:
+                tx.date = datetime.fromtimestamp(record["date"] / 1000, tz=timezone.utc)
+            if "account_id" in record:
+                tx.account_id = record["account_id"]
+            if "narration" in record:
+                tx.narration = record["narration"]
+            if "amount" in record:
+                tx.amount = int(record["amount"])
+
+        # Rebalance budget_months.activity when the category changes.
+        old_category_id = str(tx.category_id) if tx.category_id else None
+        new_category_id = record.get("category_id", old_category_id)
+
+        if "category_id" in record:
+            tx.category_id = new_category_id
+
+        if "memo" in record:
+            tx.memo = record["memo"]
+
+        if old_category_id != new_category_id:
+            tx_month = tx.date.strftime("%Y-%m")
+            if old_category_id:
+                old_bm = get_or_create_budget_month(
+                    db, user_id, old_category_id, tx_month
+                )
+                old_bm.activity -= tx.amount
+            if new_category_id:
+                new_bm = get_or_create_budget_month(
+                    db, user_id, new_category_id, tx_month
+                )
+                new_bm.activity += tx.amount
+            has_budget_changes = True
+
+        tx.updated_at = datetime.now(timezone.utc)
+        updated_tx_ids.append(str(tx.id))
+
+    for record_id in tx_changes.get("deleted", []):
+        tx = (
+            db.query(Transaction)
+            .filter(Transaction.id == record_id, Transaction.user_id == user_id)
+            .first()
+        )
+        if tx is None:
+            continue  # already gone — idempotent
+
+        if not tx.is_manual:
+            logger.warning(
+                "Rejected delete of non-manual transaction id=%s user=%s",
+                record_id,
+                user_id,
+            )
+            continue
+
+        # Reverse budget activity before deleting the transaction row.
+        if tx.category_id:
+            tx_month = tx.date.strftime("%Y-%m")
+            bm = get_or_create_budget_month(db, user_id, str(tx.category_id), tx_month)
+            bm.activity -= tx.amount
+            has_budget_changes = True
+
+        db.delete(tx)
+
+    # ── Commit ────────────────────────────────────────────────────────────────
     try:
         db.commit()
     except Exception as exc:
         db.rollback()
+        logger.exception("Sync push commit failed for user=%s", user_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
         )
 
-    if errors:
-        logger.warning("Sync push completed with %d errors: %s", len(errors), errors)
+    # ── Post-push side effects ────────────────────────────────────────────────
+    # Fire after commit so the new rows are visible to Celery workers.
 
-    return {"errors": errors}
+    # 1. Categorise new transactions that have no category yet.
+    if new_uncategorised_tx_ids:
+        from app.worker.celery_app import CeleryTask, celery_app as _celery
+        from typing import cast
+
+        cast(
+            CeleryTask,
+            _celery.signature("app.worker.tasks.categorize_transactions"),
+        ).delay(new_uncategorised_tx_ids)
+
+    # 2. Evaluate nudges for all created/updated transactions that already
+    #    have a category (categorize_transactions handles the others internally).
+    needs_nudge_eval = [
+        tid for tid in new_tx_ids if tid not in new_uncategorised_tx_ids
+    ] + updated_tx_ids
+    if needs_nudge_eval:
+        from app.worker.celery_app import CeleryTask, celery_app as _celery
+        from typing import cast
+
+        cast(
+            CeleryTask,
+            _celery.signature("app.worker.tasks.evaluate_nudges_for_transactions"),
+        ).delay(needs_nudge_eval)
+
+    # 3. Emit WebSocket invalidate event to the user's active connections.
+    invalidate_keys: list[str] = []
+    if new_tx_ids or updated_tx_ids or tx_changes.get("deleted"):
+        invalidate_keys.append("transactions")
+    if has_budget_changes:
+        invalidate_keys.append("budget")
+    if has_category_changes:
+        invalidate_keys.append("categories")
+
+    if invalidate_keys:
+        notify_user(user_id, invalidate_keys)
+
+    return {}

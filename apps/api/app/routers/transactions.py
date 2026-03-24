@@ -315,15 +315,27 @@ def patch_transaction(
         new_account_id_str = str(tx.account_id)  # may have been updated above
         if old_account_id_str != new_account_id_str:
             # Account changed: undo old amount from old account, apply new amount to new account
-            old_acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
-            new_acct = db.query(BankAccount).filter(BankAccount.id == new_account_id_str).first()
+            old_acct = (
+                db.query(BankAccount)
+                .filter(BankAccount.id == old_account_id_str)
+                .first()
+            )
+            new_acct = (
+                db.query(BankAccount)
+                .filter(BankAccount.id == new_account_id_str)
+                .first()
+            )
             if old_acct and not old_acct.is_mono_linked:
                 old_acct.balance -= old_amount
             if new_acct and not new_acct.is_mono_linked:
                 new_acct.balance += new_signed
         else:
             # Same account: apply the signed delta
-            acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
+            acct = (
+                db.query(BankAccount)
+                .filter(BankAccount.id == old_account_id_str)
+                .first()
+            )
             if acct and not acct.is_mono_linked:
                 acct.balance += new_signed - old_amount
 

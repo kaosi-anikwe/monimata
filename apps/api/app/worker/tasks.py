@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import and_, select
 
 from app.core.database import SessionLocal
+from app.models.budget import BudgetMonth
 from app.worker.celery_app import CeleryTask, celery_app
 import app.worker.beat_schedule as _beat_schedule  # noqa: F401 — registers beat schedule
 
@@ -88,12 +89,16 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             )
             return {"status": "skipped", "reason": "account_not_found"}
 
-        # Fetch since last sync (or all available if never synced)
+        # Fetch since last sync (or all available if never synced).
+        # Pass start=last_synced_at and end=now so we always request the
+        # open-ended period [last_sync, now].  Passing end=start was a bug
+        # that caused Mono to return zero transactions after the first sync.
         is_initial_sync = account.last_synced_at is None
         start_date = account.last_synced_at
+        end_date = datetime.now(timezone.utc)
         raw_txns = _run_async(
             mono_client.get_transactions(
-                mono_account_id, start=start_date, end=start_date
+                mono_account_id, start=start_date, end=end_date
             )
         )
 
@@ -286,10 +291,12 @@ def _notify_sync_complete(user_id: str, account_id: str) -> None:
     """Publish a sync_complete event to the WebSocket channel (via Redis pub/sub)."""
     import json
     from app.core.redis_client import get_redis
+    from app.ws_manager import ws_channel
 
     r = get_redis()
     r.publish(
-        f"ws:{user_id}", json.dumps({"type": "sync_complete", "account_id": account_id})
+        ws_channel(str(user_id)),
+        json.dumps({"type": "sync_complete", "account_id": str(account_id)}),
     )
 
 
@@ -301,11 +308,13 @@ def categorize_transactions(self, transaction_ids: List[str]) -> None:
     """Run the categorization pipeline for a list of transaction IDs."""
     from app.services.categorization import categorize_transaction
     from app.services.nudge_engine import evaluate_transaction_nudges
+    from app.ws_manager import notify_user
 
     db = SessionLocal()
     try:
         from app.models.transaction import Transaction
 
+        user_ids: set[str] = set()
         for tx_id in transaction_ids:
             tx = db.get(Transaction, tx_id)
             if tx and tx.category_id is None:
@@ -322,10 +331,56 @@ def categorize_transactions(self, transaction_ids: List[str]) -> None:
                         logger.exception(
                             "evaluate_transaction_nudges failed for tx=%s", tx_id
                         )
+            if tx:
+                user_ids.add(str(tx.user_id))
         db.commit()
+
+        # Notify affected users that their transactions have been updated.
+        for uid in user_ids:
+            notify_user(uid, ["transactions", "nudges"])
     except Exception:
         db.rollback()
         logger.exception("categorize_transactions failed")
+        raise
+    finally:
+        db.close()
+
+
+# ── evaluate_nudges_for_transactions ─────────────────────────────────────────
+
+
+@celery_app.task(name="app.worker.tasks.evaluate_nudges_for_transactions")
+def evaluate_nudges_for_transactions(transaction_ids: List[str]) -> None:
+    """
+    Evaluate nudge triggers for transactions that were pushed by the client
+    with a category already set (so categorize_transactions won't run for them).
+    Called by POST /sync/push for categorised new/updated transactions.
+    """
+    from app.services.nudge_engine import evaluate_transaction_nudges
+    from app.ws_manager import notify_user
+
+    db = SessionLocal()
+    try:
+        from app.models.transaction import Transaction
+
+        user_ids: set[str] = set()
+        for tx_id in transaction_ids:
+            tx = db.get(Transaction, tx_id)
+            if tx:
+                try:
+                    evaluate_transaction_nudges(db, tx)
+                except Exception:
+                    logger.exception(
+                        "evaluate_transaction_nudges failed for tx=%s", tx_id
+                    )
+                user_ids.add(str(tx.user_id))
+        db.commit()
+
+        for uid in user_ids:
+            notify_user(uid, ["nudges"])
+    except Exception:
+        db.rollback()
+        logger.exception("evaluate_nudges_for_transactions failed")
         raise
     finally:
         db.close()
@@ -405,6 +460,7 @@ def deliver_queued_nudges() -> None:
     from app.models.nudge import Nudge
     from app.models.user import User
     from app.services.push_service import send_push_notification
+    from app.ws_manager import notify_user
 
     db = SessionLocal()
     try:
@@ -418,6 +474,7 @@ def deliver_queued_nudges() -> None:
             .all()
         )
 
+        notified_users: set[str] = set()
         for nudge in queued:
             nudge.delivered_at = now
             user: User | None = db.get(User, nudge.user_id)
@@ -428,9 +485,14 @@ def deliver_queued_nudges() -> None:
                     body=nudge.message,
                     data={"nudge_id": nudge.id, "trigger_type": nudge.trigger_type},
                 )
+            notified_users.add(str(nudge.user_id))
 
         db.commit()
         logger.info("deliver_queued_nudges: delivered %d nudges", len(queued))
+
+        # Notify each affected user's WebSocket so the nudge badge updates.
+        for uid in notified_users:
+            notify_user(uid, ["nudges"])
     finally:
         db.close()
 
@@ -442,3 +504,81 @@ def deliver_queued_nudges() -> None:
 def weekly_review_nudges() -> None:
     """Generate and stagger weekly review nudges for all active users. (Phase 2 — LLM path)"""
     logger.info("weekly_review_nudges: skipped — LLM path not yet implemented")
+
+
+# ── reconcile_budget_activity ─────────────────────────────────────────────────
+
+
+@celery_app.task(name="app.worker.tasks.reconcile_budget_activity")
+def reconcile_budget_activity() -> None:
+    """
+    Recompute budget_months.activity from the canonical transactions table.
+
+    Runs nightly at 4:00 AM WAT as a safety net against drift that can occur
+    from edge cases (e.g. Mono reversals, manual-transaction deletes that
+    failed to update activity, category re-assignment race conditions).
+
+    Algorithm per (user_id, category_id, month):
+      correct_activity = SUM(amount) for transactions WHERE
+          user_id = X AND category_id = Y AND date in month M
+
+    Only rows where abs(stored - correct) > 0 are written, so the typical
+    no-op case is cheap (read-only).
+    """
+    from sqlalchemy import func, text
+
+    db = SessionLocal()
+    try:
+        # Aggregate the ground-truth activity directly from transactions.
+        # We join against budget_months to limit work to rows that already exist;
+        # missing budget_month rows will be created by get_or_create_budget_month
+        # if and when a transaction is categorised.
+        rows = db.execute(text("""
+                SELECT
+                    t.user_id,
+                    t.category_id,
+                    to_char(DATE_TRUNC('month', t.date), 'YYYY-MM') AS month,
+                    SUM(t.amount) AS correct_activity
+                FROM transactions t
+                WHERE t.category_id IS NOT NULL
+                GROUP BY t.user_id, t.category_id, DATE_TRUNC('month', t.date)
+                """)).fetchall()
+
+        corrected = 0
+        for row in rows:
+            user_id, category_id, month, correct_activity = row
+            bm = (
+                db.query(BudgetMonth)
+                .filter(
+                    BudgetMonth.user_id == str(user_id),
+                    BudgetMonth.category_id == str(category_id),
+                    BudgetMonth.month == month,
+                )
+                .first()
+            )
+            if bm is None:
+                # Create a zeroed row so the correct_activity can be stored.
+                bm = BudgetMonth(
+                    user_id=str(user_id),
+                    category_id=str(category_id),
+                    month=month,
+                    assigned=0,
+                    activity=int(correct_activity),
+                )
+                db.add(bm)
+                corrected += 1
+            elif bm.activity != int(correct_activity):
+                bm.activity = int(correct_activity)
+                bm.updated_at = datetime.now(timezone.utc)
+                corrected += 1
+
+        db.commit()
+        logger.info(
+            "reconcile_budget_activity: corrected %d budget_month rows", corrected
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("reconcile_budget_activity failed")
+        raise
+    finally:
+        db.close()
