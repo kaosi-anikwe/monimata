@@ -32,6 +32,7 @@ from sqlalchemy import and_, select
 
 from app.core.database import SessionLocal
 from app.worker.celery_app import CeleryTask, celery_app
+import app.worker.beat_schedule as _beat_schedule  # noqa: F401 — registers beat schedule
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +294,7 @@ def _notify_sync_complete(user_id: str, account_id: str) -> None:
 def categorize_transactions(self, transaction_ids: List[str]) -> None:
     """Run the categorization pipeline for a list of transaction IDs."""
     from app.services.categorization import categorize_transaction
+    from app.services.nudge_engine import evaluate_transaction_nudges
 
     db = SessionLocal()
     try:
@@ -305,6 +307,15 @@ def categorize_transactions(self, transaction_ids: List[str]) -> None:
                 if category_id:
                     tx.category_id = category_id
                     _update_budget_activity(db, tx)
+                    # Evaluate nudge triggers now that we know the category + budget impact.
+                    # flush first so budget month changes are visible within the session.
+                    db.flush()
+                    try:
+                        evaluate_transaction_nudges(db, tx)
+                    except Exception:
+                        logger.exception(
+                            "evaluate_transaction_nudges failed for tx=%s", tx_id
+                        )
         db.commit()
     except Exception:
         db.rollback()
@@ -380,8 +391,10 @@ def nightly_reconciliation() -> None:
 
 @celery_app.task(name="app.worker.tasks.deliver_queued_nudges")
 def deliver_queued_nudges() -> None:
-    """Deliver all nudges that were queued overnight (during quiet hours)."""
+    """Deliver all nudges that were queued during quiet hours."""
     from app.models.nudge import Nudge
+    from app.models.user import User
+    from app.services.push_service import send_push_notification
 
     db = SessionLocal()
     try:
@@ -389,15 +402,22 @@ def deliver_queued_nudges() -> None:
         queued = (
             db.query(Nudge)
             .filter(
-                Nudge.delivered_at == None,
+                Nudge.delivered_at == None,  # noqa: E711
                 Nudge.created_at < now,
             )
             .all()
         )
 
         for nudge in queued:
-            # TODO: send FCM push notification
             nudge.delivered_at = now
+            user: User | None = db.get(User, nudge.user_id)
+            if user and user.expo_push_token:
+                send_push_notification(
+                    token=user.expo_push_token,
+                    title=nudge.title or "MoniMata",
+                    body=nudge.message,
+                    data={"nudge_id": nudge.id, "trigger_type": nudge.trigger_type},
+                )
 
         db.commit()
         logger.info("deliver_queued_nudges: delivered %d nudges", len(queued))

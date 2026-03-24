@@ -59,7 +59,8 @@ class Settings(BaseSettings):
         "https://api-marketplace-routing.k8.isw.la/marketplace-routing/api/v1"
     )
 
-    INTERSWITCH_PASSPORT_URL: str = "https://passport-v2.k8.isw.la"
+    # INTERSWITCH_PASSPORT_URL: str = "https://passport-v2.k8.isw.la"
+    INTERSWITCH_PASSPORT_URL: str = "https://apps.qa.interswitchng.com"
 
     # Quickteller bill-payment API (sandbox vs production base URLs differ).
     # Sandbox:    https://qa.interswitchng.com/quicktellerservice/api/v5
@@ -74,9 +75,6 @@ class Settings(BaseSettings):
     # ── AI / LLM ──────────────────────────────────────────────────────────────
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
-
-    # ── Notifications ─────────────────────────────────────────────────────────
-    FIREBASE_SERVICE_ACCOUNT_JSON: str = ""
 
     # ── Encryption ────────────────────────────────────────────────────────────
     # 32-byte (64-char hex) key for AES-256-GCM used on PII columns

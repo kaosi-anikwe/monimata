@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "512673962306",
+    "project_id": "monimata-dev",
+    "storage_bucket": "monimata-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:512673962306:android:67b8efec79963f83d150db",
+        "android_client_info": {
+          "package_name": "ng.com.monimata"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB4_E5mQqnp24gUIpSCr_dTnmrs2euMnQw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

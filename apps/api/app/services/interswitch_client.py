@@ -72,9 +72,6 @@ class InterswitchClient:
             f"{settings.INTERSWITCH_CLIENT_ID}:{settings.INTERSWITCH_CLIENT_SECRET}".encode()
         ).decode()
 
-        # TODO: remove
-        logger.info(f"Base64 credentials: {credentials}")
-
         async with self._client() as http:
             response = await http.post(
                 f"{settings.INTERSWITCH_PASSPORT_URL}/passport/oauth/token",
@@ -137,17 +134,13 @@ class InterswitchClient:
         token = await self._get_access_token()
         async with self._client() as http:
             response = await http.get(
-                f"{self._qt}/services/categories",
+                f"{self._qt}/services",
                 headers=self._headers(token),
             )
             response.raise_for_status()
             data = response.json()
-        # Defensive extraction — ISW wraps in different envelopes across versions.
-        return (
-            data.get("categoriesList", {}).get("category", [])
-            or data.get("BillerCategories", [])
-            or (data if isinstance(data, list) else [])
-        )
+        # Actual ISW envelope: {"BillerList": {"Category": [...], "Count": N}}
+        return data.get("BillerList", {}).get("Category", [])
 
     async def get_billers_by_category(self, category_id: str) -> list[dict]:
         """
@@ -163,11 +156,9 @@ class InterswitchClient:
             )
             response.raise_for_status()
             data = response.json()
-        return (
-            data.get("billerList", {}).get("biller", [])
-            or data.get("BillerList", {}).get("Billers", [])
-            or (data if isinstance(data, list) else [])
-        )
+        # Actual ISW envelope: {"BillerList": {"Category": [{"Billers": [...]}]}}
+        categories = data.get("BillerList", {}).get("Category", [])
+        return categories[0].get("Billers", []) if categories else []
 
     async def get_biller_payment_items(self, biller_id: str) -> list[dict]:
         """
@@ -177,16 +168,14 @@ class InterswitchClient:
         token = await self._get_access_token()
         async with self._client() as http:
             response = await http.get(
-                f"{self._qt}/services/{biller_id}/paymentitems",
+                f"{self._qt}/services/options",
                 headers=self._headers(token),
+                params={"serviceid": biller_id},
             )
             response.raise_for_status()
             data = response.json()
-        return (
-            data.get("paymentitems", [])
-            or data.get("PaymentItems", [])
-            or (data if isinstance(data, list) else [])
-        )
+        # Actual ISW envelope: {"PaymentItems": [...]}
+        return data.get("PaymentItems", [])
 
     # ── Quickteller — customer validation ────────────────────────────────────
 
@@ -209,8 +198,8 @@ class InterswitchClient:
             )
             response.raise_for_status()
             data = response.json()
-        # ISW wraps results in {"customers": [<result>]} — unwrap the first entry.
-        customers = data.get("customers", [])
+        # ISW wraps results in {"Customers": [<result>]} — unwrap the first entry.
+        customers = data.get("Customers") or data.get("customers", [])
         return customers[0] if customers else data
 
     # ── Quickteller — payment ─────────────────────────────────────────────────
@@ -241,11 +230,10 @@ class InterswitchClient:
             "amount": str(amount),
             "requestReference": request_reference,
         }
-        headers = self._headers(token, auth_key="Authentication")
         async with self._client() as http:
             response = await http.post(
                 f"{self._qt}/Transactions",
-                headers=headers,
+                headers=self._headers(token),
                 json=payload,
             )
             response.raise_for_status()

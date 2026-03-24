@@ -73,7 +73,8 @@ class ValidateCustomerRequest(BaseModel):
 
 class CustomerValidationResponse(BaseModel):
     customer_id: str
-    customer_name: str
+    # ISW does not return a customer name from the validate endpoint.
+    customer_name: str | None = None
     is_amount_fixed: bool = False
     # kobo; present only when the biller fixes the amount.
     fixed_amount: int | None = None
@@ -98,6 +99,9 @@ class BillPayRequest(BaseModel):
     )
     customer_mobile: str | None = None
     customer_email: str | None = None
+    # Human-readable biller name (e.g. "DSTV", "Ikeja Electric").
+    # Sent by the client for narration and nudge purposes.
+    biller_name: str | None = Field(None, max_length=120)
     # MoniMata budget category the payment should be charged to.
     category_id: str | None = None
 
@@ -121,15 +125,23 @@ class BillPayResponse(BaseModel):
     date: datetime
     category_id: str | None = None
     account_id: str
+    # ISW's own transaction reference (distinct from our requestReference).
+    transaction_ref: str | None = None
+    # Recharge PIN returned for electricity/airtime payments.
+    recharge_pin: str | None = None
 
     model_config = {"from_attributes": True}
 
 
 class PaymentStatusResponse(BaseModel):
     reference: str
-    status: str
+    status: str  # "success" | "failed"
     response_code: str
     response_description: str
+    # ISW's TransactionRef (may differ from our requestReference).
+    transaction_ref: str | None = None
+    # Raw ISW Status string (e.g. "Complete").
+    isw_status: str | None = None
 
 
 class BillHistoryItem(BaseModel):

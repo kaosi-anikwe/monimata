@@ -47,7 +47,7 @@ from datetime import datetime, timezone
 
 import httpx
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 
 from app.models.user import User
 from app.core.database import get_db
@@ -86,41 +86,98 @@ def _month_for(dt: datetime) -> str:
     return dt.strftime("%Y-%m")
 
 
+def _schedule_bill_nudge(
+    background_tasks: "BackgroundTasks",
+    user: User,
+    tx: Transaction,
+    biller_name: str,
+    category_id: str | None,
+) -> None:
+    """
+    Schedule a bill_payment nudge to be evaluated after the HTTP response is sent.
+    Snapshots the IDs we need; the nudge engine opens its own DB session.
+    """
+    from app.services.nudge_engine import evaluate_bill_payment_nudge
+
+    user_id = user.id
+    tx_id = tx.id
+    tx_category_id = tx.category_id
+
+    def _run() -> None:
+        from app.core.database import SessionLocal
+        from app.models.transaction import Transaction as TxModel
+        from app.models.user import User as UserModel
+        from app.models.category import Category as CatModel
+        import logging as _logging
+
+        db = SessionLocal()
+        try:
+            fresh_user = db.get(UserModel, user_id)
+            fresh_tx = db.get(TxModel, tx_id)
+            if not fresh_user or not fresh_tx:
+                return
+
+            cat_name: str | None = None
+            if tx_category_id:
+                cat = db.get(CatModel, tx_category_id)
+                if cat:
+                    cat_name = cat.name
+
+            evaluate_bill_payment_nudge(db, fresh_user, fresh_tx, biller_name, cat_name)
+            db.commit()
+        except Exception:
+            db.rollback()
+            _logging.getLogger(__name__).exception(
+                "_schedule_bill_nudge background task failed for tx=%s", tx_id
+            )
+        finally:
+            db.close()
+
+    background_tasks.add_task(_run)
+
+
 def _parse_biller_category(raw: dict) -> BillerCategory:
     return BillerCategory(
-        id=str(raw.get("categoryId") or raw.get("id", "")),
-        name=str(raw.get("categoryName") or raw.get("name", "")),
-        description=raw.get("description"),
-        picture_id=raw.get("pictureId"),
+        id=str(raw.get("Id") or raw.get("id", "")),
+        name=str(raw.get("Name") or raw.get("name", "")),
+        description=raw.get("Description") or raw.get("description"),
+        picture_id=raw.get("LogoUrl") or raw.get("pictureId"),
     )
 
 
 def _parse_biller(raw: dict) -> Biller:
     return Biller(
-        id=str(raw.get("id") or raw.get("billerId", "")),
-        name=str(raw.get("name") or raw.get("billerName", "")),
-        short_name=raw.get("shortName"),
-        category_id=str(raw.get("categoryId", "")) or None,
-        picture_id=raw.get("pictureId"),
+        id=str(raw.get("Id") or raw.get("id", "")),
+        name=str(raw.get("Name") or raw.get("name", "")),
+        short_name=raw.get("ShortName") or raw.get("shortName"),
+        category_id=str(raw.get("CategoryId") or raw.get("categoryId", "")) or None,
+        picture_id=raw.get("LogoUrl") or raw.get("pictureId"),
     )
 
 
 def _parse_payment_item(raw: dict) -> PaymentItem:
-    amount_str = raw.get("amount") or raw.get("itemFee")
+    amount_str = (
+        raw.get("Amount")
+        or raw.get("ItemFee")
+        or raw.get("amount")
+        or raw.get("itemFee")
+    )
     fixed_amount: int | None = None
-    is_fixed = bool(raw.get("isAmountFixed") or raw.get("isFixed"))
+    is_fixed = bool(
+        raw.get("IsAmountFixed") or raw.get("isAmountFixed") or raw.get("isFixed")
+    )
     if is_fixed and amount_str:
         try:
             fixed_amount = int(amount_str)
         except (TypeError, ValueError):
             pass
     return PaymentItem(
-        id=str(raw.get("id", "")),
-        name=str(raw.get("paymentItemName") or raw.get("Name") or raw.get("name", "")),
-        payment_code=str(raw.get("paymentCode") or raw.get("PaymentCode", "")),
+        id=str(raw.get("Id") or raw.get("id", "")),
+        name=str(raw.get("Name") or raw.get("name", "")),
+        payment_code=str(raw.get("PaymentCode") or raw.get("paymentCode", "")),
         is_amount_fixed=is_fixed,
         fixed_amount=fixed_amount,
-        currency_code=raw.get("currencyCode", "NGN"),
+        currency_code=raw.get("CurrencyCode") or raw.get("currencyCode", "NGN"),
     )
 
 
@@ -248,12 +305,8 @@ async def validate_customer(
 
     return CustomerValidationResponse(
         customer_id=str(result.get("CustomerId") or body.customer_id),
-        customer_name=str(
-            result.get("FullName")
-            or result.get("CustomerName")
-            or result.get("fullName")
-            or "Customer"
-        ),
+        # ISW customer validation does not return a customer name; leave as None.
+        customer_name=None,
         is_amount_fixed=is_fixed,
         fixed_amount=fixed_amount if is_fixed else None,
         biller_name=result.get("BillerName") or result.get("billerName"),
@@ -273,6 +326,7 @@ async def validate_customer(
 )
 async def pay_bill(
     body: BillPayRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_verified_user),
 ) -> BillPayResponse:
@@ -365,7 +419,8 @@ async def pay_bill(
         )
 
     # Build a human-readable narration from what we know.
-    narration = f"Bill payment via Interswitch"
+    biller_label = body.biller_name or "Biller"
+    narration = f"{biller_label} via Interswitch"
 
     # Create a Transaction record immediately — source="interswitch", debit.
     tx = Transaction(
@@ -399,6 +454,14 @@ async def pay_bill(
 
     payment_status = "pending" if response_code == "90000" else "success"
 
+    isw_tx_ref = isw_result.get("TransactionRef") or isw_result.get("transactionRef")
+    recharge_pin = isw_result.get("RechargePIN") or isw_result.get("rechargePIN")
+
+    # Trigger a confirmation nudge in the background after the response is sent.
+    _schedule_bill_nudge(
+        background_tasks, current_user, tx, biller_label, body.category_id
+    )
+
     return BillPayResponse(
         id=tx.id,
         reference=request_reference,
@@ -408,6 +471,8 @@ async def pay_bill(
         date=tx.date,
         category_id=tx.category_id,
         account_id=tx.account_id,
+        transaction_ref=isw_tx_ref,
+        recharge_pin=recharge_pin,
     )
 
 
@@ -452,9 +517,19 @@ async def get_payment_status(
         )
 
     response_code = str(
-        result.get("ResponseCode") or result.get("responseCode") or "99"
+        result.get("ResponseCode")
+        or result.get("TransactionResponseCode")
+        or result.get("responseCode")
+        or "99"
     )
-    human_status = "success" if response_code in _ISW_SUCCESS_CODES else "failed"
+    isw_status = result.get("Status") or result.get("status")
+    human_status = (
+        "success"
+        if (isw_status or "").lower() == "complete"
+        or response_code in _ISW_SUCCESS_CODES
+        else "failed"
+    )
+    tx_ref = result.get("TransactionRef") or result.get("transactionRef")
 
     return PaymentStatusResponse(
         reference=reference,
@@ -463,6 +538,8 @@ async def get_payment_status(
         response_description=str(
             result.get("ResponseDescription") or result.get("responseDescription") or ""
         ),
+        transaction_ref=tx_ref,
+        isw_status=isw_status,
     )
 
 

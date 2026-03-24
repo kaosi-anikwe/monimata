@@ -626,6 +626,7 @@ function BillsContent() {
         customer_id: customerId.trim(),
         amount: amountKobo,
         account_id: selectedAccountId,
+        biller_name: selectedBiller?.name ?? undefined,
         ...(selectedBudgetCategoryId ? { category_id: selectedBudgetCategoryId } : {}),
       },
       {

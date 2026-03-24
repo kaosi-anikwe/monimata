@@ -321,6 +321,24 @@ def patch_transaction(
     tx.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(tx)
+
+    # Evaluate nudge triggers when a category is assigned or changed.
+    # Only fires for debit transactions with an active category — consistent
+    # with the Celery path.
+    if (
+        body.category_id is not None
+        and new_category_id
+        and new_category_id != old_category_id
+        and tx.type == "debit"
+    ):
+        try:
+            from app.services.nudge_engine import evaluate_transaction_nudges
+
+            evaluate_transaction_nudges(db, tx)
+            db.commit()
+        except Exception:
+            logger.exception("evaluate_transaction_nudges failed for tx=%s", tx.id)
+
     return tx
 
 
@@ -519,6 +537,19 @@ def create_manual_transaction(
 
     db.commit()
     db.refresh(tx)
+
+    # Evaluate nudge triggers for categorized manual transactions.
+    if tx.category_id:
+        try:
+            from app.services.nudge_engine import evaluate_transaction_nudges
+
+            evaluate_transaction_nudges(db, tx)
+            db.commit()
+        except Exception:
+            logger.exception(
+                "evaluate_transaction_nudges failed for manual tx=%s", tx.id
+            )
+
     return tx
 
 
