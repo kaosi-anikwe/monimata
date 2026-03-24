@@ -61,6 +61,16 @@ class Settings(BaseSettings):
 
     INTERSWITCH_PASSPORT_URL: str = "https://passport-v2.k8.isw.la"
 
+    # Quickteller bill-payment API (sandbox vs production base URLs differ).
+    # Sandbox:    https://qa.interswitchng.com/quicktellerservice/api/v5
+    # Production: https://api.interswitchng.com/quickteller/api/v5
+    INTERSWITCH_QUICKTELLER_URL: str = (
+        "https://qa.interswitchng.com/quicktellerservice/api/v5"
+    )
+    # TerminalId assigned by Interswitch during onboarding; default is the
+    # public sandbox terminal used in Interswitch's own documentation examples.
+    INTERSWITCH_TERMINAL_ID: str = "3pbl0001"
+
     # ── AI / LLM ──────────────────────────────────────────────────────────────
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""

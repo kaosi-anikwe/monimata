@@ -31,9 +31,11 @@ function tabIcon(outline: IoniconsName, filled: IoniconsName) {
 function SharedFAB() {
   const router = useRouter();
   const segments = useSegments();
-  // segments[1] is the tab name: 'index' (Budget) or 'transactions'
-  const activeTab = segments[1];
-  const visible = segments.length === 1 || activeTab === 'transactions';
+  // segments[1] is the tab name: 'index' (Budget), 'transactions', etc.
+  const activeTab: string | undefined = segments[1];
+  const visible =
+    (segments.length === 1 || activeTab === 'transactions') &&
+    activeTab !== 'bills';
   if (!visible) return null;
 
   return (
@@ -80,6 +82,14 @@ export default function TabsLayout() {
             title: 'Accounts',
             tabBarLabel: 'Accounts',
             tabBarIcon: tabIcon('business-outline', 'business'),
+          }}
+        />
+        <Tabs.Screen
+          name="bills"
+          options={{
+            title: 'Pay Bills',
+            tabBarLabel: 'Bills',
+            tabBarIcon: tabIcon('flash-outline', 'flash'),
           }}
         />
         <Tabs.Screen

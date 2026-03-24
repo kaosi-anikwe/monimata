@@ -31,4 +31,8 @@ export const queryKeys = {
   accounts: () => ['accounts'] as const,
   recurringRule: (ruleId: string) => ['recurring-rule', ruleId] as const,
   target: (categoryId: string) => ['target', categoryId] as const,
+  billCategories: () => ['bill-categories'] as const,
+  billers: (categoryId: string) => ['billers', categoryId] as const,
+  billPaymentItems: (billerId: string) => ['bill-payment-items', billerId] as const,
+  billHistory: () => ['bill-history'] as const,
 } as const;
