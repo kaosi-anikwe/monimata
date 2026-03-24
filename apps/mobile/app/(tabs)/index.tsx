@@ -25,31 +25,31 @@
  *  - Budget data comes from the API via React Query
  *  - FAB (Add Transaction) is rendered by the tab _layout.tsx
  */
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   SectionList,
+  StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-  RefreshControl,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useState, useCallback, useMemo } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { formatNaira } from '@/utils/money';
-import { useBudget, useAssignCategory, useMoveMoney } from '@/hooks/useBudget';
 import { syncDatabase } from '@/database/sync';
-import { prevMonth, nextMonth } from '@/store/budgetSlice';
+import { useAssignCategory, useBudget, useMoveMoney } from '@/hooks/useBudget';
+import { nextMonth, prevMonth } from '@/store/budgetSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import type { BudgetCategory, BudgetGroup } from '@/types/budget';
+import { formatNaira } from '@/utils/money';
 
 // ─── Month nav header ─────────────────────────────────────────────────────────
 
@@ -66,20 +66,35 @@ function MonthHeader({ month, tbb }: { month: string; tbb: number }) {
 
   return (
     <View style={s.monthHeader}>
-      <TouchableOpacity onPress={() => dispatch(prevMonth())} hitSlop={12}>
+      <TouchableOpacity
+        onPress={() => dispatch(prevMonth())}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Previous month"
+      >
         <Ionicons name="chevron-back" size={24} color="#374151" />
       </TouchableOpacity>
       <View style={s.monthCenter}>
-        <Text style={s.monthLabel}>{label}</Text>
+        <Text style={s.monthLabel} accessibilityRole="header">{label}</Text>
         <Text style={[s.tbb, { color: tbbColor }]}>
           {formatNaira(tbb)} to budget
         </Text>
       </View>
       <View style={s.monthRight}>
-        <TouchableOpacity onPress={() => dispatch(nextMonth())} hitSlop={12}>
+        <TouchableOpacity
+          onPress={() => dispatch(nextMonth())}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Next month"
+        >
           <Ionicons name="chevron-forward" size={24} color="#374151" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/budget-edit' as never)} hitSlop={12}>
+        <TouchableOpacity
+          onPress={() => router.push('/budget-edit' as never)}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Edit budget categories"
+        >
           <Ionicons name="pencil-outline" size={20} color="#374151" />
         </TouchableOpacity>
       </View>

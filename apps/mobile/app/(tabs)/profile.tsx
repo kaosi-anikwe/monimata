@@ -18,24 +18,25 @@ import { useState } from 'react';
 
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Switch,
-  TextInput,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { logout } from '@/store/authSlice';
 import { useToast } from '@/components/Toast';
-import type { NudgeSettings } from '@/types/nudge';
+import { useBiometricLock } from '@/hooks/useBiometricLock';
+import { useNudgeSettings, useNudgeUnreadCount, useUpdateNudgeSettings } from '@/hooks/useNudges';
+import { logout } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { useNudgeUnreadCount, useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
+import type { NudgeSettings } from '@/types/nudge';
 
 export default function ProfileScreen() {
   const dispatch = useAppDispatch();
@@ -46,6 +47,8 @@ export default function ProfileScreen() {
   const { error, confirm } = useToast();
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [draft, setDraft] = useState<NudgeSettings | null>(null);
+
+  const { isEnrolled, isEnabled: biometricEnabled, toggleEnabled: toggleBiometric } = useBiometricLock();
 
   function openSettings() {
     setDraft(
@@ -58,11 +61,9 @@ export default function ProfileScreen() {
 
   function saveSettings() {
     if (!draft) return;
-    if (
-      !/^\d{2}:\d{2}$/.test(draft.quiet_hours_start) ||
-      !/^\d{2}:\d{2}$/.test(draft.quiet_hours_end)
-    ) {
-      error('Invalid time', 'Please enter times in HH:MM format (e.g. 23:00).');
+    const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!timeRegex.test(draft.quiet_hours_start) || !timeRegex.test(draft.quiet_hours_end)) {
+      error('Invalid time', 'Please enter a valid time in HH:MM format (e.g. 23:00).');
       return;
     }
     updateSettings.mutate(draft, {
@@ -130,6 +131,35 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
             </View>
           </TouchableOpacity>
+          {/* Only show biometric lock option if the device has enrolled biometrics */}
+          {isEnrolled && (
+            <>
+              <View style={s.menuDivider} />
+              <TouchableOpacity
+                style={s.menuRow}
+                onPress={toggleBiometric}
+                activeOpacity={0.75}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: biometricEnabled }}
+                accessibilityLabel="Biometric lock"
+              >
+                <View style={s.menuLeft}>
+                  <Ionicons name="finger-print-outline" size={20} color="#374151" style={s.menuIcon} />
+                  <Text style={s.menuLabel}>Biometric Lock</Text>
+                </View>
+                <View style={s.menuRight}>
+                  <Switch
+                    value={biometricEnabled}
+                    onValueChange={toggleBiometric}
+                    trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+                    thumbColor="#fff"
+                    accessibilityLabel="Toggle biometric lock"
+                    pointerEvents="none"
+                  />
+                </View>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
           <Text style={s.logoutText}>Log Out</Text>

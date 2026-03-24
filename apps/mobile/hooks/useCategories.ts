@@ -14,9 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import { Q } from '@nozbe/watermelondb';
 import { useQuery } from '@tanstack/react-query';
 
-import api from '@/services/api';
+import { getDatabase } from '@/database';
+import CategoryModel from '@/database/models/Category';
+import CategoryGroupModel from '@/database/models/CategoryGroup';
 import { queryKeys } from '@/lib/queryKeys';
 import type { CategoryGroup } from '@/types/category';
 
@@ -24,8 +27,22 @@ export function useCategoryGroups() {
   return useQuery({
     queryKey: queryKeys.categoryGroups(),
     queryFn: async () => {
-      const { data } = await api.get<CategoryGroup[]>('/category-groups');
-      return data;
+      const db = getDatabase();
+      const [groups, categories] = await Promise.all([
+        db.get<CategoryGroupModel>('category_groups')
+          .query(Q.sortBy('sort_order', Q.asc))
+          .fetch(),
+        db.get<CategoryModel>('categories')
+          .query(Q.sortBy('sort_order', Q.asc))
+          .fetch(),
+      ]);
+      return groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        categories: categories
+          .filter((c) => c.groupId === g.id)
+          .map((c) => ({ id: c.id, name: c.name })),
+      })) as CategoryGroup[];
     },
   });
 }

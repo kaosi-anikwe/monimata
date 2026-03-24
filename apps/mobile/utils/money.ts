@@ -70,15 +70,28 @@ export function computeNextDue(fromDate: Date | string, frequency: string, inter
         // Use the calendar date in local time, discarding the time component
         d = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
     } else {
+        // Append T00:00:00 (no Z) so Date parses in local time, not UTC.
         d = new Date(fromDate + 'T00:00:00');
     }
     switch (frequency) {
         case 'daily': d.setDate(d.getDate() + interval); break;
         case 'weekly': d.setDate(d.getDate() + 7 * interval); break;
         case 'biweekly': d.setDate(d.getDate() + 14); break;
-        case 'monthly': d.setMonth(d.getMonth() + interval); break;
+        case 'monthly': {
+            // Temporarily move to the 1st so setMonth never overflows.
+            // Then clamp the original day to the days available in the target month.
+            const origDay = d.getDate();
+            d.setDate(1);
+            d.setMonth(d.getMonth() + interval);
+            const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+            d.setDate(Math.min(origDay, daysInMonth));
+            break;
+        }
         case 'yearly': d.setFullYear(d.getFullYear() + interval); break;
         default: d.setDate(d.getDate() + 7); break;
     }
-    return d.toISOString().slice(0, 10);
+    // Format using local date parts to avoid UTC-conversion off-by-one errors
+    // that toISOString() causes for timezones ahead of UTC (e.g. Africa/Lagos UTC+1).
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

@@ -30,15 +30,15 @@
  *      that navigates to the Nudges tab.
  */
 
-import { useRouter } from 'expo-router';
-import { useSelector } from 'react-redux';
-import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import * as Notifications from 'expo-notifications';
+import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import { useSelector } from 'react-redux';
 
-import type { RootState } from '../store';
 import { useToast } from '@/components/Toast';
+import type { RootState } from '../store';
 import { useRegisterDevice } from './useNudges';
 
 // Show notifications as banners even when the app is in the foreground.

@@ -1,14 +1,25 @@
 import { Database } from '@nozbe/watermelondb'
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite'
-import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@nozbe/watermelondb/Schema/migrations'
+import { addColumns, createTable, schemaMigrations, unsafeExecuteSql } from '@nozbe/watermelondb/Schema/migrations'
+import { randomUUID } from 'expo-crypto'
 
-import { schema } from './schema'
-import Category from './models/Category'
-import Transaction from './models/Transaction'
+import { getOrCreateDbKey } from './encryption'
 import BudgetMonth from './models/BudgetMonth'
+import Category from './models/Category'
 import CategoryGroup from './models/CategoryGroup'
-import RecurringRule from './models/RecurringRule'
 import CategoryTarget from './models/CategoryTarget'
+import RecurringRule from './models/RecurringRule'
+import Transaction from './models/Transaction'
+import { schema } from './schema'
+
+// Override WatermelonDB's default ID generator (base-36 random strings like
+// "H35OjG2Jz2NU8M7J") so it produces UUID v4 strings instead.  PostgreSQL
+// expects UUID primary keys; this mismatch caused sync push failures.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { setGenerator } = require('@nozbe/watermelondb/utils/common/randomId') as {
+  setGenerator: (fn: () => string) => void;
+};
+setGenerator(() => randomUUID());
 
 // Migrations run once on each device when the schema version increases.
 // Every new schema version MUST have a corresponding migration step here.
@@ -112,22 +123,55 @@ const migrations = schemaMigrations({
   ],
 })
 
-// jsi:true lets WatermelonDB use its fast synchronous JSI path when available.
-// It automatically falls back to async bridge if initializeJSI() fails
-// (e.g. remote debugger, or before a first native build).
-const adapter = new SQLiteAdapter({
-  schema,
-  migrations,
-  dbName: 'monimata',
-  jsi: true,
-  onSetUpError: (error) => {
-    console.error('[WatermelonDB] setup error', error)
-  },
-})
+// ── Lazy async database singleton ───────────────────────────────────────────
+// The database must be initialised after the encryption key is available from
+// the OS keychain. Call `initDatabase()` once in app/_layout.tsx before the
+// React tree mounts, then use `getDatabase()` everywhere else.
 
-const database = new Database({
-  adapter,
-  modelClasses: [CategoryGroup, Category, Transaction, BudgetMonth, CategoryTarget, RecurringRule],
-})
+let _db: Database | null = null;
 
-export default database
+/**
+ * Initialises WatermelonDB with a SQLCipher encryption key.
+ * Idempotent — safe to call multiple times; resolves immediately after first call.
+ *
+ * Must be awaited in app/_layout.tsx before rendering <DatabaseProvider>.
+ */
+export async function initDatabase(): Promise<Database> {
+  if (_db) return _db;
+
+  const encryptionKey = await getOrCreateDbKey();
+
+  const adapter = new SQLiteAdapter({
+    schema,
+    migrations,
+    dbName: 'monimata',
+    jsi: true,
+    // encryptionKey is a runtime SQLCipher option not yet reflected in the
+    // @nozbe/watermelondb TypeScript definitions; cast to any to pass it.
+    ...({ encryptionKey } as any),
+    onSetUpError: (error) => {
+      console.error('[WatermelonDB] setup error', error);
+    },
+  });
+
+  _db = new Database({
+    adapter,
+    modelClasses: [CategoryGroup, Category, Transaction, BudgetMonth, CategoryTarget, RecurringRule],
+  });
+
+  return _db;
+}
+
+/**
+ * Synchronous getter. Throws if `initDatabase()` has not yet resolved.
+ * Use this in database/sync.ts and anywhere that accesses the db after init.
+ */
+export function getDatabase(): Database {
+  if (!_db) {
+    throw new Error(
+      '[MoniMata] Database not initialized. ' +
+      'Ensure initDatabase() is awaited in app/_layout.tsx before rendering.'
+    );
+  }
+  return _db;
+}

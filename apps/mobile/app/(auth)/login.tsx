@@ -17,17 +17,20 @@
 /**
  * Login screen.
  */
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
-} from 'react-native';
-import { z } from 'zod';
-import { router } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { router } from 'expo-router';
+import { Controller, useForm } from 'react-hook-form';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView, Platform,
+  StyleSheet,
+  Text, TextInput, TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { z } from 'zod';
 
-import { login, clearError } from '@/store/authSlice';
+import { clearError, login } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 const schema = z.object({
@@ -71,7 +74,7 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.container}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.back}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Go back">
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
 
@@ -125,6 +128,9 @@ export default function LoginScreen() {
             style={[styles.btn, loading && styles.btnDisabled]}
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Log in to your account"
+            accessibilityState={{ disabled: loading, busy: loading }}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />

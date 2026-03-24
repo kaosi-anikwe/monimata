@@ -16,7 +16,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter, useSegments } from 'expo-router';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { useNudgeUnreadCount } from '../../hooks/useNudges';
 
@@ -33,11 +33,14 @@ function tabIcon(outline: IoniconsName, filled: IoniconsName) {
 function SharedFAB() {
   const router = useRouter();
   const segments = useSegments();
-  // segments[1] is the tab name: 'index' (Budget), 'transactions', etc.
-  const activeTab: string | undefined = segments[1];
+  // segments[1] is the tab name for named tabs (e.g. 'transactions', 'accounts').
+  // For the Budget/index tab, segments = ['(tabs)'], so segments[1] is undefined.
+  const tabName: string | undefined = segments[1];
+  // Only show at the root tab level — not when a stack screen is pushed on top.
+  const isAtRootTabLevel = segments.length <= 2;
   const visible =
-    (segments.length === 1 || activeTab === 'transactions') &&
-    activeTab !== 'bills';
+    isAtRootTabLevel && (tabName === undefined || tabName === 'transactions');
+
   if (!visible) return null;
 
   return (
@@ -45,6 +48,8 @@ function SharedFAB() {
       style={s.fab}
       onPress={() => router.push('/add-transaction')}
       activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel="Add transaction"
     >
       <Ionicons name="add" size={28} color="#fff" />
     </TouchableOpacity>

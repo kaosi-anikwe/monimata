@@ -15,5 +15,8 @@
   "workspaces": [
     "apps/*",
     "libs/*"
-  ]
+  ],
+  "dependencies": {
+    "@sentry/react-native": "^8.5.0"
+  }
 }

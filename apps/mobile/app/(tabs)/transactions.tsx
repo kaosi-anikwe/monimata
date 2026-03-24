@@ -20,29 +20,30 @@
  * Tapping a row navigates to the transaction details screen.
  * Pull-to-refresh triggers a WatermelonDB sync.
  */
-import { useState, useCallback, useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { FlashList } from '@shopify/flash-list';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Modal,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  RefreshControl,
-  Modal,
-  ActivityIndicator,
-  StyleSheet,
-  SectionList,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
-import { formatNaira } from '@/utils/money';
-import { queryKeys } from '@/lib/queryKeys';
 import { syncDatabase } from '@/database/sync';
+import { useCategoryGroups } from '@/hooks/useCategories';
+import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
+import { queryKeys } from '@/lib/queryKeys';
 import type { CategoryGroup } from '@/types/category';
 import type { Transaction } from '@/types/transaction';
-import { useCategoryGroups } from '@/hooks/useCategories';
-import { useTransactions, useRecategorize } from '@/hooks/useTransactions';
+import { formatNaira } from '@/utils/money';
 
 // ─── Category picker modal ────────────────────────────────────────────────────
 
@@ -83,6 +84,14 @@ function CategoryPicker({ visible, groups, onSelect, onClose }: CategoryPickerPr
     </Modal>
   );
 }
+
+// ─── Flat list item type for FlashList sections ──────────────────────────────
+// FlashList v2 does not have a native sections prop. We flatten into a typed
+// union so FlashList can recycle header and transaction cells independently.
+
+type FlatItem =
+  | { _type: 'header'; day: string }
+  | { _type: 'transaction'; tx: Transaction };
 
 // ─── Transaction row ─────────────────────────────────────────────────────────
 
@@ -187,16 +196,23 @@ export default function TransactionsScreen() {
     [txPages],
   );
 
-  // Group transactions by local calendar day, preserve server sort (newest first)
-  const sections = useMemo(() => {
+  // Build a flat array interleaving day headers and transaction rows.
+  // Map is insertion-ordered; allTx is already sorted newest-first from the API.
+  const flatData = useMemo((): FlatItem[] => {
     const dayMap = new Map<string, Transaction[]>();
     for (const tx of allTx) {
-      const day = txLocalDay(tx.date); // local YYYY-MM-DD key
+      const day = txLocalDay(tx.date);
       if (!dayMap.has(day)) dayMap.set(day, []);
       dayMap.get(day)!.push(tx);
     }
-    // Map is insertion-ordered; allTx already sorted newest-first from the API
-    return Array.from(dayMap.entries()).map(([day, data]) => ({ title: day, data }));
+    const result: FlatItem[] = [];
+    for (const [day, txs] of dayMap.entries()) {
+      result.push({ _type: 'header', day });
+      for (const tx of txs) {
+        result.push({ _type: 'transaction', tx });
+      }
+    }
+    return result;
   }, [allTx]);
 
   if (isLoading) {
@@ -213,24 +229,30 @@ export default function TransactionsScreen() {
         <Text style={s.headerTitle}>Transactions</Text>
       </View>
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderSectionHeader={({ section }) => {
+      <FlashList
+        data={flatData}
+        keyExtractor={(item) =>
+          item._type === 'header' ? `h_${item.day}` : item.tx.id
+        }
+        getItemType={(item) => item._type}
+        renderItem={({ item }) => {
+          if (item._type === 'header') {
+            return (
+              <View style={s.dayHeader}>
+                <Text style={s.dayLabel}>{formatDayLabel(item.day)}</Text>
+              </View>
+            );
+          }
+          const { tx } = item;
           return (
-            <View style={s.dayHeader}>
-              <Text style={s.dayLabel}>{formatDayLabel(section.title)}</Text>
-            </View>
+            <TxRow
+              tx={tx}
+              categoryName={tx.category_id ? (categoryMap.get(tx.category_id) ?? null) : null}
+              onPress={() => router.push(`/transaction/${tx.id}` as never)}
+              onCategoryPress={() => setPickerTxId(tx.id)}
+            />
           );
         }}
-        renderItem={({ item }) => (
-          <TxRow
-            tx={item}
-            categoryName={item.category_id ? (categoryMap.get(item.category_id) ?? null) : null}
-            onPress={() => router.push(`/transaction/${item.id}` as never)}
-            onCategoryPress={() => setPickerTxId(item.id)}
-          />
-        )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
         }
@@ -238,7 +260,6 @@ export default function TransactionsScreen() {
           if (hasNextPage && !isFetchingNextPage) fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
-        stickySectionHeadersEnabled
         ListFooterComponent={
           isFetchingNextPage ? (
             <ActivityIndicator style={{ padding: 16 }} color="#10B981" />
@@ -250,7 +271,8 @@ export default function TransactionsScreen() {
             <Text style={s.emptySub}>Sync a bank account to see them here.</Text>
           </View>
         }
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        accessibilityLabel="Transactions list"
       />
 
       <CategoryPicker

@@ -1,6 +1,7 @@
-// Learn more https://docs.expo.dev/guides/customizing-metro
-const { getDefaultConfig } = require("expo/metro-config");
 const path = require("path");
+const {
+  getSentryExpoConfig
+} = require("@sentry/react-native/metro");
 
 /** @type {import('expo/metro-config').MetroConfig} */
 
@@ -9,7 +10,7 @@ const projectRoot = __dirname;
 // monimata-clone (workspace root)
 const monorepoRoot = path.resolve(projectRoot, "../..");
 
-const config = getDefaultConfig(projectRoot);
+const config = getSentryExpoConfig(projectRoot);
 
 // Expo's getDefaultConfig auto-detects the monorepo root as the Metro
 // "server root" (unstable_serverRoot). The React Native Gradle Plugin computes
@@ -45,4 +46,14 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
+// NOTE: withSentryConfig (Metro source-map injection) is intentionally NOT used here.
+// It conflicts with the monorepo custom resolveRequest above, causing a
+// "Cannot read properties of undefined (reading 'match')" crash in the Sentry
+// serializer during release bundling.
+//
+// Sentry error/crash reporting works without it — withSentryConfig only adds
+// debug IDs to bundles for source-map correlation in the Sentry dashboard.
+// To enable source map uploads for production releases, add it back via the
+// Sentry wizard (npx @sentry/wizard@latest -i reactNative) which sets up a
+// dedicated upload step in your CI pipeline instead of hooking into Metro.
 module.exports = config;

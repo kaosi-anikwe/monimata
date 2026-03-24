@@ -14,11 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Q } from '@nozbe/watermelondb';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import api from '@/services/api';
-import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/Toast';
+import { getDatabase } from '@/database';
+import TransactionModel from '@/database/models/Transaction';
+import { syncDatabase } from '@/database/sync';
+import { queryKeys } from '@/lib/queryKeys';
+import { useAppSelector } from '@/store/hooks';
 import type { Transaction, TransactionPage } from '@/types/transaction';
 
 export interface ManualTransactionBody {
@@ -33,14 +37,43 @@ export interface ManualTransactionBody {
 
 const PAGE_LIMIT = 30;
 
+function txModelToDto(m: TransactionModel): Transaction {
+  return {
+    id: m.id,
+    account_id: m.accountId,
+    date: m.date.toISOString(),
+    narration: m.narration,
+    amount: m.amount,
+    type: m.type as 'debit' | 'credit',
+    category_id: m.categoryId,
+    memo: m.memo,
+    is_split: m.isSplit,
+    is_manual: m.isManual,
+    source: m.source,
+    recurrence_id: m.recurrenceId,
+    splits: [],
+  };
+}
+
 export function useTransactions() {
   return useInfiniteQuery({
     queryKey: queryKeys.transactions(),
     queryFn: async ({ pageParam = 1 }) => {
-      const { data } = await api.get<TransactionPage>('/transactions', {
-        params: { page: pageParam, limit: PAGE_LIMIT },
-      });
-      return data;
+      const db = getDatabase();
+      const [total, items] = await Promise.all([
+        db.get<TransactionModel>('transactions').query().fetchCount(),
+        db.get<TransactionModel>('transactions').query(
+          Q.sortBy('date', Q.desc),
+          Q.skip((pageParam - 1) * PAGE_LIMIT),
+          Q.take(PAGE_LIMIT),
+        ).fetch(),
+      ]);
+      return {
+        items: items.map(txModelToDto),
+        page: pageParam,
+        limit: PAGE_LIMIT,
+        total,
+      } as TransactionPage;
     },
     initialPageParam: 1,
     getNextPageParam: (last) => {
@@ -54,8 +87,17 @@ export function useRecategorize() {
   const qc = useQueryClient();
   const { error } = useToast();
   return useMutation({
-    mutationFn: ({ txId, categoryId }: { txId: string; categoryId: string | null }) =>
-      api.patch(`/transactions/${txId}`, { category_id: categoryId }),
+    mutationFn: async ({ txId, categoryId }: { txId: string; categoryId: string | null }) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        const tx = await db.get<TransactionModel>('transactions').find(txId);
+        await tx.update(t => {
+          t.categoryId = categoryId;
+          t.updatedAt = new Date();
+        });
+      });
+      syncDatabase().catch(console.warn);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       // Recategorizing affects budget activity totals — invalidate all months
@@ -69,8 +111,9 @@ export function useTransaction(txId: string) {
   return useQuery({
     queryKey: ['transaction', txId],
     queryFn: async () => {
-      const { data } = await api.get<Transaction>(`/transactions/${txId}`);
-      return data;
+      const db = getDatabase();
+      const tx = await db.get<TransactionModel>('transactions').find(txId);
+      return txModelToDto(tx);
     },
     enabled: Boolean(txId),
   });
@@ -79,19 +122,33 @@ export function useTransaction(txId: string) {
 export function useCreateTransaction() {
   const qc = useQueryClient();
   const { error } = useToast();
+  const userId = useAppSelector(state => state.auth.user?.id ?? '');
   return useMutation({
-    mutationFn: (body: ManualTransactionBody) =>
-      api.post<Transaction>('/transactions/manual', body),
+    mutationFn: async (body: ManualTransactionBody) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        await db.get<TransactionModel>('transactions').create(tx => {
+          tx.userId = userId;
+          tx.accountId = body.account_id;
+          tx.date = new Date(body.date);
+          tx.amount = body.amount;
+          tx.narration = body.narration;
+          tx.type = body.type;
+          tx.categoryId = body.category_id ?? null;
+          tx.memo = body.memo ?? null;
+          tx.isManual = true;
+          tx.isSplit = false;
+          tx.source = 'manual';
+          tx.monoId = null;
+          tx.balanceAfter = null;
+          tx.recurrenceId = null;
+        });
+      });
+      syncDatabase().catch(console.warn);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: queryKeys.budget('') });
-      // The Celery worker categorizes the transaction and evaluates nudges
-      // asynchronously. Refresh nudges after a short delay so the badge and
-      // Nudges tab update without requiring a push notification roundtrip.
-      setTimeout(
-        () => qc.invalidateQueries({ queryKey: queryKeys.nudges() }),
-        4000,
-      );
     },
     onError: () => error('Error', 'Could not create transaction.'),
   });
@@ -101,9 +158,23 @@ export function useUpdateTransaction() {
   const qc = useQueryClient();
   const { error } = useToast();
   return useMutation({
-    mutationFn: ({ txId, body }: { txId: string; body: Partial<ManualTransactionBody> & { memo?: string | null } }) =>
-      api.patch<Transaction>(`/transactions/${txId}`, body),
-    onSuccess: (_data, { txId }) => {
+    mutationFn: async ({ txId, body }: { txId: string; body: Partial<ManualTransactionBody> & { memo?: string | null } }) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        const tx = await db.get<TransactionModel>('transactions').find(txId);
+        await tx.update(t => {
+          if (body.date !== undefined) t.date = new Date(body.date as string);
+          if (body.amount !== undefined) t.amount = body.amount as number;
+          if (body.narration !== undefined) t.narration = body.narration as string;
+          if (body.type !== undefined) t.type = body.type as string;
+          if (body.category_id !== undefined) t.categoryId = body.category_id ?? null;
+          if (body.memo !== undefined) t.memo = body.memo ?? null;
+          t.updatedAt = new Date();
+        });
+      });
+      syncDatabase().catch(console.warn);
+    },
+    onSuccess: (_data, _vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: queryKeys.budget("") });
     },
@@ -115,7 +186,14 @@ export function useDeleteTransaction() {
   const qc = useQueryClient();
   const { error } = useToast();
   return useMutation({
-    mutationFn: (txId: string) => api.delete(`/transactions/${txId}`),
+    mutationFn: async (txId: string) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        const tx = await db.get<TransactionModel>('transactions').find(txId);
+        await tx.markAsDeleted();
+      });
+      syncDatabase().catch(console.warn);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: queryKeys.budget("") });

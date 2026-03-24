@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import api from '@/services/api';
-import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/Toast';
+import { queryKeys } from '@/lib/queryKeys';
+import api from '@/services/api';
 import type { BankAccount } from '@/types/account';
 
 export interface AddManualAccountPayload {
@@ -95,10 +95,9 @@ export function useLinkMono() {
       api.post<BankAccount>(`/accounts/${accountId}/link`, { code }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.accounts() });
-      setTimeout(
-        () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
-        3000,
-      );
+      // The WebSocket (useJobEvents) will push the final invalidation once the
+      // Celery sync job completes. If WS is not yet connected, the user can
+      // pull-to-refresh to see the latest balance.
     },
     onError: () => error('Error', 'Could not link account. Try again.'),
   });
@@ -115,21 +114,13 @@ export function useUnlinkMono() {
 }
 
 export function useTriggerSync() {
-  const qc = useQueryClient();
   const { error } = useToast();
   return useMutation({
     mutationFn: (accountId: string) => api.post(`/accounts/${accountId}/sync`),
     onSuccess: () => {
-      // Server returns 202 — fetch returns immediately. Give Celery a moment then refresh.
-      setTimeout(
-        () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
-        3000,
-      );
-      // Sync may categorize transactions and trigger nudges — also refresh nudges.
-      setTimeout(
-        () => qc.invalidateQueries({ queryKey: queryKeys.nudges() }),
-        6000,
-      );
+      // The server returns 202 Accepted immediately. The WebSocket (useJobEvents)
+      // will push cache invalidations once the Celery sync job completes.
+      // If WS is not yet connected, the user can pull-to-refresh.
     },
     onError: () => error('Sync Failed', 'Could not start sync. Try again.'),
   });
@@ -143,10 +134,5 @@ export function useDeleteAccount() {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
     onError: () => error('Error', 'Could not remove account. Try again.'),
   });
-}
-
-/** @deprecated Use useUnlinkMono() + useDeleteAccount() separately. */
-export function useUnlinkAccount() {
-  return useDeleteAccount();
 }
 

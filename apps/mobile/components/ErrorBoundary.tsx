@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import * as Sentry from '@sentry/react-native';
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface Props {
   children: React.ReactNode;
@@ -49,8 +50,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // In production this should forward to your error tracking service (e.g. Sentry).
-    console.error('[ErrorBoundary] Uncaught error:', error, info.componentStack);
+    // Forward to Sentry for production crash tracking.
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
+    if (__DEV__) {
+      console.error('[ErrorBoundary] Uncaught error:', error, info.componentStack);
+    }
   }
 
   handleReset = () => {
