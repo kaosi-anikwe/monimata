@@ -18,10 +18,19 @@ export interface BankAccount {
   id: string;
   institution: string;
   account_name: string;
+  alias: string | null; // user-defined display name
+  account_number: string | null;
+  bank_code: string | null;
   account_type: string;
   currency: string;
   balance: number; // kobo
+  balance_as_of: string | null; // ISO datetime — last manual balance update
   last_synced_at: string | null; // ISO datetime string
+  is_mono_linked: boolean;
+  linked_at: string | null;
+  unlinked_at: string | null;
   is_active: boolean;
   requires_reauth: boolean;
+  deleted_at: string | null;
+  created_at: string;
 }

@@ -24,7 +24,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Modal,
   Switch,
   TextInput,
@@ -33,9 +32,10 @@ import {
 } from 'react-native';
 
 import { logout } from '@/store/authSlice';
-import { useNudgeUnreadCount, useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
+import { useToast } from '@/components/Toast';
 import type { NudgeSettings } from '@/types/nudge';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useNudgeUnreadCount, useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
 
 export default function ProfileScreen() {
   const dispatch = useAppDispatch();
@@ -43,6 +43,7 @@ export default function ProfileScreen() {
   const nudgeUnread = useNudgeUnreadCount();
   const { data: settings } = useNudgeSettings();
   const updateSettings = useUpdateNudgeSettings();
+  const { error, confirm } = useToast();
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [draft, setDraft] = useState<NudgeSettings | null>(null);
 
@@ -61,27 +62,25 @@ export default function ProfileScreen() {
       !/^\d{2}:\d{2}$/.test(draft.quiet_hours_start) ||
       !/^\d{2}:\d{2}$/.test(draft.quiet_hours_end)
     ) {
-      Alert.alert('Invalid time', 'Please enter times in HH:MM format (e.g. 23:00).');
+      error('Invalid time', 'Please enter times in HH:MM format (e.g. 23:00).');
       return;
     }
     updateSettings.mutate(draft, {
       onSuccess: () => setSettingsVisible(false),
-      onError: () => Alert.alert('Error', 'Could not save settings. Please try again.'),
+      onError: () => error('Error', 'Could not save settings. Please try again.'),
     });
   }
 
   function handleLogout() {
-    Alert.alert('Log out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out',
-        style: 'destructive',
-        onPress: async () => {
-          await dispatch(logout());
-          router.replace('/(auth)');
-        },
+    confirm({
+      title: 'Log out',
+      message: 'Are you sure?',
+      confirmText: 'Log Out',
+      confirmStyle: 'destructive',
+      onConfirm: () => {
+        dispatch(logout()).then(() => router.replace('/(auth)'));
       },
-    ]);
+    });
   }
 
   return (

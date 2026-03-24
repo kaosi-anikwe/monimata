@@ -61,6 +61,12 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
     Upserts rows using mono_id as the deduplication key.
     Triggered by: Mono webhook, POST /accounts/{id}/sync, nightly reconciliation.
     """
+    if not mono_account_id:
+        logger.warning(
+            "fetch_transactions called with empty mono_account_id — skipping"
+        )
+        return {"status": "skipped", "reason": "no_mono_account_id"}
+
     from app.models.bank_account import BankAccount
     from app.models.transaction import Transaction
     from app.services.mono_client import mono_client
@@ -378,10 +384,14 @@ def nightly_reconciliation() -> None:
             .all()
         )
 
+        enqueued = 0
         for account in stale_accounts:
+            if not account.mono_account_id:
+                continue  # manual accounts — no Mono sync needed
             cast(CeleryTask, fetch_transactions).delay(account.mono_account_id)
+            enqueued += 1
 
-        logger.info("nightly_reconciliation: enqueued %d accounts", len(stale_accounts))
+        logger.info("nightly_reconciliation: enqueued %d accounts", enqueued)
     finally:
         db.close()
 

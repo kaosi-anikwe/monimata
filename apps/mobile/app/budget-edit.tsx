@@ -31,7 +31,6 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   KeyboardAvoidingView,
@@ -43,6 +42,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatNaira } from '@/utils/money';
+import { useToast } from '@/components/Toast';
 import { useAppSelector } from '@/store/hooks';
 import type { BudgetCategory, BudgetGroup } from '@/types/budget';
 import {
@@ -88,6 +88,7 @@ function CategoryOptionsModal({ category, month, onClose, onNavigateTarget }: Ca
   const hide = useHideCategory(month);
   const del = useDeleteCategory(month);
   const delTarget = useDeleteTarget(month);
+  const { confirm } = useToast();
 
   if (!category) return null;
 
@@ -106,24 +107,33 @@ function CategoryOptionsModal({ category, month, onClose, onNavigateTarget }: Ca
   }
 
   function doHide() {
-    Alert.alert('Hide category?', `"${category!.name}" will be hidden and won't appear in your budget.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Hide', style: 'destructive', onPress: () => { hide.mutate(category!.id); onClose(); } },
-    ]);
+    confirm({
+      title: 'Hide category?',
+      message: `"${category!.name}" will be hidden and won't appear in your budget.`,
+      confirmText: 'Hide',
+      confirmStyle: 'destructive',
+      onConfirm: () => { hide.mutate(category!.id); onClose(); },
+    });
   }
 
   function doDelete() {
-    Alert.alert('Delete category?', `This will permanently delete "${category!.name}".`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { del.mutate(category!.id); onClose(); } },
-    ]);
+    confirm({
+      title: 'Delete category?',
+      message: `This will permanently delete "${category!.name}".`,
+      confirmText: 'Delete',
+      confirmStyle: 'destructive',
+      onConfirm: () => { del.mutate(category!.id); onClose(); },
+    });
   }
 
   function doRemoveTarget() {
-    Alert.alert('Remove target?', `Remove the spending target for "${category!.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => { delTarget.mutate(category!.id); onClose(); } },
-    ]);
+    confirm({
+      title: 'Remove target?',
+      message: `Remove the spending target for "${category!.name}"?`,
+      confirmText: 'Remove',
+      confirmStyle: 'destructive',
+      onConfirm: () => { delTarget.mutate(category!.id); onClose(); },
+    });
   }
 
   return (
@@ -205,6 +215,7 @@ function GroupOptionsModal({ group, month, onClose }: GroupOptionsProps) {
   const rename = useRenameGroup(month);
   const del = useDeleteGroup(month);
   const hide = useHideGroup(month);
+  const { confirm } = useToast();
 
   if (!group) return null;
 
@@ -223,17 +234,23 @@ function GroupOptionsModal({ group, month, onClose }: GroupOptionsProps) {
   }
 
   function doHide() {
-    Alert.alert('Hide group?', `"${group!.name}" will be hidden from your budget view.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Hide', style: 'destructive', onPress: () => { hide.mutate(group!.id); onClose(); } },
-    ]);
+    confirm({
+      title: 'Hide group?',
+      message: `"${group!.name}" will be hidden from your budget view.`,
+      confirmText: 'Hide',
+      confirmStyle: 'destructive',
+      onConfirm: () => { hide.mutate(group!.id); onClose(); },
+    });
   }
 
   function doDelete() {
-    Alert.alert('Delete group?', `This will permanently delete "${group!.name}" and all its categories.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { del.mutate(group!.id); onClose(); } },
-    ]);
+    confirm({
+      title: 'Delete group?',
+      message: `This will permanently delete "${group!.name}" and all its categories.`,
+      confirmText: 'Delete',
+      confirmStyle: 'destructive',
+      onConfirm: () => { del.mutate(group!.id); onClose(); },
+    });
   }
 
   return (

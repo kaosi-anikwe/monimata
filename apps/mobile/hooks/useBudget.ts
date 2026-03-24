@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import api from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
+import { useToast } from '@/components/Toast';
 import type { BudgetResponse } from '@/types/budget';
 
 export function useBudget(month: string) {
@@ -33,108 +33,119 @@ export function useBudget(month: string) {
 
 export function useAssignCategory(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: ({ categoryId, assigned }: { categoryId: string; assigned: number }) =>
       api.patch(`/budget/${categoryId}`, { assigned }, { params: { month } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not save assignment.'),
+    onError: () => error('Error', 'Could not save assignment.'),
   });
 }
 
 export function useCreateGroup(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (name: string) => api.post('/category-groups', { name }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not create group.'),
+    onError: () => error('Error', 'Could not create group.'),
   });
 }
 
 export function useCreateCategory(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: ({ groupId, name }: { groupId: string; name: string }) =>
       api.post('/categories', { group_id: groupId, name }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not create category.'),
+    onError: () => error('Error', 'Could not create category.'),
   });
 }
 
 export function useRenameCategory(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: ({ categoryId, name }: { categoryId: string; name: string }) =>
       api.patch(`/categories/${categoryId}`, { name }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not rename category.'),
+    onError: () => error('Error', 'Could not rename category.'),
   });
 }
 
 export function useHideCategory(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (categoryId: string) =>
       api.patch(`/categories/${categoryId}`, { is_hidden: true }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not hide category.'),
+    onError: () => error('Error', 'Could not hide category.'),
   });
 }
 
 export function useDeleteCategory(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (categoryId: string) => api.delete(`/categories/${categoryId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      Alert.alert('Cannot Delete', msg ?? 'Could not delete category.');
+      error('Cannot Delete', msg ?? 'Could not delete category.');
     },
   });
 }
 
 export function useRenameGroup(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: ({ groupId, name }: { groupId: string; name: string }) =>
       api.patch(`/category-groups/${groupId}`, { name }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not rename group.'),
+    onError: () => error('Error', 'Could not rename group.'),
   });
 }
 
 export function useDeleteGroup(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (groupId: string) => api.delete(`/category-groups/${groupId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      Alert.alert('Cannot Delete', msg ?? 'Could not delete group.');
+      error('Cannot Delete', msg ?? 'Could not delete group.');
     },
   });
 }
 
 export function useDeleteTarget(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (categoryId: string) => api.delete(`/categories/${categoryId}/target`),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not remove target.'),
+    onError: () => error('Error', 'Could not remove target.'),
   });
 }
 
 export function useHideGroup(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: (groupId: string) =>
       api.patch(`/category-groups/${groupId}`, { is_hidden: true }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
-    onError: () => Alert.alert('Error', 'Could not hide group.'),
+    onError: () => error('Error', 'Could not hide group.'),
   });
 }
 
 export function useMoveMoney(month: string) {
   const qc = useQueryClient();
+  const { error } = useToast();
   return useMutation({
     mutationFn: ({
       fromCategoryId,
@@ -154,7 +165,7 @@ export function useMoveMoney(month: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      Alert.alert('Cannot Move', msg ?? 'Could not move money.');
+      error('Cannot Move', msg ?? 'Could not move money.');
     },
   });
 }

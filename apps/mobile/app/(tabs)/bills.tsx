@@ -31,7 +31,6 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   StyleSheet,
   KeyboardAvoidingView,
@@ -41,10 +40,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useToast } from '@/components/Toast';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useCategoryGroups } from '@/hooks/useCategories';
 import type { BankAccount } from '@/types/account';
 import type { CategoryItem } from '@/types/category';
+import { useCategoryGroups } from '@/hooks/useCategories';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { formatNaira, nairaStringToKobo, koboToNaira } from '@/utils/money';
 import {
@@ -494,6 +494,7 @@ function BillsContent() {
 
   const validateMutation = useValidateCustomer();
   const payMutation = usePayBill();
+  const { error } = useToast();
 
   // Auto-select first account when accounts load
   useEffect(() => {
@@ -576,7 +577,7 @@ function BillsContent() {
   // ── Validation ──
   function handleValidate() {
     if (!customerId.trim()) {
-      Alert.alert('Missing Info', 'Please enter a customer/account ID.');
+      error('Missing Info', 'Please enter a customer/account ID.');
       return;
     }
     if (!selectedItem) return;
@@ -586,7 +587,7 @@ function BillsContent() {
       {
         onSuccess: (result) => {
           if (result.response_code !== '00') {
-            Alert.alert(
+            error(
               'Validation Failed',
               result.response_description || 'Could not validate customer. Check your details.',
             );
@@ -600,7 +601,7 @@ function BillsContent() {
           setStep('confirm');
         },
         onError: () => {
-          Alert.alert('Validation Error', 'Could not validate at this time. Please try again.');
+          error('Validation Error', 'Could not validate at this time. Please try again.');
         },
       },
     );
@@ -616,7 +617,7 @@ function BillsContent() {
         : nairaStringToKobo(amountNaira);
 
     if (amountKobo < 100) {
-      Alert.alert('Invalid Amount', 'Amount must be at least ₦1.00.');
+      error('Invalid Amount', 'Amount must be at least ₦1.00.');
       return;
     }
 
@@ -638,7 +639,7 @@ function BillsContent() {
           const message =
             (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
             'Payment failed. Please try again.';
-          Alert.alert('Payment Failed', message);
+          error('Payment Failed', message);
         },
       },
     );
@@ -687,6 +688,7 @@ function BillsContent() {
           <ActivityIndicator style={{ flex: 1 }} color="#0F7B3F" />
         ) : (
           <FlatList
+            key="category-grid"
             data={categories}
             keyExtractor={(item) => item.id}
             numColumns={2}
@@ -718,6 +720,7 @@ function BillsContent() {
           <ActivityIndicator style={{ flex: 1 }} color="#0F7B3F" />
         ) : (
           <FlatList
+            key="billers-list"
             data={billers}
             keyExtractor={(item) => item.id}
             contentContainerStyle={s.listContent}
@@ -745,6 +748,7 @@ function BillsContent() {
           <ActivityIndicator style={{ flex: 1 }} color="#0F7B3F" />
         ) : (
           <FlatList
+            key="payment-items-list"
             data={paymentItems}
             keyExtractor={(item) => item.id}
             contentContainerStyle={s.listContent}
