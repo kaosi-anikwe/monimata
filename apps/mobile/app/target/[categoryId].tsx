@@ -40,6 +40,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { useBudget } from '@/hooks/useBudget';
 import { useAppSelector } from '@/store/hooks';
 import { nairaStringToKobo } from '@/utils/money';
 import { useTarget, useUpsertTarget } from '@/hooks/useTargets';
@@ -368,8 +369,11 @@ export default function TargetEditScreen() {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
   const { selectedMonth } = useAppSelector((s) => s.budget);
 
-  const { data: existingTarget, isLoading } = useTarget(categoryId);
   const upsert = useUpsertTarget(selectedMonth);
+  const { data: budget } = useBudget(selectedMonth);
+  const { data: existingTarget, isLoading } = useTarget(categoryId);
+
+  const category = budget?.groups.flatMap(g => g.categories).find(c => c.id === categoryId);
 
   // Form state
   const [tab, setTab] = useState<TargetFrequency>('monthly');
@@ -428,7 +432,7 @@ export default function TargetEditScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color="#374151" />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Set Target</Text>
+        <Text style={s.headerTitle}>Set Target for {category?.name}</Text>
         <View style={{ width: 24 }} />
       </View>
 

@@ -33,15 +33,16 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { scheduleOnRN } from 'react-native-worklets';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,12 +145,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const confirm = useCallback((config: ConfirmConfig) => setConfirmCfg(config), []);
   const actionSheet = useCallback((config: ActionSheetConfig) => setSheetCfg(config), []);
 
+  const clearCurrent = useCallback(() => setCurrent(null), []);
+
   const dismiss = useCallback(() => {
     opacity.value = withTiming(0, { duration: 220 });
     translateY.value = withTiming(-120, { duration: 280 }, (finished) => {
-      if (finished) setCurrent(null);
+      'worklet';
+      if (finished) scheduleOnRN(clearCurrent);
     });
-  }, [opacity, translateY]);
+  }, [clearCurrent, opacity, translateY]);
 
   const show = useCallback(
     (config: ToastConfig) => {
