@@ -77,7 +77,7 @@ export default function VerifyBVNScreen() {
     dispatch(clearError());
     try {
       await dispatch(verifyBVN(data.bvn)).unwrap();
-      router.replace('/(auth)/link-bank');
+      router.replace('/(auth)/onboarding');
     } catch {
       // error is already written to Redux state by the rejected handler in authSlice
     }
@@ -93,7 +93,7 @@ export default function VerifyBVNScreen() {
     setValue('bvn', bvnValue.slice(0, -1), { shouldValidate: true });
   }
 
-  // If user already verified, skip straight to link-bank
+  // If user already verified (returning user), skip onboarding and go to link-bank
   if (user?.identity_verified) {
     router.replace('/(auth)/link-bank');
     return null;
