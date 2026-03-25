@@ -19,6 +19,8 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTheme } from '@/lib/theme';
+
 interface Props {
   onUnlock: () => Promise<boolean>;
 }
@@ -28,11 +30,13 @@ interface Props {
  * The user must authenticate to dismiss it.
  */
 export function AppLockScreen({ onUnlock }: Props) {
+  const colors = useTheme();
+  const s = makeStyles(colors);
   return (
     <SafeAreaView style={s.safe} accessibilityViewIsModal>
       <View style={s.container}>
         <View style={s.iconWrap}>
-          <Ionicons name="lock-closed" size={52} color="#0F7B3F" />
+          <Ionicons name="lock-closed" size={52} color={colors.brand} />
         </View>
         <Text style={s.title} accessibilityRole="header">
           MoniMata is locked
@@ -47,7 +51,7 @@ export function AppLockScreen({ onUnlock }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Unlock MoniMata with biometrics or device PIN"
         >
-          <Ionicons name="finger-print-outline" size={22} color="#fff" style={s.btnIcon} />
+          <Ionicons name="finger-print-outline" size={22} color={colors.white} style={s.btnIcon} />
           <Text style={s.btnText}>Unlock</Text>
         </TouchableOpacity>
       </View>
@@ -55,54 +59,56 @@ export function AppLockScreen({ onUnlock }: Props) {
   );
 }
 
-const s = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  iconWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#ECFDF5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 36,
-  },
-  btn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0F7B3F',
-    paddingVertical: 16,
-    paddingHorizontal: 36,
-    borderRadius: 14,
-  },
-  btnIcon: {
-    marginRight: 10,
-  },
-  btnText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-});
+function makeStyles(colors: ReturnType<typeof useTheme>) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 40,
+    },
+    iconWrap: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: colors.successSubtle,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 28,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    subtitle: {
+      fontSize: 15,
+      color: colors.textMeta,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 36,
+    },
+    btn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.brand,
+      paddingVertical: 16,
+      paddingHorizontal: 36,
+      borderRadius: 14,
+    },
+    btnIcon: {
+      marginRight: 10,
+    },
+    btnText: {
+      color: colors.white,
+      fontSize: 17,
+      fontWeight: '700',
+    },
+  });
+}

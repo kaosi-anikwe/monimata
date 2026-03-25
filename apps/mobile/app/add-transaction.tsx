@@ -28,6 +28,7 @@
  */
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -361,6 +362,7 @@ export default function AddTransactionScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style="dark" />
       {/* ── Header ── */}
       <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity
@@ -519,7 +521,7 @@ export default function AddTransactionScreen() {
       {showDatePicker && (
         Platform.OS === 'ios' ? (
           <Modal visible transparent animationType="fade">
-            <TouchableOpacity style={ss.dtBackdrop} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
+            <TouchableOpacity style={[ss.dtBackdrop, { backgroundColor: colors.overlayNeutral }]} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
             <View style={[ss.dtSheet, { backgroundColor: colors.white }]}>
               <DateTimePicker
                 value={txDatetime}

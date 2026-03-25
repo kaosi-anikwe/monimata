@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabBar } from '@/components/ui/TabBar';
 import { useTheme } from '@/lib/theme';
-import { layout, shadow } from '@/lib/tokens';
+import { layout, shadow, spacing } from '@/lib/tokens';
 
 /**
  * Floating lime "+" button — bottom-right, sits above the tab bar.
@@ -37,7 +37,7 @@ function SharedFAB() {
   // not when a stack screen is pushed on top.
   if (segments.length > 2) return null;
 
-  const bottomOffset = layout.tabBarHeight + Math.max(insets.bottom, 4) + 16;
+  const bottomOffset = layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.sm;
 
   return (
     <TouchableOpacity

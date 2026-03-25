@@ -30,6 +30,7 @@
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -58,7 +59,7 @@ import {
   useUpdateTransaction,
   type ManualTransactionBody,
 } from '@/hooks/useTransactions';
-import { useTheme } from '@/lib/theme';
+import { GRADIENTS, useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
@@ -268,8 +269,8 @@ function BankHeroHeader({
   const amountColor = isDebit ? colors.error : colors.success;
   const sign = isDebit ? '−' : '+';
   const gradColors = isDebit
-    ? (['#1F0D0D', '#3A1A1A'] as const)
-    : (['#0D1A0F', '#1A3B1A'] as const);
+    ? GRADIENTS.expenseHdr
+    : GRADIENTS.darkCard;
 
   return (
     <LinearGradient
@@ -281,28 +282,28 @@ function BankHeroHeader({
       {/* Nav row */}
       <View style={ss.heroNav}>
         <TouchableOpacity
-          style={ss.frostBtn}
+          style={[ss.frostBtn, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}
           onPress={onBack}
           accessibilityRole="button"
           accessibilityLabel="Go back"
           hitSlop={12}
         >
           <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M19 12H5M12 5l-7 7 7 7" stroke="rgba(255,255,255,0.9)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M19 12H5M12 5l-7 7 7 7" stroke={colors.textInverseHigh} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
           </Svg>
         </TouchableOpacity>
-        <Text style={ss.heroNavTitle}>Transaction Details</Text>
+        <Text style={[ss.heroNavTitle, { color: colors.textInverseHigh }]}>Transaction Details</Text>
         <TouchableOpacity
-          style={ss.frostBtn}
+          style={[ss.frostBtn, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}
           onPress={onMore}
           accessibilityRole="button"
           accessibilityLabel="More options"
           hitSlop={12}
         >
           <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Circle cx={5} cy={12} r={1.2} fill="rgba(255,255,255,0.9)" />
-            <Circle cx={12} cy={12} r={1.2} fill="rgba(255,255,255,0.9)" />
-            <Circle cx={19} cy={12} r={1.2} fill="rgba(255,255,255,0.9)" />
+            <Circle cx={5} cy={12} r={1.2} fill={colors.textInverseHigh} />
+            <Circle cx={12} cy={12} r={1.2} fill={colors.textInverseHigh} />
+            <Circle cx={19} cy={12} r={1.2} fill={colors.textInverseHigh} />
           </Svg>
         </TouchableOpacity>
       </View>
@@ -313,7 +314,7 @@ function BankHeroHeader({
       </Text>
 
       {/* Narration */}
-      <Text style={ss.heroNarr} numberOfLines={2}>{tx.narration}</Text>
+      <Text style={[ss.heroNarr, { color: colors.textInverseSub }]} numberOfLines={2}>{tx.narration}</Text>
 
       {/* Chips row */}
       <View style={ss.heroChips}>
@@ -321,8 +322,8 @@ function BankHeroHeader({
           <Text style={[ss.heroChipTxt, { color: amountColor }]}>{tx.type.toUpperCase()}</Text>
         </View>
         {tx.source ? (
-          <View style={ss.heroChipGlass}>
-            <Text style={ss.heroChipGlassTxt}>{tx.source}</Text>
+          <View style={[ss.heroChipGlass, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}>
+            <Text style={[ss.heroChipGlassTxt, { color: colors.textInverseMid }]}>{tx.source}</Text>
           </View>
         ) : null}
       </View>
@@ -745,7 +746,7 @@ function ManualEditForm({
       {showDatePicker && (
         Platform.OS === 'ios' ? (
           <Modal visible transparent animationType="fade">
-            <TouchableOpacity style={ss.dtBackdrop} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
+            <TouchableOpacity style={[ss.dtBackdrop, { backgroundColor: colors.overlayNeutral }]} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
             <View style={[ss.dtSheet, { backgroundColor: colors.white }]}>
               <DateTimePicker
                 value={txDatetime}
@@ -884,6 +885,7 @@ export default function TransactionDetailsScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style={tx.is_manual ? 'dark' : 'light'} />
       {/* ── Header: white for manual, dark gradient hero for bank ── */}
       {tx.is_manual ? (
         <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>

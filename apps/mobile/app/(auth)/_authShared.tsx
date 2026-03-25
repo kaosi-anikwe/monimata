@@ -114,6 +114,7 @@ export function BackBtn({
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
+  const colors = useTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -122,7 +123,7 @@ export function BackBtn({
       accessibilityLabel="Go back"
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+      <Ionicons name="arrow-back" size={20} color={colors.white} />
     </TouchableOpacity>
   );
 }
@@ -131,7 +132,8 @@ export function BackBtn({
 // Raw icon only — kept for backward compat. Prefer BackBtn.
 
 export function BackArrow() {
-  return <Ionicons name="arrow-back" size={20} color="#FFFFFF" />;
+  const colors = useTheme();
+  return <Ionicons name="arrow-back" size={20} color={colors.white} />;
 }
 
 // ─── EyeIcon ─────────────────────────────────────────────────────────────────

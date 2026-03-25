@@ -120,7 +120,7 @@ export function Button({
         style={[
           animStyle,
           s.iconBtn,
-          isDark ? s.iconBtnDark : { backgroundColor: colors.surface },
+          isDark ? { backgroundColor: colors.overlayGhost, borderWidth: 1, borderColor: colors.overlayGhostBorder } : { backgroundColor: colors.surface },
           disabled && s.disabled,
           style,
         ]}
@@ -130,7 +130,7 @@ export function Button({
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       >
         {loading
-          ? <ActivityIndicator size={14} color={isDark ? '#fff' : colors.textSecondary} />
+          ? <ActivityIndicator size={14} color={isDark ? colors.white : colors.textSecondary} />
           : children}
       </AnimatedTouchable>
     );
@@ -210,11 +210,11 @@ function resolveVariantStyle(
         container: {
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          borderColor: 'rgba(255,255,255,0.2)',
+          borderColor: colors.overlayGhostMid,
           height: 50,
         },
-        text: { color: 'rgba(255,255,255,0.85)' },
-        loaderColor: 'rgba(255,255,255,0.85)',
+        text: { color: colors.textInverseHigh },
+        loaderColor: colors.textInverseHigh,
       };
   }
 }
@@ -248,9 +248,8 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   iconBtnDark: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    // kept for reference only — overridden inline using colors.overlayGhost / overlayGhostBorder
+    backgroundColor: 'transparent',
   },
   disabled: {
     opacity: 0.45,

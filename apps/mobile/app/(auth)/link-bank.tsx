@@ -122,7 +122,7 @@ export default function LinkBankScreen() {
         <AuthHdr>
           <BackBtn onPress={() => router.back()} />
           <Text style={[authS.authTitle, { color: colors.white }]}>Connect your bank</Text>
-          <Text style={[authS.authSub, { color: 'rgba(255,255,255,0.5)' }]}>
+          <Text style={[authS.authSub, { color: colors.textInverseSecondary }]}>
             Automatic transaction sync — no more manual entry
           </Text>
         </AuthHdr>

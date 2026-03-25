@@ -430,7 +430,7 @@ CREATE TABLE user_badges (
 
 ---
 
-## Phase 8 — Transactions
+## Phase 8 — Transactions ✅
 
 **Files:** `app/(tabs)/transactions.tsx`, `app/transaction/[id].tsx`,
 `app/add-transaction.tsx`, `app/split-transaction.tsx` _(new)_
@@ -462,7 +462,7 @@ CREATE TABLE user_badges (
 
 ---
 
-## Phase 9 — Accounts Tab
+## Phase 9 — Accounts Tab ✅
 
 **File:** `app/(tabs)/accounts.tsx`
 
@@ -476,7 +476,7 @@ CREATE TABLE user_badges (
 
 ---
 
-## Phase 10 — Bills Tab
+## Phase 10 — Bills Tab ✅
 
 **File:** `app/(tabs)/bills.tsx`
 
@@ -493,7 +493,7 @@ The 6-step payment state machine is already built. Each step gets a visual skin:
 
 ---
 
-## Phase 11 — Nudges Tab
+## Phase 11 — Nudges Tab ✅
 
 **File:** `app/(tabs)/nudges.tsx`
 
@@ -620,10 +620,10 @@ The 6-step payment state machine is already built. Each step gets a visual skin:
 | 5     | Home / Dashboard Tab     | ✅ Complete    |
 | 6     | Budget Tab               | ✅ Complete    |
 | 7     | Budget Edit & Target     | ✅ Complete    |
-| 8     | Transactions             | ⬜ Not Started |
-| 9     | Accounts Tab             | ⬜ Not Started |
-| 10    | Bills Tab                | ⬜ Not Started |
-| 11    | Nudges Tab               | ⬜ Not Started |
+| 8     | Transactions             | ✅ Complete    |
+| 9     | Accounts Tab             | ✅ Complete    |
+| 10    | Bills Tab                | ✅ Complete    |
+| 11    | Nudges Tab               | ✅ Complete    |
 | 12    | Profile Tab              | ⬜ Not Started |
 | 13    | Knowledge Hub Tab        | ⬜ Not Started |
 | 14    | Rewards & Gamification   | ⬜ Not Started |

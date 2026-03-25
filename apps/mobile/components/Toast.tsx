@@ -26,23 +26,28 @@
  *
  * Wrap your root layout with <ToastProvider> (inside SafeAreaProvider).
  */
+import { Ionicons } from '@expo/vector-icons';
 import React, {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
 } from 'react';
+import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
-import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { scheduleOnRN } from 'react-native-worklets';
+
+import { useTheme, type ThemeColors } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,44 +90,47 @@ export interface ToastContextValue {
   actionSheet: (config: ActionSheetConfig) => void;
 }
 
-// ─── Variant styles ───────────────────────────────────────────────────────────
+// ─── Variant config ───────────────────────────────────────────────────────────
 
-const VARIANTS: Record<
-  ToastVariant,
-  {
-    bg: string;
-    border: string;
-    icon: React.ComponentProps<typeof Ionicons>['name'];
-    iconColor: string;
-    titleColor: string;
-    msgColor: string;
-  }
-> = {
-  success: {
-    bg: '#ECFDF5',
-    border: '#A7F3D0',
-    icon: 'checkmark-circle',
-    iconColor: '#0F7B3F',
-    titleColor: '#065F46',
-    msgColor: '#047857',
-  },
-  error: {
-    bg: '#FEF2F2',
-    border: '#FECACA',
-    icon: 'close-circle',
-    iconColor: '#DC2626',
-    titleColor: '#7F1D1D',
-    msgColor: '#B91C1C',
-  },
-  info: {
-    bg: '#EFF6FF',
-    border: '#BFDBFE',
-    icon: 'information-circle',
-    iconColor: '#2563EB',
-    titleColor: '#1E3A8A',
-    msgColor: '#1D4ED8',
-  },
+type VariantConfig = {
+  bg: string;
+  border: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  iconColor: string;
+  titleColor: string;
+  msgColor: string;
 };
+
+// Border rgba values are the corresponding status token colours at 25 % opacity.
+function getVariants(colors: ThemeColors): Record<ToastVariant, VariantConfig> {
+  return {
+    success: {
+      bg: colors.successSubtle,
+      border: colors.successBorder,
+      icon: 'checkmark-circle',
+      iconColor: colors.successText,
+      titleColor: colors.successText,
+      msgColor: colors.brand,
+    },
+    error: {
+      bg: colors.errorSubtle,
+      border: colors.errorBorder,
+      icon: 'close-circle',
+      iconColor: colors.error,
+      titleColor: colors.error,
+      msgColor: colors.error,
+    },
+    info: {
+      bg: colors.infoSubtle,
+      border: colors.infoBorder,
+      icon: 'information-circle',
+      iconColor: colors.info,
+      titleColor: colors.info,
+      msgColor: colors.info,
+    },
+  };
+}
+
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -132,6 +140,13 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
+  const colors = useTheme();
+
+  const variants = useMemo(() => getVariants(colors), [colors]);
+  const ts = useMemo(() => makeToastStyles(colors), [colors]);
+  const cs = useMemo(() => makeConfirmStyles(colors), [colors]);
+  const sh = useMemo(() => makeSheetStyles(colors), [colors]);
+
   const [current, setCurrent] = useState<(ToastConfig & { id: number }) | null>(null);
   const idRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -192,7 +207,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     opacity: opacity.value,
   }));
 
-  const v = VARIANTS[current?.variant ?? 'info'];
+  const v = variants[current?.variant ?? 'info'];
 
   return (
     <ToastContext.Provider value={{ toast, success, error, info, confirm, actionSheet }}>
@@ -328,105 +343,158 @@ export function useToast(): ToastContextValue {
   return ctx;
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Style factories ──────────────────────────────────────────────────────────
 
-const ts = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 10,
-    zIndex: 9999,
-  },
-  inner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 10,
-  },
-  icon: { flexShrink: 0 },
-  textWrap: { flex: 1 },
-  title: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
-  message: { fontSize: 13, lineHeight: 18, marginTop: 2 },
-  dismiss: { flexShrink: 0, opacity: 0.6 },
-});
+// Toast notification — shadow colour uses the brand dark-green
+function makeToastStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      position: 'absolute',
+      left: spacing.lg,
+      right: spacing.lg,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      // Elevated shadow (more prominent than shadow.md — toast must float above all content)
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.darkGreen,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.14,
+          shadowRadius: 18,
+        },
+        android: { elevation: 10 },
+        default: {},
+      }),
+      zIndex: 9999,
+    },
+    inner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.mdn,
+      gap: 10,
+    },
+    icon: { flexShrink: 0 },
+    textWrap: { flex: 1 },
+    title: { fontSize: 14, lineHeight: 20, ...ff(700) },
+    message: { fontSize: 13, lineHeight: 18, marginTop: 2, ...ff(400) },
+    dismiss: { flexShrink: 0, opacity: 0.55 },
+  });
+}
 
-// ─── Confirm dialog styles ────────────────────────────────────────────────────
+// Confirm dialog modal
+function makeConfirmStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: colors.overlayDark,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.xxl,
+    },
+    card: {
+      backgroundColor: colors.white,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.xxl,
+      width: '100%',
+      maxWidth: 340,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.darkGreen,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.14,
+          shadowRadius: 24,
+        },
+        android: { elevation: 12 },
+        default: {},
+      }),
+    },
+    title: {
+      fontSize: 17,
+      lineHeight: 24,
+      color: colors.textPrimary,
+      marginBottom: spacing.sm,
+      letterSpacing: -0.3,
+      ...ff(800),
+    },
+    message: {
+      fontSize: 14,
+      color: colors.textMeta,
+      lineHeight: 21,
+      marginBottom: spacing.xl,
+      ...ff(400),
+    },
+    row: { flexDirection: 'row', gap: spacing.sm },
+    cancelBtn: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+    },
+    cancelText: { fontSize: 15, color: colors.textSecondary, ...ff(600) },
+    confirmBtn: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      borderRadius: radius.sm,
+      backgroundColor: colors.brand,
+      alignItems: 'center',
+    },
+    confirmBtnDestructive: { backgroundColor: colors.error },
+    confirmText: { fontSize: 15, color: colors.white, ...ff(700) },
+    // confirmTextDestructive has the same colour — kept for API compat
+    confirmTextDestructive: { color: colors.white },
+  });
+}
 
-const cs = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 28,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 340,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-  title: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  message: { fontSize: 14, color: '#6B7280', lineHeight: 20, marginBottom: 20 },
-  row: { flexDirection: 'row', gap: 10 },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-  },
-  cancelText: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  confirmBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#0F7B3F',
-    alignItems: 'center',
-  },
-  confirmBtnDestructive: { backgroundColor: '#EF4444' },
-  confirmText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  confirmTextDestructive: { color: '#fff' },
-});
+// Action sheet modal
+function makeSheetStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: colors.overlayDarkMid,
+    },
+    sheet: {
+      backgroundColor: colors.white,
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+      paddingBottom: 34,
+      overflow: 'hidden',
+    },
+    sheetTitle: {
+      fontSize: 13,
+      color: colors.textMeta,
+      textAlign: 'center',
+      paddingVertical: spacing.mdn,
+      paddingHorizontal: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      ...ff(600),
+    },
+    option: {
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.xl,
+    },
+    optionBorder: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    optionText: {
+      fontSize: 16,
+      color: colors.textPrimary,
+      textAlign: 'center',
+      ...ff(500),
+    },
+    optionDestructive: { color: colors.error },
+    cancelOption: { marginTop: spacing.sm },
+    cancelText: {
+      fontSize: 16,
+      color: colors.textMeta,
+      textAlign: 'center',
+      ...ff(600),
+    },
+  });
+}
 
-// ─── Action sheet styles ──────────────────────────────────────────────────────
-
-const sh = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 34,
-    overflow: 'hidden',
-  },
-  sheetTitle: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  option: { paddingVertical: 16, paddingHorizontal: 20 },
-  optionBorder: { borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  optionText: { fontSize: 16, color: '#111827', textAlign: 'center' },
-  optionDestructive: { color: '#EF4444' },
-  cancelOption: { marginTop: 8 },
-  cancelText: { fontSize: 16, fontWeight: '600', color: '#6B7280', textAlign: 'center' },
-});

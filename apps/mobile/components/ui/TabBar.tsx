@@ -119,7 +119,7 @@ function TabItem({ config, isActive, badge, onPress, colors }: TabItemProps) {
             color={iconColor}
           />
           {badge != null && badge > 0 && (
-            <View style={[s.badge, { backgroundColor: colors.error }]}>
+            <View style={[s.badge, { backgroundColor: colors.error, borderColor: colors.white }]}>
               <Text style={[s.badgeText, { color: colors.textInverse }]}>
                 {badge > 99 ? '99+' : String(badge)}
               </Text>

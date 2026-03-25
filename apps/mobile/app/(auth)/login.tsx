@@ -25,6 +25,7 @@
  */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
@@ -82,11 +83,12 @@ export default function LoginScreen() {
 
   return (
     <View style={[s.screen, { backgroundColor: colors.white }]}>
+      <StatusBar style="light" />
       {/* ── Dark green curved header ── */}
       <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[s.authTitle, { color: colors.white }]}>Welcome back</Text>
-        <Text style={[s.authSub, { color: 'rgba(255,255,255,0.5)' }]}>Sign in to continue</Text>
+        <Text style={[s.authSub, { color: colors.textInverseSecondary }]}>Sign in to continue</Text>
       </AuthHdr>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

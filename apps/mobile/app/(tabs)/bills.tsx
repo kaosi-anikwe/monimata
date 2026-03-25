@@ -30,6 +30,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -633,6 +634,7 @@ function ReceiptStep({
 
   return (
     <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+      <StatusBar style="dark" />
       {/* Receipt header */}
       <View
         style={[
@@ -927,6 +929,7 @@ function BillsContent() {
   if (step === 'billers') {
     return (
       <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <StatusBar style="dark" />
         <DetailHeader
           title={selectedCategory?.name ?? 'Select Biller'}
           step={step}
@@ -968,6 +971,7 @@ function BillsContent() {
   if (step === 'payment_items') {
     return (
       <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <StatusBar style="dark" />
         <DetailHeader
           title={selectedBiller?.name ?? 'Select Plan'}
           step={step}
@@ -1017,6 +1021,7 @@ function BillsContent() {
 
     return (
       <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <StatusBar style="dark" />
         <DetailHeader title="Customer Details" step={step} onBack={goBack} />
         <KeyboardAvoidingView
           style={ss.flex1}
@@ -1159,6 +1164,7 @@ function BillsContent() {
 
     return (
       <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <StatusBar style="dark" />
         <DetailHeader title="Confirm Payment" step={step} onBack={goBack} />
         <ScrollView contentContainerStyle={ss.formContent}>
           <View
@@ -1245,6 +1251,7 @@ function BillsContent() {
 
   return (
     <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+      <StatusBar style="light" />
       <CategoriesHeader
         showHistory={showHistory}
         onToggleHistory={() => setShowHistory((v) => !v)}

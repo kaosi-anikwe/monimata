@@ -18,6 +18,8 @@ import * as Sentry from '@sentry/react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useTheme } from '@/lib/theme';
+
 interface Props {
   children: React.ReactNode;
   /** Called after the user taps "Try Again" — use to reset external state if needed. */
@@ -27,6 +29,23 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+}
+
+// Functional fallback UI so we can use useTheme() for dark mode support.
+function ErrorFallback({ message, onReset }: { message: string; onReset: () => void }) {
+  const colors = useTheme();
+  return (
+    <View style={[s.container, { backgroundColor: colors.background }]}>
+      <Text style={s.icon}>⚠️</Text>
+      <Text style={[s.title, { color: colors.textPrimary }]}>Something went wrong</Text>
+      <Text style={[s.message, { color: colors.textMeta }]} numberOfLines={4}>
+        {message}
+      </Text>
+      <TouchableOpacity style={[s.btn, { backgroundColor: colors.brand }]} onPress={onReset} activeOpacity={0.8}>
+        <Text style={[s.btnText, { color: colors.white }]}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 /**
@@ -65,16 +84,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <View style={s.container}>
-          <Text style={s.icon}>⚠️</Text>
-          <Text style={s.title}>Something went wrong</Text>
-          <Text style={s.message} numberOfLines={4}>
-            {this.state.error?.message ?? 'An unexpected error occurred.'}
-          </Text>
-          <TouchableOpacity style={s.btn} onPress={this.handleReset} activeOpacity={0.8}>
-            <Text style={s.btnText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorFallback
+          message={this.state.error?.message ?? 'An unexpected error occurred.'}
+          onReset={this.handleReset}
+        />
       );
     }
     return this.props.children;
@@ -84,7 +97,6 @@ export class ErrorBoundary extends React.Component<Props, State> {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
@@ -93,22 +105,19 @@ const s = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
     marginBottom: 8,
     textAlign: 'center',
   },
   message: {
     fontSize: 14,
-    color: '#6B7280',
     textAlign: 'center',
     marginBottom: 28,
     lineHeight: 20,
   },
   btn: {
-    backgroundColor: '#0F7B3F',
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
   },
-  btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  btnText: { fontSize: 15, fontWeight: '700' },
 });
