@@ -18,19 +18,35 @@
  * BVN Verification screen — required before linking any bank account.
  * Calls POST /auth/verify-bvn with the user's 11-digit BVN.
  * On success → navigates to Link Bank Account screen.
+ *
+ * Visual matches scr-verify-bvn in MoniMata_V5.html:
+ * - Dark green curved header with title "Prove it's you, once."
+ * - TrustCard: CBN-compliant identity check explanation
+ * - 11 individual digit boxes with brand-green active/filled state
+ * - Custom numpad (3×4 grid matching .assign-numpad style)
+ * Form logic (react-hook-form + zod + Redux) is unchanged.
  */
+import { useTheme } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff } from '@/lib/typography';
+import { clearError, verifyBVN } from '@/store/authSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { Ionicons } from '@expo/vector-icons';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { router } from 'expo-router';
+import { Controller, useForm } from 'react-hook-form';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { z } from 'zod';
-import { router } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-
-import { verifyBVN, clearError } from '@/store/authSlice';
+import { BackBtn, TrustCard, s as authS } from './_authShared';
 
 const schema = z.object({
   bvn: z.string().regex(/^\d{11}$/, 'BVN must be exactly 11 digits'),
@@ -40,11 +56,13 @@ type FormValues = z.infer<typeof schema>;
 
 export default function VerifyBVNScreen() {
   const dispatch = useAppDispatch();
-  const { loading, error, user } = useAppSelector((s) => s.auth);
+  const { loading, error, user } = useAppSelector((st) => st.auth);
+  const colors = useTheme();
 
   const {
     control,
     handleSubmit,
+    setValue,
     watch,
     formState: { errors },
   } = useForm<FormValues>({
@@ -64,105 +82,188 @@ export default function VerifyBVNScreen() {
     }
   }
 
+  function handleNumpad(digit: string) {
+    if (bvnValue.length < 11) {
+      setValue('bvn', bvnValue + digit, { shouldValidate: true });
+    }
+  }
+
+  function handleDelete() {
+    setValue('bvn', bvnValue.slice(0, -1), { shouldValidate: true });
+  }
+
   // If user already verified, skip straight to link-bank
   if (user?.identity_verified) {
     router.replace('/(auth)/link-bank');
     return null;
   }
 
-  return (
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={styles.iconWrap}>
-            <Text style={styles.icon}>🔐</Text>
-          </View>
+  const NUMPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'] as const;
 
-          <Text style={styles.title}>Verify your identity</Text>
-          <Text style={styles.body}>
-            Nigerian regulations require identity verification before linking a bank account.
-            Enter your 11-digit BVN to continue. Your BVN is never stored — only your name is
-            checked against your registration.
+  return (
+    <View style={[authS.screen, { backgroundColor: colors.white }]}>
+      {/* ── Dark green curved header ── */}
+      <View style={[authS.authHdr, { backgroundColor: colors.darkGreen }]}>
+        <BackBtn onPress={() => router.back()} />
+        <Text style={[authS.authTitle, { color: colors.white }]}>Prove it&apos;s you, once.</Text>
+        <Text style={[authS.authSub, { color: 'rgba(255,255,255,0.5)' }]}>
+          We verify your BVN with Interswitch — we never store, see, or share it.
+        </Text>
+      </View>
+
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={[authS.body, { paddingTop: 16 }]} showsVerticalScrollIndicator={false}>
+          {/* Trust card */}
+          <TrustCard
+            text="CBN-compliant identity check — MoniMata does not store your BVN. It is sent once to Interswitch's identity service and immediately discarded."
+            colors={colors}
+          />
+
+          {error ? (
+            <View style={[authS.errorBanner, { backgroundColor: colors.errorSubtle, marginBottom: 16 }]}>
+              <Text style={[authS.errorText, { color: colors.error }]}>{error}</Text>
+            </View>
+          ) : null}
+
+          {/* Label */}
+          <Text style={[authS.fieldLbl, { color: colors.textSecondary, marginBottom: 12 }]}>
+            Enter your 11-digit BVN
           </Text>
 
-          {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
-
-          <Text style={styles.label}>Bank Verification Number (BVN)</Text>
+          {/* 11 digit boxes */}
           <Controller
             control={control}
             name="bvn"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <TextInput
-                style={[styles.input, errors.bvn ? styles.inputError : null]}
-                value={value}
-                onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, 11))}
-                onBlur={onBlur}
-                placeholder="e.g. 12345678901"
-                keyboardType="numeric"
-                maxLength={11}
-                placeholderTextColor="#9CA3AF"
-              />
+            render={() => (
+              <View style={bvnS.boxes}>
+                {Array.from({ length: 11 }).map((_, i) => {
+                  const filled = i < bvnValue.length;
+                  const active = i === bvnValue.length;
+                  return (
+                    <View
+                      key={i}
+                      style={[
+                        bvnS.box,
+                        {
+                          borderColor: filled || active ? colors.brand : colors.border,
+                          backgroundColor: filled ? colors.surface : colors.white,
+                        },
+                        active && { shadowColor: colors.brand, shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
+                      ]}
+                    >
+                      <Text style={[bvnS.boxText, { color: colors.brand }]}>
+                        {filled ? bvnValue[i] : ''}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
             )}
           />
-          <Text style={styles.hint}>
-            {bvnValue.length}/11 digits — Dial *565*0# on any network to retrieve your BVN
-          </Text>
-          {errors.bvn ? <Text style={styles.fieldError}>{errors.bvn.message}</Text> : null}
 
+          {/* Digit count + USSD hint */}
+          <Text style={[bvnS.count, { color: colors.textMeta }]}>{bvnValue.length}/11 digits</Text>
+          <View style={[bvnS.ussdHint, { backgroundColor: colors.warningSubtle, borderColor: 'rgba(245,158,11,0.2)' }]}>
+            <Text style={[bvnS.ussdText, { color: '#78350F' }]}>
+              Dial <Text style={bvnS.ussdCode}>*565*0#</Text> on any network to retrieve your BVN
+            </Text>
+          </View>
+
+          {/* Numpad */}
+          <View style={bvnS.numpad}>
+            {NUMPAD.map((key, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  bvnS.numKey,
+                  { backgroundColor: key === '' ? 'transparent' : colors.surface },
+                  key === '' && { elevation: 0 },
+                ]}
+                onPress={() => {
+                  if (key === 'del') handleDelete();
+                  else if (key !== '') handleNumpad(key);
+                }}
+                disabled={key === ''}
+                activeOpacity={0.65}
+              >
+                {key === 'del' ? (
+                  <Ionicons name="backspace-outline" size={20} color={colors.textSecondary} />
+                ) : (
+                  <Text style={[bvnS.numKeyText, { color: colors.textPrimary }]}>{key}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Verify button */}
           <TouchableOpacity
-            style={[styles.btn, (loading || bvnValue.length !== 11) && styles.btnDisabled]}
+            style={[
+              authS.btnGreen,
+              { backgroundColor: colors.brand },
+              (loading || bvnValue.length !== 11) && authS.btnDisabled,
+            ]}
             onPress={handleSubmit(onSubmit)}
             disabled={loading || bvnValue.length !== 11}
+            accessibilityRole="button"
+            accessibilityLabel="Verify identity"
+            accessibilityState={{ disabled: loading || bvnValue.length !== 11 }}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.btnText}>Verify Identity</Text>
-            )}
+            {loading
+              ? <ActivityIndicator color={colors.white} />
+              : <Text style={[authS.btnText, { color: colors.white }]}>Verify Identity</Text>}
           </TouchableOpacity>
+          {errors.bvn ? <Text style={[authS.fieldErr, { color: colors.error, textAlign: 'center', marginTop: 8 }]}>{errors.bvn.message}</Text> : null}
 
-          <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipLink}>
-            <Text style={styles.skipText}>Skip for now (limited features)</Text>
+          {/* Skip link */}
+          <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={{ alignItems: 'center', marginTop: 16 }}>
+            <Text style={[{ ...ff(400), fontSize: 12, textDecorationLine: 'underline' }, { color: colors.textTertiary }]}>
+              Skip for now (limited features)
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  container: { flex: 1, padding: 24, paddingTop: 48 },
-  iconWrap: { alignItems: 'center', marginBottom: 24 },
-  icon: { fontSize: 56 },
-  title: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 12, textAlign: 'center' },
-  body: {
-    fontSize: 14, color: '#6B7280', lineHeight: 22,
-    textAlign: 'center', marginBottom: 32,
+const bvnS = StyleSheet.create({
+  boxes: {
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    flexWrap: 'nowrap',
   },
-  errorBanner: {
-    backgroundColor: '#FEE2E2', color: '#DC2626',
-    padding: 12, borderRadius: 10, marginBottom: 16, fontSize: 14,
+  box: {
+    width: 27,
+    height: 38,
+    borderWidth: 1.5,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
-  input: {
-    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 13, fontSize: 18,
-    color: '#111827', backgroundColor: '#F9FAFB', letterSpacing: 4,
-    textAlign: 'center',
+  boxText: { ...ff(800), fontSize: 16 },
+  count: { ...ff(400), fontSize: 12, textAlign: 'center', marginTop: 8, marginBottom: 12 },
+  ussdHint: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 16,
   },
-  inputError: { borderColor: '#DC2626' },
-  fieldError: { color: '#DC2626', fontSize: 12, marginTop: 4, textAlign: 'center' },
-  hint: { fontSize: 12, color: '#9CA3AF', marginTop: 8, marginBottom: 16, textAlign: 'center' },
-  btn: {
-    backgroundColor: '#0F7B3F', borderRadius: 14,
-    paddingVertical: 16, alignItems: 'center', marginTop: 16,
+  ussdText: { ...ff(400), fontSize: 12 },
+  ussdCode: { ...ff(700) },
+  numpad: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  skipLink: { marginTop: 20, alignItems: 'center' },
-  skipText: { color: '#9CA3AF', fontSize: 13 },
+  numKey: {
+    width: '30%',
+    height: 54,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  numKeyText: { ...ff(600), fontSize: 19 },
 });

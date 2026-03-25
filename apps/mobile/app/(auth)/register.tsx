@@ -17,6 +17,12 @@
 /**
  * Register screen — email, password, first/last name, phone.
  * On success → navigates to BVN verification.
+ *
+ * Visual matches scr-register in MoniMata_V5.html:
+ * - Dark green curved header (.auth-hdr)
+ * - Animated focus inputs (.inp)
+ * - Brand green submit button (.btn-green)
+ * Form logic (react-hook-form + zod + Redux) is unchanged.
  */
 import { clearError, register } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -25,14 +31,18 @@ import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
-  StyleSheet,
-  Text, TextInput, TouchableOpacity,
+  Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
+
+import { useTheme } from '@/lib/theme';
+import { ff } from '@/lib/typography';
+import { AuthInput, BackBtn, s } from './_authShared';
 
 const schema = z.object({
   first_name: z.string().min(1, 'First name is required'),
@@ -54,6 +64,7 @@ type FormValues = z.infer<typeof schema>;
 export default function RegisterScreen() {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.auth);
+  const colors = useTheme();
 
   const {
     control,
@@ -86,36 +97,46 @@ export default function RegisterScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={[s.screen, { backgroundColor: colors.white }]}>
+      {/* ── Dark green header ── */}
+      <View style={[s.authHdr, { backgroundColor: colors.darkGreen }]}>
+        <BackBtn onPress={() => router.back()} />
+        <Text style={[s.authTitle, { color: colors.white }]}>Create your account</Text>
+        <Text style={[s.authSub, { color: 'rgba(255,255,255,0.45)' }]}>3 quick fields, then you're in</Text>
+      </View>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <TouchableOpacity onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Go back">
-            <Text style={styles.backText}>← Back</Text>
-          </TouchableOpacity>
+        <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
+          {error ? (
+            <View style={[s.errorBanner, { backgroundColor: colors.errorSubtle }]}>
+              <Text style={[s.errorText, { color: colors.error }]}>{error}</Text>
+            </View>
+          ) : null}
 
-          <Text style={styles.title}>Create your account</Text>
-          <Text style={styles.sub}>It&apos;s free. No credit card needed.</Text>
-
-          {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
-
-          <View style={styles.row}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
             <Controller
               control={control}
               name="first_name"
               render={({ field: { value, onChange, onBlur } }) => (
-                <Field label="First name" value={value} onChangeText={onChange} onBlur={onBlur}
-                  placeholder="Emeka" error={errors.first_name?.message} style={{ flex: 1 }} />
+                <View style={[s.field, { flex: 1 }]}>
+                  <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>First Name</Text>
+                  <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Emeka" hasError={!!errors.first_name} colors={colors} />
+                  {errors.first_name ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.first_name.message}</Text> : null}
+                </View>
               )}
             />
             <Controller
               control={control}
               name="last_name"
               render={({ field: { value, onChange, onBlur } }) => (
-                <Field label="Last name" value={value} onChangeText={onChange} onBlur={onBlur}
-                  placeholder="Okafor" error={errors.last_name?.message} style={{ flex: 1 }} />
+                <View style={[s.field, { flex: 1 }]}>
+                  <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Last Name</Text>
+                  <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Okafor" hasError={!!errors.last_name} colors={colors} />
+                  {errors.last_name ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.last_name.message}</Text> : null}
+                </View>
               )}
             />
           </View>
@@ -124,9 +145,11 @@ export default function RegisterScreen() {
             control={control}
             name="email"
             render={({ field: { value, onChange, onBlur } }) => (
-              <Field label="Email address" value={value} onChangeText={onChange} onBlur={onBlur}
-                placeholder="emeka@example.com" keyboardType="email-address" autoCapitalize="none"
-                error={errors.email?.message} />
+              <View style={s.field}>
+                <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Email Address</Text>
+                <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="emeka@example.com" keyboardType="email-address" autoCapitalize="none" hasError={!!errors.email} colors={colors} />
+                {errors.email ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.email.message}</Text> : null}
+              </View>
             )}
           />
 
@@ -134,9 +157,11 @@ export default function RegisterScreen() {
             control={control}
             name="phone"
             render={({ field: { value, onChange, onBlur } }) => (
-              <Field label="Phone (optional)" value={value} onChangeText={onChange} onBlur={onBlur}
-                placeholder="08012345678" keyboardType="phone-pad"
-                error={errors.phone?.message} />
+              <View style={s.field}>
+                <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Phone (optional)</Text>
+                <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="08012345678" keyboardType="phone-pad" hasError={!!errors.phone} colors={colors} />
+                {errors.phone ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.phone.message}</Text> : null}
+              </View>
             )}
           />
 
@@ -144,9 +169,11 @@ export default function RegisterScreen() {
             control={control}
             name="password"
             render={({ field: { value, onChange, onBlur } }) => (
-              <Field label="Password" value={value} onChangeText={onChange} onBlur={onBlur}
-                placeholder="Min. 8 characters" secureTextEntry
-                error={errors.password?.message} />
+              <View style={s.field}>
+                <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Password</Text>
+                <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Min. 8 characters" secureTextEntry hasError={!!errors.password} colors={colors} />
+                {errors.password ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.password.message}</Text> : null}
+              </View>
             )}
           />
 
@@ -154,91 +181,42 @@ export default function RegisterScreen() {
             control={control}
             name="confirm_password"
             render={({ field: { value, onChange, onBlur } }) => (
-              <Field label="Confirm password" value={value} onChangeText={onChange} onBlur={onBlur}
-                placeholder="Repeat password" secureTextEntry
-                error={errors.confirm_password?.message} />
+              <View style={s.field}>
+                <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Confirm Password</Text>
+                <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Repeat password" secureTextEntry hasError={!!errors.confirm_password} colors={colors} />
+                {errors.confirm_password ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.confirm_password.message}</Text> : null}
+              </View>
             )}
           />
 
           <TouchableOpacity
-            style={[styles.btn, loading && styles.btnDisabled]}
+            style={[s.btnGreen, { backgroundColor: colors.brand }, loading && s.btnDisabled]}
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Create account"
+            accessibilityState={{ disabled: loading, busy: loading }}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.btnText}>Create Account</Text>
-            )}
+            {loading ? <ActivityIndicator color={colors.white} /> : <Text style={[s.btnText, { color: colors.white }]}>Create Account</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={styles.loginLink}>
-            <Text style={styles.loginLinkText}>
-              Already have an account? <Text style={styles.loginLinkBold}>Log in</Text>
+          <View style={s.tosWrap}>
+            <Text style={[s.tosText, { color: colors.textMeta }]}>
+              By creating an account, you agree to our{' '}
+              <Text style={[s.tosLink, { color: colors.textSecondary }]}>Terms of Service</Text>
+              {' '}and{' '}
+              <Text style={[s.tosLink, { color: colors.textSecondary }]}>Privacy Policy</Text>.
+            </Text>
+          </View>
+
+          <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={s.navLink}>
+            <Text style={[s.navLinkText, { color: colors.textMeta }]}>
+              Already have an account?{' '}
+              <Text style={{ color: colors.brand, ...ff(700) }}>Sign in</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-}
-
-function Field({
-  label, error, style, ...props
-}: React.ComponentProps<typeof TextInput> & { label: string; error?: string; style?: object }) {
-  return (
-    <View style={[styles.fieldWrapper, style]}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={[styles.input, error ? styles.inputError : null]}
-        placeholderTextColor="#9CA3AF"
-        {...props}
-      />
-      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  container: { padding: 24, paddingBottom: 48 },
-  back: { marginBottom: 24 },
-  backText: { color: '#0F7B3F', fontSize: 15, fontWeight: '600' },
-  title: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 4 },
-  sub: { fontSize: 14, color: '#6B7280', marginBottom: 24 },
-  errorBanner: {
-    backgroundColor: '#FEE2E2',
-    color: '#DC2626',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
-    fontSize: 14,
-  },
-  row: { flexDirection: 'row', gap: 12 },
-  fieldWrapper: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontSize: 15,
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
-  },
-  inputError: { borderColor: '#DC2626' },
-  fieldError: { color: '#DC2626', fontSize: 12, marginTop: 4 },
-  btn: {
-    backgroundColor: '#0F7B3F',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  loginLink: { marginTop: 20, alignItems: 'center' },
-  loginLinkText: { color: '#6B7280', fontSize: 14 },
-  loginLinkBold: { color: '#0F7B3F', fontWeight: '700' },
-});
