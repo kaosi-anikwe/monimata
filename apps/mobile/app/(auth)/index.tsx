@@ -19,12 +19,19 @@
  * Entry point for unauthenticated users.
  */
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+
+import { useTheme } from '@/lib/theme';
+import { ff } from '@/lib/typography';
 
 export default function WelcomeScreen() {
+  const colors = useTheme();
+  const styles = makeStyles(colors);
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="light" />
       <View style={styles.hero}>
         <Text style={styles.logo}>₦ MoniMata</Text>
         <Text style={styles.tagline}>Every Kobo, Accounted For.</Text>
@@ -45,26 +52,28 @@ export default function WelcomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F7B3F', padding: 24 },
-  hero: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  logo: { fontSize: 40, fontWeight: '800', color: '#fff', letterSpacing: -1 },
-  tagline: { fontSize: 18, fontWeight: '600', color: '#A7F3C8', textAlign: 'center' },
-  sub: { fontSize: 15, color: '#D1FAE5', textAlign: 'center', lineHeight: 22, paddingHorizontal: 16 },
-  actions: { gap: 12, paddingBottom: 8 },
-  btnPrimary: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  btnPrimaryText: { color: '#0F7B3F', fontSize: 16, fontWeight: '700' },
-  btnSecondary: {
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.6)',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  btnSecondaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-});
+function makeStyles(colors: ReturnType<typeof useTheme>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.darkGreen, padding: 24 },
+    hero: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+    logo: { fontSize: 40, color: colors.white, letterSpacing: -1, ...ff(800) },
+    tagline: { fontSize: 18, color: colors.lime, textAlign: 'center', ...ff(600) },
+    sub: { fontSize: 15, color: colors.lime3, textAlign: 'center', lineHeight: 22, paddingHorizontal: 16, ...ff(400) },
+    actions: { gap: 12, paddingBottom: 8 },
+    btnPrimary: {
+      backgroundColor: colors.white,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    btnPrimaryText: { color: colors.brand, fontSize: 16, ...ff(700) },
+    btnSecondary: {
+      borderWidth: 2,
+      borderColor: colors.textInverseMid,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    btnSecondaryText: { color: colors.white, fontSize: 16, ...ff(600) },
+  });
+}

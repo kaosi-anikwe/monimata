@@ -25,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -398,6 +399,7 @@ export default function TransactionsScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style="dark" />
       {/* ── Header ── */}
       <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         {/* Title row */}

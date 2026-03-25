@@ -236,12 +236,12 @@ export function BottomSheet({
         {!preventClose && (
           <TouchableWithoutFeedback onPress={dismiss} accessibilityLabel="Close sheet">
             <Animated.View
-              style={[s.backdrop, backdropStyle]}
+              style={[s.backdrop, { backgroundColor: colors.overlayDarkHeavy }, backdropStyle]}
             />
           </TouchableWithoutFeedback>
         )}
         {preventClose && (
-          <Animated.View style={[s.backdrop, backdropStyle]} pointerEvents="none" />
+          <Animated.View style={[s.backdrop, { backgroundColor: colors.overlayDarkHeavy }, backdropStyle]} pointerEvents="none" />
         )}
 
         {sheetContent}

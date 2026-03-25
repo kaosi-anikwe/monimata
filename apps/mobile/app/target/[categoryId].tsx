@@ -26,6 +26,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -488,6 +489,7 @@ export default function TargetEditScreen() {
 
   return (
     <View style={[ts.flex, { backgroundColor: colors.background }]}>
+      <StatusBar style="light" />
       {/* ── Dark green header ── */}
       <View
         style={[ts.hdr, {
@@ -505,7 +507,7 @@ export default function TargetEditScreen() {
           <TouchableOpacity
             onPress={() => router.back()}
             hitSlop={12}
-            style={ts.backBtn}
+            style={[ts.backBtn, { backgroundColor: colors.overlayGhost }]}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
@@ -519,7 +521,7 @@ export default function TargetEditScreen() {
 
         {/* Pill tab bar (.hub-tabs style) */}
         <View
-          style={[ts.pillBar, { backgroundColor: 'rgba(255,255,255,0.08)' }]}
+          style={[ts.pillBar, { backgroundColor: colors.overlayGhost }]}
           onLayout={(e) => {
             const w = e.nativeEvent.layout.width;
             setPillBarWidth(w);
@@ -544,7 +546,7 @@ export default function TargetEditScreen() {
               onPress={() => handleTabPress(t)}
               activeOpacity={0.8}
             >
-              <Text style={[ts.pillTabText, { color: tab === t ? colors.darkGreen : 'rgba(255,255,255,0.5)' }]}>
+              <Text style={[ts.pillTabText, { color: tab === t ? colors.darkGreen : colors.textInverseSecondary }]}>
                 {TAB_LABELS[t]}
               </Text>
             </TouchableOpacity>
@@ -645,7 +647,7 @@ const ts = StyleSheet.create({
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'transparent', // overridden inline with colors.overlayGhost
   },
 
   // ── Pill tab bar (.hub-tabs) ──────────────────────────────────────────────

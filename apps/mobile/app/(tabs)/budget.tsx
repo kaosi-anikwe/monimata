@@ -27,6 +27,7 @@
  */
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -414,7 +415,7 @@ function AssignSheet({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableOpacity style={sh.backdrop} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity style={[sh.backdrop, { backgroundColor: colors.overlayNeutral }]} activeOpacity={1} onPress={onClose} />
       <View style={sh.outer}>
         <View style={[sh.sheet, { backgroundColor: colors.white }]}>
           {/* Handle */}
@@ -888,6 +889,7 @@ export default function BudgetScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
+      <StatusBar style="dark" />
       <MonthHeader month={selectedMonth} tbb={data?.tbb ?? 0} />
 
       <ScrollView

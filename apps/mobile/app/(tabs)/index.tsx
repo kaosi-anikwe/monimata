@@ -33,6 +33,7 @@ import { ProgressBar } from '@/components/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
 import {
   RefreshControl,
@@ -141,6 +142,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
+      <StatusBar style="light" />
 
       {/* ── Dark green header (.home-hdr) ─────────────────────────────────── */}
       <View
@@ -281,7 +283,7 @@ export default function HomeScreen() {
         {firstNudge ? (
           <View style={s.sec}>
             <TouchableOpacity
-              style={[s.nudgePill, { backgroundColor: colors.warningSubtle, borderColor: 'rgba(245,158,11,0.22)' }]}
+              style={[s.nudgePill, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorderLight }]}
               onPress={() => router.push('/(tabs)/nudges')}
               activeOpacity={0.85}
               accessibilityRole="button"

@@ -57,7 +57,7 @@ export function Divider({
 
   const color =
     variant === 'dark'
-      ? 'rgba(255,255,255,0.06)'
+      ? colors.separatorInverse
       : colors.border;
 
   return (

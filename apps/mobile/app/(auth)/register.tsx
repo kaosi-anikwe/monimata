@@ -28,6 +28,7 @@ import { clearError, register } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
@@ -98,11 +99,12 @@ export default function RegisterScreen() {
 
   return (
     <View style={[s.screen, { backgroundColor: colors.white }]}>
+      <StatusBar style="light" />
       {/* ── Dark green header ── */}
       <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[s.authTitle, { color: colors.white }]}>Create your account</Text>
-        <Text style={[s.authSub, { color: 'rgba(255,255,255,0.45)' }]}>3 quick fields, then you’re in</Text>
+        <Text style={[s.authSub, { color: colors.textInverseSecondary }]}>3 quick fields, then you're in</Text>
       </AuthHdr>
 
       <KeyboardAvoidingView

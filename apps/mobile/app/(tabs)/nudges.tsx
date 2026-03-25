@@ -28,6 +28,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -457,6 +458,7 @@ export default function NudgesScreen() {
 
   return (
     <View style={[ss.root, { backgroundColor: colors.background }]}>
+      <StatusBar style="light" />
       {/* Dark-green header */}
       <View
         style={[

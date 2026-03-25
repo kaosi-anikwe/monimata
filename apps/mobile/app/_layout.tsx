@@ -49,7 +49,9 @@ import { useBiometricLock } from '@/hooks/useBiometricLock';
 import { useJobEvents } from '@/hooks/useJobEvents';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { initSentry, Sentry } from '@/lib/sentry';
-import { getTheme } from '@/lib/theme';
+import { getTheme, useTheme } from '@/lib/theme';
+import { ThemeProvider } from '@/lib/ThemeProvider';
+import { radius, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
 import { setLogoutHandler } from '@/services/api';
 import { store } from '@/store';
@@ -92,6 +94,8 @@ function RootNavigator() {
 
   // Biometric lock.
   const { isLocked, unlock } = useBiometricLock();
+  const colors = useTheme();
+  const ns = makeNsStyles(colors);
 
   useEffect(() => {
     dispatch(restoreSession());
@@ -131,7 +135,7 @@ function RootNavigator() {
 
   return (
     <>
-      <StatusBar style='dark' />
+      <StatusBar style='auto' />
       <Stack screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <Stack.Screen name="(tabs)" />
@@ -150,7 +154,7 @@ function RootNavigator() {
         <View style={ns.overlay}>
           <View style={ns.card}>
             <View style={ns.iconWrap}>
-              <Ionicons name="notifications" size={36} color="#0F7B3F" />
+              <Ionicons name="notifications" size={36} color={colors.brand} />
             </View>
             <Text style={ns.title}>Stay on top of your budget</Text>
             <Text style={ns.body}>
@@ -165,7 +169,7 @@ function RootNavigator() {
                 ['bulb-outline', 'Smart tips based on your spending patterns'],
               ] as const).map(([icon, label]) => (
                 <View key={label} style={ns.bullet}>
-                  <Ionicons name={icon} size={16} color="#0F7B3F" style={ns.bulletIcon} />
+                  <Ionicons name={icon} size={16} color={colors.brand} style={ns.bulletIcon} />
                   <Text style={ns.bulletText}>{label}</Text>
                 </View>
               ))}
@@ -184,61 +188,67 @@ function RootNavigator() {
   );
 }
 
-const ns = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 28,
-    width: '100%',
-    maxWidth: 380,
-    alignItems: 'center',
-  },
-  iconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#ECFDF5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  body: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 18,
-  },
-  bullets: { width: '100%', marginBottom: 24, gap: 10 },
-  bullet: { flexDirection: 'row', alignItems: 'center' },
-  bulletIcon: { marginRight: 10 },
-  bulletText: { fontSize: 13, color: '#374151', flex: 1 },
-  allowBtn: {
-    backgroundColor: '#0F7B3F',
-    borderRadius: 12,
-    paddingVertical: 14,
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  allowBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  laterBtn: { paddingVertical: 8 },
-  laterBtnText: { color: '#6B7280', fontSize: 14 },
-});
+function makeNsStyles(colors: ReturnType<typeof useTheme>) {
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: colors.overlayDark,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.xxl,
+    },
+    card: {
+      backgroundColor: colors.white,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.xxl,
+      width: '100%',
+      maxWidth: 380,
+      alignItems: 'center',
+    },
+    iconWrap: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: colors.successSubtle,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 18,
+    },
+    title: {
+      fontSize: 20,
+      color: colors.textPrimary,
+      textAlign: 'center',
+      marginBottom: spacing.smd,
+      letterSpacing: -0.3,
+      ...ff(800),
+    },
+    body: {
+      fontSize: 14,
+      color: colors.textMeta,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 18,
+      ...ff(400),
+    },
+    bullets: { width: '100%', marginBottom: spacing.xxl, gap: spacing.smd },
+    bullet: { flexDirection: 'row', alignItems: 'center' },
+    bulletIcon: { marginRight: spacing.smd },
+    bulletText: { fontSize: 13, color: colors.textSecondary, flex: 1, ...ff(500) },
+    allowBtn: {
+      backgroundColor: colors.brand,
+      borderRadius: radius.sm,
+      paddingVertical: spacing.mdn,
+      width: '100%',
+      alignItems: 'center',
+      marginBottom: spacing.smd,
+    },
+    allowBtnText: { color: colors.white, fontSize: 15, ...ff(700) },
+    laterBtn: { paddingVertical: spacing.sm },
+    laterBtnText: { color: colors.textMeta, fontSize: 14, ...ff(500) },
+  });
+}
 
 function RootLayout() {
   // Load Plus Jakarta Sans in all required weights.
@@ -305,7 +315,7 @@ function RootLayout() {
       <View style={{ flex: 1, backgroundColor: c.darkGreen, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
         <ActivityIndicator size="large" color={c.lime} />
         {initTimeout && (
-          <Text style={{ ...ff(400), fontSize: 12, color: 'rgba(255,255,255,0.5)', textAlign: 'center', paddingHorizontal: 32 }}>
+          <Text style={{ ...ff(400), fontSize: 12, color: c.textInverseSecondary, textAlign: 'center', paddingHorizontal: 32 }}>
             {!db ? 'Database is taking longer than expected…' : 'Loading fonts…'}
           </Text>
         )}
@@ -314,19 +324,21 @@ function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Provider store={store}>
-        <QueryClientProvider client={queryClient}>
-          <DatabaseProvider database={db}>
-            <SafeAreaProvider>
-              <ToastProvider>
-                <RootNavigator />
-              </ToastProvider>
-            </SafeAreaProvider>
-          </DatabaseProvider>
-        </QueryClientProvider>
-      </Provider>
-    </GestureHandlerRootView>
+    <ThemeProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Provider store={store}>
+          <QueryClientProvider client={queryClient}>
+            <DatabaseProvider database={db}>
+              <SafeAreaProvider>
+                <ToastProvider>
+                  <RootNavigator />
+                </ToastProvider>
+              </SafeAreaProvider>
+            </DatabaseProvider>
+          </QueryClientProvider>
+        </Provider>
+      </GestureHandlerRootView>
+    </ThemeProvider>
   );
 }
 

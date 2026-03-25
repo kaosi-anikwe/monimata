@@ -28,6 +28,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -419,7 +420,7 @@ function AddCategoryModal({ groupId, month, onClose }: AddCatProps) {
   return (
     <Modal visible={!!groupId} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={ss.modalBackdrop}
+        style={[ss.modalBackdrop, { backgroundColor: colors.overlayNeutral }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={[ss.modalCard, { backgroundColor: colors.white }]}>
@@ -651,6 +652,7 @@ export default function BudgetEditScreen() {
 
   return (
     <View style={[ss.flex, { backgroundColor: colors.background }]}>
+      <StatusBar style="light" />
       {/* ── Dark green header (.edit-hdr) ── */}
       <View
         style={[ss.hdr, { paddingTop: insets.top + 10, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl }]}
@@ -786,7 +788,7 @@ export default function BudgetEditScreen() {
         onRequestClose={() => setAddGroupOpen(false)}
       >
         <KeyboardAvoidingView
-          style={ss.modalBackdrop}
+          style={[ss.modalBackdrop, { backgroundColor: colors.overlayNeutral }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={[ss.modalCard, { backgroundColor: colors.white }]}>

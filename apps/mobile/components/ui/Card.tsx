@@ -86,7 +86,7 @@ export function Card({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: variant === 'dark'
-      ? 'rgba(168,224,99,0.13)'
+      ? colors.limeBadgeBg
       : colors.border,
     ...(elevated ? shadow.md : shadow.sm),
   };

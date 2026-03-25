@@ -34,6 +34,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
@@ -102,11 +103,12 @@ export default function VerifyBVNScreen() {
 
   return (
     <View style={[authS.screen, { backgroundColor: colors.white }]}>
+      <StatusBar style="light" />
       {/* ── Dark green curved header ── */}
       <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[authS.authTitle, { color: colors.white }]}>Prove it&apos;s you, once.</Text>
-        <Text style={[authS.authSub, { color: 'rgba(255,255,255,0.5)' }]}>
+        <Text style={[authS.authSub, { color: colors.textInverseSecondary }]}>
           We verify your BVN with Interswitch — we never store, see, or share it.
         </Text>
       </AuthHdr>
@@ -163,8 +165,8 @@ export default function VerifyBVNScreen() {
 
           {/* Digit count + USSD hint */}
           <Text style={[bvnS.count, { color: colors.textMeta }]}>{bvnValue.length}/11 digits</Text>
-          <View style={[bvnS.ussdHint, { backgroundColor: colors.warningSubtle, borderColor: 'rgba(245,158,11,0.2)' }]}>
-            <Text style={[bvnS.ussdText, { color: '#78350F' }]}>
+          <View style={[bvnS.ussdHint, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorderLight }]}>
+            <Text style={[bvnS.ussdText, { color: colors.warningText }]}>
               Dial <Text style={bvnS.ussdCode}>*565*0#</Text> on any network to retrieve your BVN
             </Text>
           </View>

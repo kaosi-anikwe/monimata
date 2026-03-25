@@ -67,6 +67,7 @@
  *   --bds  → borderStrong    rgba(45,106,45,0.25)
  */
 
+import { createContext, useContext } from 'react';
 import { useColorScheme } from 'react-native';
 
 export type ColorScheme = 'light' | 'dark';
@@ -167,6 +168,12 @@ export interface ThemeColors {
   purpleBorder: string;
   /** Amber at 30% opacity — warning card / reauth card borders. */
   warningBorder: string;
+  /** successText (#2E7D32) at 25% — success toast border. */
+  successBorder: string;
+  /** error (#D93025) at 25% — error toast border. */
+  errorBorder: string;
+  /** info (#2563EB) at 25% — info toast border. */
+  infoBorder: string;
 
   // ── On-dark text hierarchy (elements on darkGreen card backgrounds) ───────
   /** ~40% white — muted labels and icon strokes on darkGreen backgrounds. */
@@ -185,6 +192,38 @@ export interface ThemeColors {
   overlayGhostBorder: string;
   /** 70% white — readable but de-emphasised text on dark-green headers. */
   textInverseMid: string;
+
+  // ── Modal / sheet scrim overlays ─────────────────────────────────────────
+  /** darkGreen at 50% — confirm dialog backdrop. */
+  overlayDark: string;
+  /** darkGreen at 40% — action sheet backdrop. */
+  overlayDarkMid: string;
+  /** darkGreen at 55% — BottomSheet heavy backdrop. */
+  overlayDarkHeavy: string;
+  /** Pure black at 45% — neutral date-picker / modal scrim (not brand-tinted). */
+  overlayNeutral: string;
+  /** white at 20% — ghost button / disabled borders on dark surfaces. */
+  overlayGhostMid: string;
+
+  // ── Extended lime overlays ────────────────────────────────────────────────
+  /** lime at 30% — avatar and component outline borders. */
+  limeBorder: string;
+  /** lime at 40% — strong lime ring (profile header avatar). */
+  limeBorderStrong: string;
+  /** lime at 12% — very subtle lime background tint (gamification badges). */
+  limeBadgeBg: string;
+
+  // ── Extended inverse text scale ──────────────────────────────────────────
+  /** white at 90% — near-opaque text/icons on dark headers and gradients. */
+  textInverseHigh: string;
+  /** white at 55% — mid-bright narration / caption text on dark headers. */
+  textInverseSub: string;
+  /** white at 6% — hairline separator on dark surfaces. */
+  separatorInverse: string;
+
+  // ── Extended warning ─────────────────────────────────────────────────────
+  /** amber at 20% — lighter warning border variant (hint cards, nudge pills). */
+  warningBorderLight: string;
 }
 
 // ─── Light theme ─────────────────────────────────────────────────────────────
@@ -248,6 +287,9 @@ export const lightColors: ThemeColors = {
   borderBrand: 'rgba(45,106,45,0.2)',
   purpleBorder: 'rgba(124,58,237,0.2)',
   warningBorder: 'rgba(245,158,11,0.3)',
+  successBorder: 'rgba(46,125,50,0.25)',
+  errorBorder: 'rgba(217,48,37,0.25)',
+  infoBorder: 'rgba(37,99,235,0.25)',
 
   // On-dark text
   textInverseFaint: 'rgba(255,255,255,0.4)',
@@ -260,6 +302,26 @@ export const lightColors: ThemeColors = {
   overlayGhost: 'rgba(255,255,255,0.10)',
   overlayGhostBorder: 'rgba(255,255,255,0.12)',
   textInverseMid: 'rgba(255,255,255,0.70)',
+
+  // Modal / sheet scrim overlays
+  overlayDark: 'rgba(13,31,13,0.5)',
+  overlayDarkMid: 'rgba(13,31,13,0.4)',
+  overlayDarkHeavy: 'rgba(13,31,13,0.55)',
+  overlayNeutral: 'rgba(0,0,0,0.45)',
+  overlayGhostMid: 'rgba(255,255,255,0.2)',
+
+  // Extended lime overlays
+  limeBorder: 'rgba(168,224,99,0.3)',
+  limeBorderStrong: 'rgba(168,224,99,0.4)',
+  limeBadgeBg: 'rgba(168,224,99,0.12)',
+
+  // Extended inverse text scale
+  textInverseHigh: 'rgba(255,255,255,0.9)',
+  textInverseSub: 'rgba(255,255,255,0.55)',
+  separatorInverse: 'rgba(255,255,255,0.06)',
+
+  // Extended warning
+  warningBorderLight: 'rgba(245,158,11,0.2)',
 };
 
 // ─── Dark theme ──────────────────────────────────────────────────────────────
@@ -325,6 +387,9 @@ export const darkColors: ThemeColors = {
   borderBrand: 'rgba(168,224,99,0.2)',     // lime-based in dark mode
   purpleBorder: 'rgba(167,139,250,0.2)',   // A78BFA (lighter purple) in dark
   warningBorder: 'rgba(251,191,36,0.3)',   // amber-400 in dark
+  successBorder: 'rgba(168,224,99,0.3)',   // lime @ 30% on dark success-subtle
+  errorBorder: 'rgba(248,113,113,0.3)',    // F87171 (dark error) @ 30%
+  infoBorder: 'rgba(96,165,250,0.3)',      // 60A5FA (dark info) @ 30%
 
   // On-dark text (always relative to darkGreen card — same in both modes)
   textInverseFaint: 'rgba(255,255,255,0.4)',
@@ -337,6 +402,26 @@ export const darkColors: ThemeColors = {
   overlayGhost: 'rgba(255,255,255,0.10)',
   overlayGhostBorder: 'rgba(255,255,255,0.12)',
   textInverseMid: 'rgba(255,255,255,0.70)',
+
+  // Modal / sheet scrim overlays
+  overlayDark: 'rgba(13,31,13,0.5)',
+  overlayDarkMid: 'rgba(13,31,13,0.4)',
+  overlayDarkHeavy: 'rgba(13,31,13,0.55)',
+  overlayNeutral: 'rgba(0,0,0,0.6)',   // slightly heavier in dark mode
+  overlayGhostMid: 'rgba(255,255,255,0.2)',
+
+  // Extended lime overlays (lime-on-dark is the same in both modes)
+  limeBorder: 'rgba(168,224,99,0.3)',
+  limeBorderStrong: 'rgba(168,224,99,0.4)',
+  limeBadgeBg: 'rgba(168,224,99,0.12)',
+
+  // Extended inverse text scale (always on dark-green surfaces)
+  textInverseHigh: 'rgba(255,255,255,0.9)',
+  textInverseSub: 'rgba(255,255,255,0.55)',
+  separatorInverse: 'rgba(255,255,255,0.06)',
+
+  // Extended warning
+  warningBorderLight: 'rgba(245,158,11,0.2)',
 };
 
 // ─── Gradient presets ─────────────────────────────────────────────────────────
@@ -347,6 +432,8 @@ export const GRADIENTS = {
   darkHeader: ['#060E06', '#0D1A0D', '#081408'] as const,
   /** Dark green card backgrounds (budget header, edit header). */
   darkCard: ['#0D1F0D', '#1A3A1A'] as const,
+  /** Dark red — expense/debit transaction hero header. */
+  expenseHdr: ['#1F0D0D', '#3A1A1A'] as const,
   /** Brand progress fill — left to right brand→lime. */
   brandProgress: ['#2D6A2D', '#A8E063'] as const,
   /** Lime FAB glow. */
@@ -363,11 +450,44 @@ export function getTheme(scheme: string | null | undefined): ThemeColors {
   return scheme === 'dark' ? darkColors : lightColors;
 }
 
+// ─── Theme preference context ─────────────────────────────────────────────────
+// Stores the user's manual dark/light override, persisted to SecureStore.
+// ThemeProvider (the component) lives in lib/ThemeProvider.tsx (JSX file).
+// Set overrideScheme to null to follow the device OS setting.
+
+export const THEME_STORAGE_KEY = 'mm_theme_preference_v1';
+
+export interface ThemeContextValue {
+  overrideScheme: 'light' | 'dark' | null;
+  setOverrideScheme: (scheme: 'light' | 'dark') => void;
+}
+
+export const ThemeContext = createContext<ThemeContextValue>({
+  overrideScheme: null,
+  setOverrideScheme: () => { },
+});
+
 /**
- * React hook — returns the correct token map based on the device's OS setting.
- * Re-renders automatically when the user changes their device appearance.
+ * React hook — returns the correct token map.
+ * Honours the user's manual override (set via the Profile dark-mode toggle);
+ * falls back to the device OS appearance setting.
  */
 export function useTheme(): ThemeColors {
-  const scheme = useColorScheme();
-  return getTheme(scheme);
+  const { overrideScheme } = useContext(ThemeContext);
+  const deviceScheme = useColorScheme();
+  return getTheme(overrideScheme ?? deviceScheme);
+}
+
+/**
+ * Returns whether dark mode is currently active and a setter that persists the
+ * choice to device storage. Use in the Profile screen dark-mode toggle.
+ */
+export function useThemePreference() {
+  const { overrideScheme, setOverrideScheme } = useContext(ThemeContext);
+  const deviceScheme = useColorScheme();
+  const isDark = (overrideScheme ?? deviceScheme) === 'dark';
+  return {
+    isDark,
+    setIsDark: (dark: boolean) => setOverrideScheme(dark ? 'dark' : 'light'),
+  };
 }

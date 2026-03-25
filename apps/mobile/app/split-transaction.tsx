@@ -8,6 +8,7 @@
  * Route: /split-transaction?id=<txId>
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import {
   ScrollView,
@@ -147,7 +148,7 @@ function SplitLineRow({
       {/* Row header: badge + category pill + delete */}
       <View style={ss.splitRowTop}>
         <View style={[ss.splitNumBadge, { backgroundColor: accentColor }]}>
-          <Text style={[ss.splitNumTxt, { color: '#fff' }]}>{index + 1}</Text>
+          <Text style={[ss.splitNumTxt, { color: colors.white }]}>{index + 1}</Text>
         </View>
 
         <TouchableOpacity
@@ -300,6 +301,7 @@ export default function SplitTransactionScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style="dark" />
       {/* ── Header ── */}
       <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity
@@ -419,7 +421,7 @@ export default function SplitTransactionScreen() {
       {/* Sticky remaining pill */}
       {!isBalanced && (
         <View style={[ss.remPill, { backgroundColor: colors.darkGreen }]}>
-          <Text style={ss.remLbl}>Remaining</Text>
+          <Text style={[ss.remLbl, { color: colors.textInverseSecondary }]}>Remaining</Text>
           <Text style={[ss.remVal, { color: remainingKobo > 0 ? colors.warning : colors.error }]}>
             {remainingKobo > 0 ? '' : '−'}{formatNaira(Math.abs(remainingKobo))}
           </Text>
@@ -548,7 +550,7 @@ const ss = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  remLbl: { fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
+  remLbl: { fontSize: 12, fontWeight: '600' },
   remVal: { fontSize: 18, fontWeight: '800', fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.5 },
 
   // Category picker

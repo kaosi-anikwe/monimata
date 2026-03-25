@@ -24,6 +24,7 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -728,6 +729,7 @@ function AccountsContent() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style="dark" />
       {/* ── Header ── */}
       <View
         style={[

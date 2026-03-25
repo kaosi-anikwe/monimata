@@ -83,7 +83,7 @@ export function Avatar({ name, uri, size = 'md', style }: AvatarProps) {
           borderRadius: radius,
           backgroundColor: colors.brand,
           borderWidth: 2,
-          borderColor: 'rgba(168,224,99,0.3)',
+          borderColor: colors.limeBorder,
         },
         style,
       ]}
