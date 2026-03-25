@@ -19,21 +19,31 @@
  * On success, exchanges the one-time auth_code for a linked bank account
  * via POST /accounts/connect.
  *
+ * Visual matches scr-link-bank in MoniMata_V5.html:
+ * - Dark green curved header with "Connect your bank" title
+ * - Mono trust card (powered-by badge)
+ * - Brand green "Connect Bank Account" button
+ * Mono SDK logic is unchanged.
+ *
  * Set EXPO_PUBLIC_MONO_PUBLIC_KEY in apps/mobile/.env
  */
-import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
-} from 'react-native';
-import { router } from 'expo-router';
-import { useSelector } from 'react-redux';
-import { Ionicons } from '@expo/vector-icons';
-import { useMutation } from '@tanstack/react-query';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MonoProvider, useMonoConnect } from '@mono.co/connect-react-native';
+import { useMutation } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text, TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSelector } from 'react-redux';
 
+import { useToast } from '@/components/Toast';
+import { useTheme } from '@/lib/theme';
+import { spacing } from '@/lib/tokens';
 import api from '@/services/api';
 import type { RootState } from '@/store';
-import { useToast } from '@/components/Toast';
+import { BackBtn, TrustCard, s as authS } from './_authShared';
 
 // ── Inner component — must live inside <MonoProvider> to use the hook ────────
 
@@ -43,16 +53,17 @@ interface ConnectButtonProps {
 
 function ConnectButton({ isPending }: ConnectButtonProps) {
   const { init } = useMonoConnect();
+  const colors = useTheme();
 
   return (
     <TouchableOpacity
-      style={[styles.btn, isPending && styles.btnDisabled]}
+      style={[authS.btnGreen, isPending && authS.btnDisabled, { backgroundColor: colors.brand }]}
       onPress={() => init()}
       disabled={isPending}
     >
       {isPending
-        ? <ActivityIndicator color="#fff" />
-        : <Text style={styles.btnText}>Connect Bank Account</Text>}
+        ? <ActivityIndicator color={colors.white} />
+        : <Text style={[authS.btnText, { color: colors.white }]}>Connect Bank Account</Text>}
     </TouchableOpacity>
   );
 }
@@ -101,63 +112,45 @@ export default function LinkBankScreen() {
     },
   };
 
+  const colors = useTheme();
+
   return (
     <MonoProvider {...monoConfig}>
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.container}>
-          <View style={styles.hero}>
-            <Text>
-              <Ionicons name='business' size={64} color="#0F7B3F" />
-            </Text>
-            <Text style={styles.title}>Link your bank account</Text>
-            <Text style={styles.body}>
-              Connect your GTBank, Kuda, Zenith, OPay or any Nigerian bank account.
-              MoniMata will automatically import your transactions every day.
-            </Text>
-            <Text style={styles.security}>
-              🔒 Powered by Mono. Your bank credentials go directly to Mono — MoniMata
-              never sees them.
-            </Text>
-          </View>
+      <View style={[authS.screen, { backgroundColor: colors.white }]}>
+
+        {/* ── Dark green curved header ── */}
+        <View style={[authS.authHdr, { backgroundColor: colors.darkGreen }]}>
+          <BackBtn onPress={() => router.back()} />
+          <Text style={[authS.authTitle, { color: colors.white }]}>Connect your bank</Text>
+          <Text style={[authS.authSub, { color: 'rgba(255,255,255,0.5)' }]}>
+            Automatic transaction sync — no more manual entry
+          </Text>
+        </View>
+
+        {/* ── Body ── */}
+        <View style={[authS.body, { flex: 1, justifyContent: 'space-between' }]}>
+          <TrustCard
+            text="Powered by Mono — your login credentials go directly to your bank and never touch MoniMata's servers."
+            colors={colors}
+          />
 
           <View style={styles.actions}>
             <ConnectButton isPending={connectMutation.isPending} />
-
             <TouchableOpacity
               onPress={() => router.replace('/(tabs)')}
-              style={styles.skipLink}
+              style={authS.navLink}
             >
-              <Text style={styles.skipText}>I&apos;ll do this later</Text>
+              <Text style={[authS.navLinkText, { color: colors.textMeta }]}>
+                I&apos;ll do this later
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     </MonoProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  container: { flex: 1, padding: 24, justifyContent: 'space-between' },
-  hero: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  icon: { fontSize: 64 },
-  title: { fontSize: 26, fontWeight: '800', color: '#111827', textAlign: 'center' },
-  body: {
-    fontSize: 15, color: '#6B7280', lineHeight: 23,
-    textAlign: 'center', paddingHorizontal: 8,
-  },
-  security: {
-    fontSize: 13, color: '#059669', lineHeight: 20,
-    textAlign: 'center', paddingHorizontal: 16,
-    backgroundColor: '#ECFDF5', padding: 12, borderRadius: 10,
-  },
-  actions: { gap: 12, paddingBottom: 8 },
-  btn: {
-    backgroundColor: '#0F7B3F', borderRadius: 14,
-    paddingVertical: 16, alignItems: 'center',
-  },
-  btnDisabled: { opacity: 0.5 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  skipLink: { alignItems: 'center', paddingVertical: 12 },
-  skipText: { color: '#9CA3AF', fontSize: 14 },
+  actions: { gap: spacing.sm, paddingBottom: spacing.lg },
 });

@@ -1,8 +1,8 @@
 # MoniMata — UI Migration Plan
 
-**Document version:** 1.0  
+**Document version:** 1.1  
 **Date:** March 2026  
-**Status:** In Progress  
+**Status:** In Progress — Phase 5 next  
 **Source mockup:** `apps/mobile/MoniMata_V5.html`
 
 > Gradual, screen-by-screen migration from the functional MVP UI to the
@@ -142,9 +142,9 @@
 
 ---
 
-## Phase 0 — Design System
+## Phase 0 — Design System ✅
 
-**Status:** In Progress  
+**Status:** ~~In Progress~~ **Complete**  
 **Files:** `lib/theme.ts`, `lib/tokens.ts`, `lib/typography.ts`
 
 This phase is the prerequisite for every other phase. Establishes one source of
@@ -186,18 +186,19 @@ export const headerHeight = { condensed: 54, standard: 64 };
 
 ### Acceptance Criteria
 
-- [ ] All tokens from design system reference table are present as typed fields.
-- [ ] `lightColors` + `darkColors` values match the HTML `:root` variables
+- [x] All tokens from design system reference table are present as typed fields.
+- [x] `lightColors` + `darkColors` values match the HTML `:root` variables
       precisely (colour-check the hex values).
-- [ ] `lib/tokens.ts` + `lib/typography.ts` compile without errors.
-- [ ] Running `npx tsc --noEmit` produces no new errors.
-- [ ] No existing screen is broken (no import path changes yet — those happen
+- [x] `lib/tokens.ts` + `lib/typography.ts` compile without errors.
+- [x] Running `npx tsc --noEmit` produces no new errors.
+- [x] No existing screen is broken (no import path changes yet — those happen
       as each screen is migrated).
 
 ---
 
-## Phase 1 — Missing Dependencies
+## Phase 1 — Missing Dependencies ✅
 
+**Status:** **Complete**  
 **Files:** `package.json`, `app.json`, `app/_layout.tsx`
 
 ### Deliverables
@@ -212,13 +213,15 @@ export const headerHeight = { condensed: 54, standard: 64 };
 
 ### Acceptance Criteria
 
-- [ ] `expo-linear-gradient` renders a gradient on a test screen.
-- [ ] Plus Jakarta Sans renders correctly at all weights in a test screen.
-- [ ] Cold launch does not flash system font before custom font loads.
+- [x] `expo-linear-gradient` renders a gradient on a test screen.
+- [x] Plus Jakarta Sans renders correctly at all weights in a test screen.
+- [x] Cold launch does not flash system font before custom font loads.
 
 ---
 
-## Phase 2 — Shared Component Library (`components/ui/`)
+## Phase 2 — Shared Component Library (`components/ui/`) ✅
+
+**Status:** **Complete**
 
 All primitives used across screens. Zero business logic. Each component accepts
 a full prop interface; style overrides allowed via `style` prop.
@@ -241,16 +244,17 @@ a full prop interface; style overrides allowed via `style` prop.
 
 ### Acceptance Criteria
 
-- [ ] Storybook-style render test for each component (or screenshot review).
-- [ ] All components use theme tokens — no raw hex values.
-- [ ] All interactive components have `accessibilityRole` + `accessibilityLabel`.
-- [ ] Touch targets ≥ 44 × 44 pt.
+- [x] Storybook-style render test for each component (or screenshot review).
+- [x] All components use theme tokens — no raw hex values.
+- [x] All interactive components have `accessibilityRole` + `accessibilityLabel`.
+- [x] Touch targets ≥ 44 × 44 pt.
 
 ---
 
-## Phase 3 — Navigation Shell
+## Phase 3 — Navigation Shell ✅
 
-**Files:** `app/(tabs)/_layout.tsx`, `app/_layout.tsx`
+**Status:** **Complete**  
+**Files:** `app/(tabs)/_layout.tsx`, `app/_layout.tsx`, `components/ui/TabBar.tsx`
 
 ### IA Changes from MVP
 
@@ -278,27 +282,26 @@ Replace default Expo Tabs tab bar with a custom `components/ui/TabBar.tsx`:
 
 ### Acceptance Criteria
 
-- [ ] All 4 named tabs + hidden FAB route render without errors.
-- [ ] FAB opens `/add-transaction`.
-- [ ] Nudge badge count updates live.
-- [ ] Safe area insets respected on iPhone notch and Android nav-bar devices.
+- [x] All 5 named tabs (Home, Budget, Activity, Pay Bills, Nudges) render without errors.
+- [x] FAB (lime, bottom-right) opens `/add-transaction`.
+- [x] Nudge badge count updates live.
+- [x] Safe area insets respected on iPhone notch and Android nav-bar devices.
+- [x] Active tab uses `colors.brand` (#2D6A2D). All icons are outline-only.
 
 ---
 
-## Phase 4 — Auth Flow
+## Phase 4 — Auth Flow ✅
 
-**Files:** `app/(auth)/index.tsx`, `register.tsx`, `login.tsx`,
-`verify-bvn.tsx`, `link-bank.tsx`
+**Status:** **Complete**  
+**Files:** `app/(auth)/_authShared.tsx` _(new)_, `index.tsx`, `register.tsx`, `login.tsx`, `verify-bvn.tsx`, `link-bank.tsx`
 
-| Screen     | Key visual changes                                                                                                         |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Welcome    | Dark forest-green full-bleed gradient hero; MoniMata wordmark + tagline; lime "Get Started" button; ghost "Log In" button. |
-| Register   | Off-white `surface` card; green-focus inputs; floating label style; lime submit CTA.                                       |
-| Login      | Same as Register. "Forgot password" link in `textMeta`.                                                                    |
-| Verify BVN | 11-digit BVN pin-input; Interswitch branding badge at bottom.                                                              |
-| Link Bank  | Mono Connect WebView wrapper unchanged; surrounding shell gets new header style.                                           |
+### Delivered
 
-All form logic (`react-hook-form` + `zod`) and Redux thunks remain untouched.
+- `_authShared.tsx` — shared primitives: `AuthInput` (animated focus ring), `BackBtn` (frosted `.x-btn.dk` pill), `EyeIcon`, `TrustCard`, shared `s` StyleSheet.
+- All 5 auth screens restyled: dark-green curved header, Plus Jakarta Sans typography, brand-green CTAs.
+- Back button on every screen uses `BackBtn` — 36×36 frosted-glass pill (`rgba(255,255,255,0.10)` background, `rgba(255,255,255,0.12)` border, radius 11) matching `.x-btn.dk`.
+- Register screen: ToS + Privacy Policy notice below submit button.
+- All form logic (`react-hook-form` + `zod` + Redux thunks) untouched.
 
 ---
 
