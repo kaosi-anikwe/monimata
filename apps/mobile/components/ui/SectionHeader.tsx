@@ -16,18 +16,6 @@
 
 /**
  * components/ui/SectionHeader.tsx
- *
- * Section heading row matching the .sec-row / .sec-ttl / .sec-lnk pattern
- * from MoniMata_V5.html.
- *
- * CSS reference:
- *   .sec         padding: 14px 20px 0
- *   .sec-row     flexDirection:row, alignItems:center, justifyContent:space-between, marginBottom:11
- *   .sec-ttl     16px / 800 / --tp / tracking -0.3px
- *   .sec-lnk     13px / 600 / --gp (brand green)
- *
- * Also supports the uppercase group-header variant:
- *   .sbs / .bgt-grp-name   11px / 700 / uppercase / 1.5px tracking / --ts
  */
 
 import React from 'react';

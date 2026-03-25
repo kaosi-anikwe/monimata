@@ -23,15 +23,6 @@
  *   warn  — amber fill (#F59E0B)          funded but over 80%
  *   over  — red fill (#D93025)            overspent (> 100%)
  *   brand — brand-to-lime gradient fill   (goals / targets)
- *
- * CSS reference (MoniMata_V5.html):
- *   .bgt-rbar   height:3, bg:--s2, borderRadius:2
- *   .bgt-rfill  height:100%, borderRadius:2
- *   .bgt-rfill.ok     background:var(--gb)
- *   .bgt-rfill.warn   background:var(--amber)
- *   .bgt-rfill.over   background:var(--red)
- *   .goal-bar   height:5, bg:--s2
- *   .goal-fill  gradient 90deg --gp → --lime
  */
 
 import { LinearGradient } from 'expo-linear-gradient';

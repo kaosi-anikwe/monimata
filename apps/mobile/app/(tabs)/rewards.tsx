@@ -21,12 +21,6 @@
  * the Gamification service endpoints listed in the migration plan.
  * See docs/UI_MIGRATION_PLAN.md Phase 14 for full backend design notes.
  *
- * Sections (matches scr-rewards in MoniMata_V5.html):
- *   1. Dark green header — level title, XP bar with progress, level meta
- *   2. Streak banner — fire emoji, streak count, daily dots (7-day)
- *   3. Badges grid (3-col) — earned / locked, "New!" pip
- *   4. Active challenges — join cta / joined badge, progress bar
- *
  * Tapping a challenge navigates to /challenge/[id].
  */
 

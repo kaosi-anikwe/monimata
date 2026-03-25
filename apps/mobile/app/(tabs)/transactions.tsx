@@ -24,6 +24,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
@@ -312,6 +313,7 @@ export default function TransactionsScreen() {
   const {
     data: txPages,
     isLoading,
+    error,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -397,6 +399,23 @@ export default function TransactionsScreen() {
     );
   }
 
+  if (error) {
+    return (
+      <View style={[ss.safe, { backgroundColor: colors.background }]}>
+        <ScrollView
+          contentContainerStyle={ss.errorContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
+          }
+        >
+          <Ionicons name="cloud-offline-outline" size={40} color={colors.textTertiary} />
+          <Text style={[ss.errorText, { color: colors.textSecondary }]}>Could not load transactions.</Text>
+          <Text style={[ss.errorSub, { color: colors.textMeta }]}>Pull down to retry.</Text>
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
@@ -456,7 +475,7 @@ export default function TransactionsScreen() {
               key={opt.key}
               label={opt.label}
               selected={activeFilter === opt.key}
-              onPress={() => setActiveFilter(opt.key)}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveFilter(opt.key); }}
               style={{ marginRight: spacing.sm }}
             />
           ))}
@@ -656,5 +675,16 @@ const ss = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+
+  // Error state
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xl,
+  },
+  errorText: { fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  errorSub: { fontSize: 13, textAlign: 'center' },
 });
 

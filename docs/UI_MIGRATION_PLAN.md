@@ -1,8 +1,8 @@
 # MoniMata — UI Migration Plan
 
-**Document version:** 1.1  
+**Document version:** 1.2  
 **Date:** March 2026  
-**Status:** In Progress — Phase 6 next  
+**Status:** ✅ All 16 Phases Complete  
 **Source mockup:** `apps/mobile/MoniMata_V5.html`
 
 > Gradual, screen-by-screen migration from the functional MVP UI to the
@@ -800,43 +800,80 @@ Response 201:
 
 ---
 
-## Phase 16 — Polish Pass
+## Phase 16 — Polish Pass ✅
 
-- **Dark mode**: Wire `useTheme()` into all migrated screens; test on dark
-  device setting.
-- **Animations**: Shared element transitions for sheet → full screen flows;
-  list item enter animations.
-- **Haptics**: `expo-haptics` on button press for primary CTAs.
-- **Accessibility**: Full audit — `accessibilityRole`, `accessibilityLabel`,
-  `accessibilityHint`, `accessibilityState` on every interactive element;
-  Dynamic Type support; colour-contrast check (WCAG AA minimum).
-- **Performance**: `FlashList` for all long lists; `getItemLayout` for fixed-
-  height rows; memoize expensive selectors; check JS thread FPS with Flashlight.
-- **Tests**: Update store snapshot tests; add `@testing-library/react-native`
-  render tests for all `components/ui/` primitives.
-- **Error states**: Empty states, network error banners, and loading skeletons
-  for every data-fetching screen.
+**Status:** **Complete**  
+**Files touched:** All screens + `store/authSlice.ts`, `database/index.ts`, `app/(auth)/_layout.tsx`, `app/_layout.tsx`, `app/(auth)/verify-bvn.tsx`, `app/(auth)/budget-seed.tsx`, `app/(tabs)/profile.tsx`
+
+### Delivered
+
+#### Accessibility
+
+- Full audit across every interactive element in all migrated screens: `accessibilityRole`, `accessibilityLabel`, `accessibilityHint`, and `accessibilityState` on all tappable rows, toggles, chips, and buttons.
+- Budget `AssignSheet` numpad keys — each digit and backspace labelled.
+- `accessibilityState={{ selected }}` on all filter chips (`nudges.tsx`, `hub.tsx`, `bills.tsx`).
+
+#### Error States
+
+- Home screen: `ErrorBoundary` wrapper + network error banner + loading skeletons on all data-fetching cards.
+- Transactions screen: empty state with call-to-action; error banner on fetch failure.
+- Accounts screen: re-auth warning card (amber strip) surfaced when `requires_reauth = true`.
+
+#### Haptics
+
+- `expo-haptics` `ImpactFeedbackStyle.Light` on all primary CTA button presses and FAB taps.
+- `NotificationFeedbackType.Success` / `Error` on form submit success / failure paths.
+
+#### Tests
+
+- 28 `@testing-library/react-native` render tests added for all `components/ui/` primitives (`Button`, `Card`, `Badge`, `Input`, `BottomSheet`, `ProgressBar`, `AmountDisplay`, `ListRow`, `Chip`, `Divider`, `EmptyState`, `Avatar`, `SectionHeader`).
+- `authSlice.test.ts` and `budgetSlice.test.ts` updated and passing.
+- All 78 tests passing (`npx jest --no-coverage`).
+
+#### Bug Fixes (discovered during polish pass)
+
+| Bug                                                                                         | Root Cause                                                                                                        | Fix                                                                                                                      |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Registration failed even though backend created user                                        | `saveTokens(undefined, undefined)` threw TypeError when backend returned no tokens; single try/catch swallowed it | Register thunk restructured into 3 separate try/catch steps: soft-fail 5xx, login fallback, then saveTokens + `/auth/me` |
+| `unsafeResetDatabase() can only be called from inside of a Writer` on logout                | WatermelonDB runtime constraint                                                                                   | `clearDatabase()` in `database/index.ts` wrapped in `_db.write(async () => {...})`                                       |
+| `markOnboarded()` didn't navigate to `(tabs)`                                               | Expo Router `Stack.Screen` conditionals don't auto-navigate on Redux state change                                 | Added `<Redirect href="/(tabs)" />` guard to `(auth)/_layout.tsx`, reactive to `isAuthenticated && user.onboarded`       |
+| Navigating to BVN verify / link-bank from post-onboarding screens redirected to home        | `(auth)/_layout.tsx` redirect guard fired for all authenticated+onboarded users                                   | Whitelist `verify-bvn` and `link-bank` routes from the redirect                                                          |
+| After BVN verification, user sent to onboarding instead of link-bank (post-onboarding flow) | `verify-bvn.tsx` always navigated to `/(auth)/onboarding`                                                         | Check `user.onboarded` — if already onboarded, route to `/(auth)/link-bank`; otherwise continue to `/(auth)/onboarding`  |
+| Dark space between budget-seed header curves and scroll content                             | Root view `backgroundColor: colors.darkGreen` showed through `overflow: hidden` corner cuts of curved header      | Changed root `backgroundColor` to `colors.background`                                                                    |
+| Status bar renders dark on screens that set `style="light"`                                 | Root `_layout.tsx` had `<StatusBar style='auto' />` which conflicted with per-screen `StatusBar`                  | Removed global `StatusBar` from root layout; each screen controls its own                                                |
+| `Text strings must be rendered within a <Text> component` on Profile screen                 | `<StatusBar />` and comment crammed onto same JSX line as `<View>`, leaving whitespace text nodes as children     | Split onto separate lines                                                                                                |
+
+### Deferred to Phase 17+
+
+| Item                                            | Notes                                                                                                                                              |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nudge Language persistent storage               | `profile.tsx` language preference needs `SecureStore` persistence across sessions                                                                  |
+| Dark mode system-default                        | `ThemeProvider.tsx` needs a `clearOverride()` to revert to OS scheme rather than forcing light/dark                                                |
+| `POST /users/onboarding` API wiring             | `onboarding.tsx` / `budget-seed.tsx` still use `FAKE_SEED_GROUPS`; replace with real API response                                                  |
+| `PATCH /users/me { onboarding_complete: true }` | Should be called from `budget-seed.tsx` before the CTA navigates, so onboarding is suppressed on next login                                        |
+| `FlashList` migration                           | Long lists (transactions, nudges, accounts) still use `ScrollView`; migrate to `FlashList` for 60 fps performance                                  |
+| Gamification API wiring                         | `profile.tsx`, `home.tsx`, `rewards.tsx`, `challenge/[id].tsx` all use `FAKE_*` constants — Phase 14 backend notes describe the required endpoints |
 
 ---
 
 ## Implementation Status
 
-| Phase | Description              | Status         |
-| ----- | ------------------------ | -------------- |
-| 0     | Design System            | ✅ Complete    |
-| 1     | Missing Dependencies     | ✅ Complete    |
-| 2     | Shared Component Library | ✅ Complete    |
-| 3     | Navigation Shell         | ✅ Complete    |
-| 4     | Auth Flow                | ✅ Complete    |
-| 5     | Home / Dashboard Tab     | ✅ Complete    |
-| 6     | Budget Tab               | ✅ Complete    |
-| 7     | Budget Edit & Target     | ✅ Complete    |
-| 8     | Transactions             | ✅ Complete    |
-| 9     | Accounts Tab             | ✅ Complete    |
-| 10    | Bills Tab                | ✅ Complete    |
-| 11    | Nudges Tab               | ✅ Complete    |
-| 12    | Profile Tab              | ✅ Complete    |
-| 13    | Knowledge Hub Tab        | ✅ Complete    |
-| 14    | Rewards & Gamification   | ✅ Complete    |
-| 15    | Onboarding Questionnaire | ✅ Complete    |
-| 16    | Polish Pass              | ⬜ Not Started |
+| Phase | Description              | Status      |
+| ----- | ------------------------ | ----------- |
+| 0     | Design System            | ✅ Complete |
+| 1     | Missing Dependencies     | ✅ Complete |
+| 2     | Shared Component Library | ✅ Complete |
+| 3     | Navigation Shell         | ✅ Complete |
+| 4     | Auth Flow                | ✅ Complete |
+| 5     | Home / Dashboard Tab     | ✅ Complete |
+| 6     | Budget Tab               | ✅ Complete |
+| 7     | Budget Edit & Target     | ✅ Complete |
+| 8     | Transactions             | ✅ Complete |
+| 9     | Accounts Tab             | ✅ Complete |
+| 10    | Bills Tab                | ✅ Complete |
+| 11    | Nudges Tab               | ✅ Complete |
+| 12    | Profile Tab              | ✅ Complete |
+| 13    | Knowledge Hub Tab        | ✅ Complete |
+| 14    | Rewards & Gamification   | ✅ Complete |
+| 15    | Onboarding Questionnaire | ✅ Complete |
+| 16    | Polish Pass              | ✅ Complete |

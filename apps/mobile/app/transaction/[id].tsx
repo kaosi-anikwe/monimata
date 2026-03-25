@@ -17,10 +17,6 @@
 /**
  * Transaction Details screen.
  *
- * Design spec: MoniMata_V5.html — transaction detail patterns.
- *   Bank/Mono: read-only hero card + detail card + editable category/memo + save.
- *   Manual: editable hero (numpad) + full form card + save + delete.
- *
  * Mono/bank transactions: read-only except category + memo.
  * Manual transactions: fully editable (type, amount, narration, date, account, category, memo).
  * Manual transactions only: Delete button.

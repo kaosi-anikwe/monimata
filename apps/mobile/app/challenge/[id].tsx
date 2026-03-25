@@ -20,16 +20,6 @@
  * Route: /challenge/[id]  (Expo Router dynamic segment)
  * Phase 14 — all data is static seed matched to the seed in rewards.tsx.
  * Phase 16 will fetch `/gamification/challenges/:id` and wire join/leave mutations.
- *
- * Matches scr-challenge-detail in MoniMata_V5.html.
- *   - Gradient hero: color varies per challenge (g / a / b / p)
- *   - Status pills: "● Active" (lime) + "Ends in …" (amber)
- *   - Reward row: XP, Badge name, Participants count
- *   - Your Progress card: gradient bar + milestone row
- *   - Leaderboard mini-list (top 3 + your rank)
- *   - Challenge Rules card
- *   - Participants avatars strip
- *   - "You're In" / "Join" CTA
  */
 
 import { Ionicons } from '@expo/vector-icons';

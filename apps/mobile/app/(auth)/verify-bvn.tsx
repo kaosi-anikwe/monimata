@@ -18,13 +18,6 @@
  * BVN Verification screen — required before linking any bank account.
  * Calls POST /auth/verify-bvn with the user's 11-digit BVN.
  * On success → navigates to Link Bank Account screen.
- *
- * Visual matches scr-verify-bvn in MoniMata_V5.html:
- * - Dark green curved header with title "Prove it's you, once."
- * - TrustCard: CBN-compliant identity check explanation
- * - 11 individual digit boxes with brand-green active/filled state
- * - Custom numpad (3×4 grid matching .assign-numpad style)
- * Form logic (react-hook-form + zod + Redux) is unchanged.
  */
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
@@ -77,7 +70,9 @@ export default function VerifyBVNScreen() {
     dispatch(clearError());
     try {
       await dispatch(verifyBVN(data.bvn)).unwrap();
-      router.replace('/(auth)/onboarding');
+      // If user is already onboarded (came here from profile), go straight to link-bank.
+      // Otherwise continue the onboarding flow.
+      router.replace(user?.onboarded ? '/(auth)/link-bank' : '/(auth)/onboarding');
     } catch {
       // error is already written to Redux state by the rejected handler in authSlice
     }
@@ -216,10 +211,11 @@ export default function VerifyBVNScreen() {
           </TouchableOpacity>
           {errors.bvn ? <Text style={[authS.fieldErr, { color: colors.error, textAlign: 'center', marginTop: 8 }]}>{errors.bvn.message}</Text> : null}
 
-          {/* Skip link */}
-          <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={{ alignItems: 'center', marginTop: 16 }}>
+          {/* Skip link — takes user to onboarding questionnaire so their
+              budget categories are still seeded even without BVN verification */}
+          <TouchableOpacity onPress={() => router.replace('/(auth)/onboarding')} style={{ alignItems: 'center', marginTop: 16 }}>
             <Text style={[{ ...ff(400), fontSize: 12, textDecorationLine: 'underline' }, { color: colors.textTertiary }]}>
-              Skip for now (limited features)
+              Skip BVN — set up my budget instead
             </Text>
           </TouchableOpacity>
         </ScrollView>

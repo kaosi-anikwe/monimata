@@ -17,12 +17,6 @@
 /**
  * Register screen — email, password, first/last name, phone.
  * On success → navigates to BVN verification.
- *
- * Visual matches scr-register in MoniMata_V5.html:
- * - Dark green curved header (.auth-hdr)
- * - Animated focus inputs (.inp)
- * - Brand green submit button (.btn-green)
- * Form logic (react-hook-form + zod + Redux) is unchanged.
  */
 import { clearError, register } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -104,7 +98,7 @@ export default function RegisterScreen() {
       <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[s.authTitle, { color: colors.white }]}>Create your account</Text>
-        <Text style={[s.authSub, { color: colors.textInverseSecondary }]}>3 quick fields, then you're in</Text>
+        <Text style={[s.authSub, { color: colors.textInverseSecondary }]}>3 quick fields, then you&apos;re in</Text>
       </AuthHdr>
 
       <KeyboardAvoidingView

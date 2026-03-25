@@ -17,24 +17,7 @@
 /**
  * components/ui/BottomSheet.tsx
  *
- * Reanimated spring-driven bottom sheet matching the .sheet / .overlay classes
- * in MoniMata_V5.html.
- *
- * Features:
- *   - Slides up from the bottom with a spring animation.
- *   - Semi-transparent blurred backdrop — tap to dismiss.
- *   - Drag handle bar at the top.
- *   - Optional title + sub-title rendered below the handle.
- *   - Max height 88% of screen.
- *   - Swipe-down-to-dismiss via PanResponder.
- *   - Rendered in a React Native Modal (above everything, including tab bar).
- *
- * CSS reference (MoniMata_V5.html):
- *   .overlay-bg   background: rgba(13,31,13,0.55); backdrop-filter: blur(2px)
- *   .sheet        white, borderRadius 24px 24px 0 0, paddingBottom 32
- *   .sheet-handle width:36, height:4, background:--bds, margin:12 auto 0
- *   .sheet-title  17px/700/--tp, padding 16px 20px 0
- *   .sheet-sub    13px/--tm, padding 4px 20px 0
+ * Reanimated spring-driven bottom sheet
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';

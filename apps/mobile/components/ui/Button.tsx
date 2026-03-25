@@ -17,13 +17,6 @@
 /**
  * components/ui/Button.tsx
  *
- * Five button variants matching MoniMata_V5.html:
- *   lime   — primary CTA on dark backgrounds (lime fill, dark-green text)
- *   green  — primary CTA on light backgrounds (brand-green fill, white text)
- *   red    — destructive action (red fill, white text)
- *   ghost  — secondary on dark backgrounds (transparent, white outline)
- *   icon   — square close / action icon button (X-btn)
- *
  * All variants scale down to 0.97 on press (Reanimated spring).
  * Pass `loading` to show an ActivityIndicator inside the button.
  * Pass `fullWidth` (default true for lime/green/red/ghost) to fill container.

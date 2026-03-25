@@ -4,7 +4,6 @@
  * Allows a user to split a single transaction across multiple budget categories.
  * Navigated to from the Transaction Detail screen via an action on a manual transaction.
  *
- * Design spec: MoniMata_V5.html — split transaction patterns.
  * Route: /split-transaction?id=<txId>
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';

@@ -16,10 +16,6 @@
 
 /**
  * Profile tab — user card, gamification stats, settings links, and log-out.
- *
- * Design spec: MoniMata_V5.html — scr-profile.
- * XP, Level, Streak, and Badge count are HARDCODED for now.
- * Phase 14 will replace them with real data from the gamification service.
  */
 
 import { useMemo, useState } from 'react';
@@ -156,7 +152,9 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={[ss.root, { backgroundColor: colors.background }]}>      <StatusBar style="light" />      {/* ── Dark-green header ─────────────────────────────────────────────── */}
+    <View style={[ss.root, { backgroundColor: colors.background }]}>
+      <StatusBar style="light" />
+      {/* ── Dark-green header ─────────────────────────────────────────────── */}
       <View
         style={[
           ss.header,
@@ -350,6 +348,15 @@ export default function ProfileScreen() {
               colors={colors}
             />
           )}
+          <ProfileRow
+            iconBg={colors.surface}
+            iconColor={colors.brand}
+            icon="business-outline"
+            label="Accounts"
+            sub="Connected bank accounts"
+            onPress={() => router.push("/(tabs)/accounts")}
+            colors={colors}
+          />
           <ProfileRow
             iconBg={colors.surface}
             iconColor={colors.brand}

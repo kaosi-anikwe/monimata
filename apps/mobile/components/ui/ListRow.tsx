@@ -20,12 +20,6 @@
  * Generic tappable list row with a left slot, main content area, and right slot.
  * Used for transaction rows, account rows, settings rows, etc.
  *
- * CSS reference (MoniMata_V5.html):
- *   .bgt-row     padding:12 14, flexDir:row, gap:10, borderBottom:1px --bd
- *   .bgt-row:active  background:--s1
- *   .ash-row     padding:14 16, gap:12
- *   .ash-ic      36x36, borderRadius:10
- *
  * Props:
  *   leftIcon     — 36×36 icon bubble (ash-ic style). Pass an <Ionicons>.
  *   iconBg       — background colour for the icon bubble.

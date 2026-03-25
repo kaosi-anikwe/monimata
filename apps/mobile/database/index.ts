@@ -175,3 +175,20 @@ export function getDatabase(): Database {
   }
   return _db;
 }
+
+/**
+ * Wipes all local WatermelonDB data.
+ *
+ * Called on logout and whenever a different user account logs in on the same
+ * device. WatermelonDB is a local cache only — data re-syncs from the server
+ * on the next successful pull, so clearing it is always safe.
+ *
+ * Safe to call before `initDatabase()` has been awaited (no-op in that case).
+ */
+export async function clearDatabase(): Promise<void> {
+  if (!_db) return;
+  // unsafeResetDatabase() must be called from within a Writer action.
+  await _db.write(async () => {
+    await _db!.unsafeResetDatabase();
+  });
+}

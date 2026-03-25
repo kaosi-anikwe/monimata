@@ -17,13 +17,6 @@
 /**
  * Add Transaction screen — create a manual transaction.
  *
- * Design spec: MoniMata_V5.html → scr-add
- *   - White header with type toggle (Debit/Credit pill)
- *   - Amount display card with ₦ prefix and blinking cursor
- *   - Form section card (frow rows: What for?, Date & Time, Account, Category, Memo, Repeats)
- *   - Numpad (3×4 grid, zero spans 2 columns)
- *   - Green save button fixed at bottom
- *
  * Route: /add-transaction
  */
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';

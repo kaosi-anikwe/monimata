@@ -16,19 +16,6 @@
 
 /**
  * components/ui/Avatar.tsx
- *
- * Rounded-square avatar with initials fallback, matching the .avatar class
- * in MoniMata_V5.html.
- *
- * CSS reference:
- *   .avatar   40x40, borderRadius:13, bg:--gp, border:2px rgba(168,224,99,0.3)
- *             initials: 16px/800/--lime
- *
- * Sizes:
- *   sm   32 × 32, radius 10, font 13
- *   md   40 × 40, radius 13, font 16  (default — matches .avatar)
- *   lg   56 × 56, radius 16, font 22
- *   xl   72 × 72, radius 20, font 28
  */
 
 import React from 'react';

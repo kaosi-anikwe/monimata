@@ -16,12 +16,6 @@
 
 /**
  * Login screen.
- *
- * Visual matches scr-login in MoniMata_V5.html:
- * - Dark green curved header (.auth-hdr)
- * - Animated focus inputs (.inp)
- * - Brand green submit button (.btn-green)
- * Form logic (react-hook-form + zod + Redux) is unchanged.
  */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
@@ -71,10 +65,16 @@ export default function LoginScreen() {
     dispatch(clearError());
     try {
       const user = await dispatch(login({ email: data.email, password: data.password })).unwrap();
+      if (user.onboarded) {
+        // Root navigator detects isAuthenticated && onboarded=true and
+        // automatically transitions to (tabs) — no explicit navigation needed.
+        return;
+      }
+      // Non-onboarded: stay in auth stack and lead user through the setup flow.
       if (!user.identity_verified) {
         router.replace('/(auth)/verify-bvn');
       } else {
-        router.replace('/(tabs)');
+        router.replace('/(auth)/onboarding');
       }
     } catch {
       // error is already written to Redux state by the rejected handler in authSlice

@@ -14,12 +14,18 @@
 
 // Mock all native/Expo dependencies so tests run in a plain Node environment.
 import type { AuthUser } from '../../store/authSlice';
-import authReducer, { clearAuth, clearError } from '../../store/authSlice';
+import authReducer, { clearAuth, clearError, markOnboarded } from '../../store/authSlice';
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn().mockResolvedValue(null),
   setItemAsync: jest.fn().mockResolvedValue(undefined),
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
+// Mock the database module — clearDatabase is imported by authSlice but must
+// not trigger WatermelonDB's native randomId generator in a Node test env.
+jest.mock('../../database', () => ({
+  clearDatabase: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock axios to avoid network setup in reducer tests.
@@ -48,6 +54,10 @@ jest.mock('../../services/api', () => ({
   saveTokens: jest.fn().mockResolvedValue(undefined),
   clearTokens: jest.fn().mockResolvedValue(undefined),
   getAccessToken: jest.fn().mockResolvedValue(null),
+  // Added during auth-fix session (cross-account DB isolation):
+  saveLastUserId: jest.fn().mockResolvedValue(undefined),
+  getLastUserId: jest.fn().mockResolvedValue(null),
+  clearLastUserId: jest.fn().mockResolvedValue(undefined),
 }));
 
 const mockUser: AuthUser = {
@@ -67,6 +77,7 @@ describe('authSlice reducers', () => {
     expect(state).toEqual({
       user: null,
       isAuthenticated: false,
+      isInitialised: false,
       loading: false,
       error: null,
     });
@@ -78,6 +89,7 @@ describe('authSlice reducers', () => {
     const loggedIn = {
       user: mockUser,
       isAuthenticated: true,
+      isInitialised: true,
       loading: false,
       error: null,
     };
@@ -89,7 +101,7 @@ describe('authSlice reducers', () => {
 
   it('clearAuth preserves loading: false', () => {
     const s = authReducer(
-      { user: mockUser, isAuthenticated: true, loading: true, error: 'oops' },
+      { user: mockUser, isAuthenticated: true, isInitialised: true, loading: true, error: 'oops' },
       clearAuth(),
     );
     expect(s.loading).toBe(true); // loading is preserved — clearAuth does not touch it
@@ -101,6 +113,7 @@ describe('authSlice reducers', () => {
     const withError = {
       user: null,
       isAuthenticated: false,
+      isInitialised: true,
       loading: false,
       error: 'Login failed',
     };
@@ -112,11 +125,38 @@ describe('authSlice reducers', () => {
     const noError = {
       user: null,
       isAuthenticated: false,
+      isInitialised: true,
       loading: false,
       error: null,
     };
     const state = authReducer(noError, clearError());
     expect(state.error).toBeNull();
+  });
+
+  // ── markOnboarded ───────────────────────────────────────────────────────
+
+  it('markOnboarded sets user.onboarded to true', () => {
+    const withUser = {
+      user: { ...mockUser, onboarded: false },
+      isAuthenticated: true,
+      isInitialised: true,
+      loading: false,
+      error: null,
+    };
+    const state = authReducer(withUser, markOnboarded());
+    expect(state.user?.onboarded).toBe(true);
+  });
+
+  it('markOnboarded is a no-op when user is null', () => {
+    const noUser = {
+      user: null,
+      isAuthenticated: false,
+      isInitialised: true,
+      loading: false,
+      error: null,
+    };
+    const state = authReducer(noUser, markOnboarded());
+    expect(state.user).toBeNull();
   });
 
   // ── Reducer purity ──────────────────────────────────────────────────────

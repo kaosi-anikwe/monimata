@@ -43,6 +43,8 @@ if (!BASE_URL) {
 const SECURE_KEYS = {
     ACCESS_TOKEN: 'mm_access_token',
     REFRESH_TOKEN: 'mm_refresh_token',
+    /** Tracks which user ID is currently stored in the local WatermelonDB. */
+    LAST_USER_ID: 'mm_last_uid',
 } as const;
 
 // In-memory token cache — avoids a Keychain syscall on every API request.
@@ -78,6 +80,21 @@ export async function clearTokens(): Promise<void> {
         SecureStore.deleteItemAsync(SECURE_KEYS.ACCESS_TOKEN),
         SecureStore.deleteItemAsync(SECURE_KEYS.REFRESH_TOKEN),
     ]);
+}
+
+/** Persists the ID of the user whose data currently lives in WatermelonDB. */
+export async function saveLastUserId(id: string): Promise<void> {
+    await SecureStore.setItemAsync(SECURE_KEYS.LAST_USER_ID, id);
+}
+
+/** Returns the stored user ID, or null if not yet set. */
+export async function getLastUserId(): Promise<string | null> {
+    return SecureStore.getItemAsync(SECURE_KEYS.LAST_USER_ID);
+}
+
+/** Removes the stored user ID — called on logout. */
+export async function clearLastUserId(): Promise<void> {
+    await SecureStore.deleteItemAsync(SECURE_KEYS.LAST_USER_ID);
 }
 
 let isRefreshing = false;
