@@ -28,7 +28,7 @@ import type { Transaction, TransactionPage } from '@/types/transaction';
 export interface ManualTransactionBody {
   account_id: string;
   date: string; // ISO 8601 datetime, e.g. "2025-03-10T14:30:00.000Z"
-  amount: number; // kobo; positive
+  amount: number; // kobo; signed — negative for debit, positive for credit
   narration: string;
   type: 'debit' | 'credit';
   category_id?: string | null;

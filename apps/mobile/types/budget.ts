@@ -41,4 +41,5 @@ export interface BudgetResponse {
   month: string;
   tbb: number;
   groups: BudgetGroup[];
+  total_debit: number; // kobo; absolute sum of ALL debit transactions this month
 }

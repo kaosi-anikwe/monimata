@@ -51,6 +51,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/Toast';
+import { ProgressBar } from '@/components/ui';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import {
   useBudget,
@@ -683,14 +684,14 @@ export default function BudgetEditScreen() {
             {formatMoney(assignedTotal)} assigned of {formatMoney(costToBeMe)}
           </Text>
           {/* Progress bar */}
-          <View style={[ss.ctbmTrack, { backgroundColor: glass.borderWhiteStrong }]}>
-            <LinearGradient
-              colors={[colors.brand, colors.lime]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[ss.ctbmFill, { width: `${Math.round(progress * 100)}%` as `${number}%` }]}
-            />
-          </View>
+          <ProgressBar
+            animate
+            progress={progress}
+            state="brand"
+            gradient
+            size="md"
+            trackStyle={{ marginTop: spacing.smd, backgroundColor: glass.borderWhiteStrong }}
+          />
         </View>
       </View>
 
@@ -897,13 +898,6 @@ const ss = StyleSheet.create({
   ctbmVal: { ...ff(800), fontSize: 22, letterSpacing: -0.5 },
   ctbmSuffix: { ...ff(500), fontSize: 14, letterSpacing: 0 },
   ctbmSub: { ...ff(400), fontSize: 12, marginTop: spacing.xs },
-  ctbmTrack: {
-    height: 6,
-    borderRadius: 3,
-    marginTop: spacing.smd,
-    overflow: 'hidden',
-  },
-  ctbmFill: { height: 6, borderRadius: 3 },
 
   // ── Group card wrapper (.edit-grp) ───────────────────────────────────────
   grpWrapper: {

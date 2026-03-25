@@ -29,6 +29,7 @@
  * FAB note: the lime "+" FAB lives in (tabs)/_layout.tsx (bottom-right), not here.
  */
 
+import { ProgressBar } from '@/components/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -118,11 +119,8 @@ export default function HomeScreen() {
     [budget],
   );
 
-  // Expenses = sum of absolute negative activity (debit spend per category)
-  const totalExpenses = useMemo(
-    () => allCats.reduce((s, c) => s + Math.abs(Math.min(0, c.activity)), 0),
-    [allCats],
-  );
+  // Expenses = ALL debit transactions this month (categorised + uncategorised)
+  const totalExpenses = budget?.total_debit ?? 0;
 
   // Income = TBB + totalAssigned (fundamental ZBB identity)
   const totalIncome = useMemo(() => {
@@ -383,7 +381,6 @@ export default function HomeScreen() {
               const pct = goal.target_amount
                 ? Math.min(1, Math.max(0, goal.available / goal.target_amount))
                 : 0;
-              const fillPct = `${(pct * 100).toFixed(1)}%` as `${number}%`;
 
               return (
                 <TouchableOpacity
@@ -399,14 +396,14 @@ export default function HomeScreen() {
                   </View>
                   <View style={s.goalInfo}>
                     <Text style={[s.goalName, { color: colors.textPrimary }]}>{goal.name}</Text>
-                    <View style={[s.goalBar, { backgroundColor: colors.surfaceElevated }]}>
-                      <LinearGradient
-                        colors={[colors.brand, colors.lime]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={[s.goalFill, { width: fillPct }]}
-                      />
-                    </View>
+                    <ProgressBar
+                      animate
+                      progress={pct}
+                      state="brand"
+                      gradient
+                      size="md"
+                      trackStyle={{ marginVertical: 6 }}
+                    />
                     <Text style={[s.goalAmt, { color: colors.textMeta }]}>
                       <Text style={{ color: colors.brand, ...ff(700) }}>{formatMoney(goal.available)}</Text>
                       {' '}of {formatMoney(goal.target_amount ?? 0)}
@@ -674,8 +671,6 @@ const s = StyleSheet.create({
   goalJarTxt: { fontSize: 24 },
   goalInfo: { flex: 1, minWidth: 0 },
   goalName: { ...ff(700), fontSize: 14 },
-  goalBar: { height: 5, borderRadius: 3, marginVertical: 6, overflow: 'hidden' },
-  goalFill: { height: '100%', borderRadius: 3 },
   goalAmt: { ...ff(400), fontSize: 12 },
   goalAdd: {
     width: 30,

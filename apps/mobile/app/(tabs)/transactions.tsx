@@ -235,8 +235,8 @@ function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLas
         </Text>
         {/* <Text style={[type_.caption, { color: colors.textMeta }]}>{isDebit ? 'Debit' : 'Credit'}</Text> */}
         {tx.is_manual && (
-          <View style={[ss.manualBadge, { backgroundColor: colors.purpleSubtle }]}>
-            <Text style={[ss.manualBadgeText, { color: colors.purple }]}>MANUAL</Text>
+          <View style={[ss.manualBadge, { backgroundColor: colors.infoSubtle }]}>
+            <Text style={[ss.manualBadgeText, { color: colors.info }]}>MANUAL</Text>
           </View>
         )}
       </View>
