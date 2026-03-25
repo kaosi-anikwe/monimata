@@ -17,109 +17,66 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter, useSegments } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useNudgeUnreadCount } from '../../hooks/useNudges';
+import { MainTabBar } from '@/components/ui/TabBar';
+import { useTheme } from '@/lib/theme';
+import { layout, shadow } from '@/lib/tokens';
 
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
-
-function tabIcon(outline: IoniconsName, filled: IoniconsName) {
-  function TabIcon({ color, focused }: { color: string; focused: boolean }) {
-    return <Ionicons name={focused ? filled : outline} size={24} color={color} />;
-  }
-  return TabIcon;
-}
-
-/** Floating action button shown on Budget and Transactions tabs only. */
+/**
+ * Floating lime "+" button — bottom-right, sits above the tab bar.
+ * Visible on all tab screens. Navigates to /add-transaction.
+ */
 function SharedFAB() {
   const router = useRouter();
+  const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const segments = useSegments();
-  // segments[1] is the tab name for named tabs (e.g. 'transactions', 'accounts').
-  // For the Budget/index tab, segments = ['(tabs)'], so segments[1] is undefined.
-  const tabName: string | undefined = segments[1];
-  // Only show at the root tab level — not when a stack screen is pushed on top.
-  const isAtRootTabLevel = segments.length <= 2;
-  const visible =
-    isAtRootTabLevel && (tabName === undefined || tabName === 'transactions');
 
-  if (!visible) return null;
+  // Only show at the root level of a tab (segments.length <= 2),
+  // not when a stack screen is pushed on top.
+  if (segments.length > 2) return null;
+
+  const bottomOffset = layout.tabBarHeight + Math.max(insets.bottom, 4) + 16;
 
   return (
     <TouchableOpacity
-      style={s.fab}
+      style={[
+        s.fab,
+        { backgroundColor: colors.lime, bottom: bottomOffset },
+        shadow.fab,
+      ]}
       onPress={() => router.push('/add-transaction')}
       activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel="Add transaction"
     >
-      <Ionicons name="add" size={28} color="#fff" />
+      <Ionicons name="add" size={26} color={colors.darkGreen} />
     </TouchableOpacity>
   );
 }
 
 export default function TabsLayout() {
-  const nudgeUnread = useNudgeUnreadCount();
-
   return (
     <View style={{ flex: 1 }}>
       <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: '#0F7B3F',
-          tabBarInactiveTintColor: '#9CA3AF',
-          tabBarStyle: { borderTopColor: '#E5E7EB' },
-        }}
+        initialRouteName="home"
+        tabBar={(props) => <MainTabBar {...props} />}
+        screenOptions={{ headerShown: false }}
       >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Budget',
-            tabBarLabel: 'Budget',
-            tabBarIcon: tabIcon('wallet-outline', 'wallet'),
-          }}
-        />
-        <Tabs.Screen
-          name="transactions"
-          options={{
-            title: 'Transactions',
-            tabBarLabel: 'Transactions',
-            tabBarIcon: tabIcon('receipt-outline', 'receipt'),
-          }}
-        />
-        <Tabs.Screen
-          name="accounts"
-          options={{
-            title: 'Accounts',
-            tabBarLabel: 'Accounts',
-            tabBarIcon: tabIcon('business-outline', 'business'),
-          }}
-        />
-        <Tabs.Screen
-          name="bills"
-          options={{
-            title: 'Pay Bills',
-            tabBarLabel: 'Bills',
-            tabBarIcon: tabIcon('flash-outline', 'flash'),
-          }}
-        />
-        <Tabs.Screen
-          name="nudges"
-          options={{
-            title: 'Nudges',
-            // Hidden from the tab bar — accessible via router.push('/(tabs)/nudges')
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarLabel: 'Profile',
-            tabBarIcon: tabIcon('person-outline', 'person'),
-            tabBarBadge: nudgeUnread > 0 ? nudgeUnread : undefined,
-            tabBarBadgeStyle: { backgroundColor: '#EF4444', fontSize: 10 },
-          }}
-        />
+        {/* ── Visible tabs (left → right) ───────────────────────────────── */}
+        <Tabs.Screen name="home" options={{ title: 'Home' }} />
+        <Tabs.Screen name="index" options={{ title: 'Budget' }} />
+        <Tabs.Screen name="transactions" options={{ title: 'Transactions' }} />
+        <Tabs.Screen name="bills" options={{ title: 'Pay Bills' }} />
+        <Tabs.Screen name="nudges" options={{ title: 'Nudges' }} />
+
+        {/* ── Hidden — accessible via router.push() ────────────────────── */}
+        <Tabs.Screen name="accounts" options={{ href: null }} />
+        <Tabs.Screen name="profile" options={{ href: null }} />
       </Tabs>
+
+      {/* Floating action button — bottom-right above the tab bar */}
       <SharedFAB />
     </View>
   );
@@ -128,18 +85,11 @@ export default function TabsLayout() {
 const s = StyleSheet.create({
   fab: {
     position: 'absolute',
-    bottom: 82, // sits above the tab bar (~56 px) + 26 px breathing room
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#0F7B3F',
-    justifyContent: 'center',
+    width: layout.fabSize,
+    height: layout.fabSize,
+    borderRadius: layout.fabSize / 2,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 6,
+    justifyContent: 'center',
   },
 });

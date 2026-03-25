@@ -57,7 +57,7 @@ const WEIGHT_TO_FAMILY: Record<Weight, string> = {
   800: 'PlusJakartaSans_800ExtraBold',
 };
 
-function ff(weight: Weight): Pick<TextStyle, 'fontFamily'> {
+export function ff(weight: Weight): Pick<TextStyle, 'fontFamily'> {
   return { fontFamily: WEIGHT_TO_FAMILY[weight] };
 }
 
