@@ -42,7 +42,7 @@ import { z } from 'zod';
 
 import { useTheme } from '@/lib/theme';
 import { ff } from '@/lib/typography';
-import { AuthInput, BackBtn, s } from './_authShared';
+import { AuthHdr, AuthInput, BackBtn, s } from './_authShared';
 
 const schema = z.object({
   first_name: z.string().min(1, 'First name is required'),
@@ -99,11 +99,11 @@ export default function RegisterScreen() {
   return (
     <View style={[s.screen, { backgroundColor: colors.white }]}>
       {/* ── Dark green header ── */}
-      <View style={[s.authHdr, { backgroundColor: colors.darkGreen }]}>
+      <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[s.authTitle, { color: colors.white }]}>Create your account</Text>
-        <Text style={[s.authSub, { color: 'rgba(255,255,255,0.45)' }]}>3 quick fields, then you're in</Text>
-      </View>
+        <Text style={[s.authSub, { color: 'rgba(255,255,255,0.45)' }]}>3 quick fields, then you’re in</Text>
+      </AuthHdr>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

@@ -36,7 +36,8 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 
@@ -48,6 +49,8 @@ import { useBiometricLock } from '@/hooks/useBiometricLock';
 import { useJobEvents } from '@/hooks/useJobEvents';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { initSentry, Sentry } from '@/lib/sentry';
+import { getTheme } from '@/lib/theme';
+import { ff } from '@/lib/typography';
 import { setLogoutHandler } from '@/services/api';
 import { store } from '@/store';
 import { clearAuth, restoreSession } from '@/store/authSlice';
@@ -96,6 +99,8 @@ function RootNavigator() {
 
   useEffect(() => {
     if (!loading) {
+      // Primary hideAsync is in RootLayout; this is a safety call for the case
+      // where the splash was somehow still visible when RootNavigator mounts.
       SplashScreen.hideAsync();
     }
   }, [loading]);
@@ -254,27 +259,74 @@ function RootLayout() {
   // kept visible by SplashScreen.preventAutoHideAsync() above, so the user never
   // sees a blank frame. Once both fonts and db are ready the full tree renders.
   const [db, setDb] = useState<Database | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
+  // Timeout guard: if DB or fonts aren't ready after 10 s, surface the hang.
+  const [initTimeout, setInitTimeout] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setInitTimeout(true), 10_000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     initDatabase()
       .then(setDb)
-      .catch((e) => console.error('[MoniMata] DB init failed', e));
+      .catch((e) => {
+        console.error('[MoniMata] DB init failed', e);
+        setDbError(String(e?.message ?? e));
+      });
   }, []);
 
-  if (!fontsLoaded || !db) return null;
+  // Hide the native splash as soon as we have something to render.
+  // This MUST happen here — RootNavigator (where hideAsync used to live) only
+  // mounts after fonts+db are ready, so the splash would stay forever if we
+  // waited until there.
+  useEffect(() => {
+    if (fontsLoaded && (db || dbError)) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, db, dbError]);
+
+  if (dbError) {
+    const c = getTheme(null);
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: c.background }}>
+        <Text style={{ ...ff(700), fontSize: 16, color: c.textPrimary, marginBottom: 8 }}>
+          Database failed to initialise
+        </Text>
+        <Text style={{ ...ff(400), fontSize: 13, color: c.textMeta, textAlign: 'center' }}>{dbError}</Text>
+      </View>
+    );
+  }
+
+  if (!fontsLoaded || !db) {
+    const c = getTheme(null);
+    return (
+      <View style={{ flex: 1, backgroundColor: c.darkGreen, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <ActivityIndicator size="large" color={c.lime} />
+        {initTimeout && (
+          <Text style={{ ...ff(400), fontSize: 12, color: 'rgba(255,255,255,0.5)', textAlign: 'center', paddingHorizontal: 32 }}>
+            {!db ? 'Database is taking longer than expected…' : 'Loading fonts…'}
+          </Text>
+        )}
+      </View>
+    );
+  }
 
   return (
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <DatabaseProvider database={db}>
-          <SafeAreaProvider>
-            <ToastProvider>
-              <RootNavigator />
-            </ToastProvider>
-          </SafeAreaProvider>
-        </DatabaseProvider>
-      </QueryClientProvider>
-    </Provider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <DatabaseProvider database={db}>
+            <SafeAreaProvider>
+              <ToastProvider>
+                <RootNavigator />
+              </ToastProvider>
+            </SafeAreaProvider>
+          </DatabaseProvider>
+        </QueryClientProvider>
+      </Provider>
+    </GestureHandlerRootView>
   );
 }
 

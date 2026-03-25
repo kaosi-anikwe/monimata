@@ -482,3 +482,55 @@ export function useMoveMoney(month: string) {
     onError: () => error('Cannot Move', 'Could not move money.'),
   });
 }
+
+/**
+ * Persist a new group order. Accepts a list of group IDs in the desired order;
+ * each gets sortOrder = its index in the list. Triggers sync after write.
+ */
+export function useReorderGroups(month: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        await Promise.all(
+          orderedIds.map(async (id, idx) => {
+            const grp = await db.get<CategoryGroupModel>('category_groups').find(id);
+            await grp.update(g => {
+              g.sortOrder = idx;
+              g.updatedAt = new Date();
+            });
+          }),
+        );
+      });
+      syncDatabase().catch(console.warn);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
+  });
+}
+
+/**
+ * Persist a new category order within a group. Accepts a list of category IDs
+ * in the desired order; each gets sortOrder = its index. Triggers sync.
+ */
+export function useReorderCategories(month: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        await Promise.all(
+          orderedIds.map(async (id, idx) => {
+            const cat = await db.get<CategoryModel>('categories').find(id);
+            await cat.update(c => {
+              c.sortOrder = idx;
+              c.updatedAt = new Date();
+            });
+          }),
+        );
+      });
+      syncDatabase().catch(console.warn);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
+  });
+}

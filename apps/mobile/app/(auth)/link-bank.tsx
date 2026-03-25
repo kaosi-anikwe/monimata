@@ -43,7 +43,7 @@ import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import api from '@/services/api';
 import type { RootState } from '@/store';
-import { BackBtn, TrustCard, s as authS } from './_authShared';
+import { AuthHdr, BackBtn, TrustCard, s as authS } from './_authShared';
 
 // ── Inner component — must live inside <MonoProvider> to use the hook ────────
 
@@ -119,13 +119,13 @@ export default function LinkBankScreen() {
       <View style={[authS.screen, { backgroundColor: colors.white }]}>
 
         {/* ── Dark green curved header ── */}
-        <View style={[authS.authHdr, { backgroundColor: colors.darkGreen }]}>
+        <AuthHdr>
           <BackBtn onPress={() => router.back()} />
           <Text style={[authS.authTitle, { color: colors.white }]}>Connect your bank</Text>
           <Text style={[authS.authSub, { color: 'rgba(255,255,255,0.5)' }]}>
             Automatic transaction sync — no more manual entry
           </Text>
-        </View>
+        </AuthHdr>
 
         {/* ── Body ── */}
         <View style={[authS.body, { flex: 1, justifyContent: 'space-between' }]}>
