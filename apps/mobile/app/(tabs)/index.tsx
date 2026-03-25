@@ -148,9 +148,13 @@ export default function HomeScreen() {
       <View
         style={[
           s.header,
-          { backgroundColor: colors.darkGreen, paddingTop: insets.top + 20 },
+          { paddingTop: insets.top + 20 },
         ]}
       >
+        <LinearGradient
+          colors={[colors.darkGreen, colors.darkGreenMid]}
+          style={StyleSheet.absoluteFill}
+        />
         {/* Top row: avatar + greeting | notification bell */}
         <View style={s.topRow}>
           <TouchableOpacity

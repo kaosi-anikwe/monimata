@@ -29,11 +29,12 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRef } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRef, type ReactNode } from 'react';
 import type { StyleProp, TextInputProps, TextStyle, ViewStyle } from 'react-native';
 import { Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import type { ThemeColors } from '@/lib/theme';
+import { useTheme, type ThemeColors } from '@/lib/theme';
 import { glass, radius, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
 
@@ -139,6 +140,22 @@ export function EyeIcon({ open, color }: { open: boolean; color: string }) {
   return <Ionicons name={open ? 'eye-off-outline' : 'eye-outline'} size={18} color={color} />;
 }
 
+// ─── AuthHdr ──────────────────────────────────────────────────────────────────
+// Dark green gradient header — wraps all auth screen headers.
+
+export function AuthHdr({ children }: { children: ReactNode }) {
+  const colors = useTheme();
+  return (
+    <View style={s.authHdr}>
+      <LinearGradient
+        colors={[colors.darkGreen, colors.darkGreenMid]}
+        style={StyleSheet.absoluteFill}
+      />
+      {children}
+    </View>
+  );
+}
+
 // ─── Shared styles ────────────────────────────────────────────────────────────
 // Referenced across login, register, verify-bvn, and link-bank.
 
@@ -152,6 +169,7 @@ export const s = StyleSheet.create({
     paddingBottom: 28,
     borderBottomLeftRadius: radius.xl,   // 28 pt — matches border-radius: 0 0 28px 28px
     borderBottomRightRadius: radius.xl,
+    overflow: 'hidden',
   },
   // .x-btn.dk — frosted-glass back button for dark-green auth headers
   xBtnDk: {
@@ -237,3 +255,8 @@ const trustS = StyleSheet.create({
   },
   text: { ...ff(400), fontSize: 12, lineHeight: 19, flex: 1 },
 });
+
+// Expo Router requires a default export from every file inside app/.
+// This file is a shared primitives module, not a screen — export null to satisfy
+// the router without rendering anything.
+export default function AuthShared() { return null; }

@@ -21,48 +21,63 @@
  * - Group header: group name + [+ add category] + [⋯ group options] buttons.
  * - Category row: name + target summary + [⋯ category options] button.
  * - Changes (rename, hide, delete, add) sync immediately via API mutations.
+ * - Drag-to-reorder: long-press the ≡ handle on a group or category row to
+ *   drag it to a new position. Groups collapse while a group is being dragged.
  */
-import { useState, useMemo, useCallback } from 'react';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
-  SectionList,
   TextInput,
   TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  NestableDraggableFlatList,
+  NestableScrollContainer,
+  RenderItemParams,
+  ScaleDecorator,
+} from 'react-native-draggable-flatlist';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { formatNaira } from '@/utils/money';
 import { useToast } from '@/components/Toast';
-import { useAppSelector } from '@/store/hooks';
-import type { BudgetCategory, BudgetGroup } from '@/types/budget';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import {
   useBudget,
-  useCreateGroup,
   useCreateCategory,
-  useRenameCategory,
-  useHideCategory,
+  useCreateGroup,
   useDeleteCategory,
-  useRenameGroup,
   useDeleteGroup,
-  useHideGroup,
   useDeleteTarget,
+  useHideCategory,
+  useHideGroup,
+  useRenameCategory,
+  useRenameGroup,
+  useReorderCategories,
+  useReorderGroups,
 } from '@/hooks/useBudget';
+import { useTheme } from '@/lib/theme';
+import { glass, radius, shadow, spacing } from '@/lib/tokens';
+import { ff, formatMoney } from '@/lib/typography';
+import { useAppSelector } from '@/store/hooks';
+import type { BudgetCategory, BudgetGroup } from '@/types/budget';
+
 
 // ─── Target summary label ─────────────────────────────────────────────────────
 
 function targetLabel(cat: BudgetCategory): string {
   if (!cat.target_amount || !cat.target_frequency) return '';
-  const amount = formatNaira(cat.target_amount);
+  const amount = formatMoney(cat.target_amount);
   switch (cat.target_frequency) {
     case 'weekly': return `${amount}/wk`;
     case 'monthly': return `${amount}/mo`;
@@ -72,7 +87,7 @@ function targetLabel(cat: BudgetCategory): string {
   }
 }
 
-// ─── Category options modal ────────────────────────────────────────────────────
+// ─── Category options sheet ───────────────────────────────────────────────────
 
 interface CatOptionsProps {
   category: BudgetCategory | null;
@@ -81,7 +96,8 @@ interface CatOptionsProps {
   onNavigateTarget: (categoryId: string) => void;
 }
 
-function CategoryOptionsModal({ category, month, onClose, onNavigateTarget }: CatOptionsProps) {
+function CategoryOptionsSheet({ category, month, onClose, onNavigateTarget }: CatOptionsProps) {
+  const colors = useTheme();
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const rename = useRenameCategory(month);
@@ -90,6 +106,7 @@ function CategoryOptionsModal({ category, month, onClose, onNavigateTarget }: Ca
   const delTarget = useDeleteTarget(month);
   const { confirm } = useToast();
 
+  // Must be after all hooks — React Compiler evaluates handler bodies eagerly.
   if (!category) return null;
 
   function startRename() {
@@ -137,71 +154,117 @@ function CategoryOptionsModal({ category, month, onClose, onNavigateTarget }: Ca
   }
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.sheetBackdrop} activeOpacity={1} onPress={onClose} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={s.sheetContainer}
-      >
-        <View style={s.sheet}>
-          <View style={s.sheetHandle} />
-          <Text style={s.sheetTitle}>{category.name}</Text>
-
-          {renaming ? (
-            <View style={s.renameRow}>
-              <TextInput
-                style={s.renameInput}
-                value={newName}
-                onChangeText={setNewName}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={commitRename}
-                placeholder="Category name"
-              />
-              <TouchableOpacity style={s.renameConfirm} onPress={commitRename}>
-                <Ionicons name="checkmark" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={s.sheetRow} onPress={startRename}>
-              <Ionicons name="pencil-outline" size={20} color="#374151" />
-              <Text style={s.sheetRowText}>Rename</Text>
-            </TouchableOpacity>
-          )}
-
+    <BottomSheet
+      visible={!!category}
+      onClose={onClose}
+      title={category?.name ?? ''}
+      scrollable={false}
+    >
+      {renaming ? (
+        <View style={[ss.renameRow, { borderBottomColor: colors.border }]}>
+          <TextInput
+            style={[ss.renameInput, {
+              backgroundColor: colors.surface,
+              borderColor: colors.brand,
+              color: colors.textPrimary,
+            }]}
+            value={newName}
+            onChangeText={setNewName}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={commitRename}
+            placeholder="Category name"
+            placeholderTextColor={colors.textTertiary}
+          />
           <TouchableOpacity
-            style={s.sheetRow}
-            onPress={() => { onNavigateTarget(category.id); onClose(); }}
+            style={[ss.renameConfirm, { backgroundColor: colors.brand }]}
+            onPress={commitRename}
           >
-            <Ionicons name="flag-outline" size={20} color="#374151" />
-            <Text style={s.sheetRowText}>
-              {category.target_amount ? 'Edit target' : 'Add target'}
-            </Text>
+            <Ionicons name="checkmark" size={20} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          {/* Rename */}
+          <TouchableOpacity
+            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            onPress={startRename}
+            activeOpacity={0.7}
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.surface }]}>
+              <Feather name="edit-2" size={17} color={colors.brand} />
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[ss.ashNm, { color: colors.textPrimary }]}>Rename</Text>
+            </View>
           </TouchableOpacity>
 
-          {category.target_amount ? (
-            <TouchableOpacity style={s.sheetRow} onPress={doRemoveTarget}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              <Text style={[s.sheetRowText, { color: '#EF4444' }]}>Remove target</Text>
+          {/* Add / Edit target */}
+          <TouchableOpacity
+            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            onPress={() => { onNavigateTarget(category!.id); onClose(); }}
+            activeOpacity={0.7}
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.surface }]}>
+              <Feather name="target" size={17} color={colors.brand} />
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[ss.ashNm, { color: colors.textPrimary }]}>
+                {category?.target_amount ? 'Edit target' : 'Add target'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Remove target */}
+          {category?.target_amount ? (
+            <TouchableOpacity
+              style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+              onPress={doRemoveTarget}
+              activeOpacity={0.7}
+            >
+              <View style={[ss.ashIc, { backgroundColor: colors.errorSubtle }]}>
+                <Feather name="x-circle" size={17} color={colors.error} />
+              </View>
+              <View style={ss.ashText}>
+                <Text style={[ss.ashNm, { color: colors.error }]}>Remove target</Text>
+              </View>
             </TouchableOpacity>
           ) : null}
 
-          <TouchableOpacity style={s.sheetRow} onPress={doHide}>
-            <Ionicons name="eye-off-outline" size={20} color="#6B7280" />
-            <Text style={[s.sheetRowText, { color: '#6B7280' }]}>Hide</Text>
+          {/* Hide */}
+          <TouchableOpacity
+            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            onPress={doHide}
+            activeOpacity={0.7}
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.surface }]}>
+              <Feather name="eye-off" size={17} color={colors.textMeta} />
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[ss.ashNm, { color: colors.textSecondary }]}>Hide</Text>
+            </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={s.sheetRow} onPress={doDelete}>
-            <Ionicons name="trash-outline" size={20} color="#EF4444" />
-            <Text style={[s.sheetRowText, { color: '#EF4444' }]}>Delete</Text>
+          {/* Delete */}
+          <TouchableOpacity
+            style={[ss.ashRow]}
+            onPress={doDelete}
+            activeOpacity={0.7}
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.errorSubtle }]}>
+              <Feather name="trash-2" size={17} color={colors.error} />
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[ss.ashNm, { color: colors.error }]}>Delete</Text>
+            </View>
           </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+        </>
+      )}
+    </BottomSheet>
   );
 }
 
-// ─── Group options modal ──────────────────────────────────────────────────────
+// ─── Group options sheet ──────────────────────────────────────────────────────
 
 interface GroupOptionsProps {
   group: BudgetGroup | null;
@@ -209,7 +272,8 @@ interface GroupOptionsProps {
   onClose: () => void;
 }
 
-function GroupOptionsModal({ group, month, onClose }: GroupOptionsProps) {
+function GroupOptionsSheet({ group, month, onClose }: GroupOptionsProps) {
+  const colors = useTheme();
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const rename = useRenameGroup(month);
@@ -217,6 +281,7 @@ function GroupOptionsModal({ group, month, onClose }: GroupOptionsProps) {
   const hide = useHideGroup(month);
   const { confirm } = useToast();
 
+  // Must be after all hooks — React Compiler evaluates handler bodies eagerly.
   if (!group) return null;
 
   function startRename() {
@@ -254,47 +319,78 @@ function GroupOptionsModal({ group, month, onClose }: GroupOptionsProps) {
   }
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.sheetBackdrop} activeOpacity={1} onPress={onClose} />
-      <View style={s.sheetContainer}>
-        <View style={s.sheet}>
-          <View style={s.sheetHandle} />
-          <Text style={s.sheetTitle}>{group.name}</Text>
-
-          {renaming ? (
-            <View style={s.renameRow}>
-              <TextInput
-                style={s.renameInput}
-                value={newName}
-                onChangeText={setNewName}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={commitRename}
-                placeholder="Group name"
-              />
-              <TouchableOpacity style={s.renameConfirm} onPress={commitRename}>
-                <Ionicons name="checkmark" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={s.sheetRow} onPress={startRename}>
-              <Ionicons name="pencil-outline" size={20} color="#374151" />
-              <Text style={s.sheetRowText}>Rename</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={s.sheetRow} onPress={doHide}>
-            <Ionicons name="eye-off-outline" size={20} color="#6B7280" />
-            <Text style={[s.sheetRowText, { color: '#6B7280' }]}>Hide group</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={s.sheetRow} onPress={doDelete}>
-            <Ionicons name="trash-outline" size={20} color="#EF4444" />
-            <Text style={[s.sheetRowText, { color: '#EF4444' }]}>Delete group</Text>
+    <BottomSheet
+      visible={!!group}
+      onClose={onClose}
+      title={group?.name ?? ''}
+      scrollable={false}
+    >
+      {renaming ? (
+        <View style={[ss.renameRow, { borderBottomColor: colors.border }]}>
+          <TextInput
+            style={[ss.renameInput, {
+              backgroundColor: colors.surface,
+              borderColor: colors.brand,
+              color: colors.textPrimary,
+            }]}
+            value={newName}
+            onChangeText={setNewName}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={commitRename}
+            placeholder="Group name"
+            placeholderTextColor={colors.textTertiary}
+          />
+          <TouchableOpacity
+            style={[ss.renameConfirm, { backgroundColor: colors.brand }]}
+            onPress={commitRename}
+          >
+            <Ionicons name="checkmark" size={20} color={colors.white} />
           </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
+      ) : (
+        <>
+          <TouchableOpacity
+            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            onPress={startRename}
+            activeOpacity={0.7}
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.surface }]}>
+              <Feather name="edit-2" size={17} color={colors.brand} />
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[ss.ashNm, { color: colors.textPrimary }]}>Rename group</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            onPress={doHide}
+            activeOpacity={0.7}
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.surface }]}>
+              <Feather name="eye-off" size={17} color={colors.textMeta} />
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[ss.ashNm, { color: colors.textSecondary }]}>Hide group</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[ss.ashRow]}
+            onPress={doDelete}
+            activeOpacity={0.7}
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.errorSubtle }]}>
+              <Feather name="trash-2" size={17} color={colors.error} />
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[ss.ashNm, { color: colors.error }]}>Delete group</Text>
+            </View>
+          </TouchableOpacity>
+        </>
+      )}
+    </BottomSheet>
   );
 }
 
@@ -307,6 +403,7 @@ interface AddCatProps {
 }
 
 function AddCategoryModal({ groupId, month, onClose }: AddCatProps) {
+  const colors = useTheme();
   const [name, setName] = useState('');
   const create = useCreateCategory(month);
 
@@ -321,26 +418,37 @@ function AddCategoryModal({ groupId, month, onClose }: AddCatProps) {
   return (
     <Modal visible={!!groupId} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={s.modalBackdrop}
+        style={ss.modalBackdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={s.modalCard}>
-          <Text style={s.modalTitle}>New Category</Text>
+        <View style={[ss.modalCard, { backgroundColor: colors.white }]}>
+          <Text style={[ss.modalTitle, { color: colors.textPrimary }]}>New Category</Text>
           <TextInput
-            style={s.modalInput}
+            style={[ss.modalInput, {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+            }]}
             value={name}
             onChangeText={setName}
             placeholder="e.g. Rent"
+            placeholderTextColor={colors.textTertiary}
             autoFocus
             returnKeyType="done"
             onSubmitEditing={handleSave}
           />
-          <View style={s.modalRow}>
-            <TouchableOpacity style={s.modalCancel} onPress={onClose}>
-              <Text style={s.modalCancelText}>Cancel</Text>
+          <View style={ss.modalRow}>
+            <TouchableOpacity
+              style={[ss.modalCancel, { backgroundColor: colors.surface }]}
+              onPress={onClose}
+            >
+              <Text style={[ss.modalCancelText, { color: colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.modalSave} onPress={handleSave}>
-              <Text style={s.modalSaveText}>Create</Text>
+            <TouchableOpacity
+              style={[ss.modalSave, { backgroundColor: colors.brand }]}
+              onPress={handleSave}
+            >
+              <Text style={[ss.modalSaveText, { color: colors.white }]}>Create</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -349,60 +457,102 @@ function AddCategoryModal({ groupId, month, onClose }: AddCatProps) {
   );
 }
 
-// ─── Category row ─────────────────────────────────────────────────────────────
+// ─── Category row (.edit-cat-row) ─────────────────────────────────────────────
 
 function CategoryEditRow({
   category,
   onOptions,
-  onNavigateTarget
+  onNavigateTarget,
+  drag,
 }: {
   category: BudgetCategory;
   onOptions: () => void;
   onNavigateTarget: (categoryId: string) => void;
+  drag: () => void;
 }) {
+  const colors = useTheme();
   const label = targetLabel(category);
   return (
-    <TouchableOpacity onPress={onOptions} hitSlop={10}>
-      <View style={s.catRow}>
+    <View style={[ss.catRow, { borderBottomColor: colors.separator }]}>
+      {/* Drag handle — long-press to start drag */}
+      <TouchableOpacity onLongPress={drag} hitSlop={10} style={ss.dragHandleHit} activeOpacity={0.6}>
+        <Ionicons name="reorder-three-outline" size={18} color={colors.textTertiary} />
+      </TouchableOpacity>
 
-        <Text style={s.catName} numberOfLines={1}>
+      <TouchableOpacity style={ss.catNameBtn} onPress={onOptions} activeOpacity={0.6}>
+        <Text style={[ss.catName, { color: colors.textPrimary }]} numberOfLines={1}>
           {category.name}
         </Text>
-        {label ? (
-          <Text style={s.catTarget}>{label}</Text>
-        ) : (
-          <TouchableOpacity onPress={() => onNavigateTarget(category.id)} hitSlop={10}>
-            <Text style={s.catAddTarget}>+ Add target</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
 
+      {label ? (
+        <TouchableOpacity
+          onPress={() => onNavigateTarget(category.id)}
+          hitSlop={10}
+          style={[ss.catTargetChip, { backgroundColor: colors.surface }]}
+          activeOpacity={0.7}
+        >
+          <Text style={[ss.catTargetText, { color: colors.brand }]}>{label}</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={() => onNavigateTarget(category.id)}
+          hitSlop={10}
+          style={ss.catAddTargetBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={[ss.catAddTargetText, { color: colors.brand }]}>+ Add target</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
-// ─── Group header ─────────────────────────────────────────────────────────────
+// ─── Group header (.edit-grp-h) ───────────────────────────────────────────────
 
 function GroupEditHeader({
   group,
   onAddCategory,
   onOptions,
+  drag,
 }: {
   group: BudgetGroup;
   onAddCategory: () => void;
   onOptions: () => void;
+  drag: () => void;
 }) {
+  const colors = useTheme();
   return (
-    <View style={s.groupHeader}>
-      <Text style={s.groupName}>{group.name}</Text>
-      <View style={s.groupActions}>
-        <TouchableOpacity onPress={onAddCategory} hitSlop={10}>
-          <Ionicons name="add-circle-outline" size={20} color="#0F7B3F" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onOptions} hitSlop={10}>
-          <Ionicons name="ellipsis-horizontal" size={20} color="#6B7280" />
-        </TouchableOpacity>
-      </View>
+    <View style={[ss.groupHdr, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      {/* Drag handle — long-press to start group drag */}
+      <TouchableOpacity onLongPress={drag} hitSlop={10} style={ss.dragHandleHit} activeOpacity={0.6}>
+        <Ionicons name="reorder-three-outline" size={18} color={colors.textTertiary} />
+      </TouchableOpacity>
+
+      <Text style={[ss.groupName, { color: colors.textSecondary }]} numberOfLines={1}>
+        {group.name.toUpperCase()}
+      </Text>
+
+      {/* Add category button */}
+      <TouchableOpacity
+        style={[ss.groupAddBtn, { backgroundColor: colors.surface }]}
+        onPress={onAddCategory}
+        hitSlop={10}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="add" size={12} color={colors.brand} />
+        <Text style={[ss.groupAddText, { color: colors.brand }]}>Add</Text>
+      </TouchableOpacity>
+
+      {/* Group more button */}
+      <TouchableOpacity
+        style={[ss.groupMoreBtn, { backgroundColor: colors.surface }]}
+        onPress={onOptions}
+        hitSlop={10}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="ellipsis-horizontal" size={14} color={colors.brand} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -411,31 +561,23 @@ function GroupEditHeader({
 
 export default function BudgetEditScreen() {
   const router = useRouter();
+  const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const { selectedMonth } = useAppSelector((s) => s.budget);
-  const [refreshing, setRefreshing] = useState(false);
   const [addCatGroupId, setAddCatGroupId] = useState<string | null>(null);
   const [catOptions, setCatOptions] = useState<BudgetCategory | null>(null);
   const [groupOptions, setGroupOptions] = useState<BudgetGroup | null>(null);
   const [addGroupOpen, setAddGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  const [groupDragging, setGroupDragging] = useState(false);
 
-  const { data, isLoading, error, refetch } = useBudget(selectedMonth);
+  const reorderGroups = useReorderGroups(selectedMonth);
+  const reorderCategories = useReorderCategories(selectedMonth);
+
+  const { data, isLoading, error } = useBudget(selectedMonth);
   const createGroup = useCreateGroup(selectedMonth);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refetch().catch(() => { });
-    setRefreshing(false);
-  }, [refetch]);
-
-  const sections = useMemo(
-    () =>
-      (data?.groups ?? []).map((g) => ({
-        ...g,
-        data: g.categories,
-      })),
-    [data],
-  );
+  const groups = data?.groups ?? [];
 
   // "Cost to be me" = sum of all target amounts
   const costToBeMe = useMemo(() => {
@@ -448,101 +590,216 @@ export default function BudgetEditScreen() {
     return data.groups.flatMap((g) => g.categories).reduce((sum, c) => sum + c.assigned, 0);
   }, [data]);
 
+  const progress = costToBeMe > 0 ? Math.min(assignedTotal / costToBeMe, 1) : 0;
+
   if (isLoading && !data) {
     return (
-      <SafeAreaView style={s.safe}>
-        <ActivityIndicator style={{ flex: 1 }} color="#10B981" />
-      </SafeAreaView>
+      <View style={[ss.flex, { backgroundColor: colors.background }]}>
+        <ActivityIndicator style={ss.flex} color={colors.brand} />
+      </View>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={s.safe}>
+      <View style={[ss.flex, { backgroundColor: colors.background }]}>
         <ScrollView
-          contentContainerStyle={s.errorContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
-          }
+          contentContainerStyle={ss.errorContainer}
         >
-          <Ionicons name="cloud-offline-outline" size={40} color="#D1D5DB" />
-          <Text style={s.errorText}>Could not load budget.</Text>
-          <Text style={s.errorSub}>Pull down to retry.</Text>
+          <Ionicons name="cloud-offline-outline" size={40} color={colors.textTertiary} />
+          <Text style={[ss.errorText, { color: colors.textSecondary }]}>Could not load budget.</Text>
+          <Text style={[ss.errorSub, { color: colors.textMeta }]}>Pull down to retry.</Text>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  const progress = costToBeMe > 0 ? Math.min(assignedTotal / costToBeMe, 1) : 0;
+  // renderItem for the inner category NestableDraggableFlatList
+  function renderCategoryItem(
+    { item: cat, drag: catDrag, isActive: catIsActive, getIndex }: RenderItemParams<BudgetCategory>,
+    groupCatCount: number,
+  ) {
+    const idx = getIndex() ?? 0;
+    const isLast = idx === groupCatCount - 1;
+    return (
+      <ScaleDecorator activeScale={1.03}>
+        <View
+          style={[
+            ss.grpBodyItem,
+            {
+              backgroundColor: catIsActive ? colors.surface : colors.white,
+              borderColor: colors.border,
+              borderLeftWidth: 1,
+              borderRightWidth: 1,
+              borderBottomWidth: isLast ? 1 : 0,
+              borderBottomLeftRadius: isLast ? radius.md : 0,
+              borderBottomRightRadius: isLast ? radius.md : 0,
+            },
+          ]}
+        >
+          <CategoryEditRow
+            category={cat}
+            onOptions={() => setCatOptions(cat)}
+            onNavigateTarget={(catId) => router.push(`/target/${catId}`)}
+            drag={catDrag}
+          />
+        </View>
+      </ScaleDecorator>
+    );
+  }
 
   return (
-    <SafeAreaView style={s.safe}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Edit Budget</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {/* Cost to be me card */}
-      <View style={s.costCard}>
-        <View style={s.costRow}>
-          <Text style={s.costLabel}>Cost to be me</Text>
-          <Text style={s.costAmount}>{formatNaira(costToBeMe)}/mo</Text>
-        </View>
-        <View style={s.progressTrack}>
-          <View style={[s.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
-        </View>
-        <Text style={s.progressLabel}>
-          {formatNaira(assignedTotal)} assigned of {formatNaira(costToBeMe)}
-        </Text>
-      </View>
-
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderSectionHeader={({ section }) => (
-          <GroupEditHeader
-            group={section}
-            onAddCategory={() => setAddCatGroupId(section.id)}
-            onOptions={() => setGroupOptions(section)}
-          />
-        )}
-        renderItem={({ item }) => (
-          <CategoryEditRow
-            category={item}
-            onOptions={() => setCatOptions(item)}
-            onNavigateTarget={(catId) => router.push(`/target/${catId}`)}
-          />
-        )}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
-        }
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        ListFooterComponent={
-          <TouchableOpacity style={s.addGroupBtn} onPress={() => setAddGroupOpen(true)}>
-            <Ionicons name="add-circle-outline" size={18} color="#0F7B3F" />
-            <Text style={s.addGroupText}>Add group</Text>
+    <View style={[ss.flex, { backgroundColor: colors.background }]}>
+      {/* ── Dark green header (.edit-hdr) ── */}
+      <View
+        style={[ss.hdr, { paddingTop: insets.top + 10, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl }]}
+      >
+        <LinearGradient
+          colors={[colors.darkGreen, colors.darkGreenMid]}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Header top row */}
+        <View style={ss.hdrTop}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={[ss.backBtn]}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="chevron-back" size={22} color={colors.white} />
           </TouchableOpacity>
-        }
-      />
+          <Text style={[ss.hdrTitle, { color: colors.white }]}>Edit Budget</Text>
+          <View style={{ width: 36 }} />
+        </View>
+
+        {/* CTBM card (.ctbm-card) */}
+        <View style={[ss.ctbmCard, { backgroundColor: glass.card, borderColor: glass.borderLime }]}>
+          <Text style={[ss.ctbmLabel, { color: glass.labelDim }]}>COST TO BE ME</Text>
+          <Text style={[ss.ctbmVal, { color: colors.white }]}>
+            {formatMoney(costToBeMe)}<Text style={[ss.ctbmSuffix, { color: glass.textDim }]}>/mo</Text>
+          </Text>
+          <Text style={[ss.ctbmSub, { color: glass.textFaint }]}>
+            {formatMoney(assignedTotal)} assigned of {formatMoney(costToBeMe)}
+          </Text>
+          {/* Progress bar */}
+          <View style={[ss.ctbmTrack, { backgroundColor: glass.borderWhiteStrong }]}>
+            <LinearGradient
+              colors={[colors.brand, colors.lime]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[ss.ctbmFill, { width: `${Math.round(progress * 100)}%` as `${number}%` }]}
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* ── Groups + Categories ── */}
+      <NestableScrollContainer
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
+        <NestableDraggableFlatList<BudgetGroup>
+          data={groups}
+          keyExtractor={(g) => g.id}
+          onDragBegin={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setGroupDragging(true);
+          }}
+          onDragEnd={({ data: newGroups }) => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setGroupDragging(false);
+            reorderGroups.mutate(newGroups.map((g) => g.id));
+          }}
+          renderItem={({ item: group, drag, isActive }: RenderItemParams<BudgetGroup>) => (
+            <ScaleDecorator activeScale={1.02}>
+              <View style={ss.grpWrapper}>
+                {/* Group header card */}
+                <View
+                  style={[
+                    ss.grpCard,
+                    {
+                      backgroundColor: colors.white,
+                      borderColor: isActive ? colors.brand : colors.border,
+                      ...shadow.sm,
+                    },
+                    (group.categories.length === 0) && {
+                      borderBottomLeftRadius: radius.md,
+                      borderBottomRightRadius: radius.md,
+                    },
+                  ]}
+                >
+                  <GroupEditHeader
+                    group={group}
+                    onAddCategory={() => setAddCatGroupId(group.id)}
+                    onOptions={() => setGroupOptions(group)}
+                    drag={drag}
+                  />
+                </View>
+
+                {/* Category rows — keep mounted during group drag so heights stay stable */}
+                <View pointerEvents={groupDragging ? 'none' : 'auto'}>
+                  <NestableDraggableFlatList<BudgetCategory>
+                    data={group.categories}
+                    keyExtractor={(c) => c.id}
+                    onDragBegin={() =>
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+                    }
+                    onDragEnd={({ data: newCats }) =>
+                      reorderCategories.mutate(newCats.map((c) => c.id))
+                    }
+                    renderItem={(params) =>
+                      renderCategoryItem(params, group.categories.length)
+                    }
+                  />
+                </View>
+              </View>
+            </ScaleDecorator>
+          )}
+        />
+
+        {/* Add Group button */}
+        <TouchableOpacity
+          style={[
+            ss.addGroupBtn,
+            {
+              borderColor: colors.borderStrong,
+              backgroundColor: colors.white,
+            },
+          ]}
+          onPress={() => setAddGroupOpen(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="add" size={16} color={colors.brand} />
+          <Text style={[ss.addGroupText, { color: colors.brand }]}>Add Group</Text>
+        </TouchableOpacity>
+      </NestableScrollContainer>
 
       {/* Add group mini-modal */}
-      <Modal visible={addGroupOpen} transparent animationType="fade" onRequestClose={() => setAddGroupOpen(false)}>
+      <Modal
+        visible={addGroupOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddGroupOpen(false)}
+      >
         <KeyboardAvoidingView
-          style={s.modalBackdrop}
+          style={ss.modalBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>New Group</Text>
+          <View style={[ss.modalCard, { backgroundColor: colors.white }]}>
+            <Text style={[ss.modalTitle, { color: colors.textPrimary }]}>New Group</Text>
             <TextInput
-              style={s.modalInput}
+              style={[ss.modalInput, {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              }]}
               value={newGroupName}
               onChangeText={setNewGroupName}
               placeholder="e.g. Housing"
+              placeholderTextColor={colors.textTertiary}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={() => {
@@ -552,12 +809,15 @@ export default function BudgetEditScreen() {
                 setAddGroupOpen(false);
               }}
             />
-            <View style={s.modalRow}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => { setNewGroupName(''); setAddGroupOpen(false); }}>
-                <Text style={s.modalCancelText}>Cancel</Text>
+            <View style={ss.modalRow}>
+              <TouchableOpacity
+                style={[ss.modalCancel, { backgroundColor: colors.surface }]}
+                onPress={() => { setNewGroupName(''); setAddGroupOpen(false); }}
+              >
+                <Text style={[ss.modalCancelText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={s.modalSave}
+                style={[ss.modalSave, { backgroundColor: colors.brand }]}
                 onPress={() => {
                   const trimmed = newGroupName.trim();
                   if (trimmed) createGroup.mutate(trimmed);
@@ -565,7 +825,7 @@ export default function BudgetEditScreen() {
                   setAddGroupOpen(false);
                 }}
               >
-                <Text style={s.modalSaveText}>Create</Text>
+                <Text style={[ss.modalSaveText, { color: colors.white }]}>Create</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -578,156 +838,257 @@ export default function BudgetEditScreen() {
         onClose={() => setAddCatGroupId(null)}
       />
 
-      <CategoryOptionsModal
+      <CategoryOptionsSheet
         category={catOptions}
         month={selectedMonth}
         onClose={() => setCatOptions(null)}
         onNavigateTarget={(catId) => router.push(`/target/${catId}` as never)}
       />
 
-      <GroupOptionsModal
+      <GroupOptionsSheet
         group={groupOptions}
         month={selectedMonth}
         onClose={() => setGroupOptions(null)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
+const ss = StyleSheet.create({
+  flex: { flex: 1 },
 
-  header: {
+  // ── Header (.edit-hdr) ───────────────────────────────────────────────────
+  hdr: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    flexShrink: 0, overflow: 'hidden',
+  },
+  hdrTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: spacing.lg,
   },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
-
-  costCard: {
-    margin: 16,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+  hdrTitle: { ...ff(700), fontSize: 17, letterSpacing: -0.3 },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: glass.strong,
   },
-  costRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 },
-  costLabel: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  costAmount: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  progressTrack: { height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden', marginBottom: 6 },
-  progressFill: { height: 6, backgroundColor: '#10B981', borderRadius: 3 },
-  progressLabel: { fontSize: 12, color: '#6B7280' },
 
-  groupHeader: {
+  // ── CTBM card (.ctbm-card) ───────────────────────────────────────────────
+  ctbmCard: {
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+  },
+  ctbmLabel: {
+    ...ff(700),
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: spacing.xs,
+  },
+  ctbmVal: { ...ff(800), fontSize: 22, letterSpacing: -0.5 },
+  ctbmSuffix: { ...ff(500), fontSize: 14, letterSpacing: 0 },
+  ctbmSub: { ...ff(400), fontSize: 12, marginTop: spacing.xs },
+  ctbmTrack: {
+    height: 6,
+    borderRadius: 3,
+    marginTop: spacing.smd,
+    overflow: 'hidden',
+  },
+  ctbmFill: { height: 6, borderRadius: 3 },
+
+  // ── Group card wrapper (.edit-grp) ───────────────────────────────────────
+  grpWrapper: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.smd,
+  },
+  grpCard: {
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+
+  // ── Category list + drag overlay ─────────────────────────────────────────
+  catListContainer: { position: 'relative' },
+  grpBodyItem: {
+    overflow: 'hidden',
+  },
+
+  // ── Group header (.edit-grp-h) ───────────────────────────────────────────
+  groupHdr: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#E5E7EB',
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: spacing.sm,
   },
-  groupName: { flex: 1, fontSize: 13, fontWeight: '700', color: '#374151', textTransform: 'uppercase' },
-  groupActions: { flexDirection: 'row', gap: 14 },
+  groupName: {
+    ...ff(700),
+    fontSize: 11,
+    letterSpacing: 1.5,
+    flex: 1,
+  },
+  groupAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.xs,
+  },
+  groupAddText: { ...ff(600), fontSize: 12 },
+  groupMoreBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
+  // ── Category row (.edit-cat-row) ─────────────────────────────────────────
   catRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    backgroundColor: '#fff',
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: 12,
+    gap: spacing.smd,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
   },
-  catName: { flex: 1, fontSize: 15, color: '#111827' },
-  catTarget: { fontSize: 13, color: '#6B7280', marginRight: 8 },
-  catAddTarget: { fontSize: 13, color: '#0F7B3F', marginRight: 8 },
-  catOptions: { padding: 4 },
+  dragHandleHit: {
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dragHandle: { marginRight: 2 },
+  dragFloat: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderWidth: 1.5,
+    borderRadius: radius.md,
+    ...shadow.md,
+  },
+  catNameBtn: { flex: 1 },
+  catName: { ...ff(600), fontSize: 14 },
+  catTargetChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: 7,
+  },
+  catTargetText: { ...ff(600), fontSize: 12 },
+  catAddTargetBtn: { paddingHorizontal: 2 },
+  catAddTargetText: { ...ff(600), fontSize: 12 },
 
+  // ── Add Group button (.add-grp-btn) ──────────────────────────────────────
   addGroupBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    paddingVertical: spacing.mdn,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
   },
-  addGroupText: { fontSize: 15, color: '#0F7B3F', fontWeight: '600' },
+  addGroupText: { ...ff(600), fontSize: 14 },
 
-  // Bottom sheet
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
-  sheetContainer: { justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 34,
-    paddingTop: 12,
+  // ── Action sheet rows (.ash-row) ─────────────────────────────────────────
+  ashRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.mdn,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D1D5DB',
-    alignSelf: 'center',
-    marginBottom: 16,
+  ashIc: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111827', paddingHorizontal: 20, marginBottom: 8 },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14 },
-  sheetRowText: { fontSize: 15, color: '#111827' },
-  renameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  ashText: { flex: 1 },
+  ashNm: { ...ff(600), fontSize: 14 },
+
+  // ── Rename inline ────────────────────────────────────────────────────────
+  renameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smd,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.smd,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   renameInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#D1FAE5',
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderRadius: radius.sm,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    fontSize: 15,
-    color: '#111827',
+    fontSize: 14,
+    ...ff(600),
   },
   renameConfirm: {
     width: 36,
     height: 36,
-    borderRadius: 8,
-    backgroundColor: '#0F7B3F',
+    borderRadius: radius.xs,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // Modal (add category, add group)
+  // ── Modal (add cat / add group) ──────────────────────────────────────────
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalCard: { width: '85%', backgroundColor: '#fff', borderRadius: 16, padding: 24 },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 16 },
+  modalCard: {
+    width: '85%',
+    borderRadius: radius.lg,
+    padding: spacing.xxl,
+  },
+  modalTitle: { ...ff(700), fontSize: 18, marginBottom: spacing.lg },
   modalInput: {
-    borderWidth: 1,
-    borderColor: '#D1FAE5',
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderRadius: radius.sm,
     padding: 12,
     fontSize: 16,
-    color: '#111827',
+    ...ff(500),
     marginBottom: 20,
   },
   modalRow: { flexDirection: 'row', gap: 12 },
-  modalCancel: { flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: '#F3F4F6', alignItems: 'center' },
-  modalCancelText: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  modalSave: { flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: '#10B981', alignItems: 'center' },
-  modalSaveText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  modalCancelText: { fontSize: 15, ...ff(600) },
+  modalSave: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  modalSaveText: { fontSize: 15, ...ff(600) },
 
+  // ── Error state ──────────────────────────────────────────────────────────
   errorContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 6 },
-  errorText: { fontSize: 16, fontWeight: '600', color: '#374151', textAlign: 'center' },
-  errorSub: { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
+  errorText: { fontSize: 16, ...ff(600), textAlign: 'center' },
+  errorSub: { fontSize: 13, textAlign: 'center' },
 });

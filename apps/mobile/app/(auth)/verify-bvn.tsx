@@ -46,7 +46,7 @@ import {
   View,
 } from 'react-native';
 import { z } from 'zod';
-import { BackBtn, TrustCard, s as authS } from './_authShared';
+import { AuthHdr, BackBtn, TrustCard, s as authS } from './_authShared';
 
 const schema = z.object({
   bvn: z.string().regex(/^\d{11}$/, 'BVN must be exactly 11 digits'),
@@ -103,13 +103,13 @@ export default function VerifyBVNScreen() {
   return (
     <View style={[authS.screen, { backgroundColor: colors.white }]}>
       {/* ── Dark green curved header ── */}
-      <View style={[authS.authHdr, { backgroundColor: colors.darkGreen }]}>
+      <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[authS.authTitle, { color: colors.white }]}>Prove it&apos;s you, once.</Text>
         <Text style={[authS.authSub, { color: 'rgba(255,255,255,0.5)' }]}>
           We verify your BVN with Interswitch — we never store, see, or share it.
         </Text>
-      </View>
+      </AuthHdr>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={[authS.body, { paddingTop: 16 }]} showsVerticalScrollIndicator={false}>

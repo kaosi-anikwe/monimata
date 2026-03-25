@@ -23,28 +23,33 @@
  *
  * Route: /target/[categoryId]
  */
-import { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-  StyleSheet,
-  Platform,
-  Switch,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import Animated, { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBudget } from '@/hooks/useBudget';
-import { useAppSelector } from '@/store/hooks';
-import { nairaStringToKobo } from '@/utils/money';
 import { useTarget, useUpsertTarget } from '@/hooks/useTargets';
-import type { TargetFrequency, TargetBehavior } from '@/types/target';
+import { useTheme } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff } from '@/lib/typography';
+import { useAppSelector } from '@/store/hooks';
+import type { TargetBehavior, TargetFrequency } from '@/types/target';
+import { nairaStringToKobo } from '@/utils/money';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -54,21 +59,32 @@ function koboToNaira(kobo: number): string {
   return (kobo / 100).toFixed(0);
 }
 
-
-
 // ─── Amount input ─────────────────────────────────────────────────────────────
 
 function AmountInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const colors = useTheme();
+  // Display formatted with commas; store raw digits only
+  const formatted = value ? Number(value).toLocaleString('en-NG') : '';
+
+  function handleChange(text: string) {
+    // Strip all non-digit characters before storing
+    const raw = text.replace(/[^0-9]/g, '');
+    onChange(raw);
+  }
+
   return (
-    <View style={s.amountRow}>
-      <Text style={s.currencySymbol}>₦</Text>
+    <View style={[ts.amountRow, {
+      backgroundColor: colors.surface,
+      borderColor: colors.brand,
+    }]}>
+      <Text style={[ts.currencySymbol, { color: colors.brand }]}>₦</Text>
       <TextInput
-        style={s.amountInput}
-        value={value}
-        onChangeText={onChange}
+        style={[ts.amountInput, { color: colors.brand }]}
+        value={formatted}
+        onChangeText={handleChange}
         keyboardType="numeric"
         placeholder="0"
-        placeholderTextColor="#D1D5DB"
+        placeholderTextColor={colors.textTertiary}
       />
     </View>
   );
@@ -87,6 +103,8 @@ function BehaviorPicker({
   frequency: TargetFrequency;
   amount: string;
 }) {
+  const colors = useTheme();
+
   const heading = {
     weekly: 'Next week I want to',
     monthly: 'Next month I want to',
@@ -95,7 +113,7 @@ function BehaviorPicker({
   }[frequency];
 
   const freqSuffix = { weekly: '/week', monthly: '/month', yearly: '/year', custom: '' }[frequency];
-  const amtLabel = amount ? `₦${amount}${freqSuffix}` : 'the target amount';
+  const amtLabel = amount ? `₦${Number(amount).toLocaleString('en-NG')}${freqSuffix}` : 'the target amount';
 
   const options: { key: TargetBehavior; label: string; desc: string }[] = [
     {
@@ -118,21 +136,31 @@ function BehaviorPicker({
   ];
 
   return (
-    <View style={s.section}>
-      <Text style={s.sectionLabel}>{heading}</Text>
+    <View style={ts.section}>
+      <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>{heading}</Text>
       {options.map((opt) => (
         <TouchableOpacity
           key={opt.key}
-          style={[s.behaviorRow, value === opt.key && s.behaviorRowActive]}
+          style={[ts.behaviorRow, {
+            backgroundColor: value === opt.key ? colors.surface : colors.background,
+            borderWidth: 1.5,
+            borderColor: value === opt.key ? colors.brand : colors.border,
+          }]}
           onPress={() => onChange(opt.key)}
           activeOpacity={0.7}
         >
-          <View style={[s.radioOuter, value === opt.key && s.radioOuterActive]}>
-            {value === opt.key ? <View style={s.radioInner} /> : null}
+          <View style={[ts.radioOuter, {
+            borderColor: value === opt.key ? colors.brand : colors.borderStrong,
+          }]}>
+            {value === opt.key ? (
+              <View style={[ts.radioInner, { backgroundColor: colors.brand }]} />
+            ) : null}
           </View>
-          <View style={s.behaviorText}>
-            <Text style={[s.behaviorLabel, value === opt.key && { color: '#0F7B3F' }]}>{opt.label}</Text>
-            <Text style={s.behaviorDesc}>{opt.desc}</Text>
+          <View style={ts.behaviorText}>
+            <Text style={[ts.behaviorLabel, { color: value === opt.key ? colors.brand : colors.textPrimary }]}>
+              {opt.label}
+            </Text>
+            <Text style={[ts.behaviorDesc, { color: colors.textMeta }]}>{opt.desc}</Text>
           </View>
         </TouchableOpacity>
       ))}
@@ -149,22 +177,27 @@ function WeeklyTab({
   dayOfWeek: number; setDayOfWeek: (v: number) => void;
   behavior: TargetBehavior; setBehavior: (v: TargetBehavior) => void;
 }) {
+  const colors = useTheme();
   return (
-    <ScrollView contentContainerStyle={s.tabContent}>
-      <Text style={s.sentence}>I need</Text>
+    <ScrollView contentContainerStyle={ts.tabContent}>
+      <Text style={[ts.sentence, { color: colors.textSecondary }]}>I need</Text>
       <AmountInput value={amount} onChange={setAmount} />
-      <Text style={s.sentence}>every week</Text>
+      <Text style={[ts.sentence, { color: colors.textSecondary }]}>every week</Text>
 
-      <View style={s.section}>
-        <Text style={s.sectionLabel}>Due by</Text>
-        <View style={s.weekdayRow}>
+      <View style={ts.section}>
+        <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Due by</Text>
+        <View style={ts.weekdayRow}>
           {WEEKDAYS.map((d, i) => (
             <TouchableOpacity
               key={d}
-              style={[s.weekdayBtn, dayOfWeek === i && s.weekdayBtnActive]}
+              style={[ts.weekdayBtn, {
+                backgroundColor: dayOfWeek === i ? colors.brand : colors.surface,
+              }]}
               onPress={() => setDayOfWeek(i)}
             >
-              <Text style={[s.weekdayText, dayOfWeek === i && s.weekdayTextActive]}>{d}</Text>
+              <Text style={[ts.weekdayText, { color: dayOfWeek === i ? colors.white : colors.textMeta }]}>
+                {d}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -172,8 +205,8 @@ function WeeklyTab({
 
       <BehaviorPicker value={behavior} onChange={setBehavior} frequency="weekly" amount={amount} />
 
-      <Text style={s.hint}>
-        MoniMata will remind you to assign ₦{amount || '0'} by each {WEEKDAYS[dayOfWeek]}.
+      <Text style={[ts.hint, { color: colors.textMeta }]}>
+        MoniMata will remind you to assign ₦{Number(amount || '0').toLocaleString('en-NG')} by each {WEEKDAYS[dayOfWeek]}.
       </Text>
     </ScrollView>
   );
@@ -188,30 +221,35 @@ function MonthlyTab({
   dayOfMonth: number; setDayOfMonth: (v: number) => void;
   behavior: TargetBehavior; setBehavior: (v: TargetBehavior) => void;
 }) {
+  const colors = useTheme();
   return (
-    <ScrollView contentContainerStyle={s.tabContent}>
-      <Text style={s.sentence}>I need</Text>
+    <ScrollView contentContainerStyle={ts.tabContent}>
+      <Text style={[ts.sentence, { color: colors.textSecondary }]}>I need</Text>
       <AmountInput value={amount} onChange={setAmount} />
-      <Text style={s.sentence}>every month</Text>
+      <Text style={[ts.sentence, { color: colors.textSecondary }]}>every month</Text>
 
-      <View style={s.section}>
-        <Text style={s.sectionLabel}>Due by day of month</Text>
-        <View style={s.dayInputRow}>
+      <View style={ts.section}>
+        <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Due by day of month</Text>
+        <View style={ts.dayInputRow}>
           <TouchableOpacity
-            style={s.dayStepBtn}
+            style={[ts.dayStepBtn, { backgroundColor: colors.surface }]}
             onPress={() => setDayOfMonth(Math.max(1, dayOfMonth - 1))}
           >
-            <Ionicons name="remove" size={20} color="#374151" />
+            <Ionicons name="remove" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
-          <Text style={s.dayValue}>{dayOfMonth === 0 ? 'Last' : dayOfMonth}</Text>
+          <Text style={[ts.dayValue, { color: colors.textPrimary }]}>
+            {dayOfMonth === 0 ? 'Last' : dayOfMonth}
+          </Text>
           <TouchableOpacity
-            style={s.dayStepBtn}
+            style={[ts.dayStepBtn, { backgroundColor: colors.surface }]}
             onPress={() => setDayOfMonth(dayOfMonth >= 28 ? 0 : dayOfMonth + 1)}
           >
-            <Ionicons name="add" size={20} color="#374151" />
+            <Ionicons name="add" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
-        <Text style={s.hint}>Use &apos;Last&apos; for the last day of the month.</Text>
+        <Text style={[ts.hint, { color: colors.textMeta }]}>
+          Use &apos;Last&apos; for the last day of the month.
+        </Text>
       </View>
 
       <BehaviorPicker value={behavior} onChange={setBehavior} frequency="monthly" amount={amount} />
@@ -228,7 +266,7 @@ function YearlyTab({
   targetDate: string; setTargetDate: (v: string) => void;
   behavior: TargetBehavior; setBehavior: (v: TargetBehavior) => void;
 }) {
-  // Split into MM and DD for simple pickers
+  const colors = useTheme();
   const parts = targetDate ? targetDate.split('-') : ['', '12', '31'];
   const mm = parts[1] ?? '12';
   const dd = parts[2] ?? '31';
@@ -239,37 +277,39 @@ function YearlyTab({
   }
 
   return (
-    <ScrollView contentContainerStyle={s.tabContent}>
-      <Text style={s.sentence}>I need to save</Text>
+    <ScrollView contentContainerStyle={ts.tabContent}>
+      <Text style={[ts.sentence, { color: colors.textSecondary }]}>I need to save</Text>
       <AmountInput value={amount} onChange={setAmount} />
-      <Text style={s.sentence}>by</Text>
+      <Text style={[ts.sentence, { color: colors.textSecondary }]}>by</Text>
 
-      <View style={s.section}>
-        <Text style={s.sectionLabel}>Due on</Text>
-        <View style={s.dateRow}>
+      <View style={ts.section}>
+        <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Due on</Text>
+        <View style={ts.dateRow}>
           <TextInput
-            style={s.dateInput}
+            style={[ts.dateInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
             value={mm}
             onChangeText={(v) => updateDate(v, dd)}
             keyboardType="numeric"
             maxLength={2}
             placeholder="MM"
+            placeholderTextColor={colors.textTertiary}
           />
-          <Text style={s.dateSep}>/</Text>
+          <Text style={[ts.dateSep, { color: colors.textMeta }]}>/</Text>
           <TextInput
-            style={s.dateInput}
+            style={[ts.dateInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
             value={dd}
             onChangeText={(v) => updateDate(mm, v)}
             keyboardType="numeric"
             maxLength={2}
             placeholder="DD"
+            placeholderTextColor={colors.textTertiary}
           />
         </View>
       </View>
 
       <BehaviorPicker value={behavior} onChange={setBehavior} frequency="yearly" amount={amount} />
 
-      <Text style={s.hint}>
+      <Text style={[ts.hint, { color: colors.textMeta }]}>
         MoniMata will spread the saving goal evenly over the months until the target date.
       </Text>
     </ScrollView>
@@ -286,6 +326,7 @@ function CustomTab({
   repeats: boolean; setRepeats: (v: boolean) => void;
   behavior: TargetBehavior; setBehavior: (v: TargetBehavior) => void;
 }) {
+  const colors = useTheme();
   const parts = targetDate ? targetDate.split('-') : [String(new Date().getFullYear()), '12', '31'];
   const yyyy = parts[0] ?? String(new Date().getFullYear());
   const mm = parts[1] ?? '12';
@@ -296,53 +337,58 @@ function CustomTab({
   }
 
   return (
-    <ScrollView contentContainerStyle={s.tabContent}>
-      <Text style={s.sentence}>Amount</Text>
+    <ScrollView contentContainerStyle={ts.tabContent}>
+      <Text style={[ts.sentence, { color: colors.textSecondary }]}>Amount</Text>
       <AmountInput value={amount} onChange={setAmount} />
 
-      <View style={s.section}>
-        <Text style={s.sectionLabel}>Due on</Text>
-        <View style={s.dateRow}>
+      <View style={ts.section}>
+        <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Due on</Text>
+        <View style={ts.dateRow}>
           <TextInput
-            style={[s.dateInput, { minWidth: 60 }]}
+            style={[ts.dateInput, { minWidth: 60, borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
             value={yyyy}
             onChangeText={(v) => updateDate(v, mm, dd)}
             keyboardType="numeric"
             maxLength={4}
             placeholder="YYYY"
+            placeholderTextColor={colors.textTertiary}
           />
-          <Text style={s.dateSep}>/</Text>
+          <Text style={[ts.dateSep, { color: colors.textMeta }]}>/</Text>
           <TextInput
-            style={s.dateInput}
+            style={[ts.dateInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
             value={mm}
             onChangeText={(v) => updateDate(yyyy, v, dd)}
             keyboardType="numeric"
             maxLength={2}
             placeholder="MM"
+            placeholderTextColor={colors.textTertiary}
           />
-          <Text style={s.dateSep}>/</Text>
+          <Text style={[ts.dateSep, { color: colors.textMeta }]}>/</Text>
           <TextInput
-            style={s.dateInput}
+            style={[ts.dateInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
             value={dd}
             onChangeText={(v) => updateDate(yyyy, mm, v)}
             keyboardType="numeric"
             maxLength={2}
             placeholder="DD"
+            placeholderTextColor={colors.textTertiary}
           />
         </View>
       </View>
 
-      <View style={s.section}>
-        <View style={s.repeatRow}>
+      <View style={ts.section}>
+        <View style={ts.repeatRow}>
           <View>
-            <Text style={s.sectionLabel}>Repeasts after target date</Text>
-            <Text style={s.hint}>Create a new target after completion.</Text>
+            <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Repeats after target date</Text>
+            <Text style={[ts.hint, { marginTop: 2, color: colors.textTertiary }]}>
+              Create a new target after completion.
+            </Text>
           </View>
           <Switch
             value={repeats}
             onValueChange={setRepeats}
-            trackColor={{ true: '#10B981', false: '#D1D5DB' }}
-            thumbColor="#fff"
+            trackColor={{ true: colors.brand, false: colors.surfaceElevated }}
+            thumbColor={colors.white}
           />
         </View>
       </View>
@@ -352,7 +398,7 @@ function CustomTab({
   );
 }
 
-// ─── Tab bar ─────────────────────────────────────────────────────────────────
+// ─── Tab constants ────────────────────────────────────────────────────────────
 
 const TABS: TargetFrequency[] = ['weekly', 'monthly', 'yearly', 'custom'];
 const TAB_LABELS: Record<TargetFrequency, string> = {
@@ -366,6 +412,8 @@ const TAB_LABELS: Record<TargetFrequency, string> = {
 
 export default function TargetEditScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const colors = useTheme();
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
   const { selectedMonth } = useAppSelector((s) => s.budget);
 
@@ -377,7 +425,20 @@ export default function TargetEditScreen() {
 
   // Form state
   const [tab, setTab] = useState<TargetFrequency>('monthly');
+  const [slideDir, setSlideDir] = useState<'forward' | 'back'>('forward');
+  const [pillBarWidth, setPillBarWidth] = useState(0);
+  const indicatorX = useSharedValue(0);
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: indicatorX.value }],
+  }));
   const [amount, setAmount] = useState('');
+
+  function handleTabPress(newTab: TargetFrequency) {
+    const idx = TABS.indexOf(newTab);
+    setSlideDir(idx >= TABS.indexOf(tab) ? 'forward' : 'back');
+    indicatorX.value = withTiming(idx * ((pillBarWidth - 6) / TABS.length), { duration: 250 });
+    setTab(newTab);
+  }
   const [dayOfWeek, setDayOfWeek] = useState(5); // Saturday
   const [dayOfMonth, setDayOfMonth] = useState(0); // Last day of month
   const [targetDate, setTargetDate] = useState(`${new Date().getFullYear()}-12-31`);
@@ -419,233 +480,306 @@ export default function TargetEditScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={s.safe}>
-        <ActivityIndicator style={{ flex: 1 }} color="#10B981" />
-      </SafeAreaView>
+      <View style={[ts.flex, { backgroundColor: colors.background }]}>
+        <ActivityIndicator style={ts.flex} color={colors.brand} />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={s.safe}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Set Target for {category?.name}</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {/* Tab bar */}
-      <View style={s.tabBar}>
-        {TABS.map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[s.tabBtn, tab === t && s.tabBtnActive]}
-            onPress={() => setTab(t)}
-          >
-            <Text style={[s.tabLabel, tab === t && s.tabLabelActive]}>
-              {TAB_LABELS[t]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+    <View style={[ts.flex, { backgroundColor: colors.background }]}>
+      {/* ── Dark green header ── */}
+      <View
+        style={[ts.hdr, {
+          paddingTop: insets.top + 10,
+          borderBottomLeftRadius: radius.xl,
+          borderBottomRightRadius: radius.xl,
+        }]}
       >
-        {/* Tab content */}
-        <View style={{ flex: 1 }}>
-          {tab === 'weekly' && (
-            <WeeklyTab
-              amount={amount} setAmount={setAmount}
-              dayOfWeek={dayOfWeek} setDayOfWeek={setDayOfWeek}
-              behavior={behavior} setBehavior={setBehavior}
-            />
-          )}
-          {tab === 'monthly' && (
-            <MonthlyTab
-              amount={amount} setAmount={setAmount}
-              dayOfMonth={dayOfMonth} setDayOfMonth={setDayOfMonth}
-              behavior={behavior} setBehavior={setBehavior}
-            />
-          )}
-          {tab === 'yearly' && (
-            <YearlyTab
-              amount={amount} setAmount={setAmount}
-              targetDate={targetDate} setTargetDate={setTargetDate}
-              behavior={behavior} setBehavior={setBehavior}
-            />
-          )}
-          {tab === 'custom' && (
-            <CustomTab
-              amount={amount} setAmount={setAmount}
-              targetDate={targetDate} setTargetDate={setTargetDate}
-              repeats={repeats} setRepeats={setRepeats}
-              behavior={behavior} setBehavior={setBehavior}
-            />
-          )}
+        <LinearGradient
+          colors={[colors.darkGreen, colors.darkGreenMid]}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Back row */}
+        <View style={ts.hdrTop}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={ts.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="chevron-back" size={22} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={[ts.hdrTitle, { color: colors.white }]} numberOfLines={1}>
+            {category ? `Set Target — ${category.name}` : 'Set Target'}
+          </Text>
+          <View style={{ width: 36 }} />
         </View>
 
-        {/* Save button */}
-        <View style={s.saveBar}>
+        {/* Pill tab bar (.hub-tabs style) */}
+        <View
+          style={[ts.pillBar, { backgroundColor: 'rgba(255,255,255,0.08)' }]}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            setPillBarWidth(w);
+            // position indicator without animation on first layout
+            indicatorX.value = TABS.indexOf(tab) * ((w - 6) / TABS.length);
+          }}
+        >
+          {/* Sliding selected pill */}
+          {pillBarWidth > 0 && (
+            <Animated.View
+              style={[
+                ts.pillIndicator,
+                { width: (pillBarWidth - 6) / TABS.length, backgroundColor: colors.lime },
+                indicatorStyle,
+              ]}
+            />
+          )}
+          {TABS.map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={ts.pillTab}
+              onPress={() => handleTabPress(t)}
+              activeOpacity={0.8}
+            >
+              <Text style={[ts.pillTabText, { color: tab === t ? colors.darkGreen : 'rgba(255,255,255,0.5)' }]}>
+                {TAB_LABELS[t]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* ── Tab content ── */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={ts.flex}
+      >
+        <View style={[ts.flex, { overflow: 'hidden' }]}>
+          <Animated.View
+            key={tab}
+            style={StyleSheet.absoluteFill}
+            entering={slideDir === 'forward' ? SlideInRight.duration(260) : SlideInLeft.duration(260)}
+            exiting={slideDir === 'forward' ? SlideOutLeft.duration(260) : SlideOutRight.duration(260)}
+          >
+            {tab === 'weekly' && (
+              <WeeklyTab
+                amount={amount} setAmount={setAmount}
+                dayOfWeek={dayOfWeek} setDayOfWeek={setDayOfWeek}
+                behavior={behavior} setBehavior={setBehavior}
+              />
+            )}
+            {tab === 'monthly' && (
+              <MonthlyTab
+                amount={amount} setAmount={setAmount}
+                dayOfMonth={dayOfMonth} setDayOfMonth={setDayOfMonth}
+                behavior={behavior} setBehavior={setBehavior}
+              />
+            )}
+            {tab === 'yearly' && (
+              <YearlyTab
+                amount={amount} setAmount={setAmount}
+                targetDate={targetDate} setTargetDate={setTargetDate}
+                behavior={behavior} setBehavior={setBehavior}
+              />
+            )}
+            {tab === 'custom' && (
+              <CustomTab
+                amount={amount} setAmount={setAmount}
+                targetDate={targetDate} setTargetDate={setTargetDate}
+                repeats={repeats} setRepeats={setRepeats}
+                behavior={behavior} setBehavior={setBehavior}
+              />
+            )}
+          </Animated.View>
+        </View>
+
+        {/* ── Save bar ── */}
+        <View style={[ts.saveBar, {
+          backgroundColor: colors.white,
+          borderTopColor: colors.border,
+          paddingBottom: insets.bottom + spacing.mdn,
+        }]}>
           <TouchableOpacity
-            style={[s.saveBtn, upsert.isPending && { opacity: 0.6 }]}
+            style={[ts.saveBtn, { backgroundColor: colors.brand }, upsert.isPending && { opacity: 0.6 }]}
             onPress={handleSave}
             disabled={upsert.isPending}
+            activeOpacity={0.85}
           >
             {upsert.isPending ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={s.saveBtnText}>Save target</Text>
+              <Text style={[ts.saveBtnText, { color: colors.white }]}>Save target</Text>
             )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
+const ts = StyleSheet.create({
+  flex: { flex: 1 },
 
-  header: {
+  // ── Header ───────────────────────────────────────────────────────────────
+  hdr: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+    flexShrink: 0,
+    overflow: 'hidden',
+  },
+  hdrTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: spacing.md,
   },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  hdrTitle: { ...ff(700), fontSize: 17, letterSpacing: -0.3, flex: 1, textAlign: 'center' },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
 
-  tabBar: {
+  // ── Pill tab bar (.hub-tabs) ──────────────────────────────────────────────
+  pillBar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 3,
+    gap: 0,
   },
-  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabBtnActive: { borderBottomWidth: 2, borderBottomColor: '#0F7B3F' },
-  tabLabel: { fontSize: 14, fontWeight: '600', color: '#9CA3AF' },
-  tabLabelActive: { color: '#0F7B3F' },
+  pillIndicator: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    left: 3,
+    borderRadius: 9,
+  },
+  pillTab: {
+    flex: 1,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillTabText: { ...ff(600), fontSize: 13 },
 
+  // ── Tab content ───────────────────────────────────────────────────────────
   tabContent: {
-    padding: 20,
+    padding: spacing.xl,
     paddingBottom: 40,
   },
 
-  sentence: { fontSize: 20, fontWeight: '600', color: '#374151', marginBottom: 4, marginTop: 12 },
+  sentence: { ...ff(600), fontSize: 20, marginBottom: 4, marginTop: 12 },
 
+  // ── Amount input ─────────────────────────────────────────────────────────
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#D1FAE5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginVertical: 8,
-    backgroundColor: '#F0FDF4',
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.smd,
+    marginVertical: spacing.sm,
   },
-  currencySymbol: { fontSize: 24, fontWeight: '700', color: '#0F7B3F', marginRight: 6 },
+  currencySymbol: { ...ff(700), fontSize: 24, marginRight: 6 },
   amountInput: {
     flex: 1,
     fontSize: 32,
-    fontWeight: '800',
-    color: '#0F7B3F',
+    ...ff(800),
     padding: 0,
   },
 
+  // ── Section ───────────────────────────────────────────────────────────────
   section: { marginTop: 20 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', marginBottom: 10, letterSpacing: 0.5 },
+  sectionLabel: {
+    ...ff(700),
+    fontSize: 11,
+    marginBottom: 10,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
 
+  // ── Weekday row ───────────────────────────────────────────────────────────
   weekdayRow: { flexDirection: 'row', gap: 6 },
   weekdayBtn: {
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
     alignItems: 'center',
   },
-  weekdayBtnActive: { backgroundColor: '#0F7B3F' },
-  weekdayText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
-  weekdayTextActive: { color: '#fff' },
+  weekdayText: { ...ff(600), fontSize: 12 },
 
+  // ── Day stepper ───────────────────────────────────────────────────────────
   dayInputRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   dayStepBtn: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dayValue: { fontSize: 24, fontWeight: '800', color: '#111827', minWidth: 44, textAlign: 'center' },
+  dayValue: { ...ff(800), fontSize: 24, minWidth: 44, textAlign: 'center' },
 
+  // ── Date row ──────────────────────────────────────────────────────────────
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dateInput: {
     minWidth: 52,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
+    ...ff(700),
     textAlign: 'center',
   },
-  dateSep: { fontSize: 20, fontWeight: '600', color: '#9CA3AF' },
+  dateSep: { ...ff(600), fontSize: 20 },
 
+  // ── Repeats toggle ────────────────────────────────────────────────────────
   repeatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
-  hint: { fontSize: 13, color: '#6B7280', marginTop: 10, lineHeight: 18 },
+  hint: { ...ff(400), fontSize: 13, marginTop: 10, lineHeight: 18 },
 
+  // ── Behavior picker ───────────────────────────────────────────────────────
   behaviorRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
     marginBottom: 8,
-    backgroundColor: '#F9FAFB',
   },
-  behaviorRowActive: { backgroundColor: '#F0FDF4' },
   radioOuter: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
   },
-  radioOuterActive: { borderColor: '#0F7B3F' },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#0F7B3F' },
+  radioInner: { width: 10, height: 10, borderRadius: 5 },
   behaviorText: { flex: 1 },
-  behaviorLabel: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  behaviorDesc: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  behaviorLabel: { ...ff(600), fontSize: 15 },
+  behaviorDesc: { ...ff(400), fontSize: 12, marginTop: 2 },
 
+  // ── Save bar ──────────────────────────────────────────────────────────────
   saveBar: {
-    padding: 16,
-    paddingBottom: 32,
-    backgroundColor: '#fff',
+    padding: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
   },
   saveBtn: {
-    backgroundColor: '#0F7B3F',
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: radius.md,
+    height: 52,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  saveBtnText: { ...ff(700), fontSize: 16 },
 });

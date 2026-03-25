@@ -42,7 +42,7 @@ import { useTheme } from '@/lib/theme';
 import { ff } from '@/lib/typography';
 import { clearError, login } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { AuthInput, BackBtn, EyeIcon, s } from './_authShared';
+import { AuthHdr, AuthInput, BackBtn, EyeIcon, s } from './_authShared';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -83,11 +83,11 @@ export default function LoginScreen() {
   return (
     <View style={[s.screen, { backgroundColor: colors.white }]}>
       {/* ── Dark green curved header ── */}
-      <View style={[s.authHdr, { backgroundColor: colors.darkGreen }]}>
+      <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[s.authTitle, { color: colors.white }]}>Welcome back</Text>
         <Text style={[s.authSub, { color: 'rgba(255,255,255,0.5)' }]}>Sign in to continue</Text>
-      </View>
+      </AuthHdr>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

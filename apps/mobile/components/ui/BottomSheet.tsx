@@ -40,7 +40,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import {
   Dimensions,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   PanResponder,
   Platform,
@@ -108,6 +108,9 @@ export function BottomSheet({
   const translateY = useSharedValue(MAX_SHEET_H);
   const backdropOpacity = useSharedValue(0);
   const dragOffset = useSharedValue(0);
+  // Keyboard offset — shifts the sheet up when keyboard is visible without
+  // relying on KeyboardAvoidingView (which fights Reanimated and causes flicker).
+  const keyboardOffset = useSharedValue(0);
 
   // Track whether modal should be mounted (avoids flash before dismiss animation ends)
   const [mounted, setMounted] = React.useState(false);
@@ -154,8 +157,20 @@ export function BottomSheet({
     }),
   );
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      keyboardOffset.value = withTiming(e.endCoordinates.height, { duration: 250 });
+    });
+    const onHide = Keyboard.addListener(hideEvent, () => {
+      keyboardOffset.value = withTiming(0, { duration: 250 });
+    });
+    return () => { onShow.remove(); onHide.remove(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    transform: [{ translateY: translateY.value - keyboardOffset.value }],
   }));
 
   const backdropStyle = useAnimatedStyle(() => ({
@@ -216,10 +231,7 @@ export function BottomSheet({
       statusBarTranslucent
       onRequestClose={preventClose ? undefined : onClose}
     >
-      <KeyboardAvoidingView
-        style={s.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={s.root}>
         {/* Backdrop */}
         {!preventClose && (
           <TouchableWithoutFeedback onPress={dismiss} accessibilityLabel="Close sheet">
@@ -233,7 +245,7 @@ export function BottomSheet({
         )}
 
         {sheetContent}
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
