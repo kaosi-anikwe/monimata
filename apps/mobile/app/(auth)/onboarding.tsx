@@ -28,13 +28,6 @@
  *   Show an ActivityIndicator while the request is in flight.
  *   On success pass the server-returned seed groups as params to budget-seed.
  *   On error show a toast and let the user retry or skip.
- *
- * Visual matches `scr-onboarding` in MoniMata_V5.html:
- *   - Dark green gradient header: 3-pill progress bar + step meta + question + sub
- *   - Scrollable radio-option cards (Ionicons icon tile + text + checkbox)
- *   - Live-preview hint card once an option is selected
- *   - "Continue" / "See My Budget Preview ✨" primary CTA (disabled until selected)
- *   - "Skip this question" text link
  */
 
 import { Ionicons } from '@expo/vector-icons';

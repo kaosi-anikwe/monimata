@@ -17,8 +17,6 @@
 /**
  * Notification Settings screen — full-page promoted from the old modal.
  *
- * Design spec: MoniMata_V5.html — scr-notif-settings.
- *
  * Persisted to API: enabled, quiet_hours_start, quiet_hours_end, fatigue_limit.
  * Message Tone (Pidgin/Formal) is local state only — API support in a future phase.
  */

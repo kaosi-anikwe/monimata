@@ -13,22 +13,10 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 /**
  * components/ui/Input.tsx
  *
- * Styled text input matching the .inp / .inp-lbl / .inp-hint classes in the
- * mockup. Supports:
- *   - Optional label above the field
- *   - Animated focus border (brand colour + 3px soft ring)
- *   - Error state (red border + red hint)
- *   - Left / right slot for icons or buttons
- *   - Secure text entry toggle (password fields)
- *
- * CSS reference (MoniMata_V5.html):
- *   .inp         height:48, borderRadius:--rm, border:1.5px --bd, font:15px
- *   .inp:focus   border: --gp, box-shadow: 0 0 0 3px rgba(45,106,45,0.1)
- *   .inp-lbl     12px / 600 / --ts
- *   .inp-hint    12px / --tm
  */
 
 import React, { forwardRef, useState } from 'react';

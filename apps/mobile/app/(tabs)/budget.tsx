@@ -26,6 +26,7 @@
  *  - FAB (Add Transaction) is rendered by the tab _layout.tsx
  */
 import { Feather, Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
@@ -108,7 +109,7 @@ function MonthHeader({ month, tbb }: { month: string; tbb: number }) {
       <View style={ms.mnav}>
         <TouchableOpacity
           style={[ms.mnavBtn, { backgroundColor: colors.surface }]}
-          onPress={() => dispatch(prevMonth())}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); dispatch(prevMonth()); }}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Previous month"
@@ -118,7 +119,7 @@ function MonthHeader({ month, tbb }: { month: string; tbb: number }) {
         <Text style={[ms.mnavLbl, { color: colors.textPrimary }]}>{label}</Text>
         <TouchableOpacity
           style={[ms.mnavBtn, { backgroundColor: colors.surface }]}
-          onPress={() => dispatch(nextMonth())}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); dispatch(nextMonth()); }}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Next month"
@@ -307,7 +308,12 @@ function NumpadGrid({ onKey, onDel }: { onKey: (k: string) => void; onDel: () =>
   const colors = useTheme();
   const keyStyle = [np.key, { backgroundColor: colors.white }];
   const K = (v: string) => (
-    <TouchableOpacity key={v} style={keyStyle} onPress={() => onKey(v)} activeOpacity={0.5}>
+    <TouchableOpacity
+      key={v}
+      style={keyStyle}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onKey(v); }}
+      activeOpacity={0.5
+      }>
       <Text style={[np.keyTxt, { color: colors.textPrimary }]}>{v}</Text>
     </TouchableOpacity>
   );
@@ -320,10 +326,10 @@ function NumpadGrid({ onKey, onDel }: { onKey: (k: string) => void; onDel: () =>
       ))}
       {/* Bottom row: 0 (wide) + backspace — no decimal key, integers only */}
       <View style={np.row}>
-        <TouchableOpacity style={[keyStyle, { flex: 2 }]} onPress={() => onKey('0')} activeOpacity={0.5}>
+        <TouchableOpacity style={[keyStyle, { flex: 2 }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onKey('0'); }} activeOpacity={0.5}>
           <Text style={[np.keyTxt, { color: colors.textPrimary }]}>0</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={keyStyle} onPress={onDel} activeOpacity={0.5}>
+        <TouchableOpacity style={keyStyle} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onDel(); }} activeOpacity={0.5}>
           <Ionicons name="backspace-outline" size={19} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -402,11 +408,13 @@ function AssignSheet({
   }
 
   function handleSave() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     assign.mutate({ categoryId: category!.id, assigned: assignKobo }, { onSuccess: onClose });
   }
 
   function handleMove() {
     if (!moveTarget || moveKobo <= 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     move.mutate(
       { fromCategoryId: category!.id, toCategoryId: moveTarget.id, amount: moveKobo },
       { onSuccess: () => { setShowMove(false); onClose(); } },
@@ -485,28 +493,37 @@ function AssignSheet({
                   <TouchableOpacity
                     style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
                     onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       const needed = Math.max(0, category.assigned + category.required_this_month! - category.available);
                       setAssignStr(String(Math.round(needed / 100)));
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Fill to required amount"
                   >
                     <Text style={[sh.qfTxt, { color: colors.textSecondary }]} numberOfLines={1}>Fill to required</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
                   style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
-                  onPress={() => setAssignStr(String(Math.round(Math.max(0, tbb) / 100)))}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAssignStr(String(Math.round(Math.max(0, tbb) / 100))); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Assign all available to budget"
                 >
                   <Text style={[sh.qfTxt, { color: colors.textSecondary }]} numberOfLines={1}>Assign all TBB</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
-                  onPress={() => setAssignStr('0')}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAssignStr('0'); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Zero out assignment"
                 >
                   <Text style={[sh.qfTxt, { color: colors.textSecondary }]} numberOfLines={1}>Zero out</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
-                  onPress={() => { setShowMove(true); setMoveStr('0'); setMoveTarget(null); }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowMove(true); setMoveStr('0'); setMoveTarget(null); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Move money to another category instead"
                 >
                   <Text style={[sh.qfTxt, { color: colors.textSecondary }]} numberOfLines={1}>Move money instead →</Text>
                 </TouchableOpacity>
@@ -520,6 +537,8 @@ function AssignSheet({
                 <TouchableOpacity
                   style={[sh.footBtn, { flex: 1, backgroundColor: colors.surface }]}
                   onPress={onClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel"
                 >
                   <Text style={[sh.footTxt, { color: colors.textSecondary }]}>Cancel</Text>
                 </TouchableOpacity>
@@ -527,6 +546,8 @@ function AssignSheet({
                   style={[sh.footBtn, { flex: 2, backgroundColor: colors.brand }, assign.isPending && { opacity: 0.6 }]}
                   onPress={handleSave}
                   disabled={assign.isPending}
+                  accessibilityRole="button"
+                  accessibilityLabel="Save assignment"
                 >
                   {assign.isPending
                     ? <ActivityIndicator color={colors.white} />
@@ -584,6 +605,9 @@ function AssignSheet({
                     key={cat.id}
                     style={[sh.destRow, moveTarget?.id === cat.id && { backgroundColor: colors.brand }]}
                     onPress={() => setMoveTarget(cat)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move to ${cat.name}, ${formatMoney(cat.available)} available`}
+                    accessibilityState={{ selected: moveTarget?.id === cat.id }}
                   >
                     <Text
                       style={[sh.destName, { color: colors.textPrimary }, moveTarget?.id === cat.id && { color: colors.white }]}
@@ -603,6 +627,8 @@ function AssignSheet({
                 <TouchableOpacity
                   style={[sh.footBtn, { flex: 1, backgroundColor: colors.surface }]}
                   onPress={() => setShowMove(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Back to assign"
                 >
                   <Text style={[sh.footTxt, { color: colors.textSecondary }]}>Back</Text>
                 </TouchableOpacity>
@@ -614,6 +640,8 @@ function AssignSheet({
                   ]}
                   onPress={handleMove}
                   disabled={!moveTarget || moveKobo <= 0 || move.isPending}
+                  accessibilityRole="button"
+                  accessibilityLabel={moveTarget ? `Confirm move to ${moveTarget.name}` : 'Move money'}
                 >
                   {move.isPending
                     ? <ActivityIndicator color={colors.white} />
@@ -914,7 +942,7 @@ export default function BudgetScreen() {
               <CategoryRow
                 key={cat.id}
                 category={cat}
-                onPress={() => setSelectedCategory(cat)}
+                onPress={() => { Haptics.selectionAsync(); setSelectedCategory(cat); }}
               />
             ))}
           </View>

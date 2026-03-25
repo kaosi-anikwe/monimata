@@ -19,12 +19,6 @@
  * On success, exchanges the one-time auth_code for a linked bank account
  * via POST /accounts/connect.
  *
- * Visual matches scr-link-bank in MoniMata_V5.html:
- * - Dark green curved header with "Connect your bank" title
- * - Mono trust card (powered-by badge)
- * - Brand green "Connect Bank Account" button
- * Mono SDK logic is unchanged.
- *
  * Set EXPO_PUBLIC_MONO_PUBLIC_KEY in apps/mobile/.env
  */
 import { MonoProvider, useMonoConnect } from '@mono.co/connect-react-native';

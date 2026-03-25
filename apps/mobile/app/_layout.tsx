@@ -34,7 +34,6 @@ import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -83,7 +82,7 @@ const queryClient = new QueryClient({
 
 function RootNavigator() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, loading } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, loading, isInitialised, user } = useAppSelector((s) => s.auth);
   const appState = useRef<AppStateStatus>(AppState.currentState);
 
   // Register for push notifications and send device token to backend
@@ -126,7 +125,7 @@ function RootNavigator() {
     return () => subscription.remove();
   }, [isAuthenticated, dispatch]);
 
-  if (loading) return null;
+  if (!isInitialised) return null;
 
   // Show the lock screen over all content when biometric lock is active.
   if (isLocked && isAuthenticated) {
@@ -135,9 +134,8 @@ function RootNavigator() {
 
   return (
     <>
-      <StatusBar style='auto' />
       <Stack screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
+        {isAuthenticated && (user?.onboarded ?? false) ? (
           <Stack.Screen name="(tabs)" />
         ) : (
           <Stack.Screen name="(auth)" />

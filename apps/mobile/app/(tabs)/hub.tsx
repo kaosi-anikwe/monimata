@@ -21,12 +21,6 @@
  * backend CMS endpoints and award XP via the gamification service.
  * See docs/UI_MIGRATION_PLAN.md Phase 13 for backend design notes.
  *
- * Sections (matches scr-hub in MoniMata_V5.html):
- *   1. Dark green header — title row, "Learn & Earn 📚" heading, 3-tab switcher
- *   2. Articles tab  — category chips, featured hero card, article list
- *   3. Courses tab   — "In Progress" horizontal scroll + "All Courses" list
- *   4. Quizzes tab   — Daily quiz card + completed quizzes list
- *
  * Accessibility: every interactive element has accessibilityRole + accessibilityLabel.
  * Touch targets: all tappable rows/cards ≥ 44 pt.
  */

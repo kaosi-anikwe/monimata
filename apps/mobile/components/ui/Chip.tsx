@@ -17,14 +17,6 @@
 /**
  * components/ui/Chip.tsx
  *
- * Filter / category chip matching the .chip / .chip.on classes in the mockup.
- *
- * CSS reference (MoniMata_V5.html):
- *   .chip       padding:7px 13px, borderRadius:20, font:12/600
- *               border:1.5px --bds, bg:--white, color:--ts
- *   .chip.on    bg:--gp, borderColor:--gp, color:--white
- *   .qf         same geometry, slightly looser padding (quick-fill chips)
- *
  * The `selected` prop switches between off/on states.
  * Pass `onPress` to make it interactive; omit for a display-only chip.
  */

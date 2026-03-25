@@ -16,13 +16,9 @@
 
 /**
  * Accounts tab — manage bank accounts (manual and Mono-linked).
- *
- * Design spec: MoniMata_V5.html — scr-accounts.
- * Manual accounts:   user sets the balance; can be linked to Mono later.
- * Mono-linked:       balance synced from Mono automatically; can be unlinked.
- * Both types can be deleted (soft-delete, history preserved).
  */
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
@@ -629,7 +625,7 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
               {isLinked && (
                 <TouchableOpacity
                   style={[ss.footerBtn, { backgroundColor: colors.white, borderColor: colors.border }, isSyncing && ss.footerBtnDisabled]}
-                  onPress={onSync}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSync(); }}
                   disabled={isSyncing}
                   accessibilityRole="button"
                   accessibilityLabel="Sync account"
@@ -673,7 +669,7 @@ function AccountsContent() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { confirm } = useToast();
-  const { data: accounts = [], isLoading, refetch } = useAccounts();
+  const { data: accounts = [], isLoading, error, refetch } = useAccounts();
   const syncMutation = useTriggerSync();
   const unlinkMutation = useUnlinkMono();
   const deleteMutation = useDeleteAccount();
@@ -727,6 +723,23 @@ function AccountsContent() {
     );
   }
 
+  if (error) {
+    return (
+      <View style={[ss.safe, { backgroundColor: colors.background }]}>
+        <ScrollView
+          contentContainerStyle={ss.errorContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
+          }
+        >
+          <Ionicons name="cloud-offline-outline" size={40} color={colors.textTertiary} />
+          <Text style={[ss.errorText, { color: colors.textSecondary }]}>Could not load accounts.</Text>
+          <Text style={[ss.errorSub, { color: colors.textMeta }]}>Pull down to retry.</Text>
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
@@ -745,7 +758,7 @@ function AccountsContent() {
         <View style={ss.headerActions}>
           <TouchableOpacity
             style={[ss.headerBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => setShowAddSheet(true)}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAddSheet(true); }}
             accessibilityRole="button"
             accessibilityLabel="Add manual account"
           >
@@ -756,7 +769,7 @@ function AccountsContent() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
-            onPress={() => router.push('/(auth)/link-bank')}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(auth)/link-bank'); }}
             accessibilityRole="button"
             accessibilityLabel="Link bank via Mono"
           >
@@ -1161,4 +1174,15 @@ const ss = StyleSheet.create({
   },
   ashText: { flex: 1 },
   ashDivider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
+
+  // Error state
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xl,
+  },
+  errorText: { fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  errorSub: { fontSize: 13, textAlign: 'center' },
 });

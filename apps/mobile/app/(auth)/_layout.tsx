@@ -16,10 +16,27 @@
 
 /**
  * Auth stack layout — wraps Register, Login, BVN Verify, Link Bank screens.
+ *
+ * If the user is already authenticated and has completed onboarding, redirect
+ * them straight to (tabs). This handles the case where markOnboarded() is
+ * dispatched from any screen in this stack (e.g. budget-seed) — the layout
+ * re-renders on Redux state change and the Redirect fires immediately.
  */
-import { Stack } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
+
+import { useAppSelector } from '@/store/hooks';
 
 export default function AuthLayout() {
+  const { isAuthenticated, user } = useAppSelector((s) => s.auth);
+  const pathname = usePathname();
+
+  // Allow verify-bvn and link-bank even after onboarding — accessible from the profile/accounts screens
+  const allowAfterOnboarding = pathname.includes('verify-bvn') || pathname.includes('link-bank');
+
+  if (isAuthenticated && (user?.onboarded ?? false) && !allowAfterOnboarding) {
+    return <Redirect href="/(tabs)" />;
+  }
+
   return (
     <Stack
       screenOptions={{

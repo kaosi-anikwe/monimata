@@ -33,12 +33,6 @@
  *   POST /users/onboarding
  *   Body:  { income_type: string | null, housing: string | null, goal: string | null }
  *   Returns: { groups: SeedGroup[] }
- *
- * Visual matches `scr-budget-seed` in MoniMata_V5.html:
- *   - Dark green header with radial glow: trophy icon, title, sub, stats row
- *   - Scrollable accordion: seed-group cards, each with expandable category list
- *   - "Customise" ghost CTA → budget-edit
- *   - "Let's start budgeting!" lime primary CTA → /(tabs)
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -52,6 +46,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeColors } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
+import { markOnboarded } from '@/store/authSlice';
+import { useAppDispatch } from '@/store/hooks';
 import type { OnboardingAnswers } from './onboarding';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -142,6 +138,7 @@ export default function BudgetSeedScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const ss = makeStyles(colors);
+  const dispatch = useAppDispatch();
 
   // answers forwarded from onboarding — available for Phase 16 API call
   const { answers: answersParam } = useLocalSearchParams<{ answers: string }>();
@@ -297,7 +294,7 @@ export default function BudgetSeedScreen() {
         {/* ── CTAs ── */}
         <TouchableOpacity
           style={[ss.startBtn, { backgroundColor: colors.lime }]}
-          onPress={() => router.replace('/(tabs)')}
+          onPress={() => dispatch(markOnboarded())}
           activeOpacity={0.85}
         >
           <Text style={[ss.startTxt, { color: colors.darkGreen }]}>
@@ -311,7 +308,12 @@ export default function BudgetSeedScreen() {
             ss.customiseBtn,
             { borderColor: colors.brand, backgroundColor: colors.surface },
           ]}
-          onPress={() => router.replace('/budget-edit' as never)}
+          onPress={() => {
+            // Mark onboarded first so the navigator switches to (tabs), then
+            // push budget-edit on top of the tab stack.
+            dispatch(markOnboarded());
+            router.push('/budget-edit' as never);
+          }}
           activeOpacity={0.75}
         >
           <Ionicons name="settings-outline" size={16} color={colors.brand} />
@@ -328,7 +330,7 @@ function makeStyles(colors: ThemeColors) {
   return StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: colors.darkGreen,
+      backgroundColor: colors.background,
     },
     // ── Header ──
     header: {
@@ -336,8 +338,6 @@ function makeStyles(colors: ThemeColors) {
       paddingBottom: spacing.xl,
       borderBottomLeftRadius: 28,
       borderBottomRightRadius: 28,
-      overflow: 'hidden',
-      position: 'relative',
     },
     glowDecor: {
       position: 'absolute',

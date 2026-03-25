@@ -16,15 +16,6 @@
 
 /**
  * Welcome screen — entry point for unauthenticated users.
- *
- * Visual matches `scr-welcome` in MoniMata_V5.html:
- *   - Full dark-green gradient background (darkGreen → darkGreenMid)
- *   - 72×72 lime rounded-[22] tile with `layers-outline` Ionicon logo
- *   - "MoniMata" brand name — all white 28/800
- *   - "Every Kobo, Accounted For" tagline — textInverseFaint
- *   - Auto-advancing 3-slide value carousel with Ionicons + fade animation
- *   - 3-dot indicator (active = lime pill, inactive = overlayGhostMid)
- *   - Bottom CTA section: lime "Get Started" + ghost "I already have an account"
  */
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';

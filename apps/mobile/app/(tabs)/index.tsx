@@ -17,25 +17,18 @@
 /**
  * app/(tabs)/home.tsx — Home / Dashboard tab
  *
- * Sections (matches scr-home in MoniMata_V5.html):
- *   1. Dark green header (.home-hdr) — greeting, avatar (→ profile), notification bell,
- *      frosted balance card (.bal-card)
- *   2. Stats grid — income ↑ / expenses ↓ this month (derived from budget data)
- *   3. Nudge pill (.nudge-pill) — first unread nudge, dismissible
- *   4. Streak card (.streak-c) — 7-day budgeting streak
- *      ⚠ FAKE DATA — gamification is Phase 14; see backend design note in the docs.
- *   5. Goals section — categories that have a savings target set
- *
  * FAB note: the lime "+" FAB lives in (tabs)/_layout.tsx (bottom-right), not here.
  */
 
 import { ProgressBar } from '@/components/ui';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -91,8 +84,10 @@ export default function HomeScreen() {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const currentMonth = useMemo(getCurrentMonth, []);
-  const { data: accounts, refetch: refetchAccounts } = useAccounts();
-  const { data: budget, refetch: refetchBudget } = useBudget(currentMonth);
+  const { data: accounts, isLoading: accountsLoading, error: accountsError, refetch: refetchAccounts } = useAccounts();
+  const { data: budget, isLoading: budgetLoading, error: budgetError, refetch: refetchBudget } = useBudget(currentMonth);
+  const isLoading = accountsLoading || budgetLoading;
+  const fetchError = accountsError ?? budgetError;
   const { data: nudgesData, refetch: refetchNudges } = useNudges(false); // exclude dismissed
   const dismissNudge = useDismissNudge();
   const unreadCount = useNudgeUnreadCount();
@@ -139,6 +134,31 @@ export default function HomeScreen() {
   const firstNudge = nudgesData?.nudges.find((n) => !n.is_opened);
 
   const bottomPad = layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.lg;
+
+  if (isLoading && !accounts && !budget) {
+    return (
+      <View style={[s.root, { backgroundColor: colors.background }]}>
+        <ActivityIndicator style={{ flex: 1 }} color={colors.brand} />
+      </View>
+    );
+  }
+
+  if (fetchError && !accounts && !budget) {
+    return (
+      <View style={[s.root, { backgroundColor: colors.background }]}>
+        <ScrollView
+          contentContainerStyle={s.errorContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
+          }
+        >
+          <Ionicons name="cloud-offline-outline" size={40} color={colors.textTertiary} />
+          <Text style={[s.errorText, { color: colors.textSecondary }]}>Could not load dashboard.</Text>
+          <Text style={[s.errorSub, { color: colors.textMeta }]}>Pull down to retry.</Text>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
@@ -208,20 +228,20 @@ export default function HomeScreen() {
           <View style={s.balActions}>
             <TouchableOpacity
               style={s.balBtnGhost}
-              onPress={() => router.push('/(tabs)/budget' as never)}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/budget' as never); }}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="Add transaction"
+              accessibilityLabel="Go to budget"
             >
               <Ionicons name="card-outline" size={14} color={colors.white} />
               <Text style={[s.balBtnTxt, { color: colors.white }]}>Budget</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.balBtnGhost, s.balBtnPrimary, { backgroundColor: colors.lime, borderColor: colors.lime }]}
-              onPress={() => router.push('/add-transaction')}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/add-transaction'); }}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="Transfer between accounts"
+              accessibilityLabel="Add transaction"
             >
               <Ionicons name="add" size={14} color={colors.darkGreen} />
               <Text style={[s.balBtnTxt, { color: colors.darkGreen }]}>Add Tx</Text>
@@ -681,4 +701,15 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // Error state
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xl,
+  },
+  errorText: { ...ff(600), fontSize: 16, textAlign: 'center' },
+  errorSub: { ...ff(400), fontSize: 13, textAlign: 'center' },
 });
