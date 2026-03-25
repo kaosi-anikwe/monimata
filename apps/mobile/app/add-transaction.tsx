@@ -17,163 +17,312 @@
 /**
  * Add Transaction screen — create a manual transaction.
  *
+ * Design spec: MoniMata_V5.html → scr-add
+ *   - White header with type toggle (Debit/Credit pill)
+ *   - Amount display card with ₦ prefix and blinking cursor
+ *   - Form section card (frow rows: What for?, Date & Time, Account, Category, Memo, Repeats)
+ *   - Numpad (3×4 grid, zero spans 2 columns)
+ *   - Green save button fixed at bottom
+ *
  * Route: /add-transaction
  */
-import { useState, useMemo } from 'react';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
+  Animated,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-  StyleSheet,
-  Modal,
-  FlatList,
-  Platform,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Polyline } from 'react-native-svg';
 
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Button } from '@/components/ui/Button';
 import { useAccounts } from '@/hooks/useAccounts';
-import type { BankAccount } from '@/types/account';
-import type { CategoryItem } from '@/types/category';
-import { RECURRENCE_OPTIONS } from '@/types/recurring';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCreateRecurringRule } from '@/hooks/useRecurring';
 import { useCreateTransaction } from '@/hooks/useTransactions';
-import { nairaStringToKobo, computeNextDue } from '@/utils/money';
+import { useTheme } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
+import type { BankAccount } from '@/types/account';
+import type { CategoryGroup, CategoryItem } from '@/types/category';
+import { RECURRENCE_OPTIONS } from '@/types/recurring';
+import { computeNextDue, nairaStringToKobo } from '@/utils/money';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Format a Date for display in the date/time picker row. */
 function formatDateTime(d: Date): string {
-  return d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
-    + ', '
-    + d.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
-}
-
-
-// ─── Picker modal ─────────────────────────────────────────────────────────────
-
-interface PickerOption { id: string; label: string }
-
-function PickerModal({
-  visible,
-  title,
-  options,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  title: string;
-  options: PickerOption[];
-  onSelect: (opt: PickerOption) => void;
-  onClose: () => void;
-}) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.pickerBackdrop} onPress={onClose} activeOpacity={1} />
-      <View style={s.pickerSheet}>
-        <View style={s.pickerHeader}>
-          <Text style={s.pickerTitle}>{title}</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={12}>
-            <Ionicons name="close" size={22} color="#374151" />
-          </TouchableOpacity>
-        </View>
-        <FlatList
-          data={options}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={s.pickerRow} onPress={() => { onSelect(item); onClose(); }}>
-              <Text style={s.pickerRowText}>{item.label}</Text>
-            </TouchableOpacity>
-          )}
-          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#F3F4F6' }} />}
-        />
-      </View>
-    </Modal>
+    d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) +
+    ', ' +
+    d.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
   );
 }
 
-// ─── Row components ───────────────────────────────────────────────────────────
+function formatAmountDisplay(s: string): string {
+  if (!s) return '0';
+  if (s.includes('.')) {
+    const [intPart, decPart] = s.split('.');
+    const int = parseInt(intPart || '0', 10);
+    return `${new Intl.NumberFormat('en-NG').format(int)}.${decPart}`;
+  }
+  const int = parseInt(s, 10);
+  return isNaN(int) ? '0' : new Intl.NumberFormat('en-NG').format(int);
+}
 
-function FormRow({
-  label,
-  children,
+// ─── TypeToggle (animated debit/credit pill) ───────────────────────────────
+
+function TypeToggle({
+  value,
+  onChange,
 }: {
-  label: string;
-  children: React.ReactNode;
+  value: 'debit' | 'credit';
+  onChange: (v: 'debit' | 'credit') => void;
 }) {
+  const colors = useTheme();
+  const isDebit = value === 'debit';
+  const anim = useRef(new Animated.Value(isDebit ? 0 : 1)).current;
+  const [pillW, setPillW] = useState(0);
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: isDebit ? 0 : 1,
+      useNativeDriver: false,
+      tension: 180,
+      friction: 18,
+    }).start();
+  }, [isDebit, anim]);
+
+  const pillBg = anim.interpolate({ inputRange: [0, 1], outputRange: [colors.error, colors.brand] });
+  const debitColor = anim.interpolate({ inputRange: [0, 1], outputRange: [colors.white, colors.textMeta] });
+  const creditColor = anim.interpolate({ inputRange: [0, 1], outputRange: [colors.textMeta, colors.white] });
+  const pillX = anim.interpolate({ inputRange: [0, 1], outputRange: [3, pillW + 3] });
+
   return (
-    <View style={s.formRow}>
-      <Text style={s.rowLabel}>{label}</Text>
-      <View style={s.rowContent}>{children}</View>
+    <View
+      style={[ss.typeToggle, { backgroundColor: colors.surface }]}
+      onLayout={(e) => setPillW(e.nativeEvent.layout.width / 2 - 3)}
+    >
+      {pillW > 0 && (
+        <Animated.View
+          style={[ss.typePill, { width: pillW, backgroundColor: pillBg, transform: [{ translateX: pillX }] }]}
+        />
+      )}
+      <TouchableOpacity
+        style={ss.typeBtn}
+        onPress={() => onChange('debit')}
+        accessibilityRole="radio"
+        accessibilityState={{ checked: isDebit }}
+        accessibilityLabel="Debit"
+      >
+        <Animated.Text style={[ss.typeBtnText, { color: debitColor }]}>Debit (−)</Animated.Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={ss.typeBtn}
+        onPress={() => onChange('credit')}
+        accessibilityRole="radio"
+        accessibilityState={{ checked: !isDebit }}
+        accessibilityLabel="Credit"
+      >
+        <Animated.Text style={[ss.typeBtnText, { color: creditColor }]}>Credit (+)</Animated.Text>
+      </TouchableOpacity>
     </View>
+  );
+}
+
+// ─── Numpad ───────────────────────────────────────────────────────────────────
+
+function Numpad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const colors = useTheme();
+  const keyStyle = [ss.numKey, { backgroundColor: colors.white }];
+  const K = (v: string) => (
+    <TouchableOpacity key={v} style={keyStyle} onPress={() => {
+      if (value === '0') { onChange(v); return; }
+      onChange(value + v);
+    }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel={v}>
+      <Text style={[ss.numKeyText, { color: colors.textPrimary }]}>{v}</Text>
+    </TouchableOpacity>
+  );
+  return (
+    <View style={[ss.numpad, { backgroundColor: colors.border }]}>
+      {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row) => (
+        <View key={row[0]} style={ss.numRow}>
+          {row.map((k) => K(k))}
+        </View>
+      ))}
+      <View style={ss.numRow}>
+        <TouchableOpacity style={[keyStyle, { flex: 2 }]} onPress={() => {
+          if (value === '0') return;
+          onChange(value + '0');
+        }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="0">
+          <Text style={[ss.numKeyText, { color: colors.textPrimary }]}>0</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={keyStyle} onPress={() => onChange(value.slice(0, -1) || '0')}
+          activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="Backspace">
+          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+            <Path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM18 9l-6 6M12 9l6 6"
+              stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ─── Frow (form row inside card) ─────────────────────────────────────────────
+
+function Frow({ label, isLast = false, children }: { label: string; isLast?: boolean; children: React.ReactNode }) {
+  const colors = useTheme();
+  return (
+    <View style={[ss.frow, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}>
+      <Text style={[type_.small, { color: colors.textMeta, fontWeight: '500', width: 90 }]}>{label}</Text>
+      <View style={ss.frowValue}>{children}</View>
+    </View>
+  );
+}
+
+// ─── Category picker sheet ────────────────────────────────────────────────────
+
+function CategoryPickerSheet({
+  visible, groups, selected, onSelect, onClose,
+}: {
+  visible: boolean;
+  groups: CategoryGroup[];
+  selected: CategoryItem | null;
+  onSelect: (item: CategoryItem | null) => void;
+  onClose: () => void;
+}) {
+  const colors = useTheme();
+  return (
+    <BottomSheet visible={visible} onClose={onClose} title="Category" scrollable={false}>
+      <ScrollView style={{ maxHeight: 420 }}>
+        <TouchableOpacity
+          style={[ss.pickRow, { borderBottomColor: colors.separator, borderBottomWidth: StyleSheet.hairlineWidth }]}
+          onPress={() => { onSelect(null); onClose(); }}
+          accessibilityRole="button" accessibilityLabel="No category"
+        >
+          <Text style={[type_.body, { color: colors.textMeta, fontStyle: 'italic' }]}>No category</Text>
+          {!selected && (
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+              <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
+            </Svg>
+          )}
+        </TouchableOpacity>
+        {groups.map((g) => (
+          <View key={g.name}>
+            <View style={[ss.pickGroupHdr, { backgroundColor: colors.surface }]}>
+              <Text style={[type_.labelSm, { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 1.2 }]}>{g.name}</Text>
+            </View>
+            {g.categories.map((cat, i) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={[
+                  ss.pickRow,
+                  i < g.categories.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+                ]}
+                onPress={() => { onSelect(cat); onClose(); }}
+                accessibilityRole="button" accessibilityLabel={cat.name}
+              >
+                <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{cat.name}</Text>
+                {selected?.id === cat.id && (
+                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                    <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
+                  </Svg>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
+    </BottomSheet>
+  );
+}
+
+// ─── Generic option picker sheet ─────────────────────────────────────────────
+
+function OptionPickerSheet<T>({
+  visible, title, options, onSelect, onClose,
+}: {
+  visible: boolean;
+  title: string;
+  options: Array<{ value: T; label: string }>;
+  onSelect: (v: T) => void;
+  onClose: () => void;
+}) {
+  const colors = useTheme();
+  return (
+    <BottomSheet visible={visible} onClose={onClose} title={title} scrollable={false}>
+      <ScrollView style={{ maxHeight: 360 }}>
+        {options.map((opt, i) => (
+          <TouchableOpacity
+            key={i}
+            style={[
+              ss.pickRow,
+              i < options.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+            ]}
+            onPress={() => { onSelect(opt.value); onClose(); }}
+            accessibilityRole="button" accessibilityLabel={opt.label}
+          >
+            <Text style={[type_.body, { color: colors.textPrimary }]}>{opt.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </BottomSheet>
   );
 }
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function AddTransactionScreen() {
+  const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
+  // Refs kept but not used for focus management with numpad (no keyboard needed for amount)
+  const _narrationRef = useRef<TextInput>(null);
 
   const { data: accounts = [] } = useAccounts();
   const { data: groups = [] } = useCategoryGroups();
   const createTx = useCreateTransaction();
+  const createRecurring = useCreateRecurringRule();
 
-  // Form state
   const [txType, setTxType] = useState<'debit' | 'credit'>('debit');
-  const [amount, setAmount] = useState('');
+  const [amountStr, setAmountStr] = useState('');
   const [narration, setNarration] = useState('');
   const [txDatetime, setTxDatetime] = useState(() => new Date());
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryItem | null>(null);
   const [memo, setMemo] = useState('');
+  const [recurrence, setRecurrence] = useState<typeof RECURRENCE_OPTIONS[number] | null>(null);
 
-  // Picker visibility
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showRecurrencePicker, setShowRecurrencePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  // Android needs separate date then time steps
   const [dtPickerMode, setDtPickerMode] = useState<'date' | 'time'>('date');
 
-  // Recurrence
-  const [recurrence, setRecurrence] = useState<typeof RECURRENCE_OPTIONS[number] | null>(null);
-  const [showRecurrencePicker, setShowRecurrencePicker] = useState(false);
-  const createRecurring = useCreateRecurringRule();
-
-  // Derived picker options
-  const accountOptions = useMemo<PickerOption[]>(
-    () => accounts.map((a) => ({ id: a.id, label: `${a.institution} — ${a.alias ?? a.account_name}` })),
+  const accountOptions = useMemo(
+    () => accounts.map((a) => ({ value: a, label: a.alias ?? `${a.institution} — ${a.account_name}` })),
     [accounts],
   );
-
-  const categoryOptions = useMemo<PickerOption[]>(
-    () =>
-      groups.flatMap((g) =>
-        g.categories.map((c) => ({ id: c.id, label: `${g.name} › ${c.name}` })),
-      ),
-    [groups],
+  const recurrenceOptions = useMemo(
+    () => RECURRENCE_OPTIONS.map((o) => ({ value: o, label: o.label })),
+    [],
   );
 
-  const categoryMap = useMemo(() => {
-    const m = new Map<string, CategoryItem>();
-    groups.forEach((g) => g.categories.forEach((c) => m.set(c.id, c)));
-    return m;
-  }, [groups]);
+  const koboAmount = nairaStringToKobo(amountStr);
+  const canSave = koboAmount > 0 && narration.trim().length > 0 && selectedAccount !== null;
 
   function handleSave() {
-    const koboAmount = nairaStringToKobo(amount);
-    if (koboAmount <= 0) return;
-    if (!selectedAccount) return;
-    if (!narration.trim()) return;
-
+    if (!canSave || !selectedAccount) return;
     const signedAmount = txType === 'debit' ? -koboAmount : koboAmount;
-
     createTx.mutate(
       {
         account_id: selectedAccount.id,
@@ -207,369 +356,290 @@ export default function AddTransactionScreen() {
     );
   }
 
-  const canSave = nairaStringToKobo(amount) > 0 && narration.trim().length > 0 && selectedAccount !== null;
+  const isDebit = txType === 'debit';
+  const amountColor = isDebit ? colors.error : colors.success;
 
   return (
-    <SafeAreaView style={s.safe}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="close" size={24} color="#374151" />
+    <View style={[ss.safe, { backgroundColor: colors.background }]}>
+      {/* ── Header ── */}
+      <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity
+          style={[ss.closeBtn, { backgroundColor: colors.surface }]}
+          onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Close"
+        >
+          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textSecondary} strokeWidth={2.5} strokeLinecap="round" />
+          </Svg>
         </TouchableOpacity>
-        <Text style={s.headerTitle}>New Transaction</Text>
-        <View style={{ width: 24 }} />
+        <Text style={[type_.h3, { color: colors.textPrimary }]}>Add Transaction</Text>
+        <View style={ss.closeBtn} />
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+      {/* ── Type toggle ── */}
+      <View style={[ss.typeToggleWrap, { backgroundColor: colors.white, borderBottomColor: colors.border }]}>
+        <TypeToggle value={txType} onChange={setTxType} />
+      </View>
+
+      <ScrollView
+        style={ss.scroll}
+        contentContainerStyle={ss.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
-          {/* Type toggle */}
-          <View style={s.typeToggle}>
-            <TouchableOpacity
-              style={[s.typeBtn, txType === 'debit' && s.typeBtnDebit]}
-              onPress={() => setTxType('debit')}
-            >
-              <Ionicons
-                name="arrow-up"
-                size={16}
-                color={txType === 'debit' ? '#fff' : '#EF4444'}
-              />
-              <Text style={[s.typeBtnText, txType === 'debit' && { color: '#fff' }]}>Debit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.typeBtn, txType === 'credit' && s.typeBtnCredit]}
-              onPress={() => setTxType('credit')}
-            >
-              <Ionicons
-                name="arrow-down"
-                size={16}
-                color={txType === 'credit' ? '#fff' : '#10B981'}
-              />
-              <Text style={[s.typeBtnText, txType === 'credit' && { color: '#fff' }]}>Credit</Text>
-            </TouchableOpacity>
+        {/* ── Amount display ── */}
+        <View style={[ss.amtCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+          <View style={ss.amtRow}>
+            <Text style={[ss.amtSym, { color: amountColor }]}>₦</Text>
+            <Text style={[ss.amtNum, { color: amountColor }]}>{formatAmountDisplay(amountStr)}</Text>
           </View>
+          <Text style={[type_.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
+            Enter amount using keypad below
+          </Text>
+        </View>
 
-          {/* Amount */}
-          <View style={[s.amountCard, txType === 'debit' ? s.amountCardDebit : s.amountCardCredit]}>
-            <Text style={[s.amountCurrency, txType === 'debit' ? { color: '#EF4444' } : { color: '#10B981' }]}>₦</Text>
+        {/* ── Form card ── */}
+        <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.white }]}>
+          <Frow label="What for?">
             <TextInput
-              style={[s.amountInput, txType === 'debit' ? { color: '#EF4444' } : { color: '#10B981' }]}
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="numeric"
-              placeholder="0"
-              placeholderTextColor="#D1D5DB"
-            />
-          </View>
-
-          {/* Narration */}
-          <FormRow label="Narration">
-            <TextInput
-              style={s.textField}
+              ref={_narrationRef}
+              style={[ss.frowInput, { color: colors.textPrimary }]}
               value={narration}
               onChangeText={setNarration}
-              placeholder="What was this for?"
-              placeholderTextColor="#9CA3AF"
+              placeholder="Enter description"
+              placeholderTextColor={colors.textTertiary}
               returnKeyType="done"
+              accessibilityLabel="Transaction description"
             />
-          </FormRow>
-
-          {/* Date & Time */}
-          <FormRow label="Date & Time">
+          </Frow>
+          <Frow label="Date & Time">
             <TouchableOpacity
-              style={s.pickerField}
-              onPress={() => {
-                setDtPickerMode('date');
-                setShowDatePicker(true);
-              }}
+              style={ss.frowTouchable}
+              onPress={() => { setDtPickerMode('date'); setShowDatePicker(true); }}
+              accessibilityRole="button" accessibilityLabel="Select date and time"
             >
-              <Text style={s.pickerSelected}>{formatDateTime(txDatetime)}</Text>
-              <Ionicons name="calendar-outline" size={16} color="#9CA3AF" />
+              <Text style={[type_.small, { color: colors.textPrimary, fontWeight: '600', flex: 1 }]}>
+                {formatDateTime(txDatetime)}
+              </Text>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
             </TouchableOpacity>
-          </FormRow>
-
-          {/* DateTimePicker — Android uses date then time, iOS uses inline datetime */}
-          {showDatePicker && (
-            Platform.OS === 'ios' ? (
-              <Modal visible transparent animationType="fade">
-                <TouchableOpacity
-                  style={s.dtBackdrop}
-                  activeOpacity={1}
-                  onPress={() => setShowDatePicker(false)}
-                />
-                <View style={s.dtSheet}>
-                  <DateTimePicker
-                    value={txDatetime}
-                    mode="datetime"
-                    display="spinner"
-                    onChange={(_e: DateTimePickerEvent, d?: Date) => d && setTxDatetime(d)}
-                    style={{ alignSelf: 'stretch' }}
-                  />
-                  <TouchableOpacity style={s.dtDoneBtn} onPress={() => setShowDatePicker(false)}>
-                    <Text style={s.dtDoneText}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-              </Modal>
-            ) : (
-              <DateTimePicker
-                value={txDatetime}
-                mode={dtPickerMode}
-                display="default"
-                onChange={(e: DateTimePickerEvent, selected?: Date) => {
-                  setShowDatePicker(false);
-                  if (e.type !== 'set' || !selected) return;
-                  const next = new Date(txDatetime);
-                  if (dtPickerMode === 'date') {
-                    next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
-                    setTxDatetime(next);
-                    setDtPickerMode('time');
-                    setShowDatePicker(true); // chain to time picker
-                  } else {
-                    next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
-                    setTxDatetime(next);
-                  }
-                }}
-              />
-            )
-          )}
-
-          {/* Account */}
-          <FormRow label="Account">
+          </Frow>
+          <Frow label="Account">
             <TouchableOpacity
-              style={s.pickerField}
+              style={ss.frowTouchable}
               onPress={() => setShowAccountPicker(true)}
+              accessibilityRole="button" accessibilityLabel="Select account"
             >
-              <Text style={selectedAccount ? s.pickerSelected : s.pickerPlaceholder}>
+              <Text
+                style={[type_.small, {
+                  color: selectedAccount ? colors.textPrimary : colors.textTertiary,
+                  fontWeight: selectedAccount ? '600' : '400',
+                  flex: 1,
+                }]}
+                numberOfLines={1}
+              >
                 {selectedAccount
-                  ? selectedAccount.alias ? selectedAccount.alias : `${selectedAccount.institution} — ${selectedAccount.account_name}`
+                  ? (selectedAccount.alias ?? `${selectedAccount.institution} — ${selectedAccount.account_name}`)
                   : 'Select account'}
               </Text>
-              <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
             </TouchableOpacity>
-          </FormRow>
-
-          {/* Category (optional) */}
-          <FormRow label="Category">
+          </Frow>
+          <Frow label="Category">
             <TouchableOpacity
-              style={s.pickerField}
+              style={ss.frowTouchable}
               onPress={() => setShowCategoryPicker(true)}
+              accessibilityRole="button" accessibilityLabel="Select category"
             >
-              <Text style={selectedCategory ? s.pickerSelected : s.pickerPlaceholder}>
+              <Text style={[type_.small, {
+                color: selectedCategory ? colors.brand : colors.textTertiary,
+                fontWeight: selectedCategory ? '600' : '400',
+                flex: 1,
+              }]}>
                 {selectedCategory ? selectedCategory.name : 'Optional'}
               </Text>
-              <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M9 18l6-6-6-6" stroke={selectedCategory ? colors.brand : colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
             </TouchableOpacity>
-            {selectedCategory && (
-              <TouchableOpacity
-                style={s.clearBtn}
-                onPress={() => setSelectedCategory(null)}
-                hitSlop={8}
-              >
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
-          </FormRow>
-
-          {/* Memo */}
-          <FormRow label="Memo">
+          </Frow>
+          <Frow label="Memo">
             <TextInput
-              style={s.textField}
+              style={[ss.frowInput, { color: colors.textPrimary }]}
               value={memo}
               onChangeText={setMemo}
               placeholder="Optional note"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={colors.textTertiary}
               returnKeyType="done"
+              accessibilityLabel="Optional memo"
             />
-          </FormRow>
-
-          {/* Repeats */}
-          <FormRow label="Repeats">
-            <TouchableOpacity style={s.pickerField} onPress={() => setShowRecurrencePicker(true)}>
-              <Text style={recurrence ? s.pickerSelected : s.pickerPlaceholder}>
+          </Frow>
+          <Frow label="Repeats" isLast>
+            <TouchableOpacity
+              style={ss.frowTouchable}
+              onPress={() => setShowRecurrencePicker(true)}
+              accessibilityRole="button" accessibilityLabel="Select recurrence"
+            >
+              <Text style={[type_.small, {
+                color: recurrence ? colors.textPrimary : colors.textTertiary,
+                fontWeight: recurrence ? '600' : '400',
+                flex: 1,
+              }]}>
                 {recurrence ? recurrence.label : 'Never'}
               </Text>
-              <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
             </TouchableOpacity>
-            {recurrence && (
-              <TouchableOpacity style={s.clearBtn} onPress={() => setRecurrence(null)} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
-          </FormRow>
-        </ScrollView>
-
-        {/* Save button */}
-        <View style={s.saveBar}>
-          <TouchableOpacity
-            style={[s.saveBtn, (!canSave || createTx.isPending) && s.saveBtnDisabled]}
-            onPress={handleSave}
-            disabled={!canSave || createTx.isPending}
-          >
-            {createTx.isPending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={s.saveBtnText}>Add transaction</Text>
-            )}
-          </TouchableOpacity>
+          </Frow>
         </View>
-      </KeyboardAvoidingView>
 
-      {/* Pickers */}
-      <PickerModal
+        {/* ── Numpad ── */}
+        <Numpad value={amountStr} onChange={setAmountStr} />
+      </ScrollView>
+
+      {/* ── Save bar ── */}
+      <View style={[ss.saveBar, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+        <Button
+          variant="green"
+          onPress={handleSave}
+          disabled={!canSave || createTx.isPending}
+          loading={createTx.isPending}
+          accessibilityLabel="Save transaction"
+        >
+          Save Transaction
+        </Button>
+      </View>
+
+      {/* ── DateTimePicker ── */}
+      {showDatePicker && (
+        Platform.OS === 'ios' ? (
+          <Modal visible transparent animationType="fade">
+            <TouchableOpacity style={ss.dtBackdrop} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
+            <View style={[ss.dtSheet, { backgroundColor: colors.white }]}>
+              <DateTimePicker
+                value={txDatetime}
+                mode="datetime"
+                display="spinner"
+                onChange={(_e: DateTimePickerEvent, d?: Date) => d && setTxDatetime(d)}
+                style={{ alignSelf: 'stretch' }}
+              />
+              <TouchableOpacity
+                style={[ss.dtDoneBtn, { backgroundColor: colors.brand }]}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={[type_.label, { color: colors.white }]}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </Modal>
+        ) : (
+          <DateTimePicker
+            value={txDatetime}
+            mode={dtPickerMode}
+            display="default"
+            onChange={(e: DateTimePickerEvent, selected?: Date) => {
+              setShowDatePicker(false);
+              if (e.type !== 'set' || !selected) return;
+              const next = new Date(txDatetime);
+              if (dtPickerMode === 'date') {
+                next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+                setTxDatetime(next);
+                setDtPickerMode('time');
+                setShowDatePicker(true);
+              } else {
+                next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+                setTxDatetime(next);
+              }
+            }}
+          />
+        )
+      )}
+
+      {/* ── Pickers ── */}
+      <OptionPickerSheet
         visible={showAccountPicker}
         title="Select Account"
         options={accountOptions}
-        onSelect={(opt) => setSelectedAccount(accounts.find((a) => a.id === opt.id) ?? null)}
+        onSelect={(a) => setSelectedAccount(a)}
         onClose={() => setShowAccountPicker(false)}
       />
-      <PickerModal
+      <CategoryPickerSheet
         visible={showCategoryPicker}
-        title="Select Category"
-        options={categoryOptions}
-        onSelect={(opt) => setSelectedCategory(categoryMap.get(opt.id) ?? null)}
+        groups={groups}
+        selected={selectedCategory}
+        onSelect={(c) => setSelectedCategory(c)}
         onClose={() => setShowCategoryPicker(false)}
       />
-      <PickerModal
+      <OptionPickerSheet
         visible={showRecurrencePicker}
         title="Repeats"
-        options={RECURRENCE_OPTIONS.map((o, i) => ({ id: String(i), label: o.label }))}
-        onSelect={(opt) => setRecurrence(RECURRENCE_OPTIONS[parseInt(opt.id)] ?? null)}
+        options={recurrenceOptions}
+        onSelect={(o) => setRecurrence(o)}
         onClose={() => setShowRecurrencePicker(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Static styles ────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
-
+const ss = StyleSheet.create({
+  safe: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.mdn,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
-
-  body: { padding: 16, paddingBottom: 40, gap: 12 },
-
-  typeToggle: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    padding: 4,
-    gap: 4,
+  closeBtn: { width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  typeToggleWrap: { paddingHorizontal: spacing.xl, paddingVertical: spacing.mdn, borderBottomWidth: StyleSheet.hairlineWidth },
+  typeToggle: { flexDirection: 'row', borderRadius: radius.sm + 1, padding: 3, overflow: 'hidden' },
+  typePill: { position: 'absolute', top: 3, bottom: 3, borderRadius: spacing.smd },
+  typeBtn: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  typeBtnText: { fontSize: 14, fontWeight: '700', fontFamily: 'PlusJakartaSans-Bold' },
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.md,
   },
-  typeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  typeBtnDebit: { backgroundColor: '#EF4444' },
-  typeBtnCredit: { backgroundColor: '#10B981' },
-  typeBtnText: { fontSize: 15, fontWeight: '700', color: '#374151' },
-
-  amountCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
-    padding: 16,
-    marginVertical: 4,
-  },
-  amountCardDebit: { backgroundColor: '#FEF2F2' },
-  amountCardCredit: { backgroundColor: '#F0FDF4' },
-  amountCurrency: { fontSize: 28, fontWeight: '800', marginRight: 4 },
-  amountInput: { flex: 1, fontSize: 36, fontWeight: '800', padding: 0 },
-
-  formRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+  amtCard: {
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
   },
-  rowLabel: { fontSize: 13, fontWeight: '600', color: '#6B7280', width: 72 },
-  rowContent: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-
-  textField: { flex: 1, fontSize: 15, color: '#111827', padding: 0 },
-
-  pickerField: {
-    flex: 1,
+  amtRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  amtSym: { fontSize: 20, fontWeight: '800', fontFamily: 'PlusJakartaSans-ExtraBold', lineHeight: 52, marginRight: 2 },
+  amtNum: { fontSize: 48, fontWeight: '800', fontFamily: 'PlusJakartaSans-ExtraBold', letterSpacing: -2 },
+  formCard: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
+  frow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+    minHeight: 48,
   },
-  pickerSelected: { fontSize: 15, color: '#111827', flex: 1 },
-  pickerPlaceholder: { fontSize: 15, color: '#9CA3AF', flex: 1 },
-  clearBtn: { marginLeft: 8 },
-
-  saveBar: {
-    padding: 16,
-    paddingBottom: 32,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  saveBtn: {
-    backgroundColor: '#0F7B3F',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-
-  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  pickerSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '60%',
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  pickerTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  pickerRow: { paddingHorizontal: 18, paddingVertical: 14 },
-  pickerRowText: { fontSize: 15, color: '#374151' },
-
-  // DateTimePicker (iOS modal)
+  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  frowInput: { flex: 1, fontSize: 13, fontWeight: '600', fontFamily: 'PlusJakartaSans-SemiBold', padding: 0 },
+  frowValue: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  numpad: { marginHorizontal: 0, borderRadius: radius.md, overflow: 'hidden', gap: 1 },
+  numRow: { flexDirection: 'row', gap: 1 },
+  numKey: { flex: 1, height: 50, alignItems: 'center', justifyContent: 'center' },
+  numKeyText: { fontSize: 19, fontWeight: '600', fontFamily: 'PlusJakartaSans-SemiBold' },
+  saveBar: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, paddingBottom: spacing.xxl, borderTopWidth: StyleSheet.hairlineWidth },
+  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: 7 },
+  pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  dtSheet: {
-    backgroundColor: '#fff',
-    paddingBottom: 24,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  dtDoneBtn: {
-    marginTop: 4,
-    marginHorizontal: 16,
-    paddingVertical: 13,
-    backgroundColor: '#111827',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  dtDoneText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  dtSheet: { paddingBottom: 24, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
+  dtDoneBtn: { margin: spacing.lg, paddingVertical: 14, borderRadius: radius.sm, alignItems: 'center' },
 });
