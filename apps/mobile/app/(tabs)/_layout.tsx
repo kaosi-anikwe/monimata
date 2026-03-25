@@ -60,13 +60,13 @@ export default function TabsLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
-        initialRouteName="home"
+        initialRouteName="index"
         tabBar={(props) => <MainTabBar {...props} />}
         screenOptions={{ headerShown: false }}
       >
         {/* ── Visible tabs (left → right) ───────────────────────────────── */}
-        <Tabs.Screen name="home" options={{ title: 'Home' }} />
-        <Tabs.Screen name="index" options={{ title: 'Budget' }} />
+        <Tabs.Screen name="index" options={{ title: 'Home' }} />
+        <Tabs.Screen name="budget" options={{ title: 'Budget' }} />
         <Tabs.Screen name="transactions" options={{ title: 'Transactions' }} />
         <Tabs.Screen name="bills" options={{ title: 'Pay Bills' }} />
         <Tabs.Screen name="nudges" options={{ title: 'Nudges' }} />

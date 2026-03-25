@@ -196,3 +196,75 @@ export function hitSlop(size: number) {
   const pad = Math.max(0, (44 - size) / 2);
   return { top: pad, bottom: pad, left: pad, right: pad };
 }
+
+// ─── Glass (frosted overlay values) ──────────────────────────────────────────
+//
+// These are semi-transparent overlays designed to be composited on top of the
+// darkGreen (#0D1F0D) header surface. They are NOT theme-color-dependent —
+// the same values work in light and dark mode because they always sit on a
+// dark green background (balance card, control buttons, badge chips, etc.).
+//
+// Usage:
+//   <View style={[glass.card, { borderColor: glass.borderLime }]} />
+//
+// Mapping to HTML mockup classes:
+//   glass.card        → .bal-card / .ctbm-card    rgba(255,255,255,.07)
+//   glass.control     → .notif-btn / .bal-btn     rgba(255,255,255,.09)
+//   glass.strong      → .x-btn.dk                rgba(255,255,255,.10)
+//   glass.badge       → streak badge / hub-tab    rgba(168,224,99,.15)
+//   glass.borderLime  → .bal-card border          rgba(168,224,99,.13)
+//   glass.borderLimeStrong → streak badge border  rgba(168,224,99,.25)
+//   glass.borderWhite → .x-btn.dk / .notif-btn   rgba(255,255,255,.10)
+//   glass.borderWhiteStrong → .x-btn.dk border   rgba(255,255,255,.12)
+//   glass.avatarBorder → avatar ring on dark bg   rgba(168,224,99,.30)
+//   glass.labelDim    → balance label             rgba(255,255,255,.42)
+//   glass.textDim     → secondary text on dark    rgba(255,255,255,.45)
+//   glass.textFaint   → tertiary text on dark     rgba(255,255,255,.30)
+//   glass.streakDot   → unlit streak day          rgba(255,255,255,.07)
+//   glass.streakDotBorder → unlit streak border   rgba(255,255,255,.08)
+//   glass.streakDone  → completed streak day      rgba(168,224,99,.15)
+//   glass.streakDoneBorder → completed streak day rgba(168,224,99,.30)
+
+export const glass = {
+  // Surfaces
+  /** Frosted card on darkGreen — balance card, info cards  */
+  card: 'rgba(255,255,255,0.07)',
+  /** Slightly brighter surface — control buttons on dark  */
+  control: 'rgba(255,255,255,0.09)',
+  /** Opaque frosted — .x-btn.dk back button  */
+  strong: 'rgba(255,255,255,0.10)',
+  /** Lime-tinted badge surface — streak badge, hub tab */
+  badge: 'rgba(168,224,99,0.15)',
+  /** Chip on dark — balance chip  */
+  chip: 'rgba(168,224,99,0.18)',
+
+  // Borders
+  /** Lime-tinted border — balance card  */
+  borderLime: 'rgba(168,224,99,0.13)',
+  /** Stronger lime border — focused lime elements  */
+  borderLimeStrong: 'rgba(168,224,99,0.25)',
+  /** Even stronger lime border — avatar ring  */
+  borderLimeBright: 'rgba(168,224,99,0.30)',
+  /** White frosted border — control buttons, notif btn  */
+  borderWhite: 'rgba(255,255,255,0.10)',
+  /** Darker white border — .x-btn.dk  */
+  borderWhiteStrong: 'rgba(255,255,255,0.12)',
+
+  // Text / icon opacities on darkGreen backgrounds
+  /** ALL-CAPS label text on dark header (balance label)  */
+  labelDim: 'rgba(255,255,255,0.42)',
+  /** Secondary text on dark (greeting)  */
+  textDim: 'rgba(255,255,255,0.45)',
+  /** Tertiary text on dark (streak description)  */
+  textFaint: 'rgba(255,255,255,0.50)',
+
+  // Streak-specific
+  /** Unlit streak day cell  */
+  streakDay: 'rgba(255,255,255,0.07)',
+  /** Unlit streak day border  */
+  streakDayBorder: 'rgba(255,255,255,0.08)',
+  /** Completed streak day fill  */
+  streakDone: 'rgba(168,224,99,0.15)',
+  /** Completed streak day border  */
+  streakDoneBorder: 'rgba(168,224,99,0.30)',
+} as const;
