@@ -721,22 +721,82 @@ CREATE TABLE challenge_participants (
 
 ---
 
-## Phase 15 — Onboarding Questionnaire _(New)_
+## Phase 15 — Onboarding Questionnaire ✅
 
+**Status:** **Complete**  
 **Files:** `app/(auth)/onboarding.tsx`, `app/(auth)/budget-seed.tsx`
 
-### Onboarding (`scr-onboarding`)
+### Onboarding screen (`scr-onboarding`) — Delivered
 
-- Multi-step card flow post-BVN verification.
-- Questions: monthly income range, primary spending categories, savings goal.
-- Step progress bar at top.
-- Used to seed initial budget category groups.
+- 3-step questionnaire flow, shown once immediately after BVN verification (new users only).
+- `verify-bvn.tsx` now routes new users → `/(auth)/onboarding`; returning verified users still skip directly to `/(auth)/link-bank`.
+- Dark green `LinearGradient` header (`darkGreen → darkGreenMid`): 3-pill progress bar (done = `brand`, active = `lime`, future = `overlayGhost` 6 pt pills with 3 pt radius), step meta label, 20/800 question, 13/400 sub.
+- **Step 1 — Income type**: briefcase / laptop / storefront / school Ionicons with option keys `employed | freelancer | business | student`.
+- **Step 2 — Housing**: home / people / business / person-add Ionicons with option keys `renting | family | mortgage | shared`.
+- **Step 3 — Financial goal**: wallet / flag / trending-down / bar-chart Ionicons with option keys `cashflow | specific_goal | debt | track`.
+- Each `RadioOptionCard`: 44×44 Ionicons tile (surfaceHigh/surfaceElevated bg), `optName` (700/14) + `optSub` (400/12), 22×22 rounded-7 checkbox (brand bg + `checkmark` icon when selected), border flips to `colors.brand` and bg to `colors.surface` on select.
+- Live-preview hint card (`sparkles-outline` + text) animates in once an option is tapped.
+- Privacy reassurance copy below options.
+- "Continue" / "See My Budget Preview ✨" CTA (radius.full, 50 pt, disabled/0.4 opacity until selection); last step uses `lime` bg + `darkGreen` text to match `btn-lime` style.
+- "Skip this question" text link advances (or finishes) without recording an answer (`null`).
+- `OnboardingAnswers` type exported: `{ incomeType, housing, goal }` each typed union | `null`.
+- Answers forwarded to `budget-seed` as JSON-encoded `answers` route param via `router.push`.
+- All data is local component state — Phase 16 replaces `proceedToBudgetSeed()` with `POST /users/onboarding` before navigation.
 
-### Budget Seed Preview
+### Budget Seed Preview (`scr-budget-seed`) — Delivered
 
-- Shows AI-recommended categories before user hits main app.
-- "Looks good!" → navigate to tabs.
-- "Customise" → navigate to budget-edit.
+- Receives `answers` JSON param; available for Phase 16 API call.
+- Dark green `LinearGradient` header with radial `limeGlow` decoration, 48 pt `trophy-outline` Ionicon, "Your budget is ready!" (800/22) title, sub copy, stats row (3 cells: total categories / groups / target-suggested count — `lime`/800/24 numbers separated by `overlayGhostBorder` dividers).
+- Scrollable `SeedGroup` accordion: each card has a coloured `groupIconTile` (Ionicons) + ALLCAPS group name + category count + `chevron-forward`/`chevron-down` toggle; first group expanded by default.
+- Category rows: 8 pt `catDot` (brand or muted), category name, optional "Target suggested" badge (`flag-outline` Ionicon + text in `surface` pill).
+- Seed groups: Housing (home-outline), Food & Groceries (restaurant-outline), Transport (car-outline), Savings & Goals (save-outline), Personal (phone-portrait-outline).
+- Static `FAKE_SEED_GROUPS` seed data — totals computed at module level; Phase 16 replaces with API response.
+- **"Let's start budgeting!"** lime 52 pt `radius.full` button + `rocket-outline` Ionicon → `router.replace('/(tabs)')`.
+- **"Customise my categories"** ghost button (brand border, surface bg) + `settings-outline` → `router.replace('/budget-edit')`.
+- Zero raw hex/rgba throughout.
+
+### Backend Integration Notes
+
+```
+POST /users/onboarding
+Authorization: Bearer <access_token>
+Content-Type: application/json
+Body:
+  {
+    "income_type": "employed" | "freelancer" | "business" | "student" | null,
+    "housing":     "renting"  | "family"     | "mortgage" | "shared"  | null,
+    "goal":        "cashflow" | "specific_goal" | "debt"   | "track"   | null
+  }
+Response 201:
+  {
+    "groups": [
+      {
+        "id": "uuid",
+        "name": "Housing",
+        "icon_slug": "home",
+        "categories": [
+          { "id": "uuid", "name": "Rent", "target_suggested": true },
+          ...
+        ]
+      }
+    ]
+  }
+```
+
+**Server-side seeding logic:**
+
+- A mapping table `onboarding_rules` maps `(income_type, housing, goal)` combination patterns to a set of category groups + categories.
+- Seeding is idempotent: calling the endpoint again returns the same groups without duplicating.
+- After the user taps "Let's start budgeting!", call `PATCH /users/me { "onboarding_complete": true }` so the onboarding flow is suppressed on future logins.
+
+**Mobile integration (Phase 16 wiring):**
+
+- Add `useSubmitOnboarding()` mutation in `hooks/useOnboarding.ts` (React Query `useMutation`).
+- Replace `proceedToBudgetSeed()` in `onboarding.tsx` with the mutation; pass API-returned `groups` as a second param to `budget-seed`.
+- Replace `FAKE_SEED_GROUPS` in `budget-seed.tsx` with the parsed groups param.
+- Add `onboarding_complete: boolean` field to `AuthUser` type and `authSlice` state.
+- In the root `_layout.tsx` auth guard, check `user.onboarding_complete`; if false, redirect new users to `/(auth)/onboarding` after first login.
+- Register `queryKeys.onboarding()` in `lib/queryKeys.ts`.
 
 ---
 
@@ -778,5 +838,5 @@ CREATE TABLE challenge_participants (
 | 12    | Profile Tab              | ✅ Complete    |
 | 13    | Knowledge Hub Tab        | ✅ Complete    |
 | 14    | Rewards & Gamification   | ✅ Complete    |
-| 15    | Onboarding Questionnaire | ⬜ Not Started |
+| 15    | Onboarding Questionnaire | ✅ Complete    |
 | 16    | Polish Pass              | ⬜ Not Started |
