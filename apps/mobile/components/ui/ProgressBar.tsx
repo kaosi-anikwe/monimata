@@ -34,6 +34,7 @@
  *   .goal-fill  gradient 90deg --gp → --lime
  */
 
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect } from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, {
@@ -54,6 +55,10 @@ export interface ProgressBarProps {
   progress: number;
   state?: ProgressBarState;
   size?: ProgressBarSize;
+  /** Animate the fill from 0 → target on mount (and on subsequent changes). Default false. */
+  animate?: boolean;
+  /** Render a brand→lime linear gradient fill (e.g. goals, CTBM). Default false. */
+  gradient?: boolean;
   style?: StyleProp<ViewStyle>;
   trackStyle?: StyleProp<ViewStyle>;
 }
@@ -68,6 +73,8 @@ export function ProgressBar({
   progress,
   state = 'ok',
   size = 'sm',
+  animate = false,
+  gradient = false,
   style,
   trackStyle,
 }: ProgressBarProps) {
@@ -76,11 +83,14 @@ export function ProgressBar({
   // Clamp to 0–1 for visual fill (over-budget shows full red bar)
   const clampedProgress = Math.min(Math.max(progress, 0), 1);
 
-  const width = useSharedValue(0);
+  // When animate=false start at the target so there's no fill-in on mount.
+  const width = useSharedValue(animate ? 0 : clampedProgress);
 
   useEffect(() => {
-    width.value = withTiming(clampedProgress, { duration: 600 });
-  }, [clampedProgress, width]);
+    width.value = animate
+      ? withTiming(clampedProgress, { duration: 600 })
+      : clampedProgress;
+  }, [clampedProgress, animate, width]);
 
   const fillAnim = useAnimatedStyle(() => ({
     width: `${width.value * 100}%`,
@@ -100,10 +110,20 @@ export function ProgressBar({
       <Animated.View
         style={[
           s.fill,
-          { height, backgroundColor: fillColor },
+          { height },
+          gradient ? undefined : { backgroundColor: fillColor },
           fillAnim,
         ]}
-      />
+      >
+        {gradient && (
+          <LinearGradient
+            colors={[colors.brand, colors.lime]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+      </Animated.View>
     </View>
   );
 }

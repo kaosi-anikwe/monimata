@@ -287,5 +287,8 @@ const s = StyleSheet.create({
   badgeText: {
     ...ff(800),
     fontSize: 8,
+    lineHeight: 14,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
 });

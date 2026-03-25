@@ -124,6 +124,7 @@ export function useBudget(month: string) {
         targets,
         creditTxns,
         bmHistorical,
+        allMonthTxns,
       ] = await Promise.all([
         db.get<CategoryGroupModel>('category_groups')
           .query(Q.sortBy('sort_order', Q.asc))
@@ -146,11 +147,30 @@ export function useBudget(month: string) {
         db.get<BudgetMonthModel>('budget_months')
           .query(Q.where('month', Q.oneOf(tbbMonths)))
           .fetch(),
+        // All transactions this month — used for live per-category activity AND
+        // total_debit (all debits, categorised or not), so this mirrors the way
+        // creditTxns includes all credits regardless of category.
+        db.get<TransactionModel>('transactions').query(
+          Q.where('date', Q.gte(currentBounds.start)),
+          Q.where('date', Q.lt(currentBounds.end)),
+        ).fetch(),
       ]);
 
       const bmCurrentMap = new Map(bmCurrent.map((b) => [b.categoryId, b]));
       const bmPrevMap = new Map(bmPrev.map((b) => [b.categoryId, b]));
       const targetMap = new Map(targets.map((t) => [t.categoryId, t]));
+
+      // Compute live activity from transactions — normalised by type so this works
+      // regardless of whether amounts are signed (new manual txns) or unsigned
+      // (server-synced txns stored with the old positive-only convention).
+      const activityByCategory = new Map<string, number>();
+      let totalDebit = 0;
+      allMonthTxns.forEach((tx) => {
+        if (tx.type === 'debit') totalDebit += Math.abs(tx.amount);
+        if (!tx.categoryId) return;
+        const contribution = tx.type === 'debit' ? -Math.abs(tx.amount) : Math.abs(tx.amount);
+        activityByCategory.set(tx.categoryId, (activityByCategory.get(tx.categoryId) ?? 0) + contribution);
+      });
 
       // Income per month (credit transactions) for TBB
       const incomeByMonth = new Map<string, number>();
@@ -185,7 +205,8 @@ export function useBudget(month: string) {
           const bm = bmCurrentMap.get(cat.id);
           const pb = bmPrevMap.get(cat.id);
           const assigned = bm?.assigned ?? 0;
-          const activity = bm?.activity ?? 0;
+          // Use live transaction-derived activity (always up to date pre-sync)
+          const activity = activityByCategory.get(cat.id) ?? 0;
           // One level of carry-forward (matches Python's compute_available)
           const prevAvailable = pb ? pb.assigned + pb.activity : 0;
           const carry = Math.max(0, prevAvailable);
@@ -213,7 +234,7 @@ export function useBudget(month: string) {
         };
       });
 
-      return { month, tbb, groups: groupRows };
+      return { month, tbb, groups: groupRows, total_debit: totalDebit };
     },
   });
 }

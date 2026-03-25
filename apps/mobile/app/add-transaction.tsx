@@ -253,7 +253,7 @@ function OptionPickerSheet<T>({
 }: {
   visible: boolean;
   title: string;
-  options: Array<{ value: T; label: string }>;
+  options: { value: T; label: string }[];
   onSelect: (v: T) => void;
   onClose: () => void;
 }) {
@@ -327,7 +327,7 @@ export default function AddTransactionScreen() {
       {
         account_id: selectedAccount.id,
         date: txDatetime.toISOString(),
-        amount: koboAmount,
+        amount: signedAmount,
         narration: narration.trim(),
         type: txType,
         category_id: selectedCategory?.id ?? null,

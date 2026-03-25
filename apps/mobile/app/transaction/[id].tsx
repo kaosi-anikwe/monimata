@@ -542,7 +542,7 @@ function ManualEditForm({
     const signedAmount = isDebit ? -koboAmount : koboAmount;
     onSave({
       type: txType,
-      amount: koboAmount,
+      amount: signedAmount,
       narration: narration.trim(),
       date: txDatetime.toISOString(),
       account_id: selectedAccount?.id ?? tx.account_id,

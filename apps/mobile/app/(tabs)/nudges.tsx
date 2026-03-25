@@ -26,15 +26,12 @@
  * which also shows an unread count badge (managed in _layout.tsx).
  */
 
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
-  Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -42,8 +39,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BottomSheet } from '@/components/ui';
+import { useTheme } from '@/lib/theme';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
 import {
   useDismissNudge,
   useMarkAllNudgesRead,
@@ -63,48 +64,58 @@ import type {
 
 // ── Trigger type metadata ─────────────────────────────────────────────────
 
+type BubbleBgToken = 'warningSubtle' | 'errorSubtle' | 'purpleSubtle' | 'successSubtle' | 'surface';
+type IconColorToken = 'warning' | 'error' | 'purple' | 'brand' | 'textMeta';
+
 interface TriggerMeta {
   icon: React.ComponentProps<typeof Ionicons>['name'];
-  color: string;
+  bubbleBg: BubbleBgToken;
+  iconColor: IconColorToken;
   label: string;
 }
 
 const TRIGGER_META: Record<string, TriggerMeta> = {
   threshold_80: {
     icon: 'warning-outline',
-    color: '#F59E0B',
+    bubbleBg: 'warningSubtle',
+    iconColor: 'warning',
     label: 'Budget warning',
   },
   threshold_100: {
     icon: 'alert-circle-outline',
-    color: '#EF4444',
+    bubbleBg: 'errorSubtle',
+    iconColor: 'error',
     label: 'Budget exceeded',
   },
   large_single_tx: {
     icon: 'trending-down-outline',
-    color: '#8B5CF6',
+    bubbleBg: 'purpleSubtle',
+    iconColor: 'purple',
     label: 'Large transaction',
   },
   pay_received: {
     icon: 'cash-outline',
-    color: '#0F7B3F',
+    bubbleBg: 'successSubtle',
+    iconColor: 'brand',
     label: 'Money received',
   },
   bill_payment: {
     icon: 'checkmark-circle-outline',
-    color: '#0F7B3F',
+    bubbleBg: 'successSubtle',
+    iconColor: 'brand',
     label: 'Bill payment',
   },
 };
 
+const DEFAULT_META: TriggerMeta = {
+  icon: 'notifications-outline',
+  bubbleBg: 'surface',
+  iconColor: 'textMeta',
+  label: 'Nudge',
+};
+
 function getMeta(triggerType: string): TriggerMeta {
-  return (
-    TRIGGER_META[triggerType] ?? {
-      icon: 'notifications-outline',
-      color: '#6B7280',
-      label: 'Nudge',
-    }
-  );
+  return TRIGGER_META[triggerType] ?? DEFAULT_META;
 }
 
 // ── Helper: time ago ──────────────────────────────────────────────────────
@@ -241,14 +252,13 @@ interface DetailSheetProps {
 }
 
 function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
+  const colors = useTheme();
   const router = useRouter();
   const dismiss = useDismissNudge();
 
-  if (!nudge) return null;
-
-  const meta = getMeta(nudge.trigger_type);
-  const why = buildWhySummary(nudge);
-  const actions = getActions(nudge.trigger_type);
+  const meta = nudge ? getMeta(nudge.trigger_type) : DEFAULT_META;
+  const why = nudge ? buildWhySummary(nudge) : '';
+  const actions = nudge ? getActions(nudge.trigger_type) : [];
 
   function handleAction(route: string) {
     onClose();
@@ -262,100 +272,97 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
   }
 
   return (
-    <Modal
+    <BottomSheet
       visible={!!nudge}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+      onClose={onClose}
+      scrollable
+      contentStyle={{ paddingHorizontal: spacing.xl }}
     >
-      <Pressable style={ds.overlay} onPress={onClose}>
-        <Pressable
-          style={ds.sheet}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Drag handle */}
-          <View style={ds.handle} />
+      {/* Header */}
+      <View style={ss.sheetHeaderRow}>
+        <View style={[ss.sheetIconBubble, { backgroundColor: colors[meta.bubbleBg] }]}>
+          <Ionicons name={meta.icon} size={28} color={colors[meta.iconColor]} />
+        </View>
+        <View style={ss.sheetHeaderText}>
+          <Text style={[type_.caption, { color: colors.textMeta, fontWeight: '600', marginBottom: 3 }]}>
+            {meta.label}
+          </Text>
+          <Text style={[type_.h3, { color: colors.textPrimary, lineHeight: 24 }]} numberOfLines={2}>
+            {nudge?.title ?? 'Nudge'}
+          </Text>
+        </View>
+      </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={ds.scrollContent}
+      {/* Message */}
+      <View style={ss.sheetSection}>
+        <Text style={[type_.body, { color: colors.textSecondary, lineHeight: 22 }]}>
+          {nudge?.message}
+        </Text>
+      </View>
+
+      {/* Why you got this */}
+      {why ? (
+        <View style={ss.sheetSection}>
+          <Text
+            style={[
+              type_.labelSm,
+              { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+            ]}
           >
-            {/* Header */}
-            <View style={ds.headerRow}>
-              <View
-                style={[ds.iconBubble, { backgroundColor: meta.color + '20' }]}
-              >
-                <Ionicons name={meta.icon} size={28} color={meta.color} />
-              </View>
-              <View style={ds.headerText}>
-                <Text style={ds.typeLabel}>{meta.label}</Text>
-                <Text style={ds.title}>
-                  {nudge.title ?? 'Nudge'}
-                </Text>
-              </View>
-            </View>
+            Why you got this
+          </Text>
+          <View style={[ss.whyCard, { backgroundColor: colors.surface, borderRadius: radius.sm }]}>
+            <Ionicons
+              name="information-circle-outline"
+              size={18}
+              color={colors.textMeta}
+              style={{ marginTop: 1 }}
+            />
+            <Text style={[ss.whyText, { color: colors.textSecondary }]}>{why}</Text>
+          </View>
+        </View>
+      ) : null}
 
-            {/* Message */}
-            <View style={ds.section}>
-              <Text style={ds.message}>{nudge.message}</Text>
-            </View>
-
-            {/* Why you got this */}
-            {why ? (
-              <View style={ds.section}>
-                <Text style={ds.sectionTitle}>Why you got this</Text>
-                <View style={ds.whyCard}>
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={18}
-                    color="#6B7280"
-                    style={{ marginTop: 1 }}
-                  />
-                  <Text style={ds.whyText}>{why}</Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Actions */}
-            {actions.length > 0 ? (
-              <View style={ds.section}>
-                <Text style={ds.sectionTitle}>What you can do</Text>
-                {actions.map((action) => (
-                  <TouchableOpacity
-                    key={action.label}
-                    style={ds.actionButton}
-                    onPress={() => handleAction(action.route)}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons
-                      name={action.icon}
-                      size={20}
-                      color={'#0F7B3F'}
-                      style={ds.actionIcon}
-                    />
-                    <Text style={ds.actionLabel}>{action.label}</Text>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color="#9CA3AF"
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : null}
-
-            {/* Dismiss */}
+      {/* Actions */}
+      {actions.length > 0 ? (
+        <View style={ss.sheetSection}>
+          <Text
+            style={[
+              type_.labelSm,
+              { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+            ]}
+          >
+            What you can do
+          </Text>
+          {actions.map((action) => (
             <TouchableOpacity
-              style={ds.dismissButton}
-              onPress={handleDismiss}
+              key={action.label}
+              style={[ss.actionButton, { borderBottomColor: colors.surface }]}
+              onPress={() => handleAction(action.route)}
               activeOpacity={0.75}
             >
-              <Text style={ds.dismissLabel}>Dismiss</Text>
+              <Ionicons
+                name={action.icon}
+                size={20}
+                color={colors.brand}
+                style={ss.actionIcon}
+              />
+              <Text style={[ss.actionLabel, { color: colors.textPrimary }]}>{action.label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMeta} />
             </TouchableOpacity>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+          ))}
+        </View>
+      ) : null}
+
+      {/* Dismiss */}
+      <TouchableOpacity
+        style={[ss.dismissButton, { borderColor: colors.border }]}
+        onPress={handleDismiss}
+        activeOpacity={0.75}
+      >
+        <Text style={[type_.body, { color: colors.textMeta, fontWeight: '600' }]}>Dismiss</Text>
+      </TouchableOpacity>
+    </BottomSheet>
   );
 }
 
@@ -367,40 +374,58 @@ interface NudgeCardProps {
 }
 
 function NudgeCard({ nudge, onPress }: NudgeCardProps) {
+  const colors = useTheme();
   const meta = getMeta(nudge.trigger_type);
   const isUnread = !nudge.is_opened && !nudge.is_dismissed;
 
   return (
     <TouchableOpacity
-      style={[nc.card, nudge.is_dismissed && nc.dismissed]}
+      style={[
+        ss.card,
+        { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm },
+        nudge.is_dismissed && ss.cardDismissed,
+      ]}
       onPress={() => onPress(nudge)}
       activeOpacity={0.8}
     >
-      {/* Unread dot */}
-      {isUnread && <View style={nc.unreadDot} />}
+      {/* Unread left-edge accent bar */}
+      {isUnread && (
+        <View style={[ss.unreadBar, { backgroundColor: colors.brand }]} />
+      )}
 
-      {/* Icon */}
-      <View style={[nc.iconWrap, { backgroundColor: meta.color + '15' }]}>
-        <Ionicons name={meta.icon} size={22} color={meta.color} />
+      {/* Icon bubble — 42×42, borderRadius 13 per mockup */}
+      <View style={[ss.iconBubble, { backgroundColor: colors[meta.bubbleBg] }]}>
+        <Ionicons name={meta.icon} size={22} color={colors[meta.iconColor]} />
       </View>
 
       {/* Content */}
-      <View style={nc.content}>
-        <View style={nc.topRow}>
-          <Text style={[nc.title, nudge.is_dismissed && nc.dimmedText]} numberOfLines={1}>
+      <View style={ss.cardContent}>
+        <View style={ss.cardTopRow}>
+          <Text
+            style={[
+              ss.cardTitle,
+              { color: nudge.is_dismissed ? colors.textMeta : colors.textPrimary },
+            ]}
+            numberOfLines={1}
+          >
             {nudge.title ?? meta.label}
           </Text>
-          <Text style={nc.time}>{timeAgo(nudge.created_at)}</Text>
+          <Text style={[type_.caption, { color: colors.textTertiary }]}>
+            {timeAgo(nudge.created_at)}
+          </Text>
         </View>
         <Text
-          style={[nc.message, nudge.is_dismissed && nc.dimmedText]}
+          style={[
+            ss.cardMessage,
+            { color: nudge.is_dismissed ? colors.textMeta : colors.textSecondary },
+          ]}
           numberOfLines={2}
         >
           {nudge.message}
         </Text>
       </View>
 
-      <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+      <Ionicons name="chevron-forward" size={16} color={colors.textMeta} />
     </TouchableOpacity>
   );
 }
@@ -408,6 +433,9 @@ function NudgeCard({ nudge, onPress }: NudgeCardProps) {
 // ── Main screen ───────────────────────────────────────────────────────────
 
 export default function NudgesScreen() {
+  const colors = useTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { data, isLoading, refetch, isRefetching } = useNudges();
   const openNudge = useOpenNudge();
   const markAllRead = useMarkAllNudgesRead();
@@ -416,7 +444,6 @@ export default function NudgesScreen() {
 
   const handleCardPress = useCallback(
     (nudge: Nudge) => {
-      // Mark opened if not already
       if (!nudge.is_opened) {
         openNudge.mutate(nudge.id);
       }
@@ -429,44 +456,81 @@ export default function NudgesScreen() {
   const unreadCount = data?.unread_count ?? 0;
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-      {/* Header */}
-      <View style={s.header}>
-        <View style={s.headerLeft}>
-          <Text style={s.heading}>Nudges</Text>
-          {unreadCount > 0 && (
-            <View style={s.badge}>
-              <Text style={s.badgeText}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Text>
-            </View>
-          )}
-        </View>
-        {unreadCount > 0 && (
+    <View style={[ss.root, { backgroundColor: colors.background }]}>
+      {/* Dark-green header */}
+      <View
+        style={[
+          ss.header,
+          { backgroundColor: colors.darkGreen, paddingTop: insets.top + 16 },
+        ]}
+      >
+        <View style={ss.headerRow}>
+          {/* Back button — frosted glass */}
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[
+              ss.backBtn,
+              { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder },
+            ]}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="arrow-back" size={18} color={colors.white} />
+          </TouchableOpacity>
+
+          {/* Centered title + badge */}
+          <View style={ss.headerCenter}>
+            <Text style={[type_.h1, { color: colors.white, fontWeight: '700' }]}>Nudges</Text>
+            {unreadCount > 0 && (
+              <View style={[ss.badge, { backgroundColor: colors.error }]}>
+                <Text style={[ss.badgeText, { color: colors.white }]}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Mark all read — frosted green, always visible */}
           <TouchableOpacity
             onPress={() => markAllRead.mutate()}
-            style={s.markAllBtn}
+            style={[
+              ss.markAllBtn,
+              { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder },
+            ]}
+            activeOpacity={0.75}
           >
-            <Ionicons name="checkmark-done-outline" size={20} color={'#0F7B3F'} />
-            <Text style={s.markAllText}>Mark all read</Text>
+            <Text style={[ss.markAllText, { color: colors.lime }]}>Mark all read</Text>
           </TouchableOpacity>
-        )}
+        </View>
+        <Text style={[type_.small, { color: colors.textMeta, marginVertical: spacing.sm }]}>
+          Your AI-powered spending insights
+        </Text>
       </View>
 
       {/* Content */}
       {isLoading ? (
-        <View style={s.center}>
-          <ActivityIndicator color={'#0F7B3F'} size="large" />
+        <View style={ss.center}>
+          <ActivityIndicator color={colors.brand} size="large" />
         </View>
       ) : nudges.length === 0 ? (
-        <View style={s.empty}>
-          <Ionicons name="notifications-off-outline" size={56} color="#D1D5DB" />
-          <Text style={s.emptyTitle}>No nudges yet</Text>
-          <Text style={s.emptyBody}>
-            MoniMata will notify you here when you hit budget milestones or
-            receive money.
+        <ScrollView
+          contentContainerStyle={ss.empty}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={colors.brand}
+              colors={[colors.brand]}
+            />
+          }
+        >
+          <Ionicons name="notifications-off-outline" size={56} color={colors.border} />
+          <Text style={[type_.h3, { color: colors.textSecondary }]}>No nudges yet</Text>
+          <Text
+            style={[type_.body, { color: colors.textMeta, textAlign: 'center', lineHeight: 20 }]}
+          >
+            MoniMata will notify you here when you hit budget milestones or receive money.
           </Text>
-        </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={nudges}
@@ -474,14 +538,14 @@ export default function NudgesScreen() {
           renderItem={({ item }) => (
             <NudgeCard nudge={item} onPress={handleCardPress} />
           )}
-          contentContainerStyle={s.list}
-          ItemSeparatorComponent={() => <View style={s.separator} />}
+          contentContainerStyle={ss.list}
+          ItemSeparatorComponent={() => <View style={ss.separator} />}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={refetch}
-              tintColor={'#0F7B3F'}
-              colors={['#0F7B3F']}
+              tintColor={colors.brand}
+              colors={[colors.brand]}
             />
           }
         />
@@ -492,39 +556,60 @@ export default function NudgesScreen() {
         nudge={activeNudge}
         onClose={() => setActiveNudge(null)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────
+// ── Styles (layout only — no raw colours) ────────────────────────────────
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
+const ss = StyleSheet.create({
+  root: { flex: 1 },
+  // header
   header: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  heading: { fontSize: 22, fontWeight: '700', color: '#111827' },
-  badge: {
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
+    flexShrink: 0,
   },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  markAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  markAllText: { color: '#0F7B3F', fontSize: 13, fontWeight: '600' },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  badge: {
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: { fontSize: 10, fontWeight: '700' },
+  markAllBtn: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexShrink: 0,
+  },
+  markAllText: { fontSize: 12, fontWeight: '600' },
+  // body states
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: {
     flex: 1,
@@ -533,138 +618,72 @@ const s = StyleSheet.create({
     paddingHorizontal: 40,
     gap: 12,
   },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#374151' },
-  emptyBody: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  list: { paddingVertical: 8, paddingHorizontal: 16 },
-  separator: { height: 8 },
-});
-
-const nc = StyleSheet.create({
+  list: { paddingTop: 14, paddingBottom: 32, paddingHorizontal: 16 },
+  separator: { height: 9 },
+  // card
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    borderRadius: radius.md,
     padding: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  dismissed: { opacity: 0.55 },
-  unreadDot: {
+  cardDismissed: { opacity: 0.5 },
+  unreadBar: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#0F7B3F',
+    left: 0,
+    top: 14,
+    bottom: 14,
+    width: 3,
+    borderRadius: 2,
   },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  iconBubble: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  content: { flex: 1 },
-  topRow: {
+  cardContent: { flex: 1 },
+  cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 3,
   },
-  title: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-    flex: 1,
-    marginRight: 8,
-  },
-  time: { fontSize: 11, color: '#9CA3AF' },
-  message: { fontSize: 13, color: '#4B5563', lineHeight: 18 },
-  dimmedText: { color: '#9CA3AF' },
-});
-
-const ds = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '85%',
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E5E7EB',
-    marginTop: 10,
-    marginBottom: 16,
-  },
-  scrollContent: { paddingBottom: 8 },
-  headerRow: { flexDirection: 'row', gap: 14, marginBottom: 16 },
-  iconBubble: {
+  cardTitle: { fontSize: 13, fontWeight: '700', flex: 1, marginRight: 8 },
+  cardMessage: { fontSize: 12, lineHeight: 17 },
+  // detail sheet content (rendered inside BottomSheet's scroll area)
+  sheetHeaderRow: { flexDirection: 'row', gap: 14, marginBottom: 16 },
+  sheetIconBubble: {
     width: 54,
     height: 54,
-    borderRadius: 27,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  headerText: { flex: 1, justifyContent: 'center' },
-  typeLabel: { fontSize: 12, color: '#9CA3AF', fontWeight: '600', marginBottom: 3 },
-  title: { fontSize: 18, fontWeight: '700', color: '#111827', lineHeight: 24 },
-  section: { marginBottom: 20 },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-  },
-  message: { fontSize: 15, color: '#374151', lineHeight: 22 },
-  whyCard: {
-    flexDirection: 'row',
-    gap: 10,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    padding: 12,
-  },
-  whyText: { flex: 1, fontSize: 14, color: '#4B5563', lineHeight: 20 },
+  sheetHeaderText: { flex: 1, justifyContent: 'center' },
+  sheetSection: { marginBottom: 20 },
+  whyCard: { flexDirection: 'row', gap: 10, padding: 12 },
+  whyText: { flex: 1, fontSize: 14, lineHeight: 20 },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   actionIcon: { width: 24, textAlign: 'center' },
-  actionLabel: { flex: 1, fontSize: 15, color: '#111827', fontWeight: '500' },
+  actionLabel: { flex: 1, fontSize: 15, fontWeight: '500' },
   dismissButton: {
     marginTop: 8,
     paddingVertical: 14,
     alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
-  dismissLabel: { fontSize: 15, color: '#6B7280', fontWeight: '600' },
 });

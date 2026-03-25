@@ -42,6 +42,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ProgressBar } from '@/components/ui';
 import { syncDatabase } from '@/database/sync';
 import { useAssignCategory, useBudget, useMoveMoney } from '@/hooks/useBudget';
 import { useTheme } from '@/lib/theme';
@@ -229,11 +230,10 @@ function getCatState(c: BudgetCategory): FillState {
   return 'ok';
 }
 
-function getCatFillPct(c: BudgetCategory): `${number}%` {
-  if (c.assigned <= 0) return '0%';
+function getCatFillProgress(c: BudgetCategory): number {
+  if (c.assigned <= 0) return 0;
   const spent = c.assigned - c.available;
-  const pct = Math.min(1, Math.max(0, spent / c.assigned));
-  return `${(pct * 100).toFixed(1)}%` as `${number}%`;
+  return Math.min(1, Math.max(0, spent / c.assigned));
 }
 
 function CategoryRow({
@@ -252,11 +252,6 @@ function CategoryRow({
         state === 'ok' ? colors.successText :
           colors.textMeta;
 
-  const fillColor =
-    state === 'over' ? colors.error :
-      state === 'warn' ? colors.warning :
-        colors.brandBright;
-
   return (
     <TouchableOpacity
       style={[cr.wrap, { backgroundColor: colors.white, borderBottomColor: colors.separator }]}
@@ -270,9 +265,13 @@ function CategoryRow({
         <Text style={[cr.name, { color: colors.textPrimary }]} numberOfLines={1}>
           {category.name}
         </Text>
-        <View style={[cr.barTrack, { backgroundColor: colors.surfaceElevated }]}>
-          <View style={[cr.barFill, { width: getCatFillPct(category), backgroundColor: fillColor }]} />
-        </View>
+        <ProgressBar
+          animate
+          progress={getCatFillProgress(category)}
+          state={state === 'empty' ? 'neutral' : state}
+          size="sm"
+          trackStyle={{ marginTop: 5 }}
+        />
       </View>
       {/* .bgt-ra — available + assigned */}
       <View style={cr.right}>
@@ -296,8 +295,6 @@ const cr = StyleSheet.create({
   },
   left: { flex: 1, minWidth: 0 },
   name: { ...ff(600), fontSize: 14 },
-  barTrack: { height: 3, borderRadius: 2, marginTop: 5, overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: 2 },
   right: { alignItems: 'flex-end', minWidth: 86 },
   avail: { ...ff(700), fontSize: 15 },
   assignedTxt: { ...ff(400), fontSize: 11, marginTop: 1 },
