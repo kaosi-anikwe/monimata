@@ -131,12 +131,16 @@ export interface ThemeColors {
   warning: string;
   /** Warning tinted background. CSS: --ambl */
   warningSubtle: string;
+  /** Dark foreground for text/icons rendered on warningSubtle backgrounds. */
+  warningText: string;
 
   // ── Status — success ─────────────────────────────────────────────────────
   /** Positive balance / received money / success actions. */
   success: string;
   /** Success tinted background. */
   successSubtle: string;
+  /** Dark foreground for text/icons rendered on successSubtle backgrounds. */
+  successText: string;
 
   // ── Accent — info / blue ─────────────────────────────────────────────────
   /** Info colour — links, info badges. CSS: --blue */
@@ -195,10 +199,12 @@ export const lightColors: ThemeColors = {
   // Warning
   warning: '#F59E0B',
   warningSubtle: '#FEF3C7',
+  warningText: '#B45309',    // Tailwind amber-700 — legible on #FEF3C7
 
   // Success
   success: '#4CAF50',
   successSubtle: '#E8F5E9',
+  successText: '#2E7D32',    // Material dark green — legible on #E8F5E9
 
   // Info
   info: '#2563EB',
@@ -253,10 +259,12 @@ export const darkColors: ThemeColors = {
   // Warning
   warning: '#FBBF24',
   warningSubtle: '#451A03',
+  warningText: '#FBBF24',    // amber-400 on dark warning-subtle surface
 
   // Success
   success: '#A8E063',
   successSubtle: '#1A3A1A',
+  successText: '#A8E063',    // lime on dark success-subtle surface
 
   // Info
   info: '#60A5FA',
