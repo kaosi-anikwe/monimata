@@ -17,44 +17,48 @@
 /**
  * Accounts tab — manage bank accounts (manual and Mono-linked).
  *
+ * Design spec: MoniMata_V5.html — scr-accounts.
  * Manual accounts:   user sets the balance; can be linked to Mono later.
  * Mono-linked:       balance synced from Mono automatically; can be unlinked.
  * Both types can be deleted (soft-delete, history preserved).
  */
-import { useState, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator,
-  TextInput,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-} from 'react-native';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
 
-import { formatNaira } from '@/utils/money';
-import { useToast } from '@/components/Toast';
-import type { BankAccount } from '@/types/account';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useToast } from '@/components/Toast';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import {
   useAccounts,
+  useAddManualAccount,
+  useDeleteAccount,
   useTriggerSync,
   useUnlinkMono,
-  useDeleteAccount,
-  useAddManualAccount,
-  useUpdateBalance,
   useUpdateAlias,
+  useUpdateBalance,
   type AddManualAccountPayload,
 } from '@/hooks/useAccounts';
+import { useTheme } from '@/lib/theme';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
+import type { BankAccount } from '@/types/account';
+import { formatNaira } from '@/utils/money';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatLastSynced(dateStr: string | null): string {
   if (!dateStr) return 'Never synced';
@@ -80,6 +84,7 @@ interface AddManualSheetProps {
 }
 
 function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
+  const colors = useTheme();
   const addMutation = useAddManualAccount();
   const { error } = useToast();
   const [alias, setAlias] = useState('');
@@ -108,7 +113,6 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
       error('Missing details', 'Please fill in all required fields. Account number must be 10 digits.');
       return;
     }
-
     const payload: AddManualAccountPayload = {
       alias: alias.trim(),
       institution: institution.trim(),
@@ -117,111 +121,95 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
       account_type: accountType,
       balance: balance ? Math.round(parseFloat(balance) * 100) : 0,
     };
-
-    addMutation.mutate(payload, {
-      onSuccess: () => {
-        handleClose();
-      },
-    });
+    addMutation.mutate(payload, { onSuccess: handleClose });
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#F9FAFB' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={ms.sheetHeader}>
-            <Text style={ms.sheetTitle}>Add Account Manually</Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={22} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
+    <BottomSheet visible={visible} onClose={handleClose} title="Add Account Manually" scrollable>
+      <View style={ss.sheetBody}>
+        <Input
+          label="Account Nickname *"
+          value={alias}
+          onChangeText={setAlias}
+          placeholder="e.g. My Salary Account"
+          autoFocus
+          accessibilityLabel="Account nickname"
+        />
+        <Input
+          label="Bank Name *"
+          value={institution}
+          onChangeText={setInstitution}
+          placeholder="e.g. First Bank"
+          accessibilityLabel="Bank name"
+        />
+        <Input
+          label="CBN Bank Code *"
+          value={bankCode}
+          onChangeText={setBankCode}
+          placeholder="e.g. 011"
+          keyboardType="number-pad"
+          maxLength={6}
+          accessibilityLabel="CBN bank code"
+        />
+        <Input
+          label="Account Number *"
+          value={accountNumber}
+          onChangeText={setAccountNumber}
+          placeholder="10-digit NUBAN"
+          keyboardType="number-pad"
+          maxLength={10}
+          accessibilityLabel="Account number"
+        />
 
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={ms.sheetBody}>
-            <Text style={ms.label}>Account Nickname *</Text>
-            <TextInput
-              style={ms.input}
-              value={alias}
-              onChangeText={setAlias}
-              placeholder="e.g. My Salary Account"
-              placeholderTextColor="#9CA3AF"
-              autoFocus
-            />
-
-            <Text style={ms.label}>Bank Name *</Text>
-            <TextInput
-              style={ms.input}
-              value={institution}
-              onChangeText={setInstitution}
-              placeholder="e.g. First Bank"
-              placeholderTextColor="#9CA3AF"
-            />
-
-            <Text style={ms.label}>CBN Bank Code *</Text>
-            <TextInput
-              style={ms.input}
-              value={bankCode}
-              onChangeText={setBankCode}
-              placeholder="e.g. 011"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="number-pad"
-              maxLength={6}
-            />
-
-            <Text style={ms.label}>Account Number *</Text>
-            <TextInput
-              style={ms.input}
-              value={accountNumber}
-              onChangeText={setAccountNumber}
-              placeholder="10-digit NUBAN"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="number-pad"
-              maxLength={10}
-            />
-
-            <Text style={ms.label}>Account Type</Text>
-            <View style={ms.segmentRow}>
-              {(['SAVINGS', 'CURRENT'] as const).map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[ms.segment, accountType === t && ms.segmentActive]}
-                  onPress={() => setAccountType(t)}
+        {/* Account type segment */}
+        <View style={ss.inputBlock}>
+          <Text style={[type_.labelSm, { color: colors.textSecondary, marginBottom: spacing.xs }]}>Account Type</Text>
+          <View style={ss.segmentRow}>
+            {(['SAVINGS', 'CURRENT'] as const).map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[
+                  ss.segment,
+                  { borderColor: colors.border, backgroundColor: colors.white },
+                  accountType === t && { borderColor: colors.brand, backgroundColor: colors.surface },
+                ]}
+                onPress={() => setAccountType(t)}
+                accessibilityRole="button"
+                accessibilityLabel={t}
+              >
+                <Text
+                  style={[
+                    type_.label,
+                    { color: accountType === t ? colors.brand : colors.textMeta },
+                  ]}
                 >
-                  <Text style={[ms.segmentText, accountType === t && ms.segmentTextActive]}>
-                    {t}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  {t}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
-            <Text style={ms.label}>Opening Balance (₦) — optional</Text>
-            <TextInput
-              style={ms.input}
-              value={balance}
-              onChangeText={setBalance}
-              placeholder="0.00"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="decimal-pad"
-            />
+        <Input
+          label="Opening Balance (₦) — optional"
+          value={balance}
+          onChangeText={setBalance}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+          accessibilityLabel="Opening balance"
+        />
 
-            <TouchableOpacity
-              style={[ms.submitBtn, addMutation.isPending && ms.submitBtnDisabled]}
-              onPress={handleSubmit}
-              disabled={addMutation.isPending}
-              activeOpacity={0.8}
-            >
-              {addMutation.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={ms.submitBtnText}>Add Account</Text>
-              )}
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
+        <Button
+          variant="green"
+          onPress={handleSubmit}
+          disabled={addMutation.isPending}
+          loading={addMutation.isPending}
+          accessibilityLabel="Add account"
+        >
+          Add Account
+        </Button>
+      </View>
+    </BottomSheet>
   );
 }
 
@@ -233,6 +221,7 @@ interface UpdateBalanceSheetProps {
 }
 
 function UpdateBalanceSheet({ account, onClose }: UpdateBalanceSheetProps) {
+  const colors = useTheme();
   const updateMutation = useUpdateBalance();
   const { error } = useToast();
   const [amount, setAmount] = useState('');
@@ -257,187 +246,49 @@ function UpdateBalanceSheet({ account, onClose }: UpdateBalanceSheetProps) {
     );
   }
 
-  if (!account) return null;
-
   return (
-    <Modal visible={!!account} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#F9FAFB' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={ms.sheetHeader}>
-            <Text style={ms.sheetTitle}>Update Balance</Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={22} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={ms.sheetBody}>
-            <Text style={ms.sheetSub}>
-              {account.institution} · {account.alias ?? account.account_name}
-            </Text>
-            <Text style={ms.sheetCurrentBalance}>
+    <BottomSheet visible={!!account} onClose={handleClose} title="Update Balance">
+      <View style={ss.sheetBody}>
+        {account && (
+          <Text style={[type_.bodyReg, { color: colors.textMeta, marginBottom: spacing.lg }]}>
+            {account.institution} · {account.alias ?? account.account_name}
+            {'  '}
+            <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>
               Current: {formatNaira(account.balance)}
             </Text>
-
-            <Text style={ms.label}>New Balance (₦) *</Text>
-            <TextInput
-              style={ms.input}
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0.00"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="decimal-pad"
-              autoFocus
-            />
-
-            <Text style={ms.label}>Note — optional</Text>
-            <TextInput
-              style={ms.input}
-              value={note}
-              onChangeText={setNote}
-              placeholder="e.g. Monthly reconciliation"
-              placeholderTextColor="#9CA3AF"
-            />
-
-            <TouchableOpacity
-              style={[ms.submitBtn, updateMutation.isPending && ms.submitBtnDisabled]}
-              onPress={handleSubmit}
-              disabled={updateMutation.isPending}
-              activeOpacity={0.8}
-            >
-              {updateMutation.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={ms.submitBtnText}>Save Balance</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
-// ─── Account card ─────────────────────────────────────────────────────────────
-
-interface AccountCardProps {
-  account: BankAccount;
-  isSyncing: boolean;
-  onSync: () => void;
-  onUnlink: () => void;
-  onDelete: () => void;
-  onUpdateBalance: () => void;
-  onRename: () => void;
-}
-
-function AccountCard({
-  account,
-  isSyncing,
-  onSync,
-  onUnlink,
-  onDelete,
-  onUpdateBalance,
-  onRename,
-}: AccountCardProps) {
-  const isLinked = account.is_mono_linked;
-  const { actionSheet } = useToast();
-
-  function handleMoreActions() {
-    actionSheet({
-      title: account.alias ?? account.account_name,
-      options: [
-        { label: 'Rename', onPress: onRename },
-        { label: 'Remove Account', onPress: onDelete, style: 'destructive' as const },
-        ...(isLinked
-          ? [{ label: 'Disconnect Mono', onPress: onUnlink, style: 'destructive' as const }]
-          : [
-            { label: 'Update Balance', onPress: onUpdateBalance },
-            {
-              label: 'Link to Mono',
-              onPress: () => router.push({ pathname: '/(auth)/link-bank', params: { accountId: account.id } }),
-            },
-          ]),
-      ],
-    });
-  }
-
-  return (
-    <View style={s.card}>
-      {account.requires_reauth && isLinked && (
-        <TouchableOpacity
-          style={s.reauthBanner}
-          onPress={() => router.push('/(auth)/link-bank')}
-          activeOpacity={0.8}
+          </Text>
+        )}
+        <Input
+          label="New Balance (₦) *"
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+          autoFocus
+          accessibilityLabel="New balance"
+        />
+        <Input
+          label="Note — optional"
+          value={note}
+          onChangeText={setNote}
+          placeholder="e.g. Monthly reconciliation"
+          accessibilityLabel="Balance note"
+        />
+        <Button
+          variant="green"
+          onPress={handleSubmit}
+          disabled={updateMutation.isPending}
+          loading={updateMutation.isPending}
+          accessibilityLabel="Save balance"
         >
-          <Ionicons name="warning-outline" size={15} color="#92400E" />
-          <Text style={s.reauthText}>Reconnection needed — tap to reauthorize</Text>
-        </TouchableOpacity>
-      )}
-
-      <View style={s.cardHeader}>
-        <View style={[s.cardIconWrap, !isLinked && s.cardIconWrapManual]}>
-          <Ionicons
-            name={isLinked ? 'business' : 'wallet-outline'}
-            size={20}
-            color={isLinked ? '#0F7B3F' : '#6B7280'}
-          />
-        </View>
-        <View style={s.cardHeaderText}>
-          <Text style={s.institutionName}>{account.institution}</Text>
-          <Text style={s.accountType}>{account.account_type}</Text>
-        </View>
-        <View style={[s.badge, isLinked ? s.badgeLinked : s.badgeManual]}>
-          <Text style={[s.badgeText, isLinked ? s.badgeTextLinked : s.badgeTextManual]}>
-            {isLinked ? 'Mono' : 'Manual'}
-          </Text>
-        </View>
+          Save Balance
+        </Button>
       </View>
-
-      <Text style={s.accountName}>{account.alias ?? account.account_name}</Text>
-      <Text style={s.balance}>{formatNaira(account.balance)}</Text>
-      {!isLinked && account.balance_as_of && (
-        <Text style={s.balanceAsOf}>{formatBalanceDate(account.balance_as_of)}</Text>
-      )}
-
-      <View style={s.divider} />
-
-      <View style={s.cardFooter}>
-        <View style={s.syncInfo}>
-          <Ionicons name="time-outline" size={13} color="#9CA3AF" />
-          <Text style={s.syncText}>
-            {isLinked ? formatLastSynced(account.last_synced_at) : 'Manual account'}
-          </Text>
-        </View>
-
-        <View style={s.footerActions}>
-          {isLinked && (
-            <TouchableOpacity
-              style={[s.syncBtn, isSyncing && s.syncBtnDisabled]}
-              onPress={onSync}
-              disabled={isSyncing}
-              activeOpacity={0.75}
-            >
-              {isSyncing ? (
-                <ActivityIndicator size={14} color="#0F7B3F" />
-              ) : (
-                <Ionicons name="refresh-outline" size={14} color="#0F7B3F" />
-              )}
-              <Text style={s.syncBtnText}>{isSyncing ? 'Syncing…' : 'Sync'}</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={s.moreBtn} onPress={handleMoreActions} activeOpacity={0.75}>
-            <Ionicons name="ellipsis-horizontal" size={16} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
+    </BottomSheet>
   );
 }
 
-// ─── Rename Sheet ────────────────────────────────────────────────────────────
+// ─── Rename Sheet ─────────────────────────────────────────────────────────────
 
 interface RenameSheetProps {
   account: BankAccount | null;
@@ -470,80 +321,346 @@ function RenameSheet({ account, onClose }: RenameSheetProps) {
     );
   }
 
-  if (!account) return null;
-
   return (
-    <Modal visible={!!account} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#F9FAFB' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={ms.sheetHeader}>
-            <Text style={ms.sheetTitle}>Rename Account</Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={22} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={ms.sheetBody}>
-            <Text style={ms.sheetSub}>{account.institution}</Text>
-
-            <Text style={ms.label}>Nickname *</Text>
-            <TextInput
-              style={ms.input}
-              value={alias}
-              onChangeText={setAlias}
-              placeholder="e.g. My Salary Account"
-              placeholderTextColor="#9CA3AF"
-              autoFocus
-            />
-
-            <TouchableOpacity
-              style={[ms.submitBtn, renameMutation.isPending && ms.submitBtnDisabled]}
-              onPress={handleSubmit}
-              disabled={renameMutation.isPending}
-              activeOpacity={0.8}
-            >
-              {renameMutation.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={ms.submitBtnText}>Save</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
+    <BottomSheet visible={!!account} onClose={handleClose} title="Rename Account">
+      <View style={ss.sheetBody}>
+        <Input
+          label="Nickname *"
+          value={alias}
+          onChangeText={setAlias}
+          placeholder="e.g. My Salary Account"
+          autoFocus
+          accessibilityLabel="Account nickname"
+        />
+        <Button
+          variant="green"
+          onPress={handleSubmit}
+          disabled={renameMutation.isPending}
+          loading={renameMutation.isPending}
+          accessibilityLabel="Save name"
+        >
+          Save
+        </Button>
+      </View>
+    </BottomSheet>
   );
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
+// ─── More Actions Sheet ───────────────────────────────────────────────────────
 
-interface EmptyStateProps {
-  onAddManual: () => void;
+interface MoreActionsSheetProps {
+  account: BankAccount | null;
+  onClose: () => void;
+  onRename: () => void;
+  onUpdateBalance: () => void;
+  onUnlink: () => void;
+  onDelete: () => void;
 }
 
-function EmptyState({ onAddManual }: EmptyStateProps) {
+function MoreActionsSheet({
+  account,
+  onClose,
+  onRename,
+  onUpdateBalance,
+  onUnlink,
+  onDelete,
+}: MoreActionsSheetProps) {
+  const colors = useTheme();
+  if (!account) return null;
+  const isLinked = account.is_mono_linked;
+
+  function action(fn: () => void) {
+    onClose();
+    // brief delay so sheet closes before any confirm modal opens
+    setTimeout(fn, 220);
+  }
+
   return (
-    <View style={s.emptyContainer}>
-      <Ionicons name="business-outline" size={52} color="#D1FAE5" />
-      <Text style={s.emptyTitle}>No accounts yet</Text>
-      <Text style={s.emptySub}>
-        Add a bank account manually, or link one via Mono to sync transactions automatically.
-      </Text>
-      <View style={s.emptyActions}>
-        <TouchableOpacity style={s.emptyBtnPrimary} onPress={onAddManual} activeOpacity={0.8}>
-          <Ionicons name="add" size={16} color="#fff" />
-          <Text style={s.emptyBtnPrimaryText}>Add Manually</Text>
-        </TouchableOpacity>
+    <BottomSheet visible={!!account} onClose={onClose} title={account.alias ?? account.account_name}>
+      <View style={ss.ashList}>
+        {/* Rename */}
         <TouchableOpacity
-          style={s.emptyBtnSecondary}
-          onPress={() => router.push('/(auth)/link-bank')}
-          activeOpacity={0.8}
+          style={ss.ashRow}
+          onPress={() => action(onRename)}
+          accessibilityRole="button"
+          accessibilityLabel="Rename account"
         >
-          <Text style={s.emptyBtnSecondaryText}>Link via Mono</Text>
+          <View style={[ss.ashIc, { backgroundColor: colors.surface }]}>
+            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+              <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </View>
+          <View style={ss.ashText}>
+            <Text style={[type_.body, { color: colors.textPrimary }]}>Rename</Text>
+            <Text style={[type_.caption, { color: colors.textMeta }]}>Change the display name</Text>
+          </View>
         </TouchableOpacity>
+
+        {/* Update Balance (manual only) */}
+        {!isLinked && (
+          <TouchableOpacity
+            style={ss.ashRow}
+            onPress={() => action(onUpdateBalance)}
+            accessibilityRole="button"
+            accessibilityLabel="Update balance"
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.warningSubtle }]}>
+              <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+                <Path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>Update Balance</Text>
+              <Text style={[type_.caption, { color: colors.textMeta }]}>Manually set the current balance</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Link to Mono (manual only) */}
+        {!isLinked && (
+          <TouchableOpacity
+            style={ss.ashRow}
+            onPress={() => {
+              onClose();
+              router.push({ pathname: '/(auth)/link-bank', params: { accountId: account.id } });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Link to Mono"
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.infoSubtle }]}>
+              <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+                <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>Link to Mono</Text>
+              <Text style={[type_.caption, { color: colors.textMeta }]}>Enable automatic sync</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Disconnect Mono (linked only) */}
+        {isLinked && (
+          <TouchableOpacity
+            style={ss.ashRow}
+            onPress={() => action(onUnlink)}
+            accessibilityRole="button"
+            accessibilityLabel="Disconnect Mono"
+          >
+            <View style={[ss.ashIc, { backgroundColor: colors.warningSubtle }]}>
+              <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+                <Path d="M18.84 12.25l1.72-1.71a4.91 4.91 0 00-6.94-6.94l-1.72 1.71M5.17 8l-2.14 2.14a4.91 4.91 0 006.94 6.94l2.14-2.13M2 2l20 20" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </View>
+            <View style={ss.ashText}>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>Disconnect Mono</Text>
+              <Text style={[type_.caption, { color: colors.textMeta }]}>Stop automatic sync</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        <View style={[ss.ashDivider, { backgroundColor: colors.border }]} />
+
+        {/* Delete */}
+        <TouchableOpacity
+          style={ss.ashRow}
+          onPress={() => action(onDelete)}
+          accessibilityRole="button"
+          accessibilityLabel="Remove account"
+        >
+          <View style={[ss.ashIc, { backgroundColor: colors.errorSubtle }]}>
+            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+              <Path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </View>
+          <View style={ss.ashText}>
+            <Text style={[type_.body, { color: colors.error }]}>Remove Account</Text>
+            <Text style={[type_.caption, { color: colors.textMeta }]}>Transaction history is preserved</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </BottomSheet>
+  );
+}
+
+// ─── Account Card ─────────────────────────────────────────────────────────────
+
+interface AccountCardProps {
+  account: BankAccount;
+  isSyncing: boolean;
+  onSync: () => void;
+  onMoreActions: () => void;
+}
+
+function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardProps) {
+  const colors = useTheme();
+  const isLinked = account.is_mono_linked;
+  const needsReauth = isLinked && account.requires_reauth;
+
+  // Sync status
+  type SyncState = 'ok' | 'warn' | 'manual';
+  const syncState: SyncState = !isLinked ? 'manual' : needsReauth ? 'warn' : 'ok';
+  const syncDotColor =
+    syncState === 'ok' ? colors.brandBright :
+      syncState === 'warn' ? colors.warning :
+        'transparent';
+
+  const syncStatusText =
+    syncState === 'manual' ? 'Manual account' :
+      syncState === 'warn' ? 'Sync paused · Re-auth needed' :
+        `Synced · ${formatLastSynced(account.last_synced_at)}`;
+
+  return (
+    <View
+      style={[
+        ss.card,
+        { backgroundColor: colors.white, borderColor: needsReauth ? colors.warning : colors.border },
+        shadow.sm,
+      ]}
+    >
+      {/* Card top section */}
+      <View style={[ss.cardTop, { borderBottomColor: colors.border }]}>
+        {/* Bank info row */}
+        <View style={ss.cardRow}>
+          <View style={ss.bankInfo}>
+            <View style={[ss.bankIc, { backgroundColor: colors.surface }]}>
+              <Ionicons
+                name={isLinked ? 'business' : 'wallet-outline'}
+                size={20}
+                color={isLinked ? colors.brand : colors.textMeta}
+              />
+            </View>
+            <View>
+              <Text style={[type_.label, { color: colors.textPrimary }]}>{account.institution}</Text>
+              <Text style={[type_.caption, { color: colors.textMeta, marginTop: 1 }]}>
+                {account.account_type}
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              ss.badge,
+              isLinked
+                ? { backgroundColor: colors.surface, borderColor: colors.borderBrand }
+                : { backgroundColor: colors.purpleSubtle, borderColor: colors.purpleBorder },
+            ]}
+          >
+            <Text
+              style={[
+                ss.badgeText,
+                { color: isLinked ? colors.brand : colors.purple },
+              ]}
+            >
+              {isLinked ? 'Mono' : 'Manual'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Balance */}
+        <Text style={[ss.balanceAmt, { color: colors.textPrimary }]}>
+          {formatNaira(account.balance)}
+        </Text>
+        {!isLinked && account.balance_as_of && (
+          <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2, marginBottom: spacing.sm }]}>
+            {formatBalanceDate(account.balance_as_of)}
+          </Text>
+        )}
+
+        {/* Sync status */}
+        <View style={ss.syncStatusRow}>
+          {syncState !== 'manual' && (
+            <View style={[ss.syncDot, { backgroundColor: syncDotColor }]} />
+          )}
+          <Text
+            style={[
+              type_.caption,
+              {
+                color: syncState === 'warn' ? colors.warning : colors.textMeta,
+                fontWeight: syncState === 'warn' ? '600' : '400',
+              },
+            ]}
+          >
+            {syncStatusText}
+          </Text>
+        </View>
+      </View>
+
+      {/* Card footer */}
+      <View
+        style={[
+          ss.cardFooter,
+          {
+            backgroundColor: needsReauth ? colors.warningSubtle : colors.surface,
+            borderTopColor: needsReauth ? colors.warningBorder : colors.border,
+          },
+        ]}
+      >
+        {needsReauth ? (
+          <>
+            <Text style={[type_.caption, { color: colors.warningText, flex: 1 }]}>
+              Session expired — needs reconnection
+            </Text>
+            <TouchableOpacity
+              style={[ss.footerBtn, { backgroundColor: colors.warning, borderColor: colors.warning }]}
+              onPress={() => router.push({ pathname: '/(auth)/link-bank', params: { accountId: account.id } })}
+              accessibilityRole="button"
+              accessibilityLabel="Reconnect Mono"
+            >
+              <Text style={[ss.footerBtnTxt, { color: colors.white }]}>Reconnect</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {/* Last sync info */}
+            <View style={ss.footerSyncInfo}>
+              <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+                <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={[type_.caption, { color: colors.textMeta }]}>
+                {isLinked ? `Last sync: ${formatLastSynced(account.last_synced_at)}` : 'Manual account'}
+              </Text>
+            </View>
+
+            <View style={ss.footerBtns}>
+              {isLinked && (
+                <TouchableOpacity
+                  style={[ss.footerBtn, { backgroundColor: colors.white, borderColor: colors.border }, isSyncing && ss.footerBtnDisabled]}
+                  onPress={onSync}
+                  disabled={isSyncing}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sync account"
+                >
+                  {isSyncing ? (
+                    <ActivityIndicator size={12} color={colors.brand} />
+                  ) : (
+                    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+                      <Path d="M23 4v6h-6" stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                      <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10" stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
+                  )}
+                  <Text style={[ss.footerBtnTxt, { color: colors.textSecondary }]}>
+                    {isSyncing ? 'Syncing…' : 'Sync'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[ss.footerBtnMore, { backgroundColor: colors.white, borderColor: colors.border }]}
+                onPress={onMoreActions}
+                accessibilityRole="button"
+                accessibilityLabel="More options"
+              >
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                  <Circle cx={12} cy={5} r={1.5} fill={colors.textMeta} />
+                  <Circle cx={12} cy={12} r={1.5} fill={colors.textMeta} />
+                  <Circle cx={12} cy={19} r={1.5} fill={colors.textMeta} />
+                </Svg>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -552,6 +669,8 @@ function EmptyState({ onAddManual }: EmptyStateProps) {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 function AccountsContent() {
+  const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const { confirm } = useToast();
   const { data: accounts = [], isLoading, refetch } = useAccounts();
   const syncMutation = useTriggerSync();
@@ -563,8 +682,10 @@ function AccountsContent() {
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [balanceAccount, setBalanceAccount] = useState<BankAccount | null>(null);
   const [renameAccount, setRenameAccount] = useState<BankAccount | null>(null);
+  const [moreAccount, setMoreAccount] = useState<BankAccount | null>(null);
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
+  const hasReauthAccount = accounts.some((a) => a.is_mono_linked && a.requires_reauth);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -574,9 +695,7 @@ function AccountsContent() {
 
   function handleSync(account: BankAccount) {
     setSyncingId(account.id);
-    syncMutation.mutate(account.id, {
-      onSettled: () => setSyncingId(null),
-    });
+    syncMutation.mutate(account.id, { onSettled: () => setSyncingId(null) });
   }
 
   function handleUnlink(account: BankAccount) {
@@ -601,74 +720,179 @@ function AccountsContent() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={s.safe}>
-        <ActivityIndicator style={{ flex: 1 }} color="#10B981" />
-      </SafeAreaView>
+      <View style={[ss.safe, { backgroundColor: colors.background }]}>
+        <ActivityIndicator style={{ flex: 1, marginTop: insets.top + 40 }} color={colors.brand} />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={s.safe}>
-      <View style={s.header}>
-        <Text style={s.headerTitle}>Accounts</Text>
-        <View style={s.headerActions}>
+    <View style={[ss.safe, { backgroundColor: colors.background }]}>
+      {/* ── Header ── */}
+      <View
+        style={[
+          ss.header,
+          {
+            backgroundColor: colors.white,
+            borderBottomColor: colors.border,
+            paddingTop: insets.top + spacing.smd,
+          },
+        ]}
+      >
+        <Text style={[ss.headerTitle, { color: colors.textPrimary }]}>Accounts</Text>
+        <View style={ss.headerActions}>
           <TouchableOpacity
-            style={s.addManualBtn}
+            style={[ss.headerBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => setShowAddSheet(true)}
-            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Add manual account"
           >
-            <Ionicons name="add" size={16} color="#0F7B3F" />
-            <Text style={s.addManualBtnText}>Manual</Text>
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Path d="M12 5v14M5 12h14" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
+            </Svg>
+            <Text style={[ss.headerBtnTxt, { color: colors.brand }]}>Manual</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={s.linkBtn}
+            style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
             onPress={() => router.push('/(auth)/link-bank')}
-            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Link bank via Mono"
           >
-            <Ionicons name="link-outline" size={16} color="#fff" />
-            <Text style={s.linkBtnText}>Link Mono</Text>
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+            <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Link Bank</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={[s.scroll, accounts.length === 0 && s.scrollEmpty]}
+        contentContainerStyle={[ss.scroll, accounts.length === 0 && { flex: 1 }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
         }
+        showsVerticalScrollIndicator={false}
       >
         {accounts.length === 0 ? (
-          <EmptyState onAddManual={() => setShowAddSheet(true)} />
+          /* ── Empty state ── */
+          <View style={ss.emptyWrap}>
+            <View style={[ss.emptyIconWrap, { backgroundColor: colors.surface }]}>
+              <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
+                <Path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke={colors.brand} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M9 22V12h6v10" stroke={colors.brand} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </View>
+            <Text style={[ss.emptyTitle, { color: colors.textPrimary }]}>No accounts yet</Text>
+            <Text style={[type_.body, { color: colors.textMeta, textAlign: 'center', marginBottom: spacing.xxl }]}>
+              Add a bank account manually, or link one via Mono to sync transactions automatically.
+            </Text>
+            <Button variant="green" onPress={() => setShowAddSheet(true)} accessibilityLabel="Add  account manually">
+              Add Manually
+            </Button>
+            <TouchableOpacity
+              style={[ss.emptyGhostBtn, { borderColor: colors.border }]}
+              onPress={() => router.push('/(auth)/link-bank')}
+              accessibilityRole="button"
+              accessibilityLabel="Link via Mono"
+            >
+              <Text style={[type_.label, { color: colors.brand }]}>Link via Mono</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <>
-            <View style={s.totalCard}>
-              <Text style={s.totalLabel}>Total Balance</Text>
-              <Text style={s.totalAmount}>{formatNaira(totalBalance)}</Text>
-              <Text style={s.totalSub}>
-                across {accounts.length} account{accounts.length !== 1 ? 's' : ''}
-              </Text>
+            {/* ── Total Balance Card ── */}
+            <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
+              <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
+              <Text style={[ss.totalAmt, { color: colors.textInverse }]}>{formatNaira(totalBalance)}</Text>
+              <View style={ss.syncNote}>
+                <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                  <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+                <Text style={[ss.syncNoteTxt, { color: colors.textInverseFaint }]}>
+                  Syncs every 12 AM
+                </Text>
+              </View>
             </View>
 
+            {/* ── Global re-auth warning banner ── */}
+            {hasReauthAccount && (
+              <TouchableOpacity
+                style={[ss.globalReauthBanner, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorder }]}
+                onPress={() => router.push('/(auth)/link-bank')}
+                accessibilityRole="button"
+                accessibilityLabel="Fix Mono reconnection"
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M12 9v4M12 17h.01" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" />
+                </Svg>
+                <View style={{ flex: 1 }}>
+                  <Text style={[type_.label, { color: colors.warningText }]}>
+                    Sync paused on one or more accounts
+                  </Text>
+                  <Text style={[type_.caption, { color: colors.warningText, marginTop: 2 }]}>
+                    Reconnect to resume automatic sync
+                  </Text>
+                </View>
+                <Text style={[type_.label, { color: colors.warning }]}>Fix →</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* ── Account cards ── */}
             {accounts.map((account) => (
               <AccountCard
                 key={account.id}
                 account={account}
                 isSyncing={syncingId === account.id}
                 onSync={() => handleSync(account)}
-                onUnlink={() => handleUnlink(account)}
-                onDelete={() => handleDelete(account)}
-                onUpdateBalance={() => setBalanceAccount(account)}
-                onRename={() => setRenameAccount(account)}
+                onMoreActions={() => setMoreAccount(account)}
               />
             ))}
+
+            {/* ── Link more prompt card ── */}
+            <View style={[ss.linkMoreCard, { backgroundColor: colors.darkGreen }]}>
+              {/* Radial glow overlay */}
+              <View style={[ss.linkMoreGlow, { backgroundColor: colors.limeGlow }]} />
+              <Text style={[ss.linkMoreTitle, { color: colors.textInverse }]}>Got another account?</Text>
+              <Text style={[ss.linkMoreSub, { color: colors.textInverseSecondary }]}>
+                Link your OPay, Zenith, or Access account for a complete picture of your money.
+              </Text>
+              <TouchableOpacity
+                style={[ss.linkMoreBtn, { backgroundColor: colors.lime }]}
+                onPress={() => router.push('/(auth)/link-bank')}
+                accessibilityRole="button"
+                accessibilityLabel="Link another bank"
+              >
+                <Text style={[ss.linkMoreBtnTxt, { color: colors.darkGreen }]}>Link Another Bank</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: spacing.xxl + 60 }} />
           </>
         )}
       </ScrollView>
 
+      {/* ── Sheets ── */}
       <AddManualSheet visible={showAddSheet} onClose={() => setShowAddSheet(false)} />
-      <UpdateBalanceSheet account={balanceAccount} onClose={() => setBalanceAccount(null)} />
-      <RenameSheet account={renameAccount} onClose={() => setRenameAccount(null)} />
-    </SafeAreaView>
+      <UpdateBalanceSheet
+        account={balanceAccount}
+        onClose={() => setBalanceAccount(null)}
+      />
+      <RenameSheet
+        account={renameAccount}
+        onClose={() => setRenameAccount(null)}
+      />
+      <MoreActionsSheet
+        account={moreAccount}
+        onClose={() => setMoreAccount(null)}
+        onRename={() => { setMoreAccount(null); setRenameAccount(moreAccount); }}
+        onUpdateBalance={() => { setMoreAccount(null); setBalanceAccount(moreAccount); }}
+        onUnlink={() => moreAccount && handleUnlink(moreAccount)}
+        onDelete={() => moreAccount && handleDelete(moreAccount)}
+      />
+    </View>
   );
 }
 
@@ -680,235 +904,259 @@ export default function AccountsScreen() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Static styles ────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
+const ss = StyleSheet.create({
+  safe: { flex: 1 },
 
+  // Header
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.mdn,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  addManualBtn: {
+  headerTitle: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 20,
+    letterSpacing: -0.3,
+  },
+  headerActions: { flexDirection: 'row', gap: spacing.sm },
+  headerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
     borderWidth: 1,
-    borderColor: '#D1FAE5',
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 12,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
     paddingVertical: 7,
-    borderRadius: 20,
   },
-  addManualBtnText: { color: '#0F7B3F', fontSize: 13, fontWeight: '600' },
-  linkBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#0F7B3F',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  linkBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  headerBtnTxt: { fontSize: 13, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
 
-  scroll: { padding: 16, gap: 12 },
-  scrollEmpty: { flex: 1 },
+  // Scroll
+  scroll: { paddingTop: spacing.smd },
 
+  // Total Balance Card  — matches .tbb-card in HTML
   totalCard: {
-    backgroundColor: '#0F7B3F',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 4,
+    borderRadius: radius.md,
+    padding: spacing.mdn,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
   },
-  totalLabel: { fontSize: 13, fontWeight: '500', color: '#D1FAE5', marginBottom: 4 },
-  totalAmount: { fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
-  totalSub: { fontSize: 12, color: '#A7F3D0', marginTop: 4 },
-
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+  totalLbl: {
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1.3,
+    marginBottom: spacing.xs,
   },
-  reauthBanner: {
+  totalAmt: {
+    fontSize: 30,
+    fontWeight: '800',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: -1,
+  },
+  syncNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginBottom: 12,
+    gap: spacing.xs,
+    paddingTop: spacing.sm,
   },
-  reauthText: { fontSize: 12, color: '#92400E', fontWeight: '500', flex: 1 },
+  syncNoteTxt: { fontSize: 11 },
 
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  cardIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#D1FAE5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardIconWrapManual: { backgroundColor: '#F3F4F6' },
-  cardHeaderText: { flex: 1 },
-  institutionName: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  accountType: { fontSize: 12, color: '#6B7280', marginTop: 1 },
-  badge: {
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  // Global re-auth banner  — matches .reauth-banner
+  globalReauthBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.smd,
     borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.smd,
   },
-  badgeLinked: { backgroundColor: '#D1FAE5', borderColor: '#6EE7B7' },
-  badgeManual: { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' },
-  badgeText: { fontSize: 11, fontWeight: '600' },
-  badgeTextLinked: { color: '#065F46' },
-  badgeTextManual: { color: '#374151' },
 
-  accountName: { fontSize: 13, color: '#6B7280', marginBottom: 6 },
-  balance: {
+  // Account card  — matches .acct-card
+  card: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.smd,
+  },
+  cardTop: {
+    padding: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  bankInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.smd },
+  bankIc: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  badge: {
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  badgeText: { fontSize: 10, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+
+  balanceAmt: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#111827',
-    letterSpacing: -0.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: -1,
+    marginBottom: spacing.sm,
   },
-  balanceAsOf: { fontSize: 11, color: '#9CA3AF', marginTop: 2, marginBottom: 10 },
+  syncStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  syncDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
 
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB', marginVertical: 12 },
-
+  // Card footer  — matches .acct-footer
   cardFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.smd,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  syncInfo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  syncText: { fontSize: 12, color: '#9CA3AF' },
-
-  footerActions: { flexDirection: 'row', gap: 8 },
-  syncBtn: {
+  footerSyncInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },
+  footerBtns: { flexDirection: 'row', gap: spacing.xs },
+  footerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
     borderWidth: 1,
-    borderColor: '#D1FAE5',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#F0FDF4',
+    borderRadius: radius.xs,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: 5,
   },
-  syncBtnDisabled: { opacity: 0.6 },
-  syncBtnText: { fontSize: 13, fontWeight: '600', color: '#0F7B3F' },
-  moreBtn: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#F9FAFB',
-    justifyContent: 'center',
+  footerBtnDisabled: { opacity: 0.6 },
+  footerBtnTxt: { fontSize: 11, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+  footerBtnMore: {
+    width: 28,
+    height: 28,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: radius.xs,
   },
 
-  emptyContainer: {
+  // Link more card  — matches .link-more-card
+  linkMoreCard: {
+    borderRadius: radius.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.smd,
+    padding: spacing.lg,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  linkMoreGlow: {
+    position: 'absolute',
+    right: -20,
+    top: -20,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  linkMoreTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    marginBottom: spacing.xs,
+  },
+  linkMoreSub: {
+    fontSize: 12,
+    marginBottom: spacing.md,
+    lineHeight: 18,
+  },
+  linkMoreBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: spacing.smd,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.lg,
+  },
+  linkMoreBtnTxt: { fontSize: 13, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+
+  // Empty state
+  emptyWrap: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xxl + spacing.lg,
+    paddingVertical: spacing.xxxl,
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
   },
   emptyTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
-    marginTop: 16,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  emptySub: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  emptyActions: { flexDirection: 'row', gap: 12 },
-  emptyBtnPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#0F7B3F',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  emptyBtnPrimaryText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  emptyBtnSecondary: {
+  emptyGhostBtn: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.smd,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: '#D1FAE5',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
   },
-  emptyBtnSecondaryText: { color: '#0F7B3F', fontSize: 14, fontWeight: '600' },
-});
 
-// ─── Sheet styles ─────────────────────────────────────────────────────────────
-
-const ms = StyleSheet.create({
-  sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#fff',
-  },
-  sheetTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  sheetBody: { padding: 20, gap: 4 },
-  sheetSub: { fontSize: 14, color: '#6B7280', marginBottom: 4 },
-  sheetCurrentBalance: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 16 },
-
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 12 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#111827',
-    backgroundColor: '#fff',
-  },
-  segmentRow: { flexDirection: 'row', gap: 8 },
+  // Sheet body
+  sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.md },
+  inputBlock: {},
+  segmentRow: { flexDirection: 'row', gap: spacing.sm },
   segment: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.smd,
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
-  segmentActive: { borderColor: '#0F7B3F', backgroundColor: '#F0FDF4' },
-  segmentText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
-  segmentTextActive: { color: '#0F7B3F' },
 
-  submitBtn: {
-    backgroundColor: '#0F7B3F',
-    borderRadius: 12,
-    paddingVertical: 14,
+  // More actions sheet  — ash-list pattern
+  ashList: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
+  ashRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 24,
+    gap: spacing.md,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  ashIc: {
+    width: 36,
+    height: 36,
+    borderRadius: spacing.smd,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  ashText: { flex: 1 },
+  ashDivider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
 });

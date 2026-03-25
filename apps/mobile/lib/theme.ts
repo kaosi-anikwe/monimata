@@ -159,6 +159,24 @@ export interface ThemeColors {
   teal: string;
   /** Teal tinted background. CSS: --teall */
   tealSubtle: string;
+
+  // ── Semantic border variants ─────────────────────────────────────────────
+  /** Brand-green at 20% opacity — Mono badge borders, brand-tinted dividers. */
+  borderBrand: string;
+  /** Purple at 20% opacity — Manual account badge border. */
+  purpleBorder: string;
+  /** Amber at 30% opacity — warning card / reauth card borders. */
+  warningBorder: string;
+
+  // ── On-dark text hierarchy (elements on darkGreen card backgrounds) ───────
+  /** ~40% white — muted labels and icon strokes on darkGreen backgrounds. */
+  textInverseFaint: string;
+  /** ~50% white — secondary body text on darkGreen backgrounds. */
+  textInverseSecondary: string;
+
+  // ── Glow overlays ────────────────────────────────────────────────────────
+  /** Lime at 20% opacity — radial glow overlay on darkGreen promo cards. */
+  limeGlow: string;
 }
 
 // ─── Light theme ─────────────────────────────────────────────────────────────
@@ -217,6 +235,18 @@ export const lightColors: ThemeColors = {
   // Teal
   teal: '#0891B2',
   tealSubtle: '#E0F7FA',
+
+  // Semantic borders
+  borderBrand: 'rgba(45,106,45,0.2)',
+  purpleBorder: 'rgba(124,58,237,0.2)',
+  warningBorder: 'rgba(245,158,11,0.3)',
+
+  // On-dark text
+  textInverseFaint: 'rgba(255,255,255,0.4)',
+  textInverseSecondary: 'rgba(255,255,255,0.5)',
+
+  // Glow overlay
+  limeGlow: 'rgba(168,224,99,0.2)',
 };
 
 // ─── Dark theme ──────────────────────────────────────────────────────────────
@@ -277,6 +307,18 @@ export const darkColors: ThemeColors = {
   // Teal
   teal: '#22D3EE',
   tealSubtle: '#0C2D3A',
+
+  // Semantic borders
+  borderBrand: 'rgba(168,224,99,0.2)',     // lime-based in dark mode
+  purpleBorder: 'rgba(167,139,250,0.2)',   // A78BFA (lighter purple) in dark
+  warningBorder: 'rgba(251,191,36,0.3)',   // amber-400 in dark
+
+  // On-dark text (always relative to darkGreen card — same in both modes)
+  textInverseFaint: 'rgba(255,255,255,0.4)',
+  textInverseSecondary: 'rgba(255,255,255,0.5)',
+
+  // Glow overlay
+  limeGlow: 'rgba(168,224,99,0.2)',
 };
 
 // ─── Gradient presets ─────────────────────────────────────────────────────────
