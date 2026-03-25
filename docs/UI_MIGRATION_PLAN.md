@@ -2,7 +2,7 @@
 
 **Document version:** 1.1  
 **Date:** March 2026  
-**Status:** In Progress — Phase 5 next  
+**Status:** In Progress — Phase 6 next  
 **Source mockup:** `apps/mobile/MoniMata_V5.html`
 
 > Gradual, screen-by-screen migration from the functional MVP UI to the
@@ -305,32 +305,93 @@ Replace default Expo Tabs tab bar with a custom `components/ui/TabBar.tsx`:
 
 ---
 
-## Phase 5 — Home / Dashboard Tab _(New)_
+## Phase 5 — Home / Dashboard Tab ✅
 
-**File:** `app/(tabs)/home.tsx` (becomes the index route)
+**Status:** **Complete**  
+**File:** `app/(tabs)/home.tsx`
 
-This is the most complex new screen. Data requirements:
+### Delivered
 
-| Section                      | Data source                                         |
-| ---------------------------- | --------------------------------------------------- |
-| Net worth / balance          | `useAccounts()` — sum all balances                  |
-| Income / Expenses this month | `useTransactions()` — aggregate                     |
-| Active nudge pill            | `useNudges()` — first unread                        |
-| Streak counter               | New: `streakDays` in user profile / local persisted |
-| Goals summary                | `useTargets()` via budget hook                      |
+- Dark green `.home-hdr` shell (`borderBottomRadius: radius.xl`, `overflow: hidden`).
+- Top row: initials avatar (→ Profile) + greeting copy + notification bell with unread dot.
+- Frosted balance card (`.bal-card`) — net worth from `useAccounts()`, "Add" (→ `/add-transaction`) and "Transfer" (→ `/accounts`) action buttons.
+- Stats grid — Income (total ZBB income = TBB + assigned) / Expenses (sum of negative category activity) from `useBudget()`.
+- Nudge pill — first non-dismissed, unread nudge from `useNudges(false)`; X button calls `useDismissNudge`; taps navigate to Nudges tab.
+- Streak card — 7-day dot row, day labels, "Keep it up!" badge.  
+  ⚠ **FAKE DATA** (Phase 14 replaces with real data from gamification service — see backend design notes below).
+- Goals section — categories with `target_amount !== null`; gradient progress bar (`LinearGradient`); navigates to `/target/[categoryId]`; "Budget →" link goes to Budget tab.
 
-### Layout (matches `scr-home`)
+### Gamification / Streak — Backend Design (Phase 14)
 
-1. **Dark header** (`LinearGradient` → `--gd`) — avatar, greeting, notification bell.
-2. **Balance card** — total net worth in ₦, "Add" + "Transfer" action buttons, lime FAB `-22pt` overlap.
-3. **Stats grid** — Income ↑ (green) / Expenses ↓ (red) 2-column cards with % change badge.
-4. **Nudge pill** — dismissible amber strip; taps to nudge detail sheet.
-5. **Streak card** — dark green card, streak number, 7-day dot row.
-6. **Goals section** — progress bars per target, "Add +" button.
+Gamification is a **net-new vertical** that should be a separate FastAPI service (or an isolated module within the monolith) to avoid coupling the core budget domain with rewards logic. Recommended architecture:
+
+#### Database tables (PostgreSQL)
+
+```sql
+-- user_streaks: one row per user, updated by Celery task at UTC midnight
+CREATE TABLE user_streaks (
+  user_id       UUID PRIMARY KEY REFERENCES users(id),
+  current       INT  NOT NULL DEFAULT 0,   -- consecutive days
+  longest       INT  NOT NULL DEFAULT 0,
+  last_active   DATE,                      -- last date user performed a qualifying action
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
+
+-- streak_events: qualifying actions that count toward the streak
+CREATE TABLE streak_events (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id),
+  event_type  TEXT NOT NULL,               -- 'login' | 'budget_assigned' | 'transaction_added'
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- user_xp: running XP ledger
+CREATE TABLE user_xp (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id),
+  delta       INT  NOT NULL,               -- positive = earn, negative = spend
+  reason      TEXT NOT NULL,               -- 'streak_day' | 'badge_awarded' | 'challenge_complete'
+  reference_id UUID,                       -- nullable FK to relevant entity
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+-- user_badges: earned badges (immutable once awarded)
+CREATE TABLE user_badges (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id),
+  badge_slug  TEXT NOT NULL,
+  awarded_at  TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (user_id, badge_slug)
+);
+```
+
+#### Streak logic (Celery beat task, runs UTC midnight +01:00)
+
+1. For each user, query `streak_events` where `occurred_at >= today 00:00 WAT`.
+2. If at least one qualifying event exists → `current += 1`, update `last_active`.
+3. If no event → reset `current = 0`.
+4. Update `longest = max(longest, current)`.
+5. Award XP: `+10 XP` per day, `+50 XP` bonus at 7-day milestone, `+200 XP` at 30-day milestone.
+
+#### API endpoints (prefixed `/gamification`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/gamification/me` | Current user's streak, XP, level, recent badges |
+| `POST` | `/gamification/event` | Record a qualifying event (called internally by budget/transaction services) |
+| `GET` | `/gamification/leaderboard` | Top 10 streaks (opt-in only) |
+| `GET` | `/gamification/badges` | All badge definitions + earned status |
+
+#### Mobile integration (Phase 14)
+
+- Add `GET /gamification/me` to React Query with `queryKeys.streak()`.
+- Replace `FAKE_STREAK` constant in `home.tsx` with `useStreak()` hook.
+- Add `useAwardBadge()` mutation called from success paths (transaction added, budget completed etc.).
+- Rewards tab (`app/(tabs)/rewards.tsx`) uses the same hook for the full badge grid and XP bar.
 
 ---
 
-## Phase 6 — Budget Tab
+
 
 **File:** `app/(tabs)/index.tsx` (rename to `budget.tsx`; update `_layout`)
 

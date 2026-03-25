@@ -15,748 +15,669 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Budget tab — YNAB-style zero-based budget for the selected month.
+ * app/(tabs)/home.tsx — Home / Dashboard tab
  *
- * Read-only view: shows assigned / available per category with target funding
- * indicators. Tap the pencil icon to enter edit mode (budget-edit screen).
+ * Sections (matches scr-home in MoniMata_V5.html):
+ *   1. Dark green header (.home-hdr) — greeting, avatar (→ profile), notification bell,
+ *      frosted balance card (.bal-card)
+ *   2. Stats grid — income ↑ / expenses ↓ this month (derived from budget data)
+ *   3. Nudge pill (.nudge-pill) — first unread nudge, dismissible
+ *   4. Streak card (.streak-c) — 7-day budgeting streak
+ *      ⚠ FAKE DATA — gamification is Phase 14; see backend design note in the docs.
+ *   5. Goals section — categories that have a savings target set
  *
- * Architecture:
- *  - selectedMonth lives in Redux (budgetSlice)
- *  - Budget data comes from the API via React Query
- *  - FAB (Add Transaction) is rendered by the tab _layout.tsx
+ * FAB note: the lime "+" FAB lives in (tabs)/_layout.tsx (bottom-right), not here.
  */
+
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   RefreshControl,
   ScrollView,
-  SectionList,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { syncDatabase } from '@/database/sync';
-import { useAssignCategory, useBudget, useMoveMoney } from '@/hooks/useBudget';
-import { nextMonth, prevMonth } from '@/store/budgetSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import type { BudgetCategory, BudgetGroup } from '@/types/budget';
-import { formatNaira } from '@/utils/money';
+import { useAccounts } from '@/hooks/useAccounts';
+import { useBudget } from '@/hooks/useBudget';
+import { useDismissNudge, useNudgeUnreadCount, useNudges } from '@/hooks/useNudges';
+import { useTheme } from '@/lib/theme';
+import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
+import { ff, formatMoney } from '@/lib/typography';
+import { useAppSelector } from '@/store/hooks';
 
-// ─── Month nav header ─────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function MonthHeader({ month, tbb }: { month: string; tbb: number }) {
-  const dispatch = useAppDispatch();
-  const router = useRouter();
-  const [y, m] = month.split('-');
-  const label = new Date(Number(y), Number(m) - 1, 1).toLocaleString('en-NG', {
-    month: 'long',
-    year: 'numeric',
-  });
-
-  const tbbColor = tbb < 0 ? '#EF4444' : tbb === 0 ? '#6B7280' : '#10B981';
-
-  return (
-    <View style={s.monthHeader}>
-      <TouchableOpacity
-        onPress={() => dispatch(prevMonth())}
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel="Previous month"
-      >
-        <Ionicons name="chevron-back" size={24} color="#374151" />
-      </TouchableOpacity>
-      <View style={s.monthCenter}>
-        <Text style={s.monthLabel} accessibilityRole="header">{label}</Text>
-        <Text style={[s.tbb, { color: tbbColor }]}>
-          {formatNaira(tbb)} to budget
-        </Text>
-      </View>
-      <View style={s.monthRight}>
-        <TouchableOpacity
-          onPress={() => dispatch(nextMonth())}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Next month"
-        >
-          <Ionicons name="chevron-forward" size={24} color="#374151" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => router.push('/budget-edit' as never)}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Edit budget categories"
-        >
-          <Ionicons name="pencil-outline" size={20} color="#374151" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+function getGreeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
-// ─── Category row (read-only) ─────────────────────────────────────────────────
-
-/**
- * Funding dot: green = fully funded, amber = underfunded, none = no target.
- */
-function FundingDot({ category }: { category: BudgetCategory }) {
-  if (category.required_this_month === null) return null;
-  const funded = category.available >= category.required_this_month;
-  return (
-    <View
-      style={[
-        s.fundingDot,
-        { backgroundColor: funded ? '#10B981' : '#F59E0B' },
-      ]}
-    />
-  );
+function getCurrentMonth(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function CategoryRow({ category, onPress }: { category: BudgetCategory; onPress: () => void }) {
-  const availColor =
-    category.available < 0
-      ? '#EF4444'
-      : category.available === 0
-        ? '#9CA3AF'
-        : '#10B981';
+// ── Streak (fake data) ────────────────────────────────────────────────────────
+// Phase 14 will replace this with real data from the gamification service.
+// See docs/UI_MIGRATION_PLAN.md Phase 14 for backend design notes.
 
-  return (
-    <TouchableOpacity style={s.catRow} onPress={onPress} activeOpacity={0.7}>
-      <FundingDot category={category} />
-      <Text style={s.catName} numberOfLines={1}>
-        {category.name}
-      </Text>
-      <View style={s.catRight}>
-        <Text style={s.catAssigned}>{formatNaira(category.assigned)}</Text>
-        <Text style={[s.catAvail, { color: availColor }]}>
-          {formatNaira(category.available)}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+const FAKE_STREAK = 5;
+const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+// Convert JS getDay() (0 = Sun) to Mon-indexed (0 = Mon … 6 = Sun)
+const TODAY_IDX = (new Date().getDay() + 6) % 7;
+
+function streakDayState(i: number): 'done' | 'today' | 'future' {
+  if (i === TODAY_IDX) return 'today';
+  const diff = TODAY_IDX - i;
+  if (diff > 0 && diff < FAKE_STREAK) return 'done';
+  return 'future';
 }
 
-// ─── Assign / Move sheet ──────────────────────────────────────────────────────
+// ── Screen ────────────────────────────────────────────────────────────────────
 
-/** Parse a user-typed naira string like "5,000.50" → kobo. */
-function parseNairaInput(raw: string): number {
-  const n = parseFloat(raw.replace(/,/g, ''));
-  return isNaN(n) ? 0 : Math.round(n * 100);
-}
+export default function HomeScreen() {
+  const colors = useTheme();
+  const insets = useSafeAreaInsets();
+  const user = useAppSelector((st) => st.auth.user);
 
-function AssignSheet({
-  category,
-  tbb,
-  month,
-  allCategories,
-  onClose,
-}: {
-  category: BudgetCategory | null;
-  tbb: number;
-  month: string;
-  allCategories: BudgetCategory[];
-  onClose: () => void;
-}) {
-  const [input, setInput] = useState('');
-  const [showMove, setShowMove] = useState(false);
-  const [moveTarget, setMoveTarget] = useState<BudgetCategory | null>(null);
-  const [moveInput, setMoveInput] = useState('');
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const currentMonth = useMemo(getCurrentMonth, []);
+  const { data: accounts, refetch: refetchAccounts } = useAccounts();
+  const { data: budget, refetch: refetchBudget } = useBudget(currentMonth);
+  const { data: nudgesData, refetch: refetchNudges } = useNudges(false); // exclude dismissed
+  const dismissNudge = useDismissNudge();
+  const unreadCount = useNudgeUnreadCount();
 
-  const assign = useAssignCategory(month);
-  const move = useMoveMoney(month);
-
-  // Sync input when a new category is opened
-  const [lastId, setLastId] = useState<string | null>(null);
-  if (category && category.id !== lastId) {
-    setLastId(category.id);
-    setInput((category.assigned / 100).toFixed(2));
-    setShowMove(false);
-    setMoveTarget(null);
-    setMoveInput('');
-  }
-
-  if (!category) return null;
-
-  const availColor =
-    category.available < 0
-      ? '#EF4444'
-      : category.available === 0
-        ? '#9CA3AF'
-        : '#10B981';
-
-  const otherCategories = allCategories.filter((c) => c.id !== category.id);
-
-  function handleSave() {
-    assign.mutate(
-      { categoryId: category!.id, assigned: parseNairaInput(input) },
-      { onSuccess: onClose },
-    );
-  }
-
-  function handleMove() {
-    if (!moveTarget) return;
-    const kobo = parseNairaInput(moveInput);
-    if (kobo <= 0) return;
-    move.mutate(
-      { fromCategoryId: category!.id, toCategoryId: moveTarget.id, amount: kobo },
-      {
-        onSuccess: () => {
-          setShowMove(false);
-          onClose();
-        },
-      },
-    );
-  }
-
-  return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      {/* Dimmed backdrop tap-to-close */}
-      <TouchableOpacity
-        style={s.sheetBackdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={s.sheetOuter}
-      >
-        <View style={s.sheet}>
-          <View style={s.sheetHandle} />
-
-          {/* Header */}
-          <View style={s.sheetHeader}>
-            <TouchableOpacity
-              onPress={showMove ? () => setShowMove(false) : onClose}
-              hitSlop={12}
-            >
-              <Ionicons
-                name={showMove ? 'arrow-back' : 'close'}
-                size={22}
-                color="#374151"
-              />
-            </TouchableOpacity>
-            <Text style={s.sheetTitle} numberOfLines={1}>
-              {showMove ? `Move from ${category.name}` : category.name}
-            </Text>
-            <View style={{ width: 22 }} />
-          </View>
-
-          {!showMove ? (
-            // ── Assign screen ───────────────────────────────────────────────
-            <>
-              {/* Stats strip */}
-              <View style={s.statsRow}>
-                <View style={s.statItem}>
-                  <Text style={s.statLabel}>Ready to assign</Text>
-                  <Text style={[s.statValue, { color: tbb < 0 ? '#EF4444' : '#10B981' }]}>
-                    {formatNaira(tbb)}
-                  </Text>
-                </View>
-                <View style={s.statDivider} />
-                <View style={s.statItem}>
-                  <Text style={s.statLabel}>Activity</Text>
-                  <Text style={s.statValue}>{formatNaira(category.activity)}</Text>
-                </View>
-                <View style={s.statDivider} />
-                <View style={s.statItem}>
-                  <Text style={s.statLabel}>Available</Text>
-                  <Text style={[s.statValue, { color: availColor }]}>
-                    {formatNaira(category.available)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Amount input */}
-              <View style={s.amountRow}>
-                <Text style={s.amountCurrency}>₦</Text>
-                <TextInput
-                  style={s.amountInput}
-                  value={input}
-                  onChangeText={setInput}
-                  keyboardType="decimal-pad"
-                  selectTextOnFocus
-                  autoFocus
-                  placeholder="0.00"
-                  placeholderTextColor="#D1D5DB"
-                />
-              </View>
-
-              {/* Quick-fill chips */}
-              <View style={s.chipsRow}>
-                {category.required_this_month !== null && (
-                  <TouchableOpacity
-                    style={s.chip}
-                    onPress={() => {
-                      // Set assigned to exactly cover the requirement
-                      const needed = Math.max(
-                        0,
-                        category.assigned + category.required_this_month! - category.available,
-                      );
-                      setInput((needed / 100).toFixed(2));
-                    }}
-                  >
-                    <Text style={s.chipText}>Fill to required</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity style={s.chip} onPress={() => setInput('0.00')}>
-                  <Text style={s.chipText}>Zero out</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Move money link */}
-              <TouchableOpacity
-                style={s.moveLink}
-                onPress={() => {
-                  setMoveTarget(null);
-                  setMoveInput('');
-                  setShowMove(true);
-                }}
-              >
-                <Ionicons name="swap-horizontal" size={16} color="#6B7280" />
-                <Text style={s.moveLinkText}>Move money to another category</Text>
-                <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
-              </TouchableOpacity>
-
-              {/* Save */}
-              <TouchableOpacity
-                style={[s.saveBtn, assign.isPending && { opacity: 0.6 }]}
-                onPress={handleSave}
-                disabled={assign.isPending}
-              >
-                {assign.isPending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={s.saveBtnText}>Save</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : (
-            // ── Move screen ─────────────────────────────────────────────────
-            <>
-              {/* Available-to-move strip */}
-              <View style={s.moveAvailRow}>
-                <Text style={s.moveAvailLabel}>Available in {category.name}</Text>
-                <Text style={[s.moveAvailValue, { color: availColor }]}>
-                  {formatNaira(category.available)}
-                </Text>
-              </View>
-
-              {/* Amount to move */}
-              <View style={s.amountRow}>
-                <Text style={s.amountCurrency}>₦</Text>
-                <TextInput
-                  style={s.amountInput}
-                  value={moveInput}
-                  onChangeText={setMoveInput}
-                  keyboardType="decimal-pad"
-                  selectTextOnFocus
-                  autoFocus
-                  placeholder="0.00"
-                  placeholderTextColor="#D1D5DB"
-                />
-              </View>
-
-              {/* Quick-fill: move all available */}
-              <View style={s.chipsRow}>
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() =>
-                    setMoveInput((Math.max(0, category.available) / 100).toFixed(2))
-                  }
-                >
-                  <Text style={s.chipText}>Move all available</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={s.moveSectionLabel}>TO</Text>
-
-              {/* Destination list */}
-              <ScrollView style={s.moveList} keyboardShouldPersistTaps="handled">
-                {otherCategories.map((cat) => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    style={[
-                      s.moveCatRow,
-                      moveTarget?.id === cat.id && s.moveCatRowSelected,
-                    ]}
-                    onPress={() => setMoveTarget(cat)}
-                  >
-                    <Text
-                      style={[
-                        s.moveCatName,
-                        moveTarget?.id === cat.id && { color: '#fff' },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {cat.name}
-                    </Text>
-                    <Text
-                      style={[
-                        s.moveCatAvail,
-                        moveTarget?.id === cat.id && { color: 'rgba(255,255,255,0.75)' },
-                      ]}
-                    >
-                      {formatNaira(cat.available)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {/* Move button */}
-              <TouchableOpacity
-                style={[
-                  s.saveBtn,
-                  (!moveTarget || parseNairaInput(moveInput) <= 0 || move.isPending) && {
-                    opacity: 0.5,
-                  },
-                ]}
-                onPress={handleMove}
-                disabled={!moveTarget || parseNairaInput(moveInput) <= 0 || move.isPending}
-              >
-                {move.isPending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={s.saveBtnText}>
-                    Move{moveInput ? ` ₦${moveInput}` : ''}
-                    {moveTarget ? ` → ${moveTarget.name}` : ''}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
-// ─── Group header ─────────────────────────────────────────────────────────────
-
-function GroupHeader({ group }: { group: BudgetGroup }) {
-  const totalAssigned = group.categories.reduce((a, c) => a + c.assigned, 0);
-  return (
-    <View style={s.groupHeader}>
-      <Text style={s.groupName}>{group.name}</Text>
-      <Text style={s.groupTotal}>{formatNaira(totalAssigned)}</Text>
-    </View>
-  );
-}
-
-// ─── Main screen ─────────────────────────────────────────────────────────────
-
-export default function BudgetScreen() {
-  const { selectedMonth } = useAppSelector((s) => s.budget);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<BudgetCategory | null>(null);
-
-  const { data, isLoading, error, refetch } = useBudget(selectedMonth);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await syncDatabase();
-    } catch (e) {
-      console.warn('Sync error', e);
-    }
-    await refetch();
+    try { await syncDatabase(); } catch (e) { console.warn('Sync error', e); }
+    await Promise.all([refetchAccounts(), refetchBudget(), refetchNudges()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetchAccounts, refetchBudget, refetchNudges]);
 
-  // All visible categories — used as the destination picker in MoveSheet
-  const allCategories = useMemo(
-    () =>
-      data?.groups
-        .filter((g) => !g.is_hidden)
-        .flatMap((g) => g.categories.filter((c) => !c.is_hidden)) ?? [],
-    [data],
+  // ── Derivations ───────────────────────────────────────────────────────────
+  const firstName = user?.first_name ?? 'there';
+  const initials = [user?.first_name?.[0], user?.last_name?.[0]]
+    .filter(Boolean).join('').toUpperCase() || '?';
+
+  const netWorth = useMemo(
+    () => (accounts ?? []).filter((a) => a.is_active).reduce((s, a) => s + a.balance, 0),
+    [accounts],
   );
 
-  const sections =
-    data?.groups
-      .filter((g) => !g.is_hidden)
-      .map((g) => ({ ...g, data: g.categories.filter((c) => !c.is_hidden) })) ?? [];
+  const allCats = useMemo(
+    () => budget?.groups.flatMap((g) => g.categories) ?? [],
+    [budget],
+  );
 
-  if (isLoading && !data) {
-    return (
-      <SafeAreaView style={s.safe}>
-        <ActivityIndicator style={{ flex: 1 }} color="#10B981" />
-      </SafeAreaView>
-    );
-  }
+  // Expenses = sum of absolute negative activity (debit spend per category)
+  const totalExpenses = useMemo(
+    () => allCats.reduce((s, c) => s + Math.abs(Math.min(0, c.activity)), 0),
+    [allCats],
+  );
 
-  if (error) {
-    return (
-      <SafeAreaView style={s.safe}>
-        <ScrollView
-          contentContainerStyle={s.errorContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
-          }
-        >
-          <Ionicons name="cloud-offline-outline" size={40} color="#D1D5DB" />
-          <Text style={s.errorText}>Could not load budget.</Text>
-          <Text style={s.errorSub}>Pull down to retry.</Text>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+  // Income = TBB + totalAssigned (fundamental ZBB identity)
+  const totalIncome = useMemo(() => {
+    const assigned = allCats.reduce((s, c) => s + c.assigned, 0);
+    return (budget?.tbb ?? 0) + assigned;
+  }, [allCats, budget]);
+
+  // Categories with a savings target → goals section
+  const goals = useMemo(
+    () => allCats.filter((c) => c.target_amount !== null && !c.is_hidden),
+    [allCats],
+  );
+
+  // First unread (not yet opened) non-dismissed nudge for the pill
+  const firstNudge = nudgesData?.nudges.find((n) => !n.is_opened);
+
+  const bottomPad = layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.lg;
 
   return (
-    <SafeAreaView style={s.safe}>
-      <MonthHeader month={selectedMonth} tbb={data?.tbb ?? 0} />
+    <View style={[s.root, { backgroundColor: colors.background }]}>
 
-      <View style={s.colHeaders}>
-        <Text style={s.colHdrCategory}>CATEGORY</Text>
-        <View style={s.colHdrRight}>
-          <Text style={s.colHdrText}>ASSIGNED</Text>
-          <Text style={s.colHdrText}>AVAILABLE</Text>
+      {/* ── Dark green header (.home-hdr) ─────────────────────────────────── */}
+      <View
+        style={[
+          s.header,
+          { backgroundColor: colors.darkGreen, paddingTop: insets.top + 20 },
+        ]}
+      >
+        {/* Top row: avatar + greeting | notification bell */}
+        <View style={s.topRow}>
+          <TouchableOpacity
+            style={s.userRow}
+            onPress={() => router.push('/(tabs)/profile')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Go to profile"
+          >
+            <View style={[s.avatar, { backgroundColor: colors.brand }]}>
+              <Text style={[s.avatarText, { color: colors.lime }]}>{initials}</Text>
+            </View>
+            <View>
+              <Text style={s.greetTxt}>{getGreeting()} 👋🏽</Text>
+              <Text style={[s.nameTxt, { color: colors.white }]}>{firstName}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.notifBtn}
+            onPress={() => router.push('/(tabs)/nudges')}
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+            }
+          >
+            <Ionicons name="notifications-outline" size={18} color={colors.white} />
+            {unreadCount > 0 && (
+              <View style={[s.notifDot, { backgroundColor: colors.error, borderColor: colors.darkGreen }]} />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Balance card (.bal-card) — frosted glass, top-rounded only */}
+        <View style={s.balCard}>
+          <View style={s.balTop}>
+            <Text style={s.balLbl}>NET WORTH</Text>
+            <TouchableOpacity
+              style={s.balChip}
+              onPress={() => router.push('/(tabs)/accounts')}
+              activeOpacity={0.75}
+              accessibilityRole="link"
+              accessibilityLabel="View all accounts"
+            >
+              <Text style={[s.balChipTxt, { color: colors.lime }]}>All accounts</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={[s.balAmt, { color: colors.white }]}>
+            {formatMoney(netWorth)}
+          </Text>
+          <View style={s.balActions}>
+            <TouchableOpacity
+              style={s.balBtnGhost}
+              onPress={() => router.push('/(tabs)/budget' as never)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Add transaction"
+            >
+              <Ionicons name="card-outline" size={14} color={colors.white} />
+              <Text style={[s.balBtnTxt, { color: colors.white }]}>Budget</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.balBtnGhost, s.balBtnPrimary, { backgroundColor: colors.lime, borderColor: colors.lime }]}
+              onPress={() => router.push('/add-transaction')}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Transfer between accounts"
+            >
+              <Ionicons name="add" size={14} color={colors.darkGreen} />
+              <Text style={[s.balBtnTxt, { color: colors.darkGreen }]}>Add Tx</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <CategoryRow category={item} onPress={() => setSelectedCategory(item)} />
-        )}
-        renderSectionHeader={({ section }) => <GroupHeader group={section} />}
+      {/* ── Scrollable body ───────────────────────────────────────────────── */}
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={{ paddingBottom: bottomPad }}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
         }
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
-      />
+      >
 
-      <AssignSheet
-        category={selectedCategory}
-        tbb={data?.tbb ?? 0}
-        month={selectedMonth}
-        allCategories={allCategories}
-        onClose={() => setSelectedCategory(null)}
-      />
-    </SafeAreaView>
+        {/* Stats: This Month */}
+        <View style={s.sec}>
+          <View style={s.secRow}>
+            <Text style={[s.secTitle, { color: colors.textPrimary }]}>This Month</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/transactions')} accessibilityRole="link">
+              <Text style={[s.secLink, { color: colors.brand }]}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={s.statGrid}>
+            {/* Income */}
+            <View style={[s.statCard, { backgroundColor: colors.white, borderColor: colors.border }, shadow.sm]}>
+              <View style={s.statTop}>
+                <View style={[s.statIcon, { backgroundColor: colors.successSubtle }]}>
+                  <Ionicons name="arrow-down-outline" size={17} color={colors.successText} />
+                </View>
+                <View style={[s.statBadge, { backgroundColor: colors.successSubtle }]}>
+                  <Text style={[s.statBadgeTxt, { color: colors.successText }]}>Income</Text>
+                </View>
+              </View>
+              <Text style={[s.statLbl, { color: colors.textMeta }]}>Total in</Text>
+              <Text style={[s.statVal, { color: colors.textPrimary }]}>{formatMoney(totalIncome)}</Text>
+            </View>
+
+            {/* Expenses */}
+            <View style={[s.statCard, { backgroundColor: colors.white, borderColor: colors.border }, shadow.sm]}>
+              <View style={s.statTop}>
+                <View style={[s.statIcon, { backgroundColor: colors.errorSubtle }]}>
+                  <Ionicons name="arrow-up-outline" size={17} color={colors.error} />
+                </View>
+                <View style={[s.statBadge, { backgroundColor: colors.errorSubtle }]}>
+                  <Text style={[s.statBadgeTxt, { color: colors.error }]}>Spent</Text>
+                </View>
+              </View>
+              <Text style={[s.statLbl, { color: colors.textMeta }]}>Total out</Text>
+              <Text style={[s.statVal, { color: colors.textPrimary }]}>{formatMoney(totalExpenses)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Nudge pill — first unread nudge */}
+        {firstNudge ? (
+          <View style={s.sec}>
+            <TouchableOpacity
+              style={[s.nudgePill, { backgroundColor: colors.warningSubtle, borderColor: 'rgba(245,158,11,0.22)' }]}
+              onPress={() => router.push('/(tabs)/nudges')}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="View nudge"
+            >
+              <Ionicons name="bulb-outline" size={15} color={colors.warning} style={{ marginTop: 1, flexShrink: 0 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={[s.nudgeTxt, { color: colors.warningText }]} numberOfLines={2}>
+                  {firstNudge.title
+                    ? <Text style={ff(700)}>{firstNudge.title}: </Text>
+                    : null}
+                  {firstNudge.message}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => dismissNudge.mutate(firstNudge.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss nudge"
+              >
+                <Ionicons name="close-outline" size={18} color={colors.warning} />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {/* Streak card (.streak-c) — 7-day budgeting streak */}
+        <View style={s.sec}>
+          <View style={[s.streakCard, { backgroundColor: colors.darkGreen }]}>
+            <View style={s.streakTop}>
+              <View>
+                <Text style={[s.streakNum, { color: colors.white }]}>
+                  {FAKE_STREAK}
+                  <Text style={[s.streakNumSm, { color: colors.lime }]}> day streak</Text>
+                </Text>
+                <Text style={[s.streakDesc, { color: glass.textFaint }]}>
+                  Budgeting streak 🔥
+                </Text>
+              </View>
+              <View style={s.streakBadge}>
+                <Text style={[s.streakBadgeTxt, { color: colors.lime }]}>Keep it up!</Text>
+              </View>
+            </View>
+
+            <View style={s.streakDays}>
+              {DAY_LABELS.map((label, i) => {
+                const state = streakDayState(i);
+                return (
+                  <View
+                    key={label}
+                    style={[
+                      s.sd,
+                      state === 'done' && s.sdDone,
+                      state === 'today' && { backgroundColor: colors.lime, borderColor: colors.lime },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.sdLbl,
+                        state === 'done' && { color: colors.lime },
+                        state === 'today' && { color: colors.darkGreen },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                    <Text
+                      style={[
+                        s.sdSym,
+                        state === 'done' && { color: colors.lime, fontSize: 13 },
+                        state === 'today' && { color: colors.darkGreen, fontSize: 13 },
+                      ]}
+                    >
+                      {state === 'today' ? '●' : state === 'done' ? '✓' : '·'}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        {/* Goals section */}
+        <View style={[s.sec, { paddingBottom: spacing.md }]}>
+          <View style={s.secRow}>
+            <Text style={[s.secTitle, { color: colors.textPrimary }]}>Goals</Text>
+            <TouchableOpacity onPress={() => router.push('/')} accessibilityRole="link">
+              <Text style={[s.secLink, { color: colors.brand }]}>Budget →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {goals.length === 0 ? (
+            <Text style={[s.emptyGoals, { color: colors.textMeta }]}>
+              Set targets on budget categories to track goals here.
+            </Text>
+          ) : (
+            goals.slice(0, 4).map((goal) => {
+              const pct = goal.target_amount
+                ? Math.min(1, Math.max(0, goal.available / goal.target_amount))
+                : 0;
+              const fillPct = `${(pct * 100).toFixed(1)}%` as `${number}%`;
+
+              return (
+                <TouchableOpacity
+                  key={goal.id}
+                  style={[s.goalRow, { backgroundColor: colors.white, borderColor: colors.border }, shadow.sm]}
+                  onPress={() => router.push(`/target/${goal.id}`)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${goal.name} goal`}
+                >
+                  <View style={[s.goalJar, { backgroundColor: colors.surface }]}>
+                    <Text style={s.goalJarTxt}>🎯</Text>
+                  </View>
+                  <View style={s.goalInfo}>
+                    <Text style={[s.goalName, { color: colors.textPrimary }]}>{goal.name}</Text>
+                    <View style={[s.goalBar, { backgroundColor: colors.surfaceElevated }]}>
+                      <LinearGradient
+                        colors={[colors.brand, colors.lime]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[s.goalFill, { width: fillPct }]}
+                      />
+                    </View>
+                    <Text style={[s.goalAmt, { color: colors.textMeta }]}>
+                      <Text style={{ color: colors.brand, ...ff(700) }}>{formatMoney(goal.available)}</Text>
+                      {' '}of {formatMoney(goal.target_amount ?? 0)}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[s.goalAdd, { backgroundColor: colors.brand }]}
+                    onPress={() => router.push('/')}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add to ${goal.name}`}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Ionicons name="add" size={14} color={colors.white} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+
+      </ScrollView>
+    </View>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
+  root: { flex: 1 },
 
-  monthHeader: {
+  // Header
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: 0,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: spacing.lg,
   },
-  monthCenter: { alignItems: 'center' },
-  monthRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  monthLabel: { fontSize: 17, fontWeight: '700', color: '#111827' },
-  tbb: { fontSize: 13, fontWeight: '500', marginTop: 2 },
-
-  colHeaders: {
+  userRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-  },
-  colHdrCategory: { fontSize: 11, fontWeight: '600', color: '#9CA3AF' },
-  colHdrRight: { flexDirection: 'row', gap: 32 },
-  colHdrText: { fontSize: 11, fontWeight: '600', color: '#9CA3AF' },
-
-  groupHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#E5E7EB',
-  },
-  groupName: { fontSize: 13, fontWeight: '700', color: '#374151', textTransform: 'uppercase' },
-  groupTotal: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-
-  catRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
+    gap: 11,
   },
-  fundingDot: {
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: glass.borderLimeBright,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { ...ff(800), fontSize: 16 },
+  greetTxt: { ...ff(400), fontSize: 12, color: glass.textDim },
+  nameTxt: { ...ff(700), fontSize: 15 },
+  notifBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: glass.control,
+    borderWidth: 1,
+    borderColor: glass.borderWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notifDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 8,
+    borderWidth: 1.5,
   },
-  catName: { flex: 1, fontSize: 15, color: '#111827' },
-  catRight: { flexDirection: 'row', gap: 20, alignItems: 'center' },
-  catAssigned: { fontSize: 14, color: '#6B7280', minWidth: 80, textAlign: 'right' },
-  catAvail: { fontSize: 14, fontWeight: '600', minWidth: 80, textAlign: 'right' },
 
-  errorContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 6 },
-  errorText: { fontSize: 16, fontWeight: '600', color: '#374151', textAlign: 'center' },
-  errorSub: { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
+  // Balance card
+  balCard: {
+    backgroundColor: glass.card,
+    borderWidth: 1,
+    borderColor: glass.borderLime,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    padding: spacing.xl,
+    paddingBottom: 18,
+  },
+  balTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  balLbl: {
+    ...ff(600),
+    fontSize: 11,
+    color: glass.labelDim,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  balChip: {
+    backgroundColor: glass.chip,
+    borderRadius: radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  balChipTxt: { ...ff(700), fontSize: 11 },
+  balAmt: {
+    ...ff(800),
+    fontSize: 36,
+    letterSpacing: -1.5,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  balActions: { flexDirection: 'row', gap: 10 },
+  balBtnGhost: {
+    flex: 1,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: glass.strong,
+    borderWidth: 1,
+    borderColor: glass.borderWhite,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  balBtnPrimary: {},
+  balBtnTxt: { ...ff(600), fontSize: 13 },
 
-  // ── Assign / Move sheet ─────────────────────────────────────────────────────
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  sheetOuter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
-    maxHeight: '90%',
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D1D5DB',
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  sheetHeader: {
+  // Scroll
+  scroll: { flex: 1 },
+
+  // Sections
+  sec: { paddingHorizontal: spacing.xl, paddingTop: 14 },
+  secRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: 11,
   },
-  sheetTitle: {
+  secTitle: { ...ff(800), fontSize: 16, letterSpacing: -0.3 },
+  secLink: { ...ff(600), fontSize: 13 },
+
+  // Stats grid
+  statGrid: { flexDirection: 'row', gap: 10 },
+  statCard: {
     flex: 1,
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginHorizontal: 8,
+    borderRadius: radius.md,
+    padding: 14,
+    borderWidth: 1,
   },
-
-  statsRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#F9FAFB',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
-  },
-  statItem: { flex: 1, alignItems: 'center', gap: 2 },
-  statDivider: { width: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB' },
-  statLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '600', textTransform: 'uppercase' },
-  statValue: { fontSize: 14, fontWeight: '700', color: '#111827' },
-
-  amountRow: {
+  statTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
+    justifyContent: 'space-between',
+    marginBottom: 9,
   },
-  amountCurrency: { fontSize: 28, fontWeight: '700', color: '#6B7280', marginRight: 4 },
-  amountInput: {
-    flex: 1,
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#111827',
-    padding: 0,
+  statIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  statBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  statBadgeTxt: { ...ff(700), fontSize: 10 },
+  statLbl: { ...ff(500), fontSize: 11 },
+  statVal: { ...ff(800), fontSize: 20, letterSpacing: -0.5, marginTop: 3 },
 
-  chipsRow: {
+  // Nudge pill
+  nudgePill: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    paddingHorizontal: 14,
   },
-  chip: {
+  nudgeTxt: { ...ff(400), fontSize: 12, lineHeight: 18 },
+
+  // Streak card
+  streakCard: {
+    borderRadius: radius.lg,
+    padding: 18,
+    paddingHorizontal: spacing.xl,
+    overflow: 'hidden',
+  },
+  streakTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  streakNum: { ...ff(800), fontSize: 30, letterSpacing: -1, lineHeight: 34 },
+  streakNumSm: { ...ff(500), fontSize: 13 },
+  streakDesc: { ...ff(400), fontSize: 13, marginTop: 3 },
+  streakBadge: {
+    backgroundColor: glass.badge,
+    borderWidth: 1,
+    borderColor: glass.borderLimeStrong,
+    borderRadius: radius.full,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+  },
+  streakBadgeTxt: { ...ff(700), fontSize: 12 },
+  streakDays: { flexDirection: 'row', gap: 5 },
+  sd: {
+    flex: 1,
+    height: 37,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    backgroundColor: glass.streakDay,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: glass.streakDayBorder,
   },
-  chipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  sdDone: {
+    backgroundColor: glass.streakDone,
+    borderColor: glass.streakDoneBorder,
+  },
+  sdLbl: {
+    ...ff(700),
+    fontSize: 9,
+    color: glass.labelDim,
+    textTransform: 'uppercase',
+  },
+  sdSym: { fontSize: 12, color: glass.streakDay },
 
-  moveLink: {
+  // Goals
+  emptyGoals: {
+    ...ff(400),
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'center',
+    paddingVertical: spacing.xl,
+  },
+  goalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
+    gap: 12,
+    borderRadius: radius.md,
+    padding: 13,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    marginBottom: 9,
   },
-  moveLinkText: { flex: 1, fontSize: 14, color: '#6B7280' },
-
-  saveBtn: {
-    marginHorizontal: 20,
-    marginTop: 4,
-    marginBottom: 20,
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    paddingVertical: 14,
+  goalJar: {
+    width: 46,
+    height: 46,
+    borderRadius: 13,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-  moveAvailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  goalJarTxt: { fontSize: 24 },
+  goalInfo: { flex: 1, minWidth: 0 },
+  goalName: { ...ff(700), fontSize: 14 },
+  goalBar: { height: 5, borderRadius: 3, marginVertical: 6, overflow: 'hidden' },
+  goalFill: { height: '100%', borderRadius: 3 },
+  goalAmt: { ...ff(400), fontSize: 12 },
+  goalAdd: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 4,
+    justifyContent: 'center',
   },
-  moveAvailLabel: { fontSize: 13, color: '#6B7280' },
-  moveAvailValue: { fontSize: 14, fontWeight: '700' },
-
-  moveSectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    letterSpacing: 1,
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  moveList: { maxHeight: 200, marginHorizontal: 12, marginBottom: 8 },
-  moveCatRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginVertical: 2,
-  },
-  moveCatRowSelected: { backgroundColor: '#10B981' },
-  moveCatName: { flex: 1, fontSize: 14, color: '#111827', fontWeight: '500' },
-  moveCatAvail: { fontSize: 13, color: '#6B7280' },
 });
-

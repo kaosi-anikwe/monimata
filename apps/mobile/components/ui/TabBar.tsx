@@ -67,8 +67,8 @@ interface TabConfig {
 // Matches the mockup home screen bnav (scr-home) from left to right.
 
 const TABS: TabConfig[] = [
-  { routeName: 'home', label: 'Home', icon: 'home-outline', iconActive: 'home-outline' },
-  { routeName: 'index', label: 'Budget', icon: 'card-outline', iconActive: 'card-outline' },
+  { routeName: 'index', label: 'Home', icon: 'home-outline', iconActive: 'home-outline' },
+  { routeName: 'budget', label: 'Budget', icon: 'card-outline', iconActive: 'card-outline' },
   { routeName: 'transactions', label: 'Transactions', icon: 'document-text-outline', iconActive: 'document-text-outline' },
   { routeName: 'bills', label: 'Pay Bills', icon: 'flash-outline', iconActive: 'flash-outline' },
   { routeName: 'nudges', label: 'Nudges', icon: 'notifications-outline', iconActive: 'notifications-outline' },
@@ -190,14 +190,14 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
       <View style={s.row}>
         <TabItem
           config={TABS[0]}
-          isActive={activeRouteName === 'home'}
-          onPress={() => handleTabPress('home')}
+          isActive={activeRouteName === 'index'}
+          onPress={() => handleTabPress('index')}
           colors={colors}
         />
         <TabItem
           config={TABS[1]}
-          isActive={activeRouteName === 'index'}
-          onPress={() => handleTabPress('index')}
+          isActive={activeRouteName === 'budget'}
+          onPress={() => handleTabPress('budget')}
           colors={colors}
         />
         <TabItem

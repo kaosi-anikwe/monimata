@@ -34,7 +34,7 @@ import type { StyleProp, TextInputProps, TextStyle, ViewStyle } from 'react-nati
 import { Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import type { ThemeColors } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
+import { glass, radius, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
 
 // ─── AuthInput ────────────────────────────────────────────────────────────────
@@ -158,9 +158,9 @@ export const s = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: glass.strong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: glass.borderWhiteStrong,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
