@@ -527,25 +527,120 @@ The 6-step payment state machine is already built. Each step gets a visual skin:
 
 ---
 
-## Phase 13 — Knowledge Hub Tab _(New)_
+## Phase 13 — Knowledge Hub Tab ✅
 
+**Status:** **Complete**  
 **File:** `app/(tabs)/hub.tsx`
 
-### Layout (`scr-hub`)
+### Layout (`scr-hub`) — Delivered
 
-- Dark header with "Knowledge Hub" title.
-- Two tabs: **Articles** / **Video Courses** (pill tab switcher).
-- Category filter chips (horizontal scroll).
-- Featured article hero card (dark green, "Featured" tag → XP badge).
-- Article list: thumbnail emoji + tag + title + read-time + XP.
-- Course row (horizontal scroll): thumbnail gradient + lesson count + XP + progress bar.
+- Dark green header (`paddingTop insets+16`, `borderBottomRadius 28`).
+- Title row: `x-btn.dk` back button (frosted), centred "Knowledge Hub" title, spacer.
+- "Learn & Earn 📚" hero heading + subtitle.
+- 3-tab pill switcher (Articles / Video Courses / Quizzes) — lime pill on dark overlay bg, matching `.hub-tabs` / `.hub-tab.on`.
+- **Articles tab**: category filter chips (All / Budgeting / Saving / Investing / Debt), featured hero card (`.feat-card` — brand green bg, glow decoration, lime "Featured" tag, title, XP badge, meta), article list rows (`.art-c` — 66×66 emoji thumb in subtle colour, tag, title, read-time, XP badge).
+- **Video Courses tab**: "In Progress" section with horizontal scroll of gradient-thumb mini cards (`.course-card` — `LinearGradient` thumb, play button, lessons/XP/progress bar), "All Courses" section with full-width list rows (`.chal-c` style — gradient icon tile, title, description, XP, duration, progress bar).
+- **Quizzes tab**: Daily quiz hero card (emoji, title, sub, green "Start Today's Quiz" CTA), past quizzes list.
+- All data is static seed (`ARTICLES`, `COURSES`, `QUIZZES` arrays) — Phase 14 wires live API.
+- `hub` registered as hidden tab (`href: null`) in `app/(tabs)/_layout.tsx`.
+- Profile → "Knowledge Hub" row now navigates via `router.push('/(tabs)/hub')`.
+- Zero raw hex/rgba values — all theme tokens.
 
-### Data
+### Backend Design Notes (implement in Phase 14+)
 
-- Backend API endpoints for content (to be built) or static seed JSON for now.
-- XP earn events integrated with gamification system (Phase 14).
+The Knowledge Hub is a **Content Service** that can live as a separate FastAPI microservice (or a module inside the monolith) with its own read-optimised models. It is intentionally decoupled from the budget domain.
 
----
+#### Database tables
+
+```sql
+-- Content is stored server-side; mobile fetches via REST, not WatermelonDB sync.
+
+-- hub_content: articles, courses, quizzes (polymorphic)
+CREATE TABLE hub_content (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content_type VARCHAR(16) NOT NULL CHECK (content_type IN ('article', 'course', 'quiz')),
+  slug         VARCHAR(128) NOT NULL UNIQUE,
+  title        TEXT NOT NULL,
+  description  TEXT,
+  category     VARCHAR(64),           -- 'Budgeting' | 'Saving' | 'Investing' | 'Debt'
+  emoji        VARCHAR(8),
+  xp_reward    INTEGER NOT NULL DEFAULT 0,
+  read_min     INTEGER,               -- articles only
+  is_featured  BOOLEAN NOT NULL DEFAULT FALSE,
+  is_published BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- hub_course_lessons: ordered lessons within a course
+CREATE TABLE hub_course_lessons (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id   UUID NOT NULL REFERENCES hub_content(id) ON DELETE CASCADE,
+  position    SMALLINT NOT NULL,
+  title       TEXT NOT NULL,
+  video_url   TEXT,
+  duration_s  INTEGER,
+  xp_reward   INTEGER NOT NULL DEFAULT 0
+);
+
+-- hub_user_progress: per-user content engagement
+CREATE TABLE hub_user_progress (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content_id  UUID NOT NULL REFERENCES hub_content(id) ON DELETE CASCADE,
+  status      VARCHAR(16) NOT NULL DEFAULT 'started'
+                CHECK (status IN ('started', 'completed')),
+  score       SMALLINT,              -- quizzes: raw score (e.g. 8 out of 10)
+  score_max   SMALLINT,              -- quizzes: maximum possible score
+  xp_earned   INTEGER NOT NULL DEFAULT 0,
+  started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id, content_id)
+);
+
+-- hub_quiz_questions: questions within a quiz
+CREATE TABLE hub_quiz_questions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id     UUID NOT NULL REFERENCES hub_content(id) ON DELETE CASCADE,
+  position    SMALLINT NOT NULL,
+  question    TEXT NOT NULL,
+  options     JSONB NOT NULL,         -- [{"key":"a","text":"...","correct":true}, ...]
+  explanation TEXT
+);
+
+-- hub_daily_quiz: which quiz_id is active today (rotates via a cron job)
+CREATE TABLE hub_daily_quiz (
+  date        DATE PRIMARY KEY,
+  quiz_id     UUID NOT NULL REFERENCES hub_content(id)
+);
+```
+
+#### API endpoints (prefix `/hub`)
+
+| Method | Path                                      | Description                                                |
+| ------ | ----------------------------------------- | ---------------------------------------------------------- |
+| `GET`  | `/hub/articles`                           | Paginated article list; query params: `category`, `cursor` |
+| `GET`  | `/hub/articles/:slug`                     | Full article body (Markdown or block JSON)                 |
+| `GET`  | `/hub/courses`                            | Course list with user progress embedded                    |
+| `GET`  | `/hub/courses/:slug`                      | Course detail with lessons and user progress               |
+| `POST` | `/hub/courses/:slug/lessons/:id/complete` | Mark lesson done, award XP via gamification service        |
+| `GET`  | `/hub/quizzes`                            | Quiz list with user scores                                 |
+| `GET`  | `/hub/quizzes/daily`                      | Today's daily quiz                                         |
+| `POST` | `/hub/quizzes/:slug/submit`               | Submit answers, get score, award XP                        |
+
+#### Mobile integration (Phase 14)
+
+- Add React Query hooks: `useHubArticles(category?)`, `useHubCourses()`, `useHubDailyQuiz()`.
+- Register `queryKeys.hub.*` in `lib/queryKeys.ts`.
+- Replace `ARTICLES` / `COURSES` / `QUIZZES` seed arrays in `hub.tsx` with hook data.
+- Use `useInfiniteQuery` for article pagination (infinite scroll).
+- `POST /hub/quizzes/:slug/submit` response triggers `invalidateQueries(queryKeys.gamification())` so the Profile XP stat and streak card update immediately.
+- Cache strategy: `staleTime: 10 minutes` for content (rarely changes); `staleTime: 0` for daily quiz (resets at midnight).
+
+#### Content management
+
+- Seed initial content via Alembic data migration (10 articles, 4 courses, 5 quizzes) so the hub is non-empty on first launch.
+- Long-term: lightweight internal CMS (Strapi or custom admin panel) so the content team can publish without a deploy.
 
 ## Phase 14 — Rewards & Gamification _(New)_
 
@@ -624,8 +719,8 @@ The 6-step payment state machine is already built. Each step gets a visual skin:
 | 9     | Accounts Tab             | ✅ Complete    |
 | 10    | Bills Tab                | ✅ Complete    |
 | 11    | Nudges Tab               | ✅ Complete    |
-| 12    | Profile Tab              | ⬜ Not Started |
-| 13    | Knowledge Hub Tab        | ⬜ Not Started |
+| 12    | Profile Tab              | ✅ Complete    |
+| 13    | Knowledge Hub Tab        | ✅ Complete    |
 | 14    | Rewards & Gamification   | ⬜ Not Started |
 | 15    | Onboarding Questionnaire | ⬜ Not Started |
 | 16    | Polish Pass              | ⬜ Not Started |

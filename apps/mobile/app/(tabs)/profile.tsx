@@ -307,7 +307,7 @@ export default function ProfileScreen() {
             icon="book-outline"
             label="Knowledge Hub"
             sub="Articles, courses, quizzes"
-            onPress={() => comingSoon('Knowledge Hub')}
+            onPress={() => router.push('/(tabs)/hub')}
             colors={colors}
           />
           <ProfileRow
