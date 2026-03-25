@@ -265,7 +265,7 @@ export default function ProfileScreen() {
             icon="star-outline"
             label="Rewards & XP"
             sub={`Level ${FAKE_LEVEL} · ${FAKE_XP.toLocaleString()} XP · ${FAKE_XP_TO_NEXT.toLocaleString()} to Level ${FAKE_LEVEL + 1}`}
-            onPress={() => comingSoon('Rewards & XP')}
+            onPress={() => router.push('/(tabs)/rewards')}
             colors={colors}
           />
           <ProfileRow

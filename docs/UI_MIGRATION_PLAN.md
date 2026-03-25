@@ -642,26 +642,82 @@ CREATE TABLE hub_daily_quiz (
 - Seed initial content via Alembic data migration (10 articles, 4 courses, 5 quizzes) so the hub is non-empty on first launch.
 - Long-term: lightweight internal CMS (Strapi or custom admin panel) so the content team can publish without a deploy.
 
-## Phase 14 — Rewards & Gamification _(New)_
+## Phase 14 — Rewards & Gamification ✅
 
+**Status:** **Complete**  
 **Files:** `app/(tabs)/rewards.tsx`, `app/challenge/[id].tsx`
 
-### Rewards screen (`scr-rewards`)
+### Rewards screen (`scr-rewards`) — Delivered
 
-- Dark header: XP level bar, current level pill, points to next level.
-- Weekly streak banner: large streak number, day dots.
-- Badges grid (3 col): earned vs locked, "New!" pip.
-- Active Challenges section: challenge cards with progress bar.
-- Leaderboard section (future): top users.
+- Dark green header (`borderBottomRadius 28`) with radial glow decoration, back button (frosted `x-btn.dk`).
+- "Money Warrior ⚔️" level title + "Level X · Y XP" subtitle.
+- XP progress bar (`.xp-bar-wrap`): `xpLev` (lime, Level + title), current/max XP, 8 pt bar with brand fill, meta row ("Current level" / "N XP to Level X+1").
+- Streak banner (`.streak-banner`): fire emoji + 42 pt streak number + "days" label; day-of-week dots (7 circles — ✓ done / ★ today / · future) in correct semantic colours; "STREAK" amber uppercase label + "Daily Budget Check-in" + "Log daily" hint.
+- Badges grid (3-col, `.badges-grid`): earned vs locked (0.55 opacity), "New!" pip (red dot top-right), `bdgIcon` + `bdgName` + "Earned!" / lock hint.
+- Active Challenges (`.chal-c`): icon tile (46×46, colour-matched), title, desc, XP badge, progress label, progress bar (colour per challenge); **"✓ Joined"** badge or **"Join"** brand button; tap → `router.push('/challenge/[id]')`; join optimistically updates local state + toast.
+- All data is static seed (`FAKE_*` constants + `CHALLENGES` array) — Phase 16 replaces with `useGamification` / `useStreak` / `useBadges` / `useChallenges` hooks.
+- `rewards` registered as hidden tab (`href: null`) in `app/(tabs)/_layout.tsx`.
+- Profile → "Rewards & XP" row wired to `router.push('/(tabs)/rewards')`.
 
-### Challenge Detail (`scr-challenge-detail`)
+### Challenge Detail (`scr-challenge-detail`) — Delivered
 
-- Gradient hero by challenge type (green/amber/blue/purple).
-- Active status pill + ends-in pill.
-- Reward row: XP badge + completion badge.
-- Rules card with numbered list.
-- Participants avatars + count.
-- Join / Leave CTA.
+- `LinearGradient` hero (160°, two-stop per color: g/a/b/p) with `borderBottomRadius 28`, back button (frosted).
+- 52 pt emoji, "● Active" lime pill + "{endsIn}" amber pill status row.
+- Title (22 pt/800) + description (14 pt/0.6 opacity) + reward row (3 frosted cells: XP, Badge name, Participants).
+- **Your Progress card** (shown when joined): gradient progress bar (10 pt), progress label, milestone dots row (achieved = brand border).
+- **Mini-leaderboard**: top entries + "You" row highlighted in `surface`/`brand` border; trophy emoji medals for top.
+- **Challenge Rules card**: numbered bullets in `surface` circles.
+- **Participants strip**: 5 avatar circles (overlapping, −8 ml) + `+N` count pill.
+- **CTA**: joined → "✓ You're In — Keep Going!" (`successSubtle`) + "Leave Challenge" (`error`) with confirm dialog; not joined → "Join Challenge 🎯" (`brand`).
+- All 4 challenge IDs (`nospend`, `literacy`, `save10k`, `zero`) have full seed data; unknown IDs show a graceful fallback.
+
+### Backend Integration Notes
+
+The Gamification backend design is already documented in Phase 5 (streak + XP tables, `/gamification/*` endpoints). Additional endpoints needed for challenges:
+
+```sql
+-- challenges: challenge definitions
+CREATE TABLE challenges (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug        VARCHAR(64) NOT NULL UNIQUE,
+  title       TEXT NOT NULL,
+  description TEXT,
+  emoji       VARCHAR(8),
+  color       VARCHAR(2) NOT NULL DEFAULT 'g',   -- g | a | b | p
+  xp_reward   INTEGER NOT NULL DEFAULT 0,
+  badge_slug  TEXT REFERENCES badge_definitions(slug),
+  starts_at   TIMESTAMPTZ NOT NULL,
+  ends_at     TIMESTAMPTZ NOT NULL,
+  is_active   BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- challenge_participants: many-to-many join
+CREATE TABLE challenge_participants (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  challenge_id UUID NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  joined_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  progress_pct FLOAT NOT NULL DEFAULT 0,
+  completed    BOOLEAN NOT NULL DEFAULT FALSE,
+  UNIQUE (challenge_id, user_id)
+);
+```
+
+| Method   | Path                                  | Description                                        |
+| -------- | ------------------------------------- | -------------------------------------------------- |
+| `GET`    | `/gamification/challenges`            | List active challenges with user join status       |
+| `GET`    | `/gamification/challenges/:slug`      | Challenge detail + user progress + top leaderboard |
+| `POST`   | `/gamification/challenges/:slug/join` | Join a challenge                                   |
+| `DELETE` | `/gamification/challenges/:slug/join` | Leave a challenge                                  |
+| `GET`    | `/gamification/badges`                | Already planned in Phase 5 backend notes           |
+
+**Mobile integration (Phase 16 wiring):**
+
+- Add `useChallenges()`, `useChallengeDetail(slug)`, `useJoinChallenge()`, `useLeaveChallenge()` hooks in `hooks/useGamification.ts`.
+- Replace `CHALLENGES` seed in `rewards.tsx` and `CHALLENGES` record in `challenge/[id].tsx` with hook data.
+- Replace `FAKE_*` constants in `rewards.tsx` and `profile.tsx` with `useGamificationMe()` response.
+- Register `queryKeys.challenges()` and `queryKeys.challenge(slug)` in `lib/queryKeys.ts`.
+- Challenge progress is updated server-side (Celery task checks transactions / hub reads at midnight); mobile polls with `refetchInterval: 30_000` when challenge detail is open.
 
 ---
 
@@ -721,6 +777,6 @@ CREATE TABLE hub_daily_quiz (
 | 11    | Nudges Tab               | ✅ Complete    |
 | 12    | Profile Tab              | ✅ Complete    |
 | 13    | Knowledge Hub Tab        | ✅ Complete    |
-| 14    | Rewards & Gamification   | ⬜ Not Started |
+| 14    | Rewards & Gamification   | ✅ Complete    |
 | 15    | Onboarding Questionnaire | ⬜ Not Started |
 | 16    | Polish Pass              | ⬜ Not Started |
