@@ -63,3 +63,5 @@ export type { DividerProps } from './Divider';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateAction, EmptyStateProps } from './EmptyState';
 
+export { MainTabBar } from './TabBar';
+
