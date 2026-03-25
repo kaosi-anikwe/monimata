@@ -375,12 +375,12 @@ CREATE TABLE user_badges (
 
 #### API endpoints (prefixed `/gamification`)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/gamification/me` | Current user's streak, XP, level, recent badges |
-| `POST` | `/gamification/event` | Record a qualifying event (called internally by budget/transaction services) |
-| `GET` | `/gamification/leaderboard` | Top 10 streaks (opt-in only) |
-| `GET` | `/gamification/badges` | All badge definitions + earned status |
+| Method | Path                        | Description                                                                  |
+| ------ | --------------------------- | ---------------------------------------------------------------------------- |
+| `GET`  | `/gamification/me`          | Current user's streak, XP, level, recent badges                              |
+| `POST` | `/gamification/event`       | Record a qualifying event (called internally by budget/transaction services) |
+| `GET`  | `/gamification/leaderboard` | Top 10 streaks (opt-in only)                                                 |
+| `GET`  | `/gamification/badges`      | All badge definitions + earned status                                        |
 
 #### Mobile integration (Phase 14)
 
@@ -390,8 +390,6 @@ CREATE TABLE user_badges (
 - Rewards tab (`app/(tabs)/rewards.tsx`) uses the same hook for the full badge grid and XP bar.
 
 ---
-
-
 
 **File:** `app/(tabs)/index.tsx` (rename to `budget.tsx`; update `_layout`)
 
@@ -412,7 +410,7 @@ CREATE TABLE user_badges (
 
 ---
 
-## Phase 7 — Budget Edit & Target Screens
+## Phase 7 — Budget Edit & Target Screens ✅
 
 **Files:** `app/budget-edit.tsx`, `app/target/[categoryId].tsx`
 
@@ -618,10 +616,10 @@ The 6-step payment state machine is already built. Each step gets a visual skin:
 | 1     | Missing Dependencies     | ✅ Complete    |
 | 2     | Shared Component Library | ✅ Complete    |
 | 3     | Navigation Shell         | ✅ Complete    |
-| 4     | Auth Flow                | ⬜ Not Started |
-| 5     | Home / Dashboard Tab     | ⬜ Not Started |
-| 6     | Budget Tab               | ⬜ Not Started |
-| 7     | Budget Edit & Target     | ⬜ Not Started |
+| 4     | Auth Flow                | ✅ Complete    |
+| 5     | Home / Dashboard Tab     | ✅ Complete    |
+| 6     | Budget Tab               | ✅ Complete    |
+| 7     | Budget Edit & Target     | ✅ Complete    |
 | 8     | Transactions             | ⬜ Not Started |
 | 9     | Accounts Tab             | ⬜ Not Started |
 | 10    | Bills Tab                | ⬜ Not Started |
