@@ -75,6 +75,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="accounts" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
         <Tabs.Screen name="hub" options={{ href: null }} />
+        <Tabs.Screen name="rewards" options={{ href: null }} />
       </Tabs>
 
       {/* Floating action button — bottom-right above the tab bar */}
