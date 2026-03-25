@@ -15,54 +15,63 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Bills tab — multi-step state machine for Interswitch bill payments.
+ * Bills tab — Interswitch bill payment state machine.
  *
- * Flow:
- *   categories → billers → payment_items → customer_form → confirm → receipt
+ * Phase 10 migration:
+ *   - Dark green header on the categories step (matches scr-bills mockup)
+ *   - White header + 3-step progress stepper for detail steps (scr-bill-detail)
+ *   - 3-column category grid with per-category coloured icon tiles
+ *   - Recent Payments mini-list below the category grid
+ *   - Full-page history toggle
+ *   - Zero raw hex / rgba — all colours from useTheme() tokens
  *
- * The screen is fully self-contained (no sub-routes). Step state lives here.
- * History is accessible via a toggle on the categories step.
+ * Flow:  categories → billers → payment_items → customer_form → confirm → receipt
  */
-import { useState, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/components/Toast';
 import { useAccounts } from '@/hooks/useAccounts';
-import type { BankAccount } from '@/types/account';
-import type { CategoryItem } from '@/types/category';
-import { useCategoryGroups } from '@/hooks/useCategories';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { formatNaira, nairaStringToKobo, koboToNaira } from '@/utils/money';
 import {
   useBillCategories,
   useBillers,
-  useBillPaymentItems,
-  useValidateCustomer,
-  usePayBill,
   useBillHistory,
+  useBillPaymentItems,
+  usePayBill,
   usePaymentStatus,
+  useValidateCustomer,
 } from '@/hooks/useBills';
+import { useCategoryGroups } from '@/hooks/useCategories';
+import { useTheme } from '@/lib/theme';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
+import type { BankAccount } from '@/types/account';
 import type {
-  BillerCategory,
   Biller,
-  PaymentItem,
-  CustomerValidationResponse,
+  BillerCategory,
+  BillHistoryItem,
   BillPayResponse,
+  CustomerValidationResponse,
+  PaymentItem,
 } from '@/types/bills';
+import type { CategoryItem } from '@/types/category';
+import { formatNaira, koboToNaira, nairaStringToKobo } from '@/utils/money';
 
 // ─── Step type ────────────────────────────────────────────────────────────────
 
@@ -83,35 +92,7 @@ const PREV_STEP: Partial<Record<BillStep, BillStep>> = {
   confirm: 'customer_form',
 };
 
-// ─── Step header ──────────────────────────────────────────────────────────────
-
-function StepHeader({
-  title,
-  onBack,
-  right,
-}: {
-  title: string;
-  onBack?: () => void;
-  right?: React.ReactNode;
-}) {
-  return (
-    <View style={s.header}>
-      {onBack ? (
-        <TouchableOpacity style={s.backBtn} onPress={onBack} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={22} color="#111827" />
-        </TouchableOpacity>
-      ) : (
-        <View style={s.backBtn} />
-      )}
-      <Text style={s.headerTitle} numberOfLines={1}>
-        {title}
-      </Text>
-      <View style={s.headerRight}>{right ?? null}</View>
-    </View>
-  );
-}
-
-// ─── Category grid item ───────────────────────────────────────────────────────
+// ─── Category icon + background helpers ──────────────────────────────────────
 
 const CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
   airtime: 'phone-portrait-outline',
@@ -121,7 +102,10 @@ const CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name
   cable: 'tv-outline',
   insurance: 'shield-checkmark-outline',
   toll: 'car-outline',
+  transport: 'car-outline',
   school: 'school-outline',
+  education: 'school-outline',
+  travel: 'airplane-outline',
 };
 
 function categoryIcon(name: string): React.ComponentProps<typeof Ionicons>['name'] {
@@ -132,6 +116,160 @@ function categoryIcon(name: string): React.ComponentProps<typeof Ionicons>['name
   return 'receipt-outline';
 }
 
+type TokenKey =
+  | 'warningSubtle'
+  | 'infoSubtle'
+  | 'tealSubtle'
+  | 'errorSubtle'
+  | 'purpleSubtle'
+  | 'successSubtle'
+  | 'surface';
+
+function categoryBgToken(name: string): TokenKey {
+  const lower = name.toLowerCase();
+  if (lower.includes('electric') || lower.includes('toll') || lower.includes('transport')) return 'warningSubtle';
+  if (lower.includes('airtime') || lower.includes('data') || lower.includes('water')) return 'infoSubtle';
+  if (lower.includes('cable') || lower.includes('tv')) return 'tealSubtle';
+  if (lower.includes('travel') || lower.includes('air')) return 'errorSubtle';
+  if (lower.includes('edu') || lower.includes('school')) return 'purpleSubtle';
+  if (lower.includes('insur')) return 'successSubtle';
+  return 'surface';
+}
+
+// ─── Progress stepper ─────────────────────────────────────────────────────────
+
+const STEPPER_STEPS: { label: string; steps: BillStep[] }[] = [
+  { label: 'Biller', steps: ['billers', 'payment_items'] },
+  { label: 'Details', steps: ['customer_form'] },
+  { label: 'Confirm', steps: ['confirm'] },
+];
+
+function stepIndexOf(step: BillStep): number {
+  for (let i = 0; i < STEPPER_STEPS.length; i++) {
+    if ((STEPPER_STEPS[i].steps as BillStep[]).includes(step)) return i;
+  }
+  return 0;
+}
+
+function BillStepper({ currentStep }: { currentStep: BillStep }) {
+  const colors = useTheme();
+  const active = stepIndexOf(currentStep);
+
+  return (
+    <View style={ss.stepper}>
+      {STEPPER_STEPS.map((s, i) => {
+        const isDone = i < active;
+        const isActive = i === active;
+        const circBg = isDone ? colors.brand : isActive ? colors.lime : colors.surfaceElevated;
+        const circTxt = isDone ? colors.white : isActive ? colors.darkGreen : colors.textMeta;
+        const lblColor = isDone || isActive ? colors.brand : colors.textMeta;
+
+        return (
+          <React.Fragment key={s.label}>
+            {i > 0 && (
+              <View
+                style={[
+                  ss.stepLine,
+                  { backgroundColor: i <= active ? colors.brand : colors.surfaceElevated },
+                ]}
+              />
+            )}
+            <View style={ss.stepCircleWrap}>
+              <View style={[ss.stepCircle, { backgroundColor: circBg }]}>
+                <Text style={[ss.stepCircleTxt, { color: circTxt }]}>
+                  {isDone ? '✓' : String(i + 1)}
+                </Text>
+              </View>
+              <Text style={[ss.stepLbl, { color: lblColor }]}>{s.label}</Text>
+            </View>
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Categories dark header ───────────────────────────────────────────────────
+
+function CategoriesHeader({
+  showHistory,
+  onToggleHistory,
+}: {
+  showHistory: boolean;
+  onToggleHistory: () => void;
+}) {
+  const colors = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      style={[
+        ss.darkHeader,
+        { paddingTop: insets.top + spacing.lg, backgroundColor: colors.darkGreen },
+      ]}
+    >
+      <View style={ss.darkHeaderRow}>
+        <Text style={[ss.darkHeaderTitle, { color: colors.white }]}>Pay Bills</Text>
+        <TouchableOpacity
+          style={[
+            ss.histToggleBtn,
+            { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder },
+          ]}
+          onPress={onToggleHistory}
+          activeOpacity={0.7}
+        >
+          <Text style={[ss.histToggleTxt, { color: colors.textInverseMid }]}>
+            {showHistory ? 'Categories' : 'History'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={[ss.darkHeaderSub, { color: colors.textInverseFaint }]}>
+        Quick, secure bill payments via Interswitch
+      </Text>
+    </View>
+  );
+}
+
+// ─── Detail white header (billers → confirm) ──────────────────────────────────
+
+function DetailHeader({
+  title,
+  step,
+  onBack,
+}: {
+  title: string;
+  step: BillStep;
+  onBack: () => void;
+}) {
+  const colors = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      style={[
+        ss.detailHeaderWrap,
+        { backgroundColor: colors.white, borderBottomColor: colors.border },
+      ]}
+    >
+      <View style={[ss.detailHeaderRow, { paddingTop: insets.top + spacing.sm }]}>
+        <TouchableOpacity style={ss.backBtn} onPress={onBack} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text
+          style={[ss.detailTitle, { color: colors.textPrimary }]}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+        <View style={ss.backBtn} />
+      </View>
+      <BillStepper currentStep={step} />
+    </View>
+  );
+}
+
+// ─── 3-column category card ───────────────────────────────────────────────────
+
 function CategoryCard({
   item,
   onPress,
@@ -139,60 +277,56 @@ function CategoryCard({
   item: BillerCategory;
   onPress: () => void;
 }) {
+  const colors = useTheme();
+  const iconBg = colors[categoryBgToken(item.name)];
+
   return (
-    <TouchableOpacity style={s.categoryCard} onPress={onPress} activeOpacity={0.75}>
-      <View style={s.categoryIcon}>
-        <Ionicons name={categoryIcon(item.name)} size={26} color="#0F7B3F" />
+    <TouchableOpacity
+      style={[ss.categoryCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <View style={[ss.categoryIconTile, { backgroundColor: iconBg }]}>
+        <Ionicons name={categoryIcon(item.name)} size={22} color={colors.brand} />
       </View>
-      <Text style={s.categoryName} numberOfLines={2}>
+      <Text style={[ss.categoryName, { color: colors.textPrimary }]} numberOfLines={2}>
         {item.name}
       </Text>
     </TouchableOpacity>
   );
 }
 
-// ─── Biller list item ─────────────────────────────────────────────────────────
+// ─── List row (billers + payment items) ──────────────────────────────────────
 
-function BillerRow({ item, onPress }: { item: Biller; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={s.billerRow} onPress={onPress} activeOpacity={0.75}>
-      <View style={s.billerIcon}>
-        <Ionicons name="business-outline" size={20} color="#0F7B3F" />
-      </View>
-      <View style={s.billerInfo}>
-        <Text style={s.billerName}>{item.name}</Text>
-        {item.short_name ? (
-          <Text style={s.billerSub}>{item.short_name}</Text>
-        ) : null}
-      </View>
-      <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-    </TouchableOpacity>
-  );
-}
-
-// ─── Payment item row ─────────────────────────────────────────────────────────
-
-function PaymentItemRow({
-  item,
+function BillListRow({
+  icon,
+  title,
+  subtitle,
   onPress,
 }: {
-  item: PaymentItem;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  subtitle?: string;
   onPress: () => void;
 }) {
-  const amountLabel = item.is_amount_fixed && item.fixed_amount
-    ? formatNaira(item.fixed_amount)
-    : 'Variable amount';
+  const colors = useTheme();
 
   return (
-    <TouchableOpacity style={s.billerRow} onPress={onPress} activeOpacity={0.75}>
-      <View style={s.billerIcon}>
-        <Ionicons name="pricetag-outline" size={20} color="#0F7B3F" />
+    <TouchableOpacity
+      style={[ss.listRow, { backgroundColor: colors.white }]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <View style={[ss.listRowIcon, { backgroundColor: colors.surfaceElevated }]}>
+        <Ionicons name={icon} size={20} color={colors.brand} />
       </View>
-      <View style={s.billerInfo}>
-        <Text style={s.billerName}>{item.name}</Text>
-        <Text style={s.billerSub}>{amountLabel}</Text>
+      <View style={ss.listRowInfo}>
+        <Text style={[ss.listRowTitle, { color: colors.textPrimary }]}>{title}</Text>
+        {subtitle ? (
+          <Text style={[ss.listRowSub, { color: colors.textMeta }]}>{subtitle}</Text>
+        ) : null}
       </View>
-      <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+      <Ionicons name="chevron-forward" size={16} color={colors.textMeta} />
     </TouchableOpacity>
   );
 }
@@ -208,26 +342,44 @@ function AccountPicker({
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
+  const colors = useTheme();
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={s.accountScroll}
-      contentContainerStyle={s.accountScrollContent}
+      style={ss.accountScroll}
+      contentContainerStyle={ss.accountScrollContent}
     >
       {accounts.map((a) => {
         const active = a.id === selectedId;
         return (
           <TouchableOpacity
             key={a.id}
-            style={[s.accountChip, active && s.accountChipActive]}
+            style={[
+              ss.accountChip,
+              {
+                borderColor: active ? colors.brand : colors.border,
+                backgroundColor: active ? colors.surfaceElevated : colors.white,
+              },
+            ]}
             onPress={() => onSelect(a.id)}
             activeOpacity={0.8}
           >
-            <Text style={[s.accountChipInst, active && s.accountChipTextActive]}>
+            <Text
+              style={[
+                ss.accountChipInst,
+                { color: active ? colors.brand : colors.textSecondary },
+              ]}
+            >
               {a.institution}
             </Text>
-            <Text style={[s.accountChipBal, active && s.accountChipTextActive]}>
+            <Text
+              style={[
+                ss.accountChipBal,
+                { color: active ? colors.brand : colors.textMeta },
+              ]}
+            >
               {formatNaira(a.balance)}
             </Text>
           </TouchableOpacity>
@@ -237,7 +389,7 @@ function AccountPicker({
   );
 }
 
-// ─── Budget category picker ──────────────────────────────────────────────────
+// ─── Budget category picker (inline expandable) ───────────────────────────────
 
 interface CategoryGroup {
   id: string;
@@ -255,6 +407,7 @@ function CategoryPickerField({
   onSelect: (id: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const colors = useTheme();
 
   const selectedName = selectedId
     ? groups.flatMap((g) => g.categories).find((c) => c.id === selectedId)?.name
@@ -263,30 +416,49 @@ function CategoryPickerField({
   return (
     <View>
       <TouchableOpacity
-        style={s.catPickerTrigger}
+        style={[
+          ss.catPickerTrigger,
+          { backgroundColor: colors.white, borderColor: colors.border },
+        ]}
         onPress={() => setOpen((v) => !v)}
         activeOpacity={0.75}
       >
-        <Ionicons name="folder-outline" size={16} color="#0F7B3F" />
-        <Text style={s.catPickerTriggerText}>
+        <Ionicons name="folder-outline" size={16} color={colors.brand} />
+        <Text style={[ss.catPickerTriggerText, { color: colors.textSecondary }]}>
           {selectedName ?? 'None — skip budget tracking'}
         </Text>
         <Ionicons
           name={open ? 'chevron-up' : 'chevron-down'}
           size={14}
-          color="#6B7280"
+          color={colors.textMeta}
         />
       </TouchableOpacity>
 
       {open && (
-        <View style={s.catPickerPanel}>
+        <View
+          style={[
+            ss.catPickerPanel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           {/* None option */}
           <TouchableOpacity
-            style={[s.catChip, !selectedId && s.catChipActive]}
+            style={[
+              ss.catChip,
+              {
+                backgroundColor: !selectedId ? colors.brand : colors.white,
+                borderColor: !selectedId ? colors.brand : colors.border,
+              },
+            ]}
             onPress={() => { onSelect(null); setOpen(false); }}
             activeOpacity={0.75}
           >
-            <Text style={[s.catChipText, !selectedId && s.catChipTextActive]}>
+            <Text
+              style={[
+                ss.catChipText,
+                { color: !selectedId ? colors.white : colors.textSecondary },
+              ]}
+            >
               None
             </Text>
           </TouchableOpacity>
@@ -295,26 +467,35 @@ function CategoryPickerField({
             .filter((g) => g.categories.length > 0)
             .map((g) => (
               <View key={g.id}>
-                <Text style={s.catGroupLabel}>{g.name}</Text>
-                <View style={s.catChipRow}>
-                  {g.categories.map((c) => (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={[s.catChip, selectedId === c.id && s.catChipActive]}
-                      onPress={() => { onSelect(c.id); setOpen(false); }}
-                      activeOpacity={0.75}
-                    >
-                      <Text
+                <Text style={[ss.catGroupLabel, { color: colors.textMeta }]}>{g.name}</Text>
+                <View style={ss.catChipRow}>
+                  {g.categories.map((c) => {
+                    const active = selectedId === c.id;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
                         style={[
-                          s.catChipText,
-                          selectedId === c.id && s.catChipTextActive,
+                          ss.catChip,
+                          {
+                            backgroundColor: active ? colors.brand : colors.white,
+                            borderColor: active ? colors.brand : colors.border,
+                          },
                         ]}
-                        numberOfLines={1}
+                        onPress={() => { onSelect(c.id); setOpen(false); }}
+                        activeOpacity={0.75}
                       >
-                        {c.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            ss.catChipText,
+                            { color: active ? colors.white : colors.textSecondary },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {c.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             ))}
@@ -324,21 +505,58 @@ function CategoryPickerField({
   );
 }
 
-// ─── History list ─────────────────────────────────────────────────────────────
+// ─── History row ──────────────────────────────────────────────────────────────
+
+function HistoryRow({ item }: { item: BillHistoryItem }) {
+  const colors = useTheme();
+
+  return (
+    <View style={[ss.historyRow, { backgroundColor: colors.white }]}>
+      <View style={[ss.historyIconTile, { backgroundColor: colors.surface }]}>
+        <Ionicons name="receipt-outline" size={18} color={colors.brand} />
+      </View>
+      <View style={ss.historyLeft}>
+        <Text style={[ss.historyNarration, { color: colors.textPrimary }]} numberOfLines={1}>
+          {item.narration}
+        </Text>
+        <Text style={[ss.historyRef, { color: colors.textMeta }]} numberOfLines={1}>
+          {item.reference}
+        </Text>
+        <Text style={[ss.historyDate, { color: colors.textMeta }]}>
+          {new Date(item.date).toLocaleDateString('en-NG', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          })}
+        </Text>
+      </View>
+      <Text style={[ss.historyAmount, { color: colors.error }]}>
+        -{formatNaira(Math.abs(item.amount))}
+      </Text>
+    </View>
+  );
+}
+
+// ─── History full-page list ───────────────────────────────────────────────────
 
 function HistoryView() {
   const { data: history = [], isLoading } = useBillHistory();
+  const colors = useTheme();
 
   if (isLoading) {
-    return <ActivityIndicator style={{ marginTop: 40 }} color="#0F7B3F" />;
+    return <ActivityIndicator style={ss.loader} color={colors.brand} />;
   }
 
   if (history.length === 0) {
     return (
-      <View style={s.emptyContainer}>
-        <Ionicons name="receipt-outline" size={52} color="#D1FAE5" />
-        <Text style={s.emptyTitle}>No bill payments yet</Text>
-        <Text style={s.emptySub}>Your Interswitch payments will appear here.</Text>
+      <View style={ss.emptyContainer}>
+        <Ionicons name="receipt-outline" size={52} color={colors.surfaceHigh} />
+        <Text style={[ss.emptyTitle, { color: colors.textSecondary }]}>
+          No bill payments yet
+        </Text>
+        <Text style={[ss.emptySub, { color: colors.textMeta }]}>
+          Your Interswitch payments will appear here.
+        </Text>
       </View>
     );
   }
@@ -347,33 +565,46 @@ function HistoryView() {
     <FlashList
       data={history}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
-      ItemSeparatorComponent={() => <View style={s.separator} />}
-      renderItem={({ item }) => (
-        <View style={s.historyRow}>
-          <View style={s.historyLeft}>
-            <Text style={s.historyNarration} numberOfLines={1}>
-              {item.narration}
-            </Text>
-            <Text style={s.historyRef} numberOfLines={1}>
-              {item.reference}
-            </Text>
-            <Text style={s.historyDate}>
-              {new Date(item.date).toLocaleDateString('en-NG', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
-            </Text>
-          </View>
-          <Text style={s.historyAmount}>{formatNaira(Math.abs(item.amount))}</Text>
-        </View>
+      contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: 40 }}
+      ItemSeparatorComponent={() => (
+        <View style={[ss.separator, { backgroundColor: colors.separator }]} />
       )}
+      renderItem={({ item }) => <HistoryRow item={item} />}
     />
   );
 }
 
-// ─── Receipt step (own component so polling hook is only mounted when needed) ─
+// ─── Summary row ─────────────────────────────────────────────────────────────
+
+function SummaryRow({
+  label,
+  value,
+  bold,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+}) {
+  const colors = useTheme();
+
+  return (
+    <View style={ss.summaryRow}>
+      <Text style={[ss.summaryLabel, { color: colors.textMeta }]}>{label}</Text>
+      <Text
+        style={[
+          ss.summaryValue,
+          { color: bold ? colors.brand : colors.textPrimary },
+          bold && ss.summaryValueBold,
+        ]}
+        numberOfLines={2}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Receipt step ─────────────────────────────────────────────────────────────
 
 function ReceiptStep({
   payResult,
@@ -382,59 +613,88 @@ function ReceiptStep({
   payResult: BillPayResponse;
   onDone: () => void;
 }) {
+  const colors = useTheme();
+  const insets = useSafeAreaInsets();
+
   const isPending = payResult.status === 'pending';
-  // Poll only when the initial status was pending — stops automatically once
-  // the query returns a non-pending status (refetchInterval returns false).
   const { data: liveStatus } = usePaymentStatus(
     isPending ? payResult.reference : null,
   );
 
   const resolvedStatus = liveStatus?.status ?? payResult.status;
   const isStillPending = resolvedStatus === 'pending';
+  const isSuccess = resolvedStatus === 'success';
 
-  const iconName = isStillPending
-    ? 'time-outline'
-    : resolvedStatus === 'success'
-      ? 'checkmark-circle'
-      : 'close-circle';
-  const iconColor = isStillPending
-    ? '#F59E0B'
-    : resolvedStatus === 'success'
-      ? '#0F7B3F'
-      : '#DC2626';
   const title = isStillPending
-    ? 'Payment Processing…'
-    : resolvedStatus === 'success'
+    ? 'Payment Processing\u2026'
+    : isSuccess
       ? 'Payment Successful'
       : 'Payment Failed';
 
   return (
-    <SafeAreaView style={s.safe}>
-      <StepHeader title={title} />
-      <ScrollView contentContainerStyle={s.formContent}>
-        <View style={s.receiptCard}>
-          <View style={s.receiptIconWrap}>
-            {isStillPending ? (
-              <ActivityIndicator size={56} color="#F59E0B" />
-            ) : (
-              <Ionicons name={iconName} size={56} color={iconColor} />
-            )}
-          </View>
-          <Text style={s.receiptAmount}>
-            {formatNaira(Math.abs(payResult.amount))}
-          </Text>
-          <Text style={s.receiptNarration}>{payResult.narration}</Text>
+    <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+      {/* Receipt header */}
+      <View
+        style={[
+          ss.detailHeaderWrap,
+          { backgroundColor: colors.white, borderBottomColor: colors.border },
+        ]}
+      >
+        <View style={[ss.detailHeaderRow, { paddingTop: insets.top + spacing.sm }]}>
+          <View style={ss.backBtn} />
+          <Text style={[ss.detailTitle, { color: colors.textPrimary }]}>{title}</Text>
+          <View style={ss.backBtn} />
+        </View>
+      </View>
 
-          {isStillPending && (
-            <Text style={s.pendingNote}>
+      <ScrollView contentContainerStyle={ss.formContent}>
+        {/* Status icon */}
+        <View style={ss.receiptIconWrap}>
+          {isStillPending ? (
+            <ActivityIndicator size={56} color={colors.warning} />
+          ) : (
+            <View
+              style={[
+                ss.receiptCheckCircle,
+                { backgroundColor: isSuccess ? colors.brand : colors.error },
+              ]}
+            >
+              <Ionicons
+                name={isSuccess ? 'checkmark' : 'close'}
+                size={32}
+                color={colors.white}
+              />
+            </View>
+          )}
+        </View>
+
+        <Text style={[ss.receiptStatusLbl, { color: colors.brand }]}>
+          {title.toUpperCase()}
+        </Text>
+        <Text style={[ss.receiptAmount, { color: colors.textPrimary }]}>
+          {formatNaira(Math.abs(payResult.amount))}
+        </Text>
+        <Text style={[ss.receiptNarration, { color: colors.textMeta }]}>
+          {payResult.narration}
+        </Text>
+
+        {isStillPending && (
+          <View style={[ss.pendingNote, { backgroundColor: colors.warningSubtle }]}>
+            <Text style={[ss.pendingNoteTxt, { color: colors.warningText }]}>
               Your payment is being processed. This page refreshes automatically.
             </Text>
-          )}
+          </View>
+        )}
 
-          <View style={s.confirmDivider} />
-
-          <SummaryRow label="Reference" value={payResult.reference} mono />
-          <SummaryRow label="Status" value={resolvedStatus.toUpperCase()} />
+        <View
+          style={[ss.receiptCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+        >
+          <Text style={[ss.summaryGroupLabel, { color: colors.textSecondary }]}>
+            Payment Details
+          </Text>
+          <View style={[ss.confirmDivider, { backgroundColor: colors.separator }]} />
+          <SummaryRow label="Reference" value={payResult.reference} />
+          <SummaryRow label="Status" value={resolvedStatus.toUpperCase()} bold={isSuccess} />
           <SummaryRow
             label="Date"
             value={new Date(payResult.date).toLocaleString('en-NG', {
@@ -448,20 +708,22 @@ function ReceiptStep({
         </View>
 
         <TouchableOpacity
-          style={s.primaryBtn}
+          style={[ss.limeBtn, { backgroundColor: colors.lime }]}
           onPress={onDone}
           activeOpacity={0.85}
         >
-          <Text style={s.primaryBtnText}>Done</Text>
+          <Text style={[ss.limeBtnText, { color: colors.darkGreen }]}>Done</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 function BillsContent() {
+  const colors = useTheme();
+
   // ── Step state ──
   const [step, setStep] = useState<BillStep>('categories');
   const [showHistory, setShowHistory] = useState(false);
@@ -491,6 +753,7 @@ function BillsContent() {
   );
   const { data: accounts = [], isLoading: loadingAccounts } = useAccounts();
   const { data: categoryGroups = [] } = useCategoryGroups();
+  const { data: history = [] } = useBillHistory();
 
   const validateMutation = useValidateCustomer();
   const payMutation = usePayBill();
@@ -505,13 +768,10 @@ function BillsContent() {
 
   // Auto-advance from payment_items when only one option exists
   useEffect(() => {
-    if (
-      step === 'payment_items' &&
-      !loadingItems &&
-      paymentItems.length === 1
-    ) {
+    if (step === 'payment_items' && !loadingItems && paymentItems.length === 1) {
       selectPaymentItem(paymentItems[0]);
     }
+
   }, [step, loadingItems, paymentItems]);
 
   // ── Navigation helpers ──
@@ -519,7 +779,6 @@ function BillsContent() {
     const prev = PREV_STEP[step];
     if (prev) {
       setStep(prev);
-      // Clear downstream state when going back
       if (prev === 'categories') {
         setSelectedBiller(null);
         setSelectedItem(null);
@@ -533,6 +792,7 @@ function BillsContent() {
         setValidationResult(null);
       }
     }
+
   }, [step]);
 
   function resetAll() {
@@ -565,7 +825,6 @@ function BillsContent() {
 
   function selectPaymentItem(item: PaymentItem) {
     setSelectedItem(item);
-    // Pre-fill amount if fixed
     if (item.is_amount_fixed && item.fixed_amount) {
       setAmountNaira(String(koboToNaira(item.fixed_amount)));
     } else {
@@ -574,7 +833,7 @@ function BillsContent() {
     setStep('customer_form');
   }
 
-  // ── Validation ──
+  // ── Validate customer ──
   function handleValidate() {
     if (!customerId.trim()) {
       error('Missing Info', 'Please enter a customer/account ID.');
@@ -593,7 +852,6 @@ function BillsContent() {
             );
             return;
           }
-          // If biller fixes the amount, override what user may have entered
           if (result.is_amount_fixed && result.fixed_amount) {
             setAmountNaira(String(koboToNaira(result.fixed_amount)));
           }
@@ -607,7 +865,7 @@ function BillsContent() {
     );
   }
 
-  // ── Payment ──
+  // ── Process payment ──
   function handlePay() {
     if (!selectedItem || !validationResult || !selectedAccountId) return;
 
@@ -617,7 +875,7 @@ function BillsContent() {
         : nairaStringToKobo(amountNaira);
 
     if (amountKobo < 100) {
-      error('Invalid Amount', 'Amount must be at least ₦1.00.');
+      error('Invalid Amount', 'Amount must be at least \u20a61.00.');
       return;
     }
 
@@ -645,11 +903,11 @@ function BillsContent() {
     );
   }
 
-  // ── Computed display values ──
+  // ── Computed ──
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null;
 
   function buildDisplayAmount(): string {
-    if (!selectedItem) return '—';
+    if (!selectedItem) return '\u2014';
     if (validationResult?.is_amount_fixed && validationResult.fixed_amount) {
       return formatNaira(validationResult.fixed_amount);
     }
@@ -657,142 +915,136 @@ function BillsContent() {
       return formatNaira(selectedItem.fixed_amount);
     }
     const kobo = nairaStringToKobo(amountNaira);
-    return kobo > 0 ? formatNaira(kobo) : '—';
+    return kobo > 0 ? formatNaira(kobo) : '\u2014';
   }
 
-  // ── Step renders ──
-  // --- CATEGORIES ---
-  if (step === 'categories') {
-    return (
-      <SafeAreaView style={s.safe}>
-        <StepHeader
-          title="Pay Bills"
-          right={
-            <TouchableOpacity
-              onPress={() => setShowHistory((v) => !v)}
-              activeOpacity={0.7}
-              style={s.historyBtn}
-            >
-              <Ionicons
-                name={showHistory ? 'grid-outline' : 'time-outline'}
-                size={20}
-                color="#0F7B3F"
-              />
-            </TouchableOpacity>
-          }
-        />
-
-        {showHistory ? (
-          <HistoryView />
-        ) : loadingCategories ? (
-          <ActivityIndicator style={{ flex: 1 }} color="#0F7B3F" />
-        ) : (
-          <FlatList
-            key="category-grid"
-            data={categories}
-            keyExtractor={(item) => item.id}
-            numColumns={2}
-            columnWrapperStyle={s.categoryRow}
-            contentContainerStyle={s.categoryGrid}
-            ListEmptyComponent={
-              <View style={s.emptyContainer}>
-                <Text style={s.emptyTitle}>No categories found</Text>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <CategoryCard item={item} onPress={() => selectCategory(item)} />
-            )}
-          />
-        )}
-      </SafeAreaView>
-    );
+  // ── RECEIPT ──────────────────────────────────────────────────────────────────
+  if (step === 'receipt' && payResult) {
+    return <ReceiptStep payResult={payResult} onDone={resetAll} />;
   }
 
-  // --- BILLERS ---
+  // ── BILLERS ──────────────────────────────────────────────────────────────────
   if (step === 'billers') {
     return (
-      <SafeAreaView style={s.safe}>
-        <StepHeader
+      <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <DetailHeader
           title={selectedCategory?.name ?? 'Select Biller'}
+          step={step}
           onBack={goBack}
         />
         {loadingBillers ? (
-          <ActivityIndicator style={{ flex: 1 }} color="#0F7B3F" />
+          <ActivityIndicator style={ss.loader} color={colors.brand} />
         ) : (
           <FlatList
             key="billers-list"
             data={billers}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={s.listContent}
-            ItemSeparatorComponent={() => <View style={s.separator} />}
+            contentContainerStyle={ss.listContent}
+            ItemSeparatorComponent={() => (
+              <View style={[ss.separator, { backgroundColor: colors.separator }]} />
+            )}
             ListEmptyComponent={
-              <View style={s.emptyContainer}>
-                <Text style={s.emptyTitle}>No billers in this category</Text>
+              <View style={ss.emptyContainer}>
+                <Text style={[ss.emptyTitle, { color: colors.textSecondary }]}>
+                  No billers in this category
+                </Text>
               </View>
             }
             renderItem={({ item }) => (
-              <BillerRow item={item} onPress={() => selectBiller(item)} />
+              <BillListRow
+                icon="business-outline"
+                title={item.name}
+                subtitle={item.short_name ?? undefined}
+                onPress={() => selectBiller(item)}
+              />
             )}
           />
         )}
-      </SafeAreaView>
+      </View>
     );
   }
 
-  // --- PAYMENT ITEMS ---
+  // ── PAYMENT ITEMS ─────────────────────────────────────────────────────────────
   if (step === 'payment_items') {
     return (
-      <SafeAreaView style={s.safe}>
-        <StepHeader title={selectedBiller?.name ?? 'Select Plan'} onBack={goBack} />
+      <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <DetailHeader
+          title={selectedBiller?.name ?? 'Select Plan'}
+          step={step}
+          onBack={goBack}
+        />
         {loadingItems ? (
-          <ActivityIndicator style={{ flex: 1 }} color="#0F7B3F" />
+          <ActivityIndicator style={ss.loader} color={colors.brand} />
         ) : (
           <FlatList
             key="payment-items-list"
             data={paymentItems}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={s.listContent}
-            ItemSeparatorComponent={() => <View style={s.separator} />}
+            contentContainerStyle={ss.listContent}
+            ItemSeparatorComponent={() => (
+              <View style={[ss.separator, { backgroundColor: colors.separator }]} />
+            )}
             ListEmptyComponent={
-              <View style={s.emptyContainer}>
-                <Text style={s.emptyTitle}>No payment options found</Text>
+              <View style={ss.emptyContainer}>
+                <Text style={[ss.emptyTitle, { color: colors.textSecondary }]}>
+                  No payment options found
+                </Text>
               </View>
             }
-            renderItem={({ item }) => (
-              <PaymentItemRow item={item} onPress={() => selectPaymentItem(item)} />
-            )}
+            renderItem={({ item }) => {
+              const subtitle = item.is_amount_fixed && item.fixed_amount
+                ? formatNaira(item.fixed_amount)
+                : 'Variable amount';
+              return (
+                <BillListRow
+                  icon="pricetag-outline"
+                  title={item.name}
+                  subtitle={subtitle}
+                  onPress={() => selectPaymentItem(item)}
+                />
+              );
+            }}
           />
         )}
-      </SafeAreaView>
+      </View>
     );
   }
 
-  // --- CUSTOMER FORM ---
+  // ── CUSTOMER FORM ─────────────────────────────────────────────────────────────
   if (step === 'customer_form') {
     const isFixed = selectedItem?.is_amount_fixed ?? false;
     const isValidating = validateMutation.isPending;
 
     return (
-      <SafeAreaView style={s.safe}>
-        <StepHeader title="Customer Details" onBack={goBack} />
+      <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <DetailHeader title="Customer Details" step={step} onBack={goBack} />
         <KeyboardAvoidingView
-          style={{ flex: 1 }}
+          style={ss.flex1}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <ScrollView contentContainerStyle={s.formContent}>
-            {/* Biller summary chip */}
-            <View style={s.contextChip}>
-              <Ionicons name="business-outline" size={14} color="#0F7B3F" />
-              <Text style={s.contextChipText}>
-                {selectedBiller?.name} · {selectedItem?.name}
+          <ScrollView contentContainerStyle={ss.formContent}>
+            {/* Biller context chip */}
+            <View style={[ss.contextChip, { backgroundColor: colors.surfaceElevated }]}>
+              <Ionicons name="business-outline" size={14} color={colors.brand} />
+              <Text style={[ss.contextChipText, { color: colors.textSecondary }]}>
+                {selectedBiller?.name} \u00b7 {selectedItem?.name}
               </Text>
             </View>
 
-            <Text style={s.fieldLabel}>Customer / Account ID</Text>
+            <Text style={[ss.fieldLabel, { color: colors.textSecondary }]}>
+              Customer / Account ID
+            </Text>
             <TextInput
-              style={s.input}
+              style={[
+                ss.input,
+                {
+                  backgroundColor: colors.white,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
               placeholder="e.g. 07012345678 or meter number"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={colors.textTertiary}
               value={customerId}
               onChangeText={setCustomerId}
               autoCapitalize="none"
@@ -802,11 +1054,20 @@ function BillsContent() {
 
             {!isFixed && (
               <>
-                <Text style={s.fieldLabel}>Amount (₦)</Text>
+                <Text style={[ss.fieldLabel, { color: colors.textSecondary }]}>
+                  Amount (\u20a6)
+                </Text>
                 <TextInput
-                  style={s.input}
+                  style={[
+                    ss.input,
+                    {
+                      backgroundColor: colors.white,
+                      borderColor: colors.border,
+                      color: colors.textPrimary,
+                    },
+                  ]}
                   placeholder="e.g. 2000"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textTertiary}
                   value={amountNaira}
                   onChangeText={setAmountNaira}
                   keyboardType="decimal-pad"
@@ -815,28 +1076,47 @@ function BillsContent() {
             )}
 
             {isFixed && selectedItem?.fixed_amount ? (
-              <View style={s.fixedAmountBadge}>
-                <Text style={s.fixedAmountLabel}>Fixed amount</Text>
-                <Text style={s.fixedAmountValue}>
+              <View
+                style={[
+                  ss.fixedAmountBadge,
+                  { backgroundColor: colors.surface, borderColor: colors.borderBrand },
+                ]}
+              >
+                <Text style={[ss.fixedAmountLabel, { color: colors.textMeta }]}>
+                  Fixed amount
+                </Text>
+                <Text style={[ss.fixedAmountValue, { color: colors.brand }]}>
                   {formatNaira(selectedItem.fixed_amount)}
                 </Text>
               </View>
             ) : null}
 
-            <Text style={s.fieldLabel}>Budget category (optional)</Text>
+            <Text style={[ss.fieldLabel, { color: colors.textSecondary }]}>
+              Budget category (optional)
+            </Text>
             <CategoryPickerField
               groups={categoryGroups}
               selectedId={selectedBudgetCategoryId}
               onSelect={setSelectedBudgetCategoryId}
             />
 
-            <Text style={s.fieldLabel}>Pay from account</Text>
+            <Text style={[ss.fieldLabel, { color: colors.textSecondary }]}>
+              Pay from account
+            </Text>
             {loadingAccounts ? (
-              <ActivityIndicator color="#0F7B3F" />
+              <ActivityIndicator color={colors.brand} />
             ) : accounts.length === 0 ? (
-              <View style={s.warningBox}>
-                <Ionicons name="warning-outline" size={16} color="#92400E" />
-                <Text style={s.warningText}>
+              <View
+                style={[
+                  ss.warningBox,
+                  {
+                    backgroundColor: colors.warningSubtle,
+                    borderColor: colors.warningBorder,
+                  },
+                ]}
+              >
+                <Ionicons name="warning-outline" size={16} color={colors.warningText} />
+                <Text style={[ss.warningText, { color: colors.warningText }]}>
                   No linked accounts. Please link a bank account first.
                 </Text>
               </View>
@@ -850,37 +1130,47 @@ function BillsContent() {
 
             <TouchableOpacity
               style={[
-                s.primaryBtn,
+                ss.primaryBtn,
+                { backgroundColor: colors.brand },
                 (isValidating || !customerId.trim() || accounts.length === 0) &&
-                s.primaryBtnDisabled,
+                ss.primaryBtnDisabled,
               ]}
               onPress={handleValidate}
               disabled={isValidating || !customerId.trim() || accounts.length === 0}
               activeOpacity={0.85}
             >
               {isValidating ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={s.primaryBtnText}>Validate & Continue</Text>
+                <Text style={[ss.primaryBtnText, { color: colors.white }]}>
+                  Validate &amp; Continue
+                </Text>
               )}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  // --- CONFIRM ---
+  // ── CONFIRM ───────────────────────────────────────────────────────────────────
   if (step === 'confirm') {
     const isPaying = payMutation.isPending;
 
     return (
-      <SafeAreaView style={s.safe}>
-        <StepHeader title="Confirm Payment" onBack={goBack} />
-        <ScrollView contentContainerStyle={s.formContent}>
-          <View style={s.confirmCard}>
-            <SummaryRow label="Biller" value={selectedBiller?.name ?? '—'} />
-            <SummaryRow label="Plan" value={selectedItem?.name ?? '—'} />
+      <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <DetailHeader title="Confirm Payment" step={step} onBack={goBack} />
+        <ScrollView contentContainerStyle={ss.formContent}>
+          <View
+            style={[ss.confirmCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <Text style={[ss.summaryGroupLabel, { color: colors.textSecondary }]}>
+              Payment Summary
+            </Text>
+            <View style={[ss.confirmDivider, { backgroundColor: colors.separator }]} />
+
+            <SummaryRow label="Biller" value={selectedBiller?.name ?? '\u2014'} />
+            <SummaryRow label="Plan" value={selectedItem?.name ?? '\u2014'} />
             <SummaryRow
               label="Customer"
               value={validationResult?.customer_name ?? customerId}
@@ -893,7 +1183,7 @@ function BillsContent() {
                   ? (categoryGroups
                     .flatMap((g) => g.categories)
                     .find((c) => c.id === selectedBudgetCategoryId)
-                    ?.name ?? '—')
+                    ?.name ?? '\u2014')
                   : 'None'
               }
             />
@@ -902,69 +1192,133 @@ function BillsContent() {
               value={
                 selectedAccount
                   ? `${selectedAccount.institution} (${formatNaira(selectedAccount.balance)})`
-                  : '—'
+                  : '\u2014'
               }
             />
-            <View style={s.confirmDivider} />
-            <SummaryRow
-              label="Amount"
-              value={buildDisplayAmount()}
-              bold
-            />
+            <View style={[ss.confirmDivider, { backgroundColor: colors.separator }]} />
+            <SummaryRow label="Amount" value={buildDisplayAmount()} bold />
+          </View>
+
+          {/* Security note */}
+          <View
+            style={[
+              ss.securityNote,
+              { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorder },
+            ]}
+          >
+            <Ionicons name="shield-checkmark-outline" size={14} color={colors.warningText} />
+            <Text style={[ss.securityNoteText, { color: colors.warningText }]}>
+              You won&apos;t be charged until you confirm. This action cannot be undone.
+            </Text>
           </View>
 
           <TouchableOpacity
-            style={[s.primaryBtn, isPaying && s.primaryBtnDisabled]}
+            style={[
+              ss.limeBtn,
+              { backgroundColor: colors.lime },
+              isPaying && ss.primaryBtnDisabled,
+            ]}
             onPress={handlePay}
             disabled={isPaying}
             activeOpacity={0.85}
           >
             {isPaying ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.darkGreen} />
             ) : (
-              <Text style={s.primaryBtnText}>Pay Now</Text>
+              <Text style={[ss.limeBtnText, { color: colors.darkGreen }]}>
+                Confirm &amp; Pay {buildDisplayAmount()}
+              </Text>
             )}
           </TouchableOpacity>
 
-          <Text style={s.disclaimer}>
-            By tapping Pay Now, you authorise MoniMata to process this payment
-            via Interswitch. This action cannot be undone.
+          <Text style={[ss.disclaimer, { color: colors.textMeta }]}>
+            By tapping Confirm &amp; Pay, you authorise MoniMata to process this payment
+            via Interswitch.
           </Text>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  // --- RECEIPT ---
-  if (step === 'receipt' && payResult) {
-    return <ReceiptStep payResult={payResult} onDone={resetAll} />;
-  }
+  // ── CATEGORIES ────────────────────────────────────────────────────────────────
+  const recentHistory = history.slice(0, 3);
 
-  return null;
-}
-
-// ─── Summary row helper ───────────────────────────────────────────────────────
-
-function SummaryRow({
-  label,
-  value,
-  bold,
-  mono,
-}: {
-  label: string;
-  value: string;
-  bold?: boolean;
-  mono?: boolean;
-}) {
   return (
-    <View style={s.summaryRow}>
-      <Text style={s.summaryLabel}>{label}</Text>
-      <Text
-        style={[s.summaryValue, bold && s.summaryValueBold, mono && s.summaryValueMono]}
-        numberOfLines={2}
-      >
-        {value}
-      </Text>
+    <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+      <CategoriesHeader
+        showHistory={showHistory}
+        onToggleHistory={() => setShowHistory((v) => !v)}
+      />
+
+      {showHistory ? (
+        <HistoryView />
+      ) : loadingCategories ? (
+        <ActivityIndicator style={ss.loader} color={colors.brand} />
+      ) : (
+        <ScrollView contentContainerStyle={ss.categoriesScrollContent}>
+          {/* All Categories label */}
+          <View style={ss.sectionLabelRow}>
+            <Text style={[ss.sectionLabel, { color: colors.textSecondary }]}>
+              All Categories
+            </Text>
+          </View>
+
+          {/* 3-column grid */}
+          {categories.length === 0 ? (
+            <View style={ss.emptyContainer}>
+              <Text style={[ss.emptyTitle, { color: colors.textSecondary }]}>
+                No categories found
+              </Text>
+            </View>
+          ) : (
+            <View style={ss.categoryGrid}>
+              {categories.map((item) => (
+                <CategoryCard
+                  key={item.id}
+                  item={item}
+                  onPress={() => selectCategory(item)}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* Recent Payments section */}
+          {recentHistory.length > 0 && (
+            <View style={ss.recentSection}>
+              <Text style={[ss.sectionLabel, { color: colors.textSecondary }]}>
+                Recent Payments
+              </Text>
+              <View
+                style={[
+                  ss.recentCard,
+                  { backgroundColor: colors.white, borderColor: colors.border },
+                ]}
+              >
+                {recentHistory.map((item, index) => (
+                  <View key={item.id}>
+                    {index > 0 && (
+                      <View style={[ss.separator, { backgroundColor: colors.separator }]} />
+                    )}
+                    <HistoryRow item={item} />
+                  </View>
+                ))}
+              </View>
+
+              {history.length > 3 && (
+                <TouchableOpacity
+                  style={ss.viewAllBtn}
+                  onPress={() => setShowHistory(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[ss.viewAllTxt, { color: colors.brand }]}>
+                    View all {history.length} payments \u2192
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -979,272 +1333,394 @@ export default function BillsScreen() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Static styles ────────────────────────────────────────────────────────────
+// Layout and structural styles only — all colours applied dynamically via useTheme().
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
+const ss = StyleSheet.create({
+  screenFlex: { flex: 1 },
+  flex1: { flex: 1 },
+  loader: { flex: 1, marginTop: 40 },
 
-  // Header
-  header: {
+  // ── Dark green header (categories step) ────────────────────────────────────
+  darkHeader: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+    flexShrink: 0,
+  },
+  darkHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  darkHeaderTitle: {
+    ...type_.h1,
+  },
+  darkHeaderSub: {
+    ...type_.bodyReg,
+  },
+  histToggleBtn: {
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
+  },
+  histToggleTxt: {
+    ...type_.btnSm,
+  },
+
+  // ── White detail header + stepper (billers to confirm) ─────────────────────
+  detailHeaderWrap: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexShrink: 0,
+  },
+  detailHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   backBtn: { width: 36, height: 36, justifyContent: 'center' },
-  headerTitle: {
+  detailTitle: {
     flex: 1,
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#111827',
+    ...type_.h2,
     textAlign: 'center',
-    marginHorizontal: 4,
+    marginHorizontal: spacing.xs,
   },
-  headerRight: { width: 36, alignItems: 'flex-end' },
-  historyBtn: { padding: 6 },
 
-  // Category grid
-  categoryGrid: { padding: 16, paddingBottom: 40 },
-  categoryRow: { justifyContent: 'space-between', marginBottom: 12 },
-  categoryCard: {
-    width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+  // ── Progress stepper ───────────────────────────────────────────────────────
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.mdn,
+    paddingTop: spacing.sm,
   },
-  categoryIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#D1FAE5',
+  stepCircleWrap: {
+    alignItems: 'center',
+  },
+  stepCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+  },
+  stepCircleTxt: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  stepLbl: {
+    fontSize: 9,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    marginTop: 3,
+    textAlign: 'center',
+  },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    marginTop: 12,
+    marginHorizontal: spacing.xs,
+  },
+
+  // ── Categories grid ────────────────────────────────────────────────────────
+  categoriesScrollContent: { paddingBottom: 48 },
+  sectionLabelRow: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.mdn,
+    paddingBottom: spacing.xs,
+  },
+  sectionLabel: { ...type_.label },
+  categoryGrid: {
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.smd,
+  },
+  categoryCard: {
+    width: '30.5%',
+    borderRadius: radius.md,
+    padding: spacing.mdn,
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    ...shadow.sm,
+  },
+  categoryIconTile: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   categoryName: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#111827',
+    ...type_.caption,
     textAlign: 'center',
   },
 
-  // Biller list
-  listContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
-  billerRow: {
+  // ── Recent Payments section ────────────────────────────────────────────────
+  recentSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+  },
+  recentCard: {
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    marginTop: spacing.sm,
+    ...shadow.sm,
+  },
+  viewAllBtn: { paddingTop: spacing.md, alignItems: 'center' },
+  viewAllTxt: { ...type_.bodyReg },
+
+  // ── List rows (billers + payment items) ────────────────────────────────────
+  listContent: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: 40,
+  },
+  listRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: spacing.mdn,
   },
-  billerIcon: {
+  listRowIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#D1FAE5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
   },
-  billerInfo: { flex: 1 },
-  billerName: { fontSize: 15, fontWeight: '500', color: '#111827' },
-  billerSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  separator: { height: 1, backgroundColor: '#F3F4F6' },
+  listRowInfo: { flex: 1 },
+  listRowTitle: { ...type_.body },
+  listRowSub: { ...type_.small, marginTop: 2 },
 
-  // Form
-  formContent: { padding: 20, paddingBottom: 48 },
+  // ── History rows ───────────────────────────────────────────────────────────
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  historyIconTile: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  historyLeft: { flex: 1 },
+  historyNarration: { ...type_.body },
+  historyRef: { ...type_.caption, marginTop: 2 },
+  historyDate: { ...type_.small, marginTop: 2 },
+  historyAmount: { ...type_.mono },
+
+  // ── Customer form ──────────────────────────────────────────────────────────
+  formContent: { padding: spacing.xl, paddingBottom: 48 },
   contextChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D1FAE5',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    borderRadius: radius.full,
+    paddingVertical: spacing.sm - 2,
+    paddingHorizontal: spacing.md,
     alignSelf: 'flex-start',
-    marginBottom: 20,
-    gap: 6,
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
   },
-  contextChipText: { fontSize: 13, color: '#065F46', fontWeight: '500' },
+  contextChipText: { ...type_.small },
   fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-    marginTop: 16,
+    ...type_.small,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    marginBottom: spacing.sm - 2,
+    marginTop: spacing.lg,
   },
   input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#111827',
+    borderWidth: 1.5,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: spacing.md,
+    ...type_.body,
   },
   fixedAmountBadge: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginTop: 4,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
   },
-  fixedAmountLabel: { fontSize: 13, color: '#6B7280' },
-  fixedAmountValue: { fontSize: 16, fontWeight: '700', color: '#0F7B3F' },
+  fixedAmountLabel: { ...type_.bodyReg },
+  fixedAmountValue: { ...type_.mono },
   warningBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 8,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
-  warningText: { flex: 1, fontSize: 13, color: '#92400E' },
+  warningText: { flex: 1, ...type_.bodyReg },
 
-  // Budget category picker
+  // ── Budget category picker ─────────────────────────────────────────────────
   catPickerTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 8,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
-  catPickerTriggerText: { flex: 1, fontSize: 14, color: '#374151' },
+  catPickerTriggerText: { flex: 1, ...type_.body },
   catPickerPanel: {
-    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 4,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.xs,
   },
   catGroupLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 10,
-    marginBottom: 6,
+    ...type_.label,
+    marginTop: spacing.smd,
+    marginBottom: spacing.sm,
   },
-  catChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  catChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm - 2 },
   catChip: {
-    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
+    borderRadius: radius.full,
+    paddingVertical: spacing.xs + 1,
+    paddingHorizontal: spacing.md,
   },
-  catChipActive: { backgroundColor: '#0F7B3F', borderColor: '#0F7B3F' },
-  catChipText: { fontSize: 13, color: '#374151' },
-  catChipTextActive: { color: '#fff', fontWeight: '600' },
+  catChipText: { ...type_.bodyReg },
 
-  // Account picker
-  accountScroll: { marginTop: 4 },
-  accountScrollContent: { gap: 10, paddingRight: 4 },
+  // ── Account picker ─────────────────────────────────────────────────────────
+  accountScroll: { marginTop: spacing.xs },
+  accountScrollContent: { gap: spacing.smd, paddingRight: spacing.xs },
   accountChip: {
-    backgroundColor: '#fff',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    paddingVertical: spacing.smd,
+    paddingHorizontal: spacing.mdn,
     minWidth: 130,
   },
-  accountChipActive: { borderColor: '#0F7B3F', backgroundColor: '#F0FDF4' },
-  accountChipInst: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  accountChipBal: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  accountChipTextActive: { color: '#0F7B3F' },
-
-  // Confirm card
-  confirmCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+  accountChipInst: {
+    ...type_.bodyReg,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
-  confirmDivider: { height: 1, backgroundColor: '#E5E7EB', marginVertical: 12 },
+  accountChipBal: { ...type_.small, marginTop: 2 },
+
+  // ── Confirm card ───────────────────────────────────────────────────────────
+  confirmCard: {
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  summaryGroupLabel: {
+    ...type_.label,
+    marginBottom: spacing.smd,
+  },
+  confirmDivider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.md },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
-    gap: 12,
+    marginBottom: spacing.smd,
+    gap: spacing.md,
   },
-  summaryLabel: { fontSize: 13, color: '#6B7280', flex: 1 },
-  summaryValue: { fontSize: 14, color: '#111827', flex: 2, textAlign: 'right' },
-  summaryValueBold: { fontWeight: '700', fontSize: 16, color: '#0F7B3F' },
-  summaryValueMono: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12 },
+  summaryLabel: { ...type_.bodyReg, flex: 1 },
+  summaryValue: { ...type_.body, flex: 2, textAlign: 'right' },
+  summaryValueBold: { ...type_.mono },
 
-  // Receipt
-  receiptCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
+  // ── Security note ──────────────────────────────────────────────────────────
+  securityNote: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.smd,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  receiptIconWrap: { marginBottom: 12 },
-  receiptAmount: { fontSize: 32, fontWeight: '800', color: '#0F7B3F', marginBottom: 6 },
-  receiptNarration: { fontSize: 14, color: '#6B7280', marginBottom: 16, textAlign: 'center' },
-  pendingNote: {
-    fontSize: 13,
-    color: '#92400E',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
+  securityNoteText: { flex: 1, ...type_.small },
 
-  // Primary button
+  // ── Buttons ────────────────────────────────────────────────────────────────
   primaryBtn: {
-    backgroundColor: '#0F7B3F',
-    borderRadius: 12,
-    paddingVertical: 15,
+    borderRadius: radius.md,
+    paddingVertical: spacing.mdn + 1,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   primaryBtnDisabled: { opacity: 0.5 },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  primaryBtnText: { ...type_.btnLg },
+  limeBtn: {
+    borderRadius: radius.md,
+    paddingVertical: spacing.mdn + 1,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  limeBtnText: { ...type_.btnLg },
   disclaimer: {
-    marginTop: 14,
-    fontSize: 12,
-    color: '#9CA3AF',
+    marginTop: spacing.mdn,
+    ...type_.caption,
     textAlign: 'center',
     lineHeight: 18,
   },
 
-  // Empty / history
+  // ── Receipt ────────────────────────────────────────────────────────────────
+  receiptIconWrap: {
+    alignItems: 'center',
+    paddingTop: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  receiptCheckCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  receiptStatusLbl: {
+    ...type_.label,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  receiptAmount: {
+    fontSize: 34,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: -1,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  receiptNarration: {
+    ...type_.bodyReg,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  pendingNote: {
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  pendingNoteTxt: { ...type_.small, textAlign: 'center' },
+  receiptCard: {
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+
+  // ── Empty state ────────────────────────────────────────────────────────────
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
@@ -1252,17 +1728,9 @@ const s = StyleSheet.create({
     paddingTop: 80,
     paddingHorizontal: 32,
   },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginTop: 12 },
-  emptySub: { fontSize: 14, color: '#9CA3AF', marginTop: 6, textAlign: 'center' },
-  historyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    justifyContent: 'space-between',
-  },
-  historyLeft: { flex: 1, marginRight: 12 },
-  historyNarration: { fontSize: 14, fontWeight: '500', color: '#111827' },
-  historyRef: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
-  historyDate: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  historyAmount: { fontSize: 15, fontWeight: '600', color: '#DC2626' },
+  emptyTitle: { ...type_.body, marginTop: spacing.md },
+  emptySub: { ...type_.bodyReg, marginTop: spacing.sm, textAlign: 'center' },
+
+  // ── Separator ──────────────────────────────────────────────────────────────
+  separator: { height: StyleSheet.hairlineWidth },
 });

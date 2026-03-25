@@ -177,6 +177,14 @@ export interface ThemeColors {
   // ── Glow overlays ────────────────────────────────────────────────────────
   /** Lime at 20% opacity — radial glow overlay on darkGreen promo cards. */
   limeGlow: string;
+
+  // ── Ghost elements on dark-green surfaces ────────────────────────────────
+  /** 10% white — ghost button background on dark-green headers. */
+  overlayGhost: string;
+  /** 12% white — ghost button border on dark-green headers. */
+  overlayGhostBorder: string;
+  /** 70% white — readable but de-emphasised text on dark-green headers. */
+  textInverseMid: string;
 }
 
 // ─── Light theme ─────────────────────────────────────────────────────────────
@@ -247,6 +255,11 @@ export const lightColors: ThemeColors = {
 
   // Glow overlay
   limeGlow: 'rgba(168,224,99,0.2)',
+
+  // Ghost elements on dark-green surfaces
+  overlayGhost: 'rgba(255,255,255,0.10)',
+  overlayGhostBorder: 'rgba(255,255,255,0.12)',
+  textInverseMid: 'rgba(255,255,255,0.70)',
 };
 
 // ─── Dark theme ──────────────────────────────────────────────────────────────
@@ -319,6 +332,11 @@ export const darkColors: ThemeColors = {
 
   // Glow overlay
   limeGlow: 'rgba(168,224,99,0.2)',
+
+  // Ghost elements on dark-green surfaces
+  overlayGhost: 'rgba(255,255,255,0.10)',
+  overlayGhostBorder: 'rgba(255,255,255,0.12)',
+  textInverseMid: 'rgba(255,255,255,0.70)',
 };
 
 // ─── Gradient presets ─────────────────────────────────────────────────────────
