@@ -1,4 +1,0 @@
-1. Make sure watermelon db runs with JSI
-cd apps/mobile
-npx expo prebuild --clean
-npx expo run:android
