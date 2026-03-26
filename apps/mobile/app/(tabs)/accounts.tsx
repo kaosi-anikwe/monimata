@@ -168,7 +168,7 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
                 key={t}
                 style={[
                   ss.segment,
-                  { borderColor: colors.border, backgroundColor: colors.white },
+                  { borderColor: colors.border, backgroundColor: colors.cardBg },
                   accountType === t && { borderColor: colors.brand, backgroundColor: colors.surface },
                 ]}
                 onPress={() => setAccountType(t)}
@@ -495,7 +495,7 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
     <View
       style={[
         ss.card,
-        { backgroundColor: colors.white, borderColor: needsReauth ? colors.warning : colors.border },
+        { backgroundColor: colors.cardBg, borderColor: needsReauth ? colors.warning : colors.border },
         shadow.sm,
       ]}
     >
@@ -606,7 +606,7 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
             <View style={ss.footerBtns}>
               {isLinked && (
                 <TouchableOpacity
-                  style={[ss.footerBtn, { backgroundColor: colors.white, borderColor: colors.border }, isSyncing && ss.footerBtnDisabled]}
+                  style={[ss.footerBtn, { backgroundColor: colors.cardBg, borderColor: colors.border }, isSyncing && ss.footerBtnDisabled]}
                   onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSync(); }}
                   disabled={isSyncing}
                   accessibilityRole="button"
@@ -626,7 +626,7 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={[ss.footerBtnMore, { backgroundColor: colors.white, borderColor: colors.border }]}
+                style={[ss.footerBtnMore, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
                 onPress={onMoreActions}
                 accessibilityRole="button"
                 accessibilityLabel="More options"
@@ -730,7 +730,7 @@ export default function AccountsScreen() {
         style={[
           ss.header,
           {
-            backgroundColor: colors.white,
+            backgroundColor: colors.cardBg,
             borderBottomColor: colors.border,
             paddingTop: insets.top + spacing.smd,
           },
@@ -801,7 +801,7 @@ export default function AccountsScreen() {
             {/* ── Total Balance Card ── */}
             <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
               <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
-              <Text style={[ss.totalAmt, { color: colors.textInverse }]}>{formatNaira(totalBalance)}</Text>
+              <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
               <View style={ss.syncNote}>
                 <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
                   <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />

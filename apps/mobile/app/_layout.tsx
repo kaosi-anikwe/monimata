@@ -204,7 +204,7 @@ function makeNsStyles(colors: ReturnType<typeof useTheme>) {
       padding: spacing.xxl,
     },
     card: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.cardBg,
       borderRadius: radius.lg,
       borderWidth: 1,
       borderColor: colors.border,

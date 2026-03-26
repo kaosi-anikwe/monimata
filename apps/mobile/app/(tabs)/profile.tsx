@@ -169,7 +169,7 @@ export default function ProfileScreen() {
 
         {/* Stats grid */}
         <View style={ss.statsGrid}>
-          <View style={[ss.statCell, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+          <View style={[ss.statCell, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
             <AmountDisplay
               kobo={netWorth}
               size="md"
@@ -178,13 +178,13 @@ export default function ProfileScreen() {
             />
             <Text style={[ss.statLbl, { color: colors.textMeta, ...ff(600) }]}>Net Worth</Text>
           </View>
-          <View style={[ss.statCell, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+          <View style={[ss.statCell, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
             <Text style={[ss.statNum, { color: colors.textPrimary, ...ff(800) }]}>
               {FAKE_XP.toLocaleString()}
             </Text>
             <Text style={[ss.statLbl, { color: colors.textMeta, ...ff(600) }]}>Total XP</Text>
           </View>
-          <View style={[ss.statCell, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+          <View style={[ss.statCell, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
             <Text style={[ss.statNum, { color: colors.textPrimary, ...ff(800) }]}>{FAKE_STREAK}</Text>
             <Text style={[ss.statLbl, { color: colors.textMeta, ...ff(600) }]}>Day Streak</Text>
           </View>
@@ -197,7 +197,7 @@ export default function ProfileScreen() {
           paddingHorizontal={spacing.lg}
           style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
         />
-        <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+        <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           {user?.identity_verified ? (
             <ListRow
               iconBg={colors.surface}
@@ -270,7 +270,7 @@ export default function ProfileScreen() {
           paddingHorizontal={spacing.lg}
           style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
         />
-        <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+        <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           <ListRow
             iconBg={colors.warningSubtle}
             leftIcon={<Ionicons name="star-outline" size={17} color={colors.warning} />}
@@ -310,7 +310,7 @@ export default function ProfileScreen() {
           paddingHorizontal={spacing.lg}
           style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
         />
-        <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+        <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           <ListRow
             iconBg={colors.infoSubtle}
             leftIcon={<Ionicons name="book-outline" size={17} color={colors.info} />}
@@ -337,7 +337,7 @@ export default function ProfileScreen() {
           paddingHorizontal={spacing.lg}
           style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
         />
-        <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+        <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           {/* Dark Mode toggle */}
           <ListRow
             title="Dark Mode"

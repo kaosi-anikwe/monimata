@@ -143,7 +143,7 @@ function SplitLineRow({
   }
 
   return (
-    <View style={[ss.splitRow, { borderColor: colors.border, backgroundColor: colors.white }]}>
+    <View style={[ss.splitRow, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
       {/* Row header: badge + category pill + delete */}
       <View style={ss.splitRowTop}>
         <View style={[ss.splitNumBadge, { backgroundColor: accentColor }]}>
@@ -302,7 +302,7 @@ export default function SplitTransactionScreen() {
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
       {/* ── Header ── */}
-      <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
+      <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity
           style={[ss.backBtn, { backgroundColor: colors.surface }]}
           onPress={() => router.back()}
@@ -324,7 +324,7 @@ export default function SplitTransactionScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Hero card: visual bar + total */}
-        <View style={[ss.heroCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+        <View style={[ss.heroCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={ss.heroTopRow}>
             <View>
               <Text style={[ss.heroLbl, { color: colors.textMeta }]}>Total</Text>
@@ -358,7 +358,7 @@ export default function SplitTransactionScreen() {
           {[2, 3, 4, 5].map((n) => (
             <TouchableOpacity
               key={n}
-              style={[ss.eqChip, { borderColor: colors.border, backgroundColor: colors.white }]}
+              style={[ss.eqChip, { borderColor: colors.border, backgroundColor: colors.cardBg }]}
               onPress={() => {
                 const base = Math.floor(totalKobo / n);
                 const rem = totalKobo - base * n;

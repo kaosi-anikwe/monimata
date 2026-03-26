@@ -410,7 +410,7 @@ function makeStyles(colors: ThemeColors) {
     },
     // ── Seed group card ──
     seedGroup: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.cardBg,
       borderRadius: radius.lg,
       borderWidth: 1,
       overflow: 'hidden',

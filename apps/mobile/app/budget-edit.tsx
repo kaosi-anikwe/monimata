@@ -423,7 +423,7 @@ function AddCategoryModal({ groupId, month, onClose }: AddCatProps) {
         style={[ss.modalBackdrop, { backgroundColor: colors.overlayNeutral }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[ss.modalCard, { backgroundColor: colors.white }]}>
+        <View style={[ss.modalCard, { backgroundColor: colors.cardBg }]}>
           <Text style={[ss.modalTitle, { color: colors.textPrimary }]}>New Category</Text>
           <TextInput
             style={[ss.modalInput, {
@@ -629,7 +629,7 @@ export default function BudgetEditScreen() {
           style={[
             ss.grpBodyItem,
             {
-              backgroundColor: catIsActive ? colors.surface : colors.white,
+              backgroundColor: catIsActive ? colors.surface : colors.cardBg,
               borderColor: colors.border,
               borderLeftWidth: 1,
               borderRightWidth: 1,
@@ -724,7 +724,7 @@ export default function BudgetEditScreen() {
                   style={[
                     ss.grpCard,
                     {
-                      backgroundColor: colors.white,
+                      backgroundColor: colors.cardBg,
                       borderColor: isActive ? colors.brand : colors.border,
                       ...shadow.sm,
                     },
@@ -769,7 +769,7 @@ export default function BudgetEditScreen() {
             ss.addGroupBtn,
             {
               borderColor: colors.borderStrong,
-              backgroundColor: colors.white,
+              backgroundColor: colors.cardBg,
             },
           ]}
           onPress={() => setAddGroupOpen(true)}
@@ -791,7 +791,7 @@ export default function BudgetEditScreen() {
           style={[ss.modalBackdrop, { backgroundColor: colors.overlayNeutral }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={[ss.modalCard, { backgroundColor: colors.white }]}>
+          <View style={[ss.modalCard, { backgroundColor: colors.cardBg }]}>
             <Text style={[ss.modalTitle, { color: colors.textPrimary }]}>New Group</Text>
             <TextInput
               style={[ss.modalInput, {

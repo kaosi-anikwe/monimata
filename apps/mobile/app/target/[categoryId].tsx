@@ -600,7 +600,7 @@ export default function TargetEditScreen() {
 
         {/* ── Save bar ── */}
         <View style={[ts.saveBar, {
-          backgroundColor: colors.white,
+          backgroundColor: colors.cardBg,
           borderTopColor: colors.border,
           paddingBottom: insets.bottom + spacing.mdn,
         }]}>

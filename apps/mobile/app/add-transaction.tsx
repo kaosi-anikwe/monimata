@@ -137,7 +137,7 @@ function TypeToggle({
 
 function Numpad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const colors = useTheme();
-  const keyStyle = [ss.numKey, { backgroundColor: colors.white }];
+  const keyStyle = [ss.numKey, { backgroundColor: colors.cardBg }];
   const K = (v: string) => (
     <TouchableOpacity key={v} style={keyStyle} onPress={() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -359,7 +359,7 @@ export default function AddTransactionScreen() {
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
       {/* ── Header ── */}
-      <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
+      <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity
           style={[ss.closeBtn, { backgroundColor: colors.surface }]}
           onPress={() => router.back()}
@@ -374,7 +374,7 @@ export default function AddTransactionScreen() {
       </View>
 
       {/* ── Type toggle ── */}
-      <View style={[ss.typeToggleWrap, { backgroundColor: colors.white, borderBottomColor: colors.border }]}>
+      <View style={[ss.typeToggleWrap, { backgroundColor: colors.cardBg, borderBottomColor: colors.border }]}>
         <TypeToggle value={txType} onChange={setTxType} />
       </View>
 
@@ -385,7 +385,7 @@ export default function AddTransactionScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Amount display ── */}
-        <View style={[ss.amtCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+        <View style={[ss.amtCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={ss.amtRow}>
             <Text style={[ss.amtSym, { color: amountColor }]}>₦</Text>
             <Text style={[ss.amtNum, { color: amountColor }]}>{formatAmountDisplay(amountStr)}</Text>
@@ -396,7 +396,7 @@ export default function AddTransactionScreen() {
         </View>
 
         {/* ── Form card ── */}
-        <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.white }]}>
+        <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
           <Frow label="What for?">
             <TextInput
               ref={_narrationRef}
@@ -517,7 +517,7 @@ export default function AddTransactionScreen() {
         Platform.OS === 'ios' ? (
           <Modal visible transparent animationType="fade">
             <TouchableOpacity style={[ss.dtBackdrop, { backgroundColor: colors.overlayNeutral }]} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
-            <View style={[ss.dtSheet, { backgroundColor: colors.white }]}>
+            <View style={[ss.dtSheet, { backgroundColor: colors.cardBg }]}>
               <DateTimePicker
                 value={txDatetime}
                 mode="datetime"

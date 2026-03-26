@@ -178,13 +178,13 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
         s.container,
         {
           paddingBottom: bottomPad,
-          backgroundColor: colors.white,
+          backgroundColor: colors.cardBg,
           borderTopColor: colors.border,
         },
       ]}
     >
       {/* Drop-shadow surface layer */}
-      <View style={[s.barSurface, { backgroundColor: colors.white }]} />
+      <View style={[s.barSurface, { backgroundColor: colors.cardBg }]} />
 
       {/* 5 equal tab slots */}
       <View style={s.row}>

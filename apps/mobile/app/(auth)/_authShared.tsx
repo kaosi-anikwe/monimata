@@ -71,7 +71,7 @@ export function AuthInput({ hasError, colors, containerStyle, style, ...rest }: 
         authInputS.wrap,
         {
           borderColor: hasError ? colors.error : borderColor,
-          backgroundColor: colors.white,
+          backgroundColor: colors.cardBg,
         },
         containerStyle,
       ]}

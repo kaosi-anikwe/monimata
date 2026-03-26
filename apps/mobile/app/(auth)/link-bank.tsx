@@ -110,7 +110,7 @@ export default function LinkBankScreen() {
 
   return (
     <MonoProvider {...monoConfig}>
-      <View style={[authS.screen, { backgroundColor: colors.white }]}>
+      <View style={[authS.screen, { backgroundColor: colors.cardBg }]}>
 
         {/* ── Dark green curved header ── */}
         <AuthHdr>

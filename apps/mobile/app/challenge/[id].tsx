@@ -372,7 +372,7 @@ export default function ChallengeDetailScreen() {
       >
         {/* Your progress card (only when joined) */}
         {joined && (
-          <View style={[ss.progCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+          <View style={[ss.progCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
             <View style={ss.progHeader}>
               <Text style={[ss.progLbl, { color: colors.textPrimary, ...ff(700) }]}>Your Progress</Text>
               <Text style={[ss.progPct, { color: colors.brand, ...ff(700) }]}>
@@ -431,7 +431,7 @@ export default function ChallengeDetailScreen() {
             style={[
               ss.lbRow,
               {
-                backgroundColor: entry.isYou ? colors.surface : colors.white,
+                backgroundColor: entry.isYou ? colors.surface : colors.cardBg,
                 borderColor: entry.isYou ? colors.brand : colors.border,
               },
             ]}
@@ -450,7 +450,7 @@ export default function ChallengeDetailScreen() {
         ))}
 
         {/* ── Rules card ──────────────────────────────────────────────────── */}
-        <View style={[ss.rulesCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+        <View style={[ss.rulesCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={ss.rulesTitleRow}>
             <Ionicons name="shield-checkmark-outline" size={16} color={colors.brand} />
             <Text style={[ss.rulesTitle, { color: colors.textPrimary, ...ff(700) }]}>
@@ -470,7 +470,7 @@ export default function ChallengeDetailScreen() {
         </View>
 
         {/* ── Participants ─────────────────────────────────────────────────── */}
-        <View style={[ss.partCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+        <View style={[ss.partCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[ss.partTitle, { color: colors.textPrimary, ...ff(700) }]}>
             Who&apos;s in this challenge
           </Text>

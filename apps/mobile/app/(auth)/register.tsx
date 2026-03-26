@@ -92,7 +92,7 @@ export default function RegisterScreen() {
   }
 
   return (
-    <View style={[s.screen, { backgroundColor: colors.white }]}>
+    <View style={[s.screen, { backgroundColor: colors.cardBg }]}>
       <StatusBar style="light" />
       {/* ── Dark green header ── */}
       <AuthHdr>

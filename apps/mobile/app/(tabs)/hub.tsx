@@ -42,6 +42,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ff } from '@/lib/typography';
 import { useTheme } from '@/lib/theme';
 import { useToast } from '@/components/Toast';
+import { Chip } from '@/components/ui/Chip';
 import { hitSlop, layout, radius, shadow, spacing } from '@/lib/tokens';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -328,7 +329,7 @@ function ArticleCard({
   const thumbBg = colors[THUMB_TOKEN[article.thumbColor]];
   return (
     <TouchableOpacity
-      style={[ss.artCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+      style={[ss.artCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.88}
       accessibilityRole="button"
@@ -371,7 +372,7 @@ function CourseCardMini({
   const [from, to] = courseGradient(course.gradientColor);
   return (
     <TouchableOpacity
-      style={[ss.courseMini, { backgroundColor: colors.white, borderColor: colors.border }]}
+      style={[ss.courseMini, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.88}
       accessibilityRole="button"
@@ -437,7 +438,7 @@ function CourseListRow({
 
   return (
     <TouchableOpacity
-      style={[ss.courseRow, { backgroundColor: colors.white, borderColor: colors.border }]}
+      style={[ss.courseRow, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.88}
       accessibilityRole="button"
@@ -490,7 +491,7 @@ function QuizCard({
   const thumbBg = colors[THUMB_TOKEN[quiz.thumbColor]];
   return (
     <TouchableOpacity
-      style={[ss.courseRow, { backgroundColor: colors.white, borderColor: colors.border }]}
+      style={[ss.courseRow, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.88}
       accessibilityRole="button"
@@ -637,34 +638,15 @@ export default function HubScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={ss.chips}
           >
-            {CATEGORIES.map((cat) => {
-              const isOn = activeCategory === cat;
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    ss.chip,
-                    {
-                      backgroundColor: isOn ? colors.brand : colors.white,
-                      borderColor: isOn ? colors.brand : colors.borderStrong,
-                    },
-                  ]}
-                  onPress={() => setActiveCategory(cat)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Filter by ${cat}`}
-                  accessibilityState={{ selected: isOn }}
-                >
-                  <Text
-                    style={[
-                      ss.chipTxt,
-                      { color: isOn ? colors.white : colors.textSecondary, ...ff(600) },
-                    ]}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+            {CATEGORIES.map((cat) => (
+              <Chip
+                key={cat}
+                label={cat}
+                selected={activeCategory === cat}
+                onPress={() => setActiveCategory(cat)}
+                accessibilityLabel={`Filter by ${cat}`}
+              />
+            ))}
           </ScrollView>
 
           {/* Featured article hero card */}
@@ -759,7 +741,7 @@ export default function HubScreen() {
           <TouchableOpacity
             style={[
               ss.dailyQuiz,
-              { backgroundColor: colors.white, borderColor: colors.border },
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
             ]}
             onPress={() => handleQuiz(QUIZZES[0]!)}
             activeOpacity={0.88}

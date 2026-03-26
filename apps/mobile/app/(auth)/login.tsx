@@ -81,7 +81,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={[s.screen, { backgroundColor: colors.white }]}>
+    <View style={[s.screen, { backgroundColor: colors.cardBg }]}>
       <StatusBar style="light" />
       {/* ── Dark green curved header ── */}
       <AuthHdr>
