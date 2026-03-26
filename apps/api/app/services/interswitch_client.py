@@ -34,6 +34,8 @@ We set the correct header per call.
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import logging
 from typing import cast
 from datetime import timedelta
@@ -255,9 +257,110 @@ class InterswitchClient:
             response.raise_for_status()
             return response.json()
 
+    # ── Web Checkout (Phase 2) ────────────────────────────────────────────────
+
+    def build_checkout_html(
+        self,
+        *,
+        ref: str,
+        amount_kobo: int,
+        cust_email: str,
+        site_redirect_url: str,
+    ) -> str:
+        """
+        Return an HTML page containing an auto-submitting form that POSTs the
+        user's browser to the Interswitch Web Checkout page.
+
+        The app backend serves this as GET /bills/checkout/{ref} so that the
+        mobile WebView can load it without embedding sensitive merchant config
+        on the client side.
+        """
+        checkout_url = settings.INTERSWITCH_WEB_CHECKOUT_URL
+        merchant_code = settings.INTERSWITCH_MERCHANT_CODE
+        pay_item_id = settings.INTERSWITCH_PAY_ITEM_ID
+
+        return f"""
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8" />
+                <title>Redirecting to secure payment…</title>
+            </head>
+            <body>
+                <p style="font-family: sans-serif; text-align: center; margin-top: 40px">
+                Redirecting to secure payment&hellip;
+                </p>
+                <form id="f" method="POST" action="{checkout_url}">
+                <input type="hidden" name="merchant_code" value="{merchant_code}" />
+                <input type="hidden" name="pay_item_id" value="{pay_item_id}" />
+                <input type="hidden" name="txn_ref" value="{ref}" />
+                <input type="hidden" name="amount" value="{amount_kobo}" />
+                <input type="hidden" name="currency" value="566" />
+                <input type="hidden" name="cust_email" value="{cust_email}" />
+                <input
+                    type="hidden"
+                    name="site_redirect_url"
+                    value="{site_redirect_url}"
+                />
+                </form>
+                <script>
+                document.getElementById("f").submit();
+                </script>
+            </body>
+            </html>
+        """
+
+    async def verify_web_payment(self, ref: str, amount_kobo: int) -> dict:
+        """
+        Re-query Interswitch Collections API to confirm a Web Checkout payment.
+
+        GET /collections/api/v1/gettransaction.json
+            ?merchantcode={mc}&transactionreference={ref}&amount={amount_kobo}
+
+        Returns the raw ISW response dict.  Callers should check
+        result["ResponseCode"] == "00" for success.
+        """
+        token = await self._get_access_token()
+        collections_base = settings.INTERSWITCH_COLLECTIONS_URL.rstrip("/")
+        async with self._client() as http:
+            response = await http.get(
+                f"{collections_base}/gettransaction.json",
+                params={
+                    "merchantcode": settings.INTERSWITCH_MERCHANT_CODE,
+                    "transactionreference": ref,
+                    "amount": str(amount_kobo),
+                },
+                headers=self._headers(token),
+            )
+            response.raise_for_status()
+            return response.json()
+
     async def aclose(self) -> None:
         pass  # no persistent client to close
 
 
 # Singleton — re-used across requests
 interswitch_client = InterswitchClient()
+
+
+def verify_interswitch_webhook(body: bytes, signature: str) -> bool:
+    """
+    Verify an Interswitch webhook event signature.
+
+    Interswitch signs each webhook payload with HMAC-SHA512 using the webhook
+    secret configured in the Developer Console.  The resulting hex digest is
+    sent in the ``x-interswitch-signature`` request header.
+
+    Returns True if the signature is valid, False otherwise.
+    An empty INTERSWITCH_WEBHOOK_SECRET means verification is disabled (dev
+    convenience only — always set in production).
+    """
+    secret = settings.INTERSWITCH_WEBHOOK_SECRET
+    if not secret:
+        logger.warning(
+            "INTERSWITCH_WEBHOOK_SECRET is not set — webhook signature verification skipped"
+        )
+        return True
+
+    expected = hmac.new(secret.encode(), body, hashlib.sha512).hexdigest()
+    return hmac.compare_digest(expected, signature.lower())

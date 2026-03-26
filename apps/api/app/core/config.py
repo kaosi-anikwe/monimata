@@ -72,6 +72,27 @@ class Settings(BaseSettings):
     # public sandbox terminal used in Interswitch's own documentation examples.
     INTERSWITCH_TERMINAL_ID: str = "3pbl0001"
 
+    # ── Interswitch Web Checkout (Phase 2) ────────────────────────────────────
+    # Sandbox:    https://newwebpay.qa.interswitchng.com/collections/w/pay
+    # Production: https://newwebpay.interswitchng.com/collections/w/pay
+    INTERSWITCH_WEB_CHECKOUT_URL: str = (
+        "https://newwebpay.qa.interswitchng.com/collections/w/pay"
+    )
+    # Collections re-query endpoint used to verify a completed Web Checkout.
+    # Sandbox:    https://qa.interswitchng.com/collections/api/v1
+    # Production: https://api.interswitchng.com/collections/api/v1
+    INTERSWITCH_COLLECTIONS_URL: str = "https://qa.interswitchng.com/collections/api/v1"
+    # Merchant code issued during Quickteller Business onboarding.
+    INTERSWITCH_MERCHANT_CODE: str = ""
+    # The single generic "Bill Payment" pay item registered on the
+    # Quickteller Business Dashboard (not per-biller).
+    INTERSWITCH_PAY_ITEM_ID: str = ""
+
+    # ── Interswitch webhook security ──────────────────────────────────────────
+    # Secret used to verify the HMAC-SHA512 signature on ISW webhook events.
+    # Set this to the value configured in the Interswitch Developer Console.
+    INTERSWITCH_WEBHOOK_SECRET: str = ""
+
     # ── AI / LLM ──────────────────────────────────────────────────────────────
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""

@@ -300,6 +300,79 @@ def _notify_sync_complete(user_id: str, account_id: str) -> None:
     )
 
 
+def _notify_bill_payment(
+    user_id: str,
+    ref: str,
+    state: str,  # "COMPLETED" | "FAILED"
+    biller_name: str,
+    amount_kobo: int,
+) -> None:
+    """
+    Publish a bill_payment_update WebSocket event and send a push notification
+    so the user knows the outcome even if the app is backgrounded.
+
+    The WS event lets the polling loop in ProcessingStep short-circuit
+    immediately rather than waiting for the next 5-second poll tick.
+    """
+    import json
+    from app.core.redis_client import get_redis
+    from app.ws_manager import ws_channel, notify_user
+
+    # ── WebSocket event ───────────────────────────────────────────────────────
+    try:
+        r = get_redis()
+        r.publish(
+            ws_channel(str(user_id)),
+            json.dumps(
+                {
+                    "type": "bill_payment_update",
+                    "ref": ref,
+                    "state": state,
+                }
+            ),
+        )
+        # Also invalidate the bills/history and budget query caches.
+        notify_user(str(user_id), ["billHistory", "budget"])
+    except Exception:
+        logger.exception(
+            "_notify_bill_payment: WS publish failed ref=%s state=%s", ref, state
+        )
+
+    # ── Push notification ─────────────────────────────────────────────────────
+    try:
+        from app.models.user import User as UserModel
+        from app.services.push_service import send_push_notification
+
+        db = SessionLocal()
+        try:
+            user = db.get(UserModel, str(user_id))
+            if user and user.expo_push_token:
+                naira = amount_kobo / 100
+                if state == "COMPLETED":
+                    title = "Payment Successful"
+                    body = (
+                        f"Your ₦{naira:,.2f} payment to {biller_name} was successful."
+                    )
+                else:
+                    title = "Payment Failed"
+                    body = (
+                        f"Your ₦{naira:,.2f} payment to {biller_name} could not be"
+                        " completed. Please try again."
+                    )
+                send_push_notification(
+                    token=user.expo_push_token,
+                    title=title,
+                    body=body,
+                    data={"ref": ref, "state": state, "screen": "bills"},
+                )
+        finally:
+            db.close()
+    except Exception:
+        logger.exception(
+            "_notify_bill_payment: push notification failed ref=%s state=%s", ref, state
+        )
+
+
 # ── categorize_transactions ───────────────────────────────────────────────────
 
 
@@ -580,5 +653,222 @@ def reconcile_budget_activity() -> None:
         db.rollback()
         logger.exception("reconcile_budget_activity failed")
         raise
+    finally:
+        db.close()
+
+
+# ── dispatch_bill_phase3 ──────────────────────────────────────────────────────
+
+
+@celery_app.task(
+    name="app.worker.tasks.dispatch_bill_phase3",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def dispatch_bill_phase3(self, ref: str) -> None:
+    """
+    Phase 3 of the 3-phase Interswitch bill payment flow.
+
+    1. Verify the Web Checkout payment server-side (ISW Collections re-query).
+    2. Call SendBillPaymentAdvice to debit the Retailpay wallet and deliver the
+       bill to the biller.
+    3. Create a Transaction record and update budget_months.activity.
+    4. Mark the PendingBillPayment as COMPLETED.
+
+    Retries up to 3 times with exponential backoff on ISW / network errors.
+    After exhaustion, marks the payment FAILED so the mobile app can surface
+    an appropriate message.
+
+    Idempotent: skips silently if the payment is already in a terminal state.
+    """
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.pending_bill_payment import PendingBillPayment
+    from app.models.transaction import Transaction
+    from app.services.interswitch_client import interswitch_client
+    from app.services.budget_logic import get_or_create_budget_month
+
+    db = SessionLocal()
+    try:
+        pending: PendingBillPayment | None = (
+            db.query(PendingBillPayment)
+            .filter(PendingBillPayment.ref == ref)
+            .with_for_update()
+            .first()
+        )
+        if pending is None:
+            logger.error("dispatch_bill_phase3: pending record not found ref=%s", ref)
+            return
+
+        # Idempotency — skip if already in a terminal or advanced state.
+        if pending.state in ("COMPLETED", "FAILED", "REFUNDED", "BILL_DISPATCHED"):
+            logger.info(
+                "dispatch_bill_phase3: skipping, already state=%s ref=%s",
+                pending.state,
+                ref,
+            )
+            return
+
+        # ── Step 1: Verify Web Checkout payment ──────────────────────────────
+        if pending.state == "PENDING_CHECKOUT":
+            try:
+                verify_result = _run_async(
+                    interswitch_client.verify_web_payment(ref, pending.amount)
+                )
+            except Exception as exc:
+                logger.warning(
+                    "dispatch_bill_phase3: verify_web_payment failed ref=%s: %s",
+                    ref,
+                    exc,
+                )
+                raise self.retry(exc=exc, countdown=30)
+
+            response_code: str = str(
+                verify_result.get("ResponseCode")
+                or verify_result.get("TransactionResponseCode")
+                or "99"
+            )
+            if response_code != "00":
+                logger.warning(
+                    "dispatch_bill_phase3: checkout not yet confirmed "
+                    "ref=%s code=%s — retrying",
+                    ref,
+                    response_code,
+                )
+                raise self.retry(countdown=30)
+
+            pending.state = "CHECKOUT_VERIFIED"
+            db.commit()
+
+        # ── Step 2: SendBillPaymentAdvice ─────────────────────────────────────
+        pending.attempt_count = (pending.attempt_count or 0) + 1
+        db.commit()
+
+        try:
+            isw_result = _run_async(
+                interswitch_client.initiate_payment(
+                    request_reference=ref,
+                    payment_code=pending.payment_code,
+                    customer_id=pending.customer_id,
+                    amount=pending.amount,
+                    customer_mobile=pending.customer_mobile or "",
+                    customer_email=pending.customer_email or "",
+                )
+            )
+        except Exception as exc:
+            logger.error(
+                "dispatch_bill_phase3: initiate_payment failed ref=%s: %s", ref, exc
+            )
+            if pending.attempt_count < 3:
+                raise self.retry(exc=exc, countdown=60 * pending.attempt_count)
+            pending.state = "FAILED"
+            db.commit()
+            _notify_bill_payment(
+                pending.user_id,
+                ref,
+                "FAILED",
+                pending.biller_name or "Biller",
+                pending.amount,
+            )
+            return
+
+        isw_code: str = str(
+            isw_result.get("ResponseCode") or isw_result.get("responseCode") or "99"
+        )
+        if isw_code not in ("00", "90000"):
+            logger.error(
+                "dispatch_bill_phase3: ISW rejected advice ref=%s code=%s: %s",
+                ref,
+                isw_code,
+                isw_result.get("ResponseDescription"),
+            )
+            if pending.attempt_count < 3:
+                raise self.retry(
+                    countdown=60 * pending.attempt_count,
+                    exc=RuntimeError(
+                        f"ISW SendBillPaymentAdvice rejected: code={isw_code}"
+                    ),
+                )
+            pending.state = "FAILED"
+            db.commit()
+            _notify_bill_payment(
+                pending.user_id,
+                ref,
+                "FAILED",
+                pending.biller_name or "Biller",
+                pending.amount,
+            )
+            return
+
+        pending.state = "BILL_DISPATCHED"
+        db.commit()
+
+        # ── Step 3: Create Transaction + update budget ────────────────────────
+        now = datetime.now(timezone.utc)
+        biller_label = pending.biller_name or "Biller"
+        narration = f"{biller_label} via Interswitch"
+
+        tx = Transaction(
+            user_id=pending.user_id,
+            account_id=pending.account_id,
+            date=now,
+            amount=-pending.amount,  # negative = debit
+            narration=narration,
+            type="debit",
+            source="interswitch",
+            interswitch_ref=ref,
+            category_id=pending.category_id,
+            is_manual=False,
+        )
+        db.add(tx)
+        db.flush()
+
+        if pending.category_id:
+            month_str = now.strftime("%Y-%m")
+            bm = get_or_create_budget_month(
+                db, pending.user_id, pending.category_id, month_str
+            )
+            bm.activity += tx.amount
+            db.flush()
+
+        pending.transaction_id = tx.id
+        pending.state = "COMPLETED"
+        db.commit()
+
+        # ── Notify user (WS + push) ───────────────────────────────────────────
+        _notify_bill_payment(
+            pending.user_id, ref, "COMPLETED", biller_label, pending.amount
+        )
+
+        # ── Nudge ─────────────────────────────────────────────────────────────
+        try:
+            from app.models.user import User as UserModel
+            from app.models.category import Category as CatModel
+            from app.services.nudge_engine import evaluate_bill_payment_nudge
+
+            fresh_user = db.get(UserModel, pending.user_id)
+            if fresh_user:
+                cat_name: str | None = None
+                if pending.category_id:
+                    cat = db.get(CatModel, pending.category_id)
+                    if cat:
+                        cat_name = cat.name
+                evaluate_bill_payment_nudge(db, fresh_user, tx, biller_label, cat_name)
+                db.commit()
+        except Exception:
+            logger.exception(
+                "dispatch_bill_phase3: nudge evaluation failed for ref=%s", ref
+            )
+
+        logger.info("dispatch_bill_phase3: completed ref=%s tx_id=%s", ref, tx.id)
+
+    except Exception as exc:
+        db.rollback()
+        # Don't mask Celery's Retry exception.
+        if hasattr(exc, "retry"):
+            raise
+        logger.exception("dispatch_bill_phase3: unexpected error ref=%s", ref)
+        raise self.retry(exc=exc, countdown=60)
     finally:
         db.close()

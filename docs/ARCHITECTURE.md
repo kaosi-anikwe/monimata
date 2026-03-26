@@ -564,22 +564,67 @@ wake-up time, which feels purposeful, not mechanical.
 
 ## 7. Interswitch Integration — Bill Payment & Identity
 
-Interswitch is the payment infrastructure layer. It provides two capabilities used
+Interswitch is the payment infrastructure layer. It provides three capabilities used
 in MoniMata:
 
-1. **Quickteller (Bill Payment)** — Pay electricity, cable TV, airtime, data, and
-   other Nigerian billers from inside the app, debiting a linked bank account directly.
-2. **Passport (Identity / BVN Verification)** — Verify a user's BVN during onboarding
+1. **Quickteller VAS (Browse & Validate)** — Browse over 7,000 billers (electricity,
+   cable TV, airtime, data), validate customer/meter/smartcard numbers, and dispatch
+   the final bill payment debit via `SendBillPaymentAdvice` from a Retailpay wallet.
+2. **Web Checkout (Collect User Payment)** — A hosted Interswitch checkout page where
+   the user pays using card, bank transfer, USSD, QR, or OPay. The collected funds
+   land in MoniMata's Retailpay wallet, which then funds the VAS bill dispatch.
+3. **Passport (Identity / BVN Verification)** — Verify a user's BVN during onboarding
    for KYC and CBN sandbox compliance.
 
 ### Why Interswitch Solves a Real Problem
 
 The biggest operational friction in MoniMata is Mono's 24-hour sync delay. For any
 transaction that happens outside the app, MoniMata only learns about it at the next
-sync. For bills paid **inside** the app via Interswitch, MoniMata initiates the
-payment itself — so it can record the transaction and update the budget **immediately**,
-with zero delay. This is the only scenario in the product where budget reflection is
-truly real-time.
+sync. For bills paid **inside** the app via Interswitch, MoniMata orchestrates the
+payment itself — so it can record the transaction and update the budget within
+**seconds of the user completing checkout**, with no Mono sync delay. This is the only
+scenario in the product where budget reflection is near-real-time.
+
+### The 3-Phase Architecture
+
+Bill payment requires three Interswitch APIs working in sequence. Each does a
+fundamentally different job and cannot substitute for the others.
+
+**Phase 1 — VAS: Browse & Validate**
+Quickteller VAS populates the biller catalogue and validates the customer's
+meter/smartcard number. The critical output of this phase is the biller's
+**`paymentCode`** — the VAS identifier used later in Phase 3 to target the correct
+biller for the actual debit.
+
+**Phase 2 — Web Checkout: Collect User Payment**
+The user pays the bill amount (plus optional service fee) through Interswitch's
+hosted checkout page. The collected funds are settled into MoniMata's **Retailpay
+wallet** — not the user's bank account. MoniMata momentarily holds the funds.
+
+The Web Checkout `pay_item_id` is a single generic **"Bill Payment"** item
+registered once on the Quickteller Business Dashboard. It is **not** a per-biller
+code. The amount is passed dynamically at checkout time.
+
+**Phase 3 — VAS: Dispatch Bill**
+After verifying that the Web Checkout payment succeeded, the backend calls
+`SendBillPaymentAdvice` using:
+
+- The biller's `paymentCode` from Phase 1 (targets the correct biller)
+- The confirmed amount from Phase 2
+- The customer's meter/smartcard number
+
+Interswitch debits the Retailpay wallet and delivers value to the biller.
+
+**Failure handling obligation:** If Phase 3 fails (biller unavailable, wrong token,
+etc.) after Phase 2 has already collected the user's money, MoniMata is responsible
+for initiating a refund to the user. This is non-negotiable. A Celery task must
+monitor Phase 3 completion and trigger a refund if it does not succeed within a
+defined timeout (recommended: 60 seconds, maximum 3 retries).
+
+**Retailpay wallet:** Operating this flow requires a Quickteller Business account
+with Retailpay wallet access enabled by Interswitch. The wallet holds float that is
+replenished by the Web Checkout settlements. Zero float = `SendBillPaymentAdvice`
+calls will fail.
 
 ### The Closed-Loop Bill Payment Flow
 
@@ -588,22 +633,70 @@ User has a "DSTV" category
   → target_type: "monthly_set_aside", target_amount: ₦15,000
   → assigned: ₦15,000, available: ₦15,000
 
+─── PHASE 1: Browse & Validate (VAS) ───────────────────────────────────────
+
 User taps "Pay Bill" on the DSTV category
-  → Opens bill payment bottom sheet
-  → App calls GET /bills/billers?category=cable-tv to populate biller list
-  → User selects "DStv", enters SmartCard number, confirms ₦15,000
+  → App calls GET /bills/categories → GET /bills/billers?category=<id>
+    (VAS: GetBillerCategories / GetBillersByCategory)
+  → User selects "DStv", enters SmartCard number
+  → App calls POST /bills/validate
+    (VAS: CustomerValidation)
+    → Returns: { customer_name: "JOHN DOE", amount_due: 1500000 }
+    → Crucially also returns: biller paymentCode (e.g. "0460600019")
+  → User reviews and confirms ₦15,000
+
+─── PHASE 2: Collect Payment (Web Checkout) ────────────────────────────────
 
 App calls: POST /bills/pay
-  → Backend calls Interswitch Quickteller API to initiate payment
-  → Interswitch debits user's linked bank account
-  → On success (HTTP 200 from Interswitch):
-      1. Backend creates a transactions row immediately
-         (source = "interswitch", category_id = DSTV category, amount = -1500000 kobo)
-      2. budget_months.activity updated for that category + month
-      3. WebSocket event "budget_updated" pushed to client
-      4. Client WatermelonDB sync triggered
+  → Backend generates idempotency key (ref), persists pending_payment record
+    including: ref, user_id, payment_code, customer_id, amount, category_id
+  → Backend opens Interswitch Web Checkout for the user:
+       Params: merchant_code, pay_item_id (generic "Bill Payment" item from dashboard),
+               amount=1500000, txn_ref=ref, cust_email, site_redirect_url
+  → Backend returns { payment_url, ref } to app
 
-User sees DSTV available drop from ₦15,000 → ₦0 in real time.
+App opens payment_url in WebView
+  → Interswitch checkout page: Card / Bank Transfer / USSD / QR / OPay
+  → User pays — funds settle into MoniMata's Retailpay wallet
+
+Two notification paths after checkout (backend must handle both):
+  a. Interswitch webhook → POST /webhooks/interswitch  (most reliable)
+  b. Interswitch redirects WebView → GET /bills/callback?txnref=<ref>&resp=<code>
+
+─── PHASE 3: Dispatch Bill (VAS SendBillPaymentAdvice) ────────────────────
+
+Backend receives webhook or callback → MUST verify server-side requery first:
+  GET https://webpay.interswitchng.com/collections/api/v1/gettransaction.json
+      ?merchantcode=<MC>&transactionreference=<ref>&amount=1500000
+  → Confirm ResponseCode == "00" and Amount matches before proceeding
+
+If verified OK:
+  Backend calls VAS SendBillPaymentAdvice:
+    POST https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions
+    {
+      "TerminalId": "<TERMINAL_ID>",
+      "paymentCode": "0460600019",    // biller paymentCode from Phase 1
+      "customerId": "<smartcard number>",
+      "customerMobile": "<user mobile>",
+      "customerEmail": "<user email>",
+      "amount": "1500000",            // kobo string
+      "requestReference": "<ref>"     // same idempotency key
+    }
+  → Interswitch debits Retailpay wallet and delivers value to DSTV
+
+If SendBillPaymentAdvice fails after Web Checkout succeeded:
+  → Enqueue Celery retry task (max 3 attempts, 60s apart)
+  → If all retries exhausted: initiate refund to user, mark payment as FAILED
+
+On confirmed Phase 3 success:
+  1. Backend creates a transactions row
+     (source = "interswitch", interswitch_ref = ref, category_id = DSTV category,
+      amount = -1500000 kobo)
+  2. budget_months.activity updated for that category + month
+  3. WebSocket event "budget_updated" pushed to client
+  4. Client WatermelonDB sync triggered
+
+User sees DSTV available drop from ₦15,000 → ₦0 within seconds of successful payment.
 No waiting for Mono's next 24-hour cycle.
 ```
 
@@ -662,20 +755,39 @@ a requirement for operating under the CBN Regulatory Sandbox.
 
 ### Interswitch API Reference
 
-| Operation                | Method | Endpoint                                                                   |
-| ------------------------ | ------ | -------------------------------------------------------------------------- |
-| Get OAuth token          | POST   | `https://passport.interswitchng.com/passport/oauth/token`                  |
-| Get biller categories    | GET    | `https://api.interswitchng.com/quickteller/api/v5/services/`               |
-| Get billers in category  | GET    | `https://api.interswitchng.com/quickteller/api/v5/services/{categoryId}`   |
-| Validate customer number | POST   | `https://api.interswitchng.com/quickteller/api/v5/services/customers`      |
-| Initiate payment         | POST   | `https://api.interswitchng.com/quickteller/api/v5/payments/requests`       |
-| Query payment status     | GET    | `https://api.interswitchng.com/quickteller/api/v5/payments/requests/{ref}` |
-| BVN lookup               | GET    | `https://api.interswitchng.com/identity/api/v1/customers/{bvn}`            |
+**VAS — Browse, Validate & Dispatch (Quickteller)**
 
-**Auth:** All Interswitch API calls use OAuth 2.0 client credentials flow
-(`grant_type=client_credentials`) with your `client_id` and `client_secret`.
-Cache the access token in Redis (it expires in 3600 seconds — always check expiry
-before using and re-fetch if stale).
+| Operation                | Method | Endpoint                                                                                       |
+| ------------------------ | ------ | ---------------------------------------------------------------------------------------------- |
+| Get biller categories    | GET    | `https://qa.interswitchng.com/quicktellerservice/api/v5/services/`                             |
+| Get billers in category  | GET    | `https://qa.interswitchng.com/quicktellerservice/api/v5/services/{categoryId}`                 |
+| Get biller payment items | GET    | `https://qa.interswitchng.com/quicktellerservice/api/v5/services/options?serviceid={billerId}` |
+| Validate customer        | POST   | `https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions/validatecustomers`        |
+| Send bill payment advice | POST   | `https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions`                          |
+| Query VAS transaction    | GET    | `https://qa.interswitchng.com/quicktellerservice/api/v5/transactions/{requestRef}`             |
+
+Live base URL: `https://www.interswitchng.com/quicktellerservice/api/v5/`
+
+**Web Checkout — Collect User Payment**
+
+| Operation                | Method | Endpoint                                                                                                                           |
+| ------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Checkout page (redirect) | POST   | `https://newwebpay.qa.interswitchng.com/collections/w/pay` (form POST)                                                             |
+| Verify payment status    | GET    | `https://qa.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode={mc}&transactionreference={ref}&amount={amount}` |
+
+Live base URL: `https://newwebpay.interswitchng.com/` and `https://webpay.interswitchng.com/`
+
+**Identity**
+
+| Operation   | Method | Endpoint                                                        |
+| ----------- | ------ | --------------------------------------------------------------- |
+| OAuth token | POST   | `https://passport.interswitchng.com/passport/oauth/token`       |
+| BVN lookup  | GET    | `https://api.interswitchng.com/identity/api/v1/customers/{bvn}` |
+
+**Auth:** VAS endpoints use a MAC-based `Authentication` header (not Bearer). Web
+Checkout uses your `merchant_code` + `pay_item_id` directly in the form POST.
+Identity (Passport) uses OAuth 2.0 client credentials — cache the access token in
+Redis (3600s expiry).
 
 ```python
 class InterswitchClient:
@@ -697,40 +809,135 @@ class InterswitchClient:
         redis.setex(self.TOKEN_CACHE_KEY, 3500, token)  # 3500s — slightly before expiry
         return token
 
-    async def pay_bill(self, payload: dict) -> dict:
-        token = await self.get_token()
+    def _vas_auth_header(self) -> str:
+        """VAS uses MAC auth, not Bearer. Computed per-request."""
+        timestamp = str(int(time.time()))
+        nonce = uuid4().hex
+        mac = hmac.new(
+            settings.INTERSWITCH_CLIENT_SECRET.encode(),
+            f"{timestamp}{nonce}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        return f'MAC id="{settings.INTERSWITCH_CLIENT_ID}",ts="{timestamp}",nonce="{nonce}",mac="{mac}"'
+
+    async def validate_customer(self, payment_code: str, customer_id: str) -> dict:
+        """Phase 1: Validate meter/smartcard number and get customer details."""
         response = await http.post(
-            "https://api.interswitchng.com/quickteller/api/v5/payments/requests",
-            headers={"Authorization": f"Bearer {token}"},
-            json=payload,
+            "https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions/validatecustomers",
+            headers={"Authentication": self._vas_auth_header(), "TerminalId": settings.INTERSWITCH_TERMINAL_ID},
+            json={"customers": [{"paymentCode": payment_code, "customerId": customer_id}]},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_checkout_url(self, ref: str, amount: int, cust_email: str) -> str:
+        """Phase 2: Returns the Web Checkout URL to open in a WebView.
+        The pay_item_id is the generic 'Bill Payment' item pre-configured on
+        the Quickteller Business Dashboard. NOT a per-biller code."""
+        params = urlencode({
+            "merchant_code": settings.INTERSWITCH_MERCHANT_CODE,
+            "pay_item_id": settings.INTERSWITCH_BILL_PAY_ITEM_ID,
+            "txn_ref": ref,
+            "amount": amount,   # kobo
+            "currency": 566,
+            "cust_email": cust_email,
+            "site_redirect_url": f"{settings.API_BASE_URL}/bills/callback",
+        })
+        return f"https://newwebpay.qa.interswitchng.com/collections/w/pay?{params}"
+
+    async def verify_payment(self, ref: str, amount: int) -> dict:
+        """Server-side verification of Web Checkout — MUST be called before Phase 3."""
+        response = await http.get(
+            "https://qa.interswitchng.com/collections/api/v1/gettransaction.json",
+            params={"merchantcode": settings.INTERSWITCH_MERCHANT_CODE, "transactionreference": ref, "amount": amount},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def send_bill_payment_advice(self, payment_code: str, customer_id: str,
+                                       amount: int, ref: str, customer_email: str) -> dict:
+        """Phase 3: Debit Retailpay wallet and deliver value to biller."""
+        response = await http.post(
+            "https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions",
+            headers={"Authentication": self._vas_auth_header(), "TerminalId": settings.INTERSWITCH_TERMINAL_ID},
+            json={
+                "TerminalId": settings.INTERSWITCH_TERMINAL_ID,
+                "paymentCode": payment_code,   # biller code from Phase 1
+                "customerId": customer_id,
+                "customerEmail": customer_email,
+                "amount": str(amount),         # kobo, as string
+                "requestReference": ref,       # same idempotency key used in Phase 2
+            },
         )
         response.raise_for_status()
         return response.json()
 ```
 
-### Idempotency for Bill Payments
+### Idempotency & State Machine for Bill Payments
 
-Bill payments must be idempotent. If the app retries due to a network timeout, you
-must not charge the user twice. Always generate a unique `requestReference` before
-calling Interswitch and store it in the DB before making the API call:
+Bill payments span three phases and multiple async steps. Track each payment as a
+state machine with states: `PENDING_CHECKOUT → CHECKOUT_VERIFIED → BILL_DISPATCHED → COMPLETED | FAILED | REFUNDED`.
+
+Always generate the idempotency key and persist the record **before** opening the
+checkout. The same `ref` is used as `txn_ref` in Web Checkout and `requestReference`
+in `SendBillPaymentAdvice`, providing end-to-end traceability.
 
 ```python
 async def initiate_bill_payment(user_id: str, payload: BillPayRequest) -> BillPayResult:
-    # 1. Generate idempotency key and persist BEFORE calling Interswitch
+    """Phase 2: Generate checkout URL. State → PENDING_CHECKOUT."""
     ref = f"MM-{uuid4().hex[:16].upper()}"
-    pending = create_pending_payment(user_id=user_id, ref=ref, payload=payload)
+    # Persist BEFORE opening checkout — captures payment_code, customer_id, amount, category_id
+    create_pending_payment(user_id=user_id, ref=ref, payload=payload, state="PENDING_CHECKOUT")
+    checkout_url = interswitch_client.get_checkout_url(
+        ref=ref, amount=payload.amount, cust_email=payload.customer_email
+    )
+    return BillPayResult(checkout_url=checkout_url, ref=ref)
 
+
+async def on_checkout_complete(ref: str) -> None:
+    """Called by webhook + redirect callback. Verifies checkout then dispatches bill."""
+    pending = get_pending_payment(ref=ref)
+    if not pending or pending.state not in ("PENDING_CHECKOUT",):
+        return  # already processed or unknown
+
+    # Verify Web Checkout server-side BEFORE dispatching bill
+    verification = await interswitch_client.verify_payment(ref=ref, amount=pending.amount)
+    if verification.get("ResponseCode") != "00":
+        update_payment_state(pending.id, "FAILED")
+        return
+
+    update_payment_state(pending.id, "CHECKOUT_VERIFIED")
+    # Dispatch the actual bill payment from Retailpay wallet
+    await dispatch_bill(pending)
+
+
+async def dispatch_bill(pending: PendingPayment, attempt: int = 1) -> None:
+    """Phase 3: SendBillPaymentAdvice. State → BILL_DISPATCHED or retry/refund."""
     try:
-        result = await interswitch_client.pay_bill({**payload.dict(), "requestReference": ref})
-    except Exception:
-        mark_payment_failed(pending.id)
-        raise
+        result = await interswitch_client.send_bill_payment_advice(
+            payment_code=pending.payment_code,
+            customer_id=pending.customer_id,
+            amount=pending.amount,
+            ref=pending.ref,
+            customer_email=pending.customer_email,
+        )
+        if result.get("responseCode") != "90000":  # VAS success code
+            raise ValueError(f"VAS error: {result.get('responseMessage')}")
+    except Exception as exc:
+        if attempt < 3:
+            # Enqueue retry with exponential backoff
+            dispatch_bill_task.apply_async((pending.id, attempt + 1), countdown=60 * attempt)
+            return
+        # All retries exhausted — must refund the user
+        update_payment_state(pending.id, "REFUNDED")
+        initiate_refund(pending)   # calls Interswitch refund endpoint
+        return
 
-    # 2. Only record transaction after confirmed success
-    record_interswitch_transaction(user_id, pending, result)
-    update_budget_activity(user_id, payload.category_id, payload.amount)
-    push_websocket_event(user_id, "budget_updated")
-    return result
+    # Success — record transaction and update budget
+    update_payment_state(pending.id, "COMPLETED")
+    record_interswitch_transaction(pending)
+    update_budget_activity(pending.user_id, pending.category_id, pending.amount)
+    push_websocket_event(pending.user_id, "budget_updated")
 ```
 
 ---
@@ -901,30 +1108,58 @@ Server-sent events:
 
 ```
 POST   /webhooks/mono                     → Mono account update events (HMAC-verified)
+POST   /webhooks/interswitch              → Interswitch TRANSACTION.COMPLETED webhook
+                                           Triggers server-side requery → SendBillPaymentAdvice
 ```
 
 ---
 
-### Bill Payment (Interswitch Quickteller)
+### Bill Payment
 
 ```
-GET    /bills/categories                  → list Interswitch biller categories
-                                           (Electricity, Cable TV, Airtime, Data, Water, etc.)
-GET    /bills/billers?category=<id>       → list billers within a category
-POST   /bills/validate                    → validate a customer/meter/smartcard number
-                                           body: { biller_id, customer_id }
+GET    /bills/categories                  → list biller categories (VAS GetBillerCategories)
+GET    /bills/billers?category=<id>       → list billers in category (VAS GetBillersByCategory)
+GET    /bills/billers/<id>/items          → list payment items for a biller (VAS GetBillerPaymentItem)
+                                           Returns: [{ paymentCode, name, amount? }]
+POST   /bills/validate                    → validate customer/meter/smartcard (VAS CustomerValidation)
+                                           body: { payment_code, customer_id }
                                            returns: { customer_name, amount_due? }
-POST   /bills/pay                         → initiate payment via Interswitch
-                                           body: { biller_id, customer_id, amount, account_id, category_id }
-                                           returns: { ref, status, transaction_id }
-                                           On success: records transaction (source="interswitch"),
-                                           updates budget_months.activity immediately
-GET    /bills/pay/{ref}/status            → query Interswitch for payment status (for retries/polling)
-GET    /bills/history                     → user's in-app bill payment history (source="interswitch" filter)
+POST   /bills/pay                         → Phase 2: open Web Checkout
+                                           body: { payment_code, customer_id, customer_email, amount, category_id }
+                                           returns: { checkout_url, ref }
+                                           App opens checkout_url in WebView
+                                           Budget NOT updated here — only after Phase 3 succeeds
+GET    /bills/callback                    → redirect target after checkout completes/is cancelled
+                                           Triggers server-side verify → dispatch_bill (Phase 3)
+GET    /bills/pay/<ref>/status            → poll payment state machine status
+                                           returns: { state: PENDING_CHECKOUT|CHECKOUT_VERIFIED|
+                                                              BILL_DISPATCHED|COMPLETED|FAILED|REFUNDED }
+GET    /bills/history                     → user's in-app bill payment history
 ```
 
 **Important:** `POST /bills/pay` requires `identity_verified = true` on the user.
 Users who have not completed BVN verification cannot initiate payments.
+
+**New DB table required: `pending_bill_payments`**
+
+```sql
+CREATE TABLE pending_bill_payments (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id),
+  ref               TEXT NOT NULL UNIQUE,            -- idempotency key, used as txn_ref in all 3 phases
+  payment_code      TEXT NOT NULL,                   -- VAS biller paymentCode from Phase 1
+  customer_id       TEXT NOT NULL,                   -- meter / SmartCard number
+  customer_email    TEXT NOT NULL,
+  amount            BIGINT NOT NULL,                 -- kobo
+  category_id       UUID REFERENCES categories(id),
+  state             TEXT NOT NULL DEFAULT 'PENDING_CHECKOUT',
+                                            -- PENDING_CHECKOUT | CHECKOUT_VERIFIED |
+                                            -- BILL_DISPATCHED | COMPLETED | FAILED | REFUNDED
+  attempt_count     INT NOT NULL DEFAULT 0,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
 
 ---
 
