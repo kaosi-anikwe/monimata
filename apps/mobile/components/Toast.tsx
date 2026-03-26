@@ -393,7 +393,7 @@ function makeConfirmStyles(colors: ThemeColors) {
       padding: spacing.xxl,
     },
     card: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.cardBg,
       borderRadius: radius.md,
       borderWidth: 1,
       borderColor: colors.border,
@@ -457,7 +457,7 @@ function makeSheetStyles(colors: ThemeColors) {
       backgroundColor: colors.overlayDarkMid,
     },
     sheet: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.cardBg,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
       paddingBottom: 34,

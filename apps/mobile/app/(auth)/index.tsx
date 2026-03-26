@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ff } from '@/lib/typography';
 import { radius, spacing } from '@/lib/tokens';
@@ -97,11 +97,11 @@ export default function WelcomeScreen() {
 
         {/* Logo tile */}
         <View style={ss.logoTile}>
-          <Ionicons name="layers-outline" size={36} color={colors.darkGreen} />
+          <Image source={require('@/assets/images/logo.png')} style={ss.logoImg} />
         </View>
 
-        {/* Brand name — all white */}
-        <Text style={ss.brand}>MoniMata</Text>
+        {/* Brand name — wordmark */}
+        <Image source={require('@/assets/images/wordmark.png')} style={ss.wordmark} />
 
         {/* Tagline */}
         <Text style={ss.tagline}>Every Kobo, Accounted For</Text>
@@ -196,21 +196,25 @@ function makeStyles(colors: ThemeColors) {
       width: 72,
       height: 72,
       borderRadius: 22,
-      backgroundColor: colors.lime,
+      // backgroundColor: colors.lime,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 20,
-      shadowColor: colors.lime,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.35,
-      shadowRadius: 20,
-      elevation: 12,
+      // marginBottom: spacing.sm,
+      // shadowColor: colors.lime,
+      // shadowOffset: { width: 0, height: 8 },
+      // shadowOpacity: 0.35,
+      // shadowRadius: 20,
+      // elevation: 12,
     },
-    brand: {
-      ...ff(800),
-      fontSize: 28,
-      color: colors.white,
-      letterSpacing: -0.8,
+    logoImg: {
+      width: 48,
+      height: 48,
+      resizeMode: 'contain',
+    },
+    wordmark: {
+      height: 36,
+      width: 160,
+      resizeMode: 'contain',
       marginBottom: 6,
     },
     tagline: {
