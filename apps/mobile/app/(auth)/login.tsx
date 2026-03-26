@@ -85,7 +85,7 @@ export default function LoginScreen() {
       <StatusBar style="light" />
       {/* ── Dark green curved header ── */}
       <AuthHdr>
-        <BackBtn onPress={() => router.back()} />
+        <BackBtn onPress={() => router.canGoBack() ? router.back() : router.replace('/(auth)')} />
         <Text style={[s.authTitle, { color: colors.white }]}>Welcome back</Text>
         <Text style={[s.authSub, { color: colors.textInverseSecondary }]}>Sign in to continue</Text>
       </AuthHdr>

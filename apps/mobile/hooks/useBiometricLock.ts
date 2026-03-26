@@ -44,7 +44,7 @@ import type { RootState } from '@/store';
 
 const LOCK_ENABLED_KEY = 'mm_biometric_lock_enabled_v1';
 /** Number of seconds in background before the app locks on return. */
-const LOCK_AFTER_SECONDS = 30;
+const LOCK_AFTER_SECONDS = 5;
 
 export interface BiometricLockState {
   /** True when the lock screen should be shown. */
@@ -66,6 +66,10 @@ export function useBiometricLock(): BiometricLockState {
   const [isEnabled, setIsEnabled] = useState(false);
 
   const backgroundTimestamp = useRef<number | null>(null);
+  // True once we've applied the initial cold-start lock for this process
+  // lifetime. Not reset on logout so that a password re-login doesn't
+  // immediately re-show the lock screen.
+  const hasLockedThisProcess = useRef(false);
 
   // Check device capability and user preference on mount.
   useEffect(() => {
@@ -79,6 +83,16 @@ export function useBiometricLock(): BiometricLockState {
     }
     init();
   }, []);
+
+  // Cold-start lock: fires once when all three conditions first become true
+  // (session restored + biometric settings loaded). Covers the case where the
+  // app is opened fresh from the task switcher / after being killed.
+  useEffect(() => {
+    if (isAuthenticated && isEnabled && isEnrolled && !hasLockedThisProcess.current) {
+      hasLockedThisProcess.current = true;
+      setIsLocked(true);
+    }
+  }, [isAuthenticated, isEnabled, isEnrolled]);
 
   // Watch AppState to lock after background timeout.
   useEffect(() => {

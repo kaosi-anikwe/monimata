@@ -78,6 +78,8 @@ export interface ThemeColors {
   darkGreen: string;
   /** Mid dark green — secondary dark surface. CSS: --gm */
   darkGreenMid: string;
+  /** Deep blood red — danger/error card backgrounds (mirrors darkGreen for error states). */
+  darkRed: string;
   /** Primary brand green — CTAs, active icons, links. CSS: --gp */
   brand: string;
   /** Bright indicator green — funding dots, progress fills. CSS: --gb */
@@ -226,6 +228,12 @@ export interface ThemeColors {
   // ── Extended warning ─────────────────────────────────────────────────────
   /** amber at 20% — lighter warning border variant (hint cards, nudge pills). */
   warningBorderLight: string;
+
+  // ── Error badge (on dark-red card surfaces) ───────────────────────────────
+  /** error at 18% — badge/button background on darkRed card (Fix button). */
+  errorBadgeBg: string;
+  /** error at 45% — badge/button border on darkRed card (Fix button). */
+  errorBadgeBorder: string;
 }
 
 // ─── Light theme ─────────────────────────────────────────────────────────────
@@ -234,6 +242,7 @@ export const lightColors: ThemeColors = {
   // Brand greens
   darkGreen: '#0D1F0D',
   darkGreenMid: '#1A3A1A',
+  darkRed: '#1F0D0D',
   brand: '#2D6A2D',
   brandBright: '#4CAF50',
   lime: '#A8E063',
@@ -325,6 +334,10 @@ export const lightColors: ThemeColors = {
 
   // Extended warning
   warningBorderLight: 'rgba(245,158,11,0.2)',
+
+  // Error badge (on darkRed surfaces)
+  errorBadgeBg: 'rgba(217,48,37,0.18)',
+  errorBadgeBorder: 'rgba(217,48,37,0.45)',
 };
 
 // ─── Dark theme ──────────────────────────────────────────────────────────────
@@ -337,6 +350,7 @@ export const darkColors: ThemeColors = {
   // Brand greens
   darkGreen: '#0D1F0D',
   darkGreenMid: '#1A3A1A',
+  darkRed: '#2E1010',
   brand: '#6DC05E',          // medium bright green — CTA buttons, active icons, links
   brandBright: '#85CF78',    // lighter indicator green — progress dots, fills
   lime: '#A8E063',           // lime-yellow — primary CTA button, active tab indicator
@@ -428,6 +442,10 @@ export const darkColors: ThemeColors = {
 
   // Extended warning
   warningBorderLight: 'rgba(255,191,71,0.2)',
+
+  // Error badge (on darkRed surfaces)
+  errorBadgeBg: 'rgba(240,114,114,0.18)',
+  errorBadgeBorder: 'rgba(240,114,114,0.45)',
 };
 
 // ─── Gradient presets ─────────────────────────────────────────────────────────

@@ -15,26 +15,35 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import { Ionicons } from '@expo/vector-icons';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
-import { logout } from '@/store/authSlice';
+import { clearAuth, logout } from '@/store/authSlice';
 import { useAppDispatch } from '@/store/hooks';
 import type { RootState } from '@/store';
 
 type BiometricKind = 'fingerprint' | 'face' | 'unknown';
 
+// expo-local-authentication only tells us what hardware *supports*, not what's
+// enrolled. Use platform as a reliable proxy for the icon: Android devices
+// overwhelmingly use fingerprint; iOS uses Face ID.
+function getPlatformBiometricKind(): BiometricKind {
+  if (Platform.OS === 'ios') return 'face';
+  return 'fingerprint';
+}
+
 interface Props {
   onUnlock: () => Promise<boolean>;
+  /** Called synchronously before clearAuth() so the caller can snapshot the current route. */
+  onPasswordLogin?: () => void;
 }
 
 function getInitials(firstName?: string | null, lastName?: string | null): string {
@@ -45,26 +54,13 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
  * Full-screen lock UI rendered over all app content when biometric lock is active.
  * Detects Face ID vs fingerprint to show the appropriate icon and label.
  */
-export function AppLockScreen({ onUnlock }: Props) {
+export function AppLockScreen({ onUnlock, onPasswordLogin }: Props) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector((s: RootState) => s.auth.user);
 
-  const [biometricKind, setBiometricKind] = useState<BiometricKind>('unknown');
-
-  useEffect(() => {
-    LocalAuthentication.supportedAuthenticationTypesAsync().then((types) => {
-      if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-        setBiometricKind('face');
-      } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-        setBiometricKind('fingerprint');
-      } else {
-        setBiometricKind('unknown');
-      }
-    });
-  }, []);
-
+  const biometricKind = getPlatformBiometricKind();
   const isFace = biometricKind === 'face';
   const biometricIcon: React.ComponentProps<typeof Ionicons>['name'] = isFace
     ? 'scan-outline'
@@ -74,6 +70,12 @@ export function AppLockScreen({ onUnlock }: Props) {
   const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Welcome back';
 
   function handleLoginWithPassword() {
+    // Save the current route BEFORE wiping auth, so RootNavigator can restore
+    // it after the user re-authenticates with their password.
+    onPasswordLogin?.();
+    // clearAuth() only wipes local Redux state — it does not invalidate the
+    // refresh token server-side, so the user can log back in smoothly.
+    dispatch(clearAuth());
     router.replace({ pathname: '/(auth)/login', params: { prefillEmail: user?.email ?? '' } });
   }
 
@@ -95,10 +97,11 @@ export function AppLockScreen({ onUnlock }: Props) {
         {/* Glow decoration */}
         <View style={[s.glow, { backgroundColor: colors.limeGlow }]} pointerEvents="none" />
 
-        {/* Logo tile */}
-        <View style={[s.logoTile, { backgroundColor: colors.lime }]}>
-          <Ionicons name="layers-outline" size={26} color={colors.darkGreen} />
+        {/* Logo + wordmark */}
+        <View style={s.logoTile}>
+          <Image source={require('@/assets/images/logo.png')} style={s.logoImg} />
         </View>
+        <Image source={require('@/assets/images/wordmark.png')} style={s.wordmark} />
 
         {/* Initials avatar */}
         <View style={[s.avatar, { backgroundColor: colors.brand, borderColor: colors.limeBorderStrong }]}>
@@ -154,7 +157,7 @@ export function AppLockScreen({ onUnlock }: Props) {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1 },
+  root: { ...StyleSheet.absoluteFill },
   hero: {
     flex: 1,
     alignItems: 'center',
@@ -174,11 +177,21 @@ const s = StyleSheet.create({
     pointerEvents: 'none',
   },
   logoTile: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 72,
+    height: 72,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logoImg: {
+    width: 48,
+    height: 48,
+    resizeMode: 'contain',
+  },
+  wordmark: {
+    height: 36,
+    width: 160,
+    resizeMode: 'contain',
     marginBottom: spacing.xl,
   },
   avatar: {

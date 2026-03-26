@@ -24,8 +24,6 @@ import { router } from 'expo-router';
 import { ff } from '@/lib/typography';
 import { useTheme } from '@/lib/theme';
 import { StatusBar } from 'expo-status-bar';
-import { radius, spacing } from '@/lib/tokens';
-import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { clearError, verifyBVN } from '@/store/authSlice';
@@ -37,6 +35,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -57,36 +56,20 @@ export default function VerifyBVNScreen() {
   const {
     control,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { bvn: '' },
   });
 
-  const bvnValue = watch('bvn');
-
   async function onSubmit(data: FormValues) {
     dispatch(clearError());
     try {
       await dispatch(verifyBVN(data.bvn)).unwrap();
-      // If user is already onboarded (came here from profile), go straight to link-bank.
-      // Otherwise continue the onboarding flow.
       router.replace(user?.onboarded ? '/(auth)/link-bank' : '/(auth)/onboarding');
     } catch {
       // error is already written to Redux state by the rejected handler in authSlice
     }
-  }
-
-  function handleNumpad(digit: string) {
-    if (bvnValue.length < 11) {
-      setValue('bvn', bvnValue + digit, { shouldValidate: true });
-    }
-  }
-
-  function handleDelete() {
-    setValue('bvn', bvnValue.slice(0, -1), { shouldValidate: true });
   }
 
   // If user already verified (returning user), skip onboarding and go to link-bank
@@ -95,12 +78,9 @@ export default function VerifyBVNScreen() {
     return null;
   }
 
-  const NUMPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'] as const;
-
   return (
     <View style={[authS.screen, { backgroundColor: colors.cardBg }]}>
       <StatusBar style="light" />
-      {/* ── Dark green curved header ── */}
       <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[authS.authTitle, { color: colors.white }]}>Prove it&apos;s you, once.</Text>
@@ -110,8 +90,7 @@ export default function VerifyBVNScreen() {
       </AuthHdr>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={[authS.body, { paddingTop: 16 }]} showsVerticalScrollIndicator={false}>
-          {/* Trust card */}
+        <ScrollView contentContainerStyle={[authS.body, { paddingTop: 16 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <TrustCard
             text="CBN-compliant identity check — MoniMata does not store your BVN. It is sent once to Interswitch's identity service and immediately discarded."
             colors={colors}
@@ -123,97 +102,80 @@ export default function VerifyBVNScreen() {
             </View>
           ) : null}
 
-          {/* Label */}
           <Text style={[authS.fieldLbl, { color: colors.textSecondary, marginBottom: 12 }]}>
             Enter your 11-digit BVN
           </Text>
 
-          {/* 11 digit boxes */}
+          {/* ── BVN single input ── */}
           <Controller
             control={control}
             name="bvn"
-            render={() => (
-              <View style={bvnS.boxes}>
-                {Array.from({ length: 11 }).map((_, i) => {
-                  const filled = i < bvnValue.length;
-                  const active = i === bvnValue.length;
-                  return (
-                    <View
-                      key={i}
-                      style={[
-                        bvnS.box,
-                        {
-                          borderColor: filled || active ? colors.brand : colors.border,
-                          backgroundColor: filled ? colors.surface : colors.white,
-                        },
-                        active && { shadowColor: colors.brand, shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
-                      ]}
-                    >
-                      <Text style={[bvnS.boxText, { color: colors.brand }]}>
-                        {filled ? bvnValue[i] : ''}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
+            render={({ field: { value, onChange, onBlur } }) => (
+              <>
+                <View style={[
+                  bvnS.inputWrap,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: errors.bvn ? colors.error : colors.brand,
+                  },
+                ]}>
+                  <View style={{ backgroundColor: errors.bvn ? colors.error : colors.brand }} />
+                  <TextInput
+                    value={value}
+                    onChangeText={(t) => {
+                      const cleaned = t.replace(/\D/g, '').slice(0, 11);
+                      onChange(cleaned);
+                    }}
+                    onBlur={onBlur}
+                    keyboardType="number-pad"
+                    maxLength={11}
+                    autoFocus
+                    placeholder="00000000000"
+                    placeholderTextColor={colors.textTertiary}
+                    style={[bvnS.input, { color: colors.brand }]}
+                    accessibilityLabel="BVN"
+                    returnKeyType="done"
+                  />
+                </View>
+
+                <View style={bvnS.inputMeta}>
+                  {errors.bvn ? (
+                    <Text style={[bvnS.metaText, { color: colors.error }]}>{errors.bvn.message}</Text>
+                  ) : (
+                    <Text style={[bvnS.metaText, { color: colors.textMeta }]}>Type or paste your BVN</Text>
+                  )}
+                  <Text style={[bvnS.metaText, { color: value.length === 11 ? colors.brand : colors.textMeta }]}>
+                    {value.length}/11
+                  </Text>
+                </View>
+              </>
             )}
           />
 
-          {/* Digit count + USSD hint */}
-          <Text style={[bvnS.count, { color: colors.textMeta }]}>{bvnValue.length}/11 digits</Text>
-          <View style={[bvnS.ussdHint, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorderLight }]}>
+          {/* USSD hint */}
+          <View style={[bvnS.ussdHint, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorderLight, marginTop: 16 }]}>
             <Text style={[bvnS.ussdText, { color: colors.warningText }]}>
-              Dial <Text style={bvnS.ussdCode}>*565*0#</Text> on any network to retrieve your BVN
+              Don&apos;t know your BVN? Dial <Text style={bvnS.ussdCode}>*565*0#</Text> on any network.
             </Text>
-          </View>
-
-          {/* Numpad */}
-          <View style={bvnS.numpad}>
-            {NUMPAD.map((key, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[
-                  bvnS.numKey,
-                  { backgroundColor: key === '' ? 'transparent' : colors.surface },
-                  key === '' && { elevation: 0 },
-                ]}
-                onPress={() => {
-                  if (key === 'del') handleDelete();
-                  else if (key !== '') handleNumpad(key);
-                }}
-                disabled={key === ''}
-                activeOpacity={0.65}
-              >
-                {key === 'del' ? (
-                  <Ionicons name="backspace-outline" size={20} color={colors.textSecondary} />
-                ) : (
-                  <Text style={[bvnS.numKeyText, { color: colors.textPrimary }]}>{key}</Text>
-                )}
-              </TouchableOpacity>
-            ))}
           </View>
 
           {/* Verify button */}
           <TouchableOpacity
             style={[
               authS.btnGreen,
-              { backgroundColor: colors.brand },
-              (loading || bvnValue.length !== 11) && authS.btnDisabled,
+              { backgroundColor: colors.brand, marginTop: 24 },
             ]}
             onPress={handleSubmit(onSubmit)}
-            disabled={loading || bvnValue.length !== 11}
+            disabled={loading}
             accessibilityRole="button"
             accessibilityLabel="Verify identity"
-            accessibilityState={{ disabled: loading || bvnValue.length !== 11 }}
+            accessibilityState={{ disabled: loading }}
           >
             {loading
               ? <ActivityIndicator color={colors.white} />
               : <Text style={[authS.btnText, { color: colors.white }]}>Verify Identity</Text>}
           </TouchableOpacity>
-          {errors.bvn ? <Text style={[authS.fieldErr, { color: colors.error, textAlign: 'center', marginTop: 8 }]}>{errors.bvn.message}</Text> : null}
 
-          {/* Skip link — takes user to onboarding questionnaire so their
-              budget categories are still seeded even without BVN verification */}
           <TouchableOpacity onPress={() => router.replace('/(auth)/onboarding')} style={{ alignItems: 'center', marginTop: 16 }}>
             <Text style={[{ ...ff(400), fontSize: 12, textDecorationLine: 'underline' }, { color: colors.textTertiary }]}>
               Skip BVN — set up my budget instead
@@ -226,43 +188,37 @@ export default function VerifyBVNScreen() {
 }
 
 const bvnS = StyleSheet.create({
-  boxes: {
+  inputWrap: {
     flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'center',
-    flexWrap: 'nowrap',
-  },
-  box: {
-    width: 27,
-    height: 38,
-    borderWidth: 1.5,
-    borderRadius: 9,
     alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    overflow: 'hidden',
+    height: 60,
   },
-  boxText: { ...ff(800), fontSize: 16 },
-  count: { ...ff(400), fontSize: 12, textAlign: 'center', marginTop: 8, marginBottom: 12 },
+  input: {
+    flex: 1,
+    paddingHorizontal: 16,
+    fontSize: 22,
+    letterSpacing: 6,
+    textAlign: 'center',
+    ...ff(700),
+  },
+  inputMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  metaText: {
+    ...ff(400),
+    fontSize: 12,
+  },
   ussdHint: {
     borderWidth: 1,
     borderRadius: 10,
     padding: 10,
-    marginBottom: 16,
   },
   ussdText: { ...ff(400), fontSize: 12 },
   ussdCode: { ...ff(700) },
-  numpad: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  numKey: {
-    width: '30%',
-    height: 54,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  numKeyText: { ...ff(600), fontSize: 19 },
 });

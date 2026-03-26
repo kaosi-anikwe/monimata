@@ -156,12 +156,16 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
       ))}
       <View style={ss.numRow}>
         <TouchableOpacity style={[keyStyle, { flex: 2 }]} onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           if (value === '0') return;
           onChange(value + '0');
         }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="0">
           <Text style={[ss.numKeyText, { color: colors.textPrimary }]}>0</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={keyStyle} onPress={() => onChange(value.slice(0, -1) || '0')}
+        <TouchableOpacity style={keyStyle} onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onChange(value.slice(0, -1) || '0')
+        }}
           activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="Backspace">
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM18 9l-6 6M12 9l6 6"
@@ -497,10 +501,8 @@ export default function AddTransactionScreen() {
 
         {/* ── Numpad ── */}
         <Numpad value={amountStr} onChange={setAmountStr} />
-      </ScrollView>
 
-      {/* ── Save bar ── */}
-      <View style={[ss.saveBar, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+        {/* ── Save button ── */}
         <Button
           variant="green"
           onPress={handleSave}
@@ -510,7 +512,7 @@ export default function AddTransactionScreen() {
         >
           Save Transaction
         </Button>
-      </View>
+      </ScrollView>
 
       {/* ── DateTimePicker ── */}
       {showDatePicker && (
@@ -604,7 +606,7 @@ const ss = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxxl + 16,
     gap: spacing.md,
   },
   amtCard: {
@@ -633,7 +635,7 @@ const ss = StyleSheet.create({
   numRow: { flexDirection: 'row', gap: 1 },
   numKey: { flex: 1, height: 50, alignItems: 'center', justifyContent: 'center' },
   numKeyText: { fontSize: 19, fontWeight: '600', fontFamily: 'PlusJakartaSans-SemiBold' },
-  saveBar: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, paddingBottom: spacing.xxl, borderTopWidth: StyleSheet.hairlineWidth },
+  saveBar: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
   pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: 7 },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },

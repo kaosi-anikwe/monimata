@@ -72,6 +72,44 @@ export function usePushNotifications(): PushNotificationConsent {
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
+  async function doTokenSetup() {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'MoniMata Nudges',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: lightColors.brand,
+      });
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: '6f68cf17-0eea-4815-8e6c-e821e0823fe6',
+    });
+
+    if (mountedRef.current) {
+      registerDevice.mutate({ token: tokenData.data });
+    }
+  }
+
+  async function handleAllow() {
+    setShowPrePrompt(false);
+    await SecureStore.setItemAsync(PRIMED_KEY, '1');
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        await doTokenSetup();
+      }
+    } catch (err) {
+      console.warn('usePushNotifications: permission request failed', err);
+    }
+  }
+
+  function handleDismiss() {
+    setShowPrePrompt(false);
+    // Mark primed so we don't show again. Fire-and-forget.
+    SecureStore.setItemAsync(PRIMED_KEY, '1').catch(() => { });
+  }
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -132,43 +170,7 @@ export function usePushNotifications(): PushNotificationConsent {
     };
   }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function doTokenSetup() {
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'MoniMata Nudges',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: lightColors.brand,
-      });
-    }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: '6f68cf17-0eea-4815-8e6c-e821e0823fe6',
-    });
-
-    if (mountedRef.current) {
-      registerDevice.mutate({ token: tokenData.data });
-    }
-  }
-
-  async function handleAllow() {
-    setShowPrePrompt(false);
-    await SecureStore.setItemAsync(PRIMED_KEY, '1');
-    try {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status === 'granted') {
-        await doTokenSetup();
-      }
-    } catch (err) {
-      console.warn('usePushNotifications: permission request failed', err);
-    }
-  }
-
-  function handleDismiss() {
-    setShowPrePrompt(false);
-    // Mark primed so we don't show again. Fire-and-forget.
-    SecureStore.setItemAsync(PRIMED_KEY, '1').catch(() => { });
-  }
 
   return { showPrePrompt, handleAllow, handleDismiss };
 }

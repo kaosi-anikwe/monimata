@@ -24,6 +24,7 @@
  * Route: /transaction/[id]
  */
 import { StatusBar } from 'expo-status-bar';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -95,8 +96,10 @@ function formatTxDatetime(dateStr: string): string {
 function Numpad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const colors = useTheme();
   const keyStyle = [ss.numKey, { backgroundColor: colors.cardBg }];
+  const tap = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   const K = (v: string) => (
     <TouchableOpacity key={v} style={keyStyle} onPress={() => {
+      tap();
       if (value === '0') { onChange(v); return; }
       onChange(value + v);
     }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel={v}>
@@ -112,12 +115,13 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
       ))}
       <View style={ss.numRow}>
         <TouchableOpacity style={[keyStyle, { flex: 2 }]} onPress={() => {
+          tap();
           if (value === '0') return;
           onChange(value + '0');
         }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="0">
           <Text style={[ss.numKeyText, { color: colors.textPrimary }]}>0</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={keyStyle} onPress={() => onChange(value.slice(0, -1) || '0')}
+        <TouchableOpacity style={keyStyle} onPress={() => { tap(); onChange(value.slice(0, -1) || '0'); }}
           activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="Backspace">
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM18 9l-6 6M12 9l6 6"

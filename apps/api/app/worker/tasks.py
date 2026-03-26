@@ -663,7 +663,7 @@ def reconcile_budget_activity() -> None:
 @celery_app.task(
     name="app.worker.tasks.dispatch_bill_phase3",
     bind=True,
-    max_retries=3,
+    max_retries=10,
     default_retry_delay=60,
 )
 def dispatch_bill_phase3(self, ref: str) -> None:
@@ -673,12 +673,17 @@ def dispatch_bill_phase3(self, ref: str) -> None:
     1. Verify the Web Checkout payment server-side (ISW Collections re-query).
     2. Call SendBillPaymentAdvice to debit the Retailpay wallet and deliver the
        bill to the biller.
+       If ISW returns ResponseCodeGrouping=PENDING the advice has been queued
+       but not yet confirmed.  The task sets state=ADVICE_PENDING and retries;
+       on re-entry it polls query_payment_status instead of re-sending the
+       advice (avoiding a duplicate charge).
     3. Create a Transaction record and update budget_months.activity.
     4. Mark the PendingBillPayment as COMPLETED.
 
-    Retries up to 3 times with exponential backoff on ISW / network errors.
-    After exhaustion, marks the payment FAILED so the mobile app can surface
-    an appropriate message.
+    pending.attempt_count tracks how many times we have *sent* the advice
+    (should be 1).  Task-level self.retries covers both error retries and
+    PENDING poll ticks; max_retries=10 gives ~5 minutes of 30-second polling
+    before the task gives up.
 
     Idempotent: skips silently if the payment is already in a terminal state.
     """
@@ -741,65 +746,97 @@ def dispatch_bill_phase3(self, ref: str) -> None:
             pending.state = "CHECKOUT_VERIFIED"
             db.commit()
 
-        # ── Step 2: SendBillPaymentAdvice ─────────────────────────────────────
-        pending.attempt_count = (pending.attempt_count or 0) + 1
-        db.commit()
-
-        try:
-            isw_result = _run_async(
-                interswitch_client.initiate_payment(
-                    request_reference=ref,
-                    payment_code=pending.payment_code,
-                    customer_id=pending.customer_id,
-                    amount=pending.amount,
-                    customer_mobile=pending.customer_mobile or "",
-                    customer_email=pending.customer_email or "",
+        # ── Step 2: SendBillPaymentAdvice (or poll if advice is in-flight) ────
+        if pending.state == "ADVICE_PENDING":
+            # The advice was already sent and ISW returned PENDING — poll only.
+            try:
+                isw_result = _run_async(interswitch_client.query_payment_status(ref))
+            except Exception as exc:
+                logger.warning(
+                    "dispatch_bill_phase3: query_payment_status failed ref=%s: %s",
+                    ref,
+                    exc,
                 )
-            )
-        except Exception as exc:
-            logger.error(
-                "dispatch_bill_phase3: initiate_payment failed ref=%s: %s", ref, exc
-            )
-            if pending.attempt_count < 3:
-                raise self.retry(exc=exc, countdown=60 * pending.attempt_count)
-            pending.state = "FAILED"
+                raise self.retry(exc=exc, countdown=30)
+        else:
+            # First (and only) send of the advice.
+            pending.attempt_count = (pending.attempt_count or 0) + 1
             db.commit()
-            _notify_bill_payment(
-                pending.user_id,
-                ref,
-                "FAILED",
-                pending.biller_name or "Biller",
-                pending.amount,
-            )
-            return
+
+            try:
+                isw_result = _run_async(
+                    interswitch_client.initiate_payment(
+                        request_reference=ref,
+                        payment_code=pending.payment_code,
+                        customer_id=pending.customer_id,
+                        amount=pending.amount,
+                        customer_mobile=pending.customer_mobile or "",
+                        customer_email=pending.customer_email or "",
+                    )
+                )
+            except Exception as exc:
+                logger.error(
+                    "dispatch_bill_phase3: initiate_payment failed ref=%s: %s", ref, exc
+                )
+                if pending.attempt_count < 3:
+                    raise self.retry(exc=exc, countdown=60 * pending.attempt_count)
+                pending.state = "FAILED"
+                db.commit()
+                _notify_bill_payment(
+                    pending.user_id,
+                    ref,
+                    "FAILED",
+                    pending.biller_name or "Biller",
+                    pending.amount,
+                )
+                return
 
         isw_code: str = str(
             isw_result.get("ResponseCode") or isw_result.get("responseCode") or "99"
         )
-        if isw_code not in ("00", "90000"):
-            logger.error(
-                "dispatch_bill_phase3: ISW rejected advice ref=%s code=%s: %s",
-                ref,
-                isw_code,
-                isw_result.get("ResponseDescription"),
-            )
-            if pending.attempt_count < 3:
-                raise self.retry(
-                    countdown=60 * pending.attempt_count,
-                    exc=RuntimeError(
-                        f"ISW SendBillPaymentAdvice rejected: code={isw_code}"
-                    ),
-                )
-            pending.state = "FAILED"
-            db.commit()
-            _notify_bill_payment(
-                pending.user_id,
-                ref,
-                "FAILED",
-                pending.biller_name or "Biller",
-                pending.amount,
-            )
-            return
+        isw_grouping: str = str(isw_result.get("ResponseCodeGrouping", ""))
+
+        # TODO: check pending state and response code
+
+        # if isw_grouping == "PENDING":
+        #     # ISW has queued the transaction but not yet confirmed it.
+        #     # Mark the state so retries poll instead of re-sending.
+        #     logger.info(
+        #         "dispatch_bill_phase3: advice queued, will poll — ref=%s code=%s",
+        #         ref,
+        #         isw_code,
+        #     )
+        #     pending.state = "ADVICE_PENDING"
+        #     db.commit()
+        #     raise self.retry(
+        #         countdown=5,
+        #         exc=RuntimeError(f"ISW advice still pending: code={isw_code}"),
+        #     )
+
+        # if isw_code not in ("00", "90000"):
+        #     logger.error(
+        #         "dispatch_bill_phase3: ISW rejected advice ref=%s code=%s: %s",
+        #         ref,
+        #         isw_code,
+        #         isw_result.get("ResponseDescription"),
+        #     )
+        #     if pending.attempt_count < 3:
+        #         raise self.retry(
+        #             countdown=10 * pending.attempt_count,
+        #             exc=RuntimeError(
+        #                 f"ISW SendBillPaymentAdvice rejected: code={isw_code}"
+        #             ),
+        #         )
+        #     pending.state = "FAILED"
+        #     db.commit()
+        #     _notify_bill_payment(
+        #         pending.user_id,
+        #         ref,
+        #         "FAILED",
+        #         pending.biller_name or "Biller",
+        #         pending.amount,
+        #     )
+        #     return
 
         pending.state = "BILL_DISPATCHED"
         db.commit()

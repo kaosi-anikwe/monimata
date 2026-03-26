@@ -72,6 +72,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
     onFocus,
     onBlur,
     style,
+    secureTextEntry,
     ...rest
   },
   ref,
@@ -80,7 +81,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   const focused = useSharedValue(0); // 0 = blurred, 1 = focused
   const [secureVisible, setSecureVisible] = useState(false);
 
-  const isSecure = rest.secureTextEntry && !secureVisible;
+  const isSecure = secureTextEntry && !secureVisible;
 
   // Animated border colour: border → brand
   const borderAnim = useAnimatedStyle(() => {
@@ -136,7 +137,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             s.field,
             { color: colors.textPrimary },
             leftSlot ? s.fieldWithLeft : undefined,
-            rightSlot || rest.secureTextEntry ? s.fieldWithRight : undefined,
+            rightSlot || secureTextEntry ? s.fieldWithRight : undefined,
             style,
           ]}
           onFocus={handleFocus}
@@ -145,7 +146,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
           {...rest}
         />
 
-        {rest.secureTextEntry ? (
+        {secureTextEntry ? (
           <TouchableOpacity
             style={s.rightSlot}
             onPress={() => setSecureVisible((v) => !v)}

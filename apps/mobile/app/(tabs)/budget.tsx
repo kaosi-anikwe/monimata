@@ -51,8 +51,9 @@ import { ff, formatMoney } from '@/lib/typography';
 import { nextMonth, prevMonth } from '@/store/budgetSlice';
 import { glass, layout, radius, spacing } from '@/lib/tokens';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { AutoAssignSheet } from '@/components/AutoAssignSheet';
 import type { BudgetCategory, BudgetGroup } from '@/types/budget';
-import { useAssignCategory, useBudget, useMoveMoney } from '@/hooks/useBudget';
+import { useAssignCategory, useBudget, useMoveMoney, useUnhideCategory, useUnhideGroup } from '@/hooks/useBudget';
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -65,7 +66,7 @@ function parseNairaInput(raw: string): number {
 
 // ── Month navigator header (.bgt-hdr) ─────────────────────────────────────────
 
-function MonthHeader({ month, tbb }: { month: string; tbb: number }) {
+function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number; onAutoAssign: () => void }) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
@@ -128,27 +129,32 @@ function MonthHeader({ month, tbb }: { month: string; tbb: number }) {
         </TouchableOpacity>
       </View>
 
-      {/* TBB card (.tbb-card) */}
-      <View style={[ms.tbbCard, { backgroundColor: colors.darkGreen }]}>
-        <View>
-          <Text style={ms.tbbLbl}>To Be Budgeted</Text>
-          <Text style={[ms.tbbVal, { color: tbb < 0 ? colors.error : colors.lime }]}>
-            {formatMoney(tbb)}
-          </Text>
-          <Text style={ms.tbbSub}>
-            {tbb < 0 ? "You've over-assigned" : tbb === 0 ? 'Fully assigned ✓' : 'Assign this to categories'}
-          </Text>
+      {/* TBB card (.tbb-card) — hidden when fully assigned */}
+      {tbb !== 0 && (
+        <View style={[ms.tbbCard, { backgroundColor: tbb < 0 ? colors.darkRed : colors.darkGreen }]}>
+          <View>
+            <Text style={ms.tbbLbl}>To Be Budgeted</Text>
+            <Text style={[ms.tbbVal, { color: tbb < 0 ? colors.error : colors.lime }]}>
+              {formatMoney(tbb)}
+            </Text>
+            <Text style={ms.tbbSub}>
+              {tbb < 0 ? `Over-assigned by ${formatMoney(Math.abs(tbb))}` : 'Assign this to categories'}
+            </Text>
+          </View>
+          {/* Auto-assign / Fix button */}
+          <TouchableOpacity
+            style={[ms.aaBtn, tbb < 0 && { borderColor: colors.errorBadgeBorder, backgroundColor: colors.errorBadgeBg }]}
+            accessibilityRole="button"
+            accessibilityLabel={tbb < 0 ? 'Fix over-assignment' : 'Auto-assign'}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onAutoAssign(); }}
+          >
+            <Ionicons name={tbb < 0 ? 'warning-outline' : 'flash-outline'} size={13} color={tbb < 0 ? colors.error : colors.lime} />
+            <Text style={[ms.aaBtnTxt, { color: tbb < 0 ? colors.error : colors.lime }]}>
+              {tbb < 0 ? 'Fix' : 'Auto-assign'}
+            </Text>
+          </TouchableOpacity>
         </View>
-        {/* Auto-assign placeholder — wired up in Phase 12 */}
-        <TouchableOpacity
-          style={ms.aaBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Auto-assign (coming soon)"
-        >
-          <Ionicons name="flash-outline" size={13} color={colors.lime} />
-          <Text style={[ms.aaBtnTxt, { color: colors.lime }]}>Auto-assign</Text>
-        </TouchableOpacity>
-      </View>
+      )}
     </View>
   );
 }
@@ -232,10 +238,17 @@ function getCatState(c: BudgetCategory): FillState {
   return 'ok';
 }
 
-function getCatFillProgress(c: BudgetCategory): number {
+function getCatAssignedProgress(c: BudgetCategory): number {
   if (c.assigned <= 0) return 0;
+  if (!c.target_amount) return 1; // assigned is the full capacity when no target
+  return Math.min(1, c.assigned / c.target_amount);
+}
+
+function getCatSpentProgress(c: BudgetCategory): number {
+  if (c.assigned <= 0) return 0;
+  const capacity = c.target_amount ?? c.assigned;
   const spent = c.assigned - c.available;
-  return Math.min(1, Math.max(0, spent / c.assigned));
+  return Math.min(1, Math.max(0, spent / capacity));
 }
 
 function CategoryRow({
@@ -246,6 +259,27 @@ function CategoryRow({
   onPress: () => void;
 }) {
   const colors = useTheme();
+
+  if (category.is_hidden) {
+    return (
+      <TouchableOpacity
+        style={[cr.wrap, { backgroundColor: colors.cardBg, borderBottomColor: colors.separator, opacity: 0.45 }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${category.name}, hidden. Tap to unhide.`}
+      >
+        <View style={cr.left}>
+          <Text style={[cr.name, { color: colors.textPrimary }]} numberOfLines={1}>
+            {category.name}
+          </Text>
+          <Text style={[cr.assignedTxt, { color: colors.textMeta, marginTop: 3 }]}>Hidden</Text>
+        </View>
+        <Ionicons name="eye-off-outline" size={16} color={colors.textMeta} />
+      </TouchableOpacity>
+    );
+  }
+
   const state = getCatState(category);
 
   const availColor =
@@ -269,9 +303,10 @@ function CategoryRow({
         </Text>
         <ProgressBar
           animate
-          progress={getCatFillProgress(category)}
+          progress={getCatAssignedProgress(category)}
+          secondProgress={getCatSpentProgress(category)}
           state={state === 'empty' ? 'neutral' : state}
-          size="sm"
+          size="md"
           trackStyle={{ marginTop: 5 }}
         />
       </View>
@@ -791,7 +826,25 @@ function GroupHeader({
   onPress: () => void;
 }) {
   const colors = useTheme();
-  const totalAssigned = group.categories.reduce((a, c) => a + c.assigned, 0);
+
+  if (group.is_hidden) {
+    return (
+      <TouchableOpacity
+        style={[gh.row, { backgroundColor: colors.surface, borderBottomColor: colors.border, opacity: 0.45 }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${group.name}, hidden group. Tap to unhide.`}
+      >
+        <Text style={[gh.name, { color: colors.textSecondary }]}>{group.name}</Text>
+        <Ionicons name="eye-off-outline" size={15} color={colors.textMeta} />
+      </TouchableOpacity>
+    );
+  }
+
+  const totalAssigned = group.categories
+    .filter(c => !c.is_hidden)
+    .reduce((a, c) => a + c.assigned, 0);
   return (
     <TouchableOpacity
       style={[
@@ -834,6 +887,95 @@ const gh = StyleSheet.create({
   total: { ...ff(700), fontSize: 13 },
 });
 
+// ── Unhide sheet (.unhide-sheet) ──────────────────────────────────────────────
+
+type UnhideTarget = { id: string; name: string; type: 'category' | 'group' };
+
+function UnhideSheet({
+  item,
+  month,
+  onClose,
+}: {
+  item: UnhideTarget | null;
+  month: string;
+  onClose: () => void;
+}) {
+  const colors = useTheme();
+  const unhideCat = useUnhideCategory(month);
+  const unhideGrp = useUnhideGroup(month);
+
+  if (!item) return null;
+
+  const mutation = item.type === 'category' ? unhideCat : unhideGrp;
+
+  function handleUnhide() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    mutation.mutate(item!.id, { onSuccess: onClose });
+  }
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity
+        style={[sh.backdrop, { backgroundColor: colors.overlayNeutral }]}
+        activeOpacity={1}
+        onPress={onClose}
+      />
+      <View style={sh.outer}>
+        <View style={[uh.sheet, { backgroundColor: colors.cardBg }]}>
+          <View style={[sh.handle, { backgroundColor: colors.borderStrong }]} />
+          <View style={uh.content}>
+            <Ionicons name="eye-outline" size={28} color={colors.brand} style={uh.icon} />
+            <Text style={[uh.title, { color: colors.textPrimary }]}>
+              Unhide {item.type === 'category' ? 'Category' : 'Group'}?
+            </Text>
+            <Text style={[uh.sub, { color: colors.textMeta }]}>
+              &quot;{item.name}&quot; will appear in your budget again.
+            </Text>
+          </View>
+          <View style={[sh.footer, { paddingBottom: Platform.OS === 'ios' ? 34 : 20 }]}>
+            <TouchableOpacity
+              style={[sh.footBtn, { flex: 1, backgroundColor: colors.surface }]}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+            >
+              <Text style={[sh.footTxt, { color: colors.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[sh.footBtn, { flex: 2, backgroundColor: colors.brand }, mutation.isPending && { opacity: 0.6 }]}
+              onPress={handleUnhide}
+              disabled={mutation.isPending}
+              accessibilityRole="button"
+              accessibilityLabel={`Unhide ${item.name}`}
+            >
+              {mutation.isPending
+                ? <ActivityIndicator color={colors.white} />
+                : <Text style={[sh.footTxt, { color: colors.white }]}>Unhide</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const uh = StyleSheet.create({
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  content: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 10,
+    gap: 8,
+  },
+  icon: { marginBottom: 4 },
+  title: { ...ff(700), fontSize: 17 },
+  sub: { ...ff(400), fontSize: 14, textAlign: 'center', lineHeight: 20 },
+});
+
 // ── Main screen ────────────────────────────────────────────────────────────────
 
 export default function BudgetScreen() {
@@ -843,6 +985,9 @@ export default function BudgetScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<BudgetCategory | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
+  const [unhideTarget, setUnhideTarget] = useState<UnhideTarget | null>(null);
+  const [showAutoAssign, setShowAutoAssign] = useState(false);
 
   function toggleGroup(id: string) {
     LayoutAnimation.configureNext({
@@ -880,13 +1025,25 @@ export default function BudgetScreen() {
     [data],
   );
 
-  const groups = useMemo(
-    () =>
-      data?.groups
-        .filter((g) => !g.is_hidden)
-        .map((g) => ({ ...g, categories: g.categories.filter((c) => !c.is_hidden) })) ?? [],
-    [data],
-  );
+  const groups = useMemo(() => {
+    if (!data?.groups) return [];
+    return data.groups
+      .filter((g) => showHidden || !g.is_hidden)
+      .map((g) => ({
+        ...g,
+        categories: g.categories.filter((c) => showHidden || !c.is_hidden),
+      }));
+  }, [data, showHidden]);
+
+  const hiddenCount = useMemo(() => {
+    if (!data?.groups) return 0;
+    const hiddenGroups = data.groups.filter((g) => g.is_hidden).length;
+    const hiddenCats = data.groups
+      .filter((g) => !g.is_hidden)
+      .flatMap((g) => g.categories)
+      .filter((c) => c.is_hidden).length;
+    return hiddenGroups + hiddenCats;
+  }, [data]);
 
   const bottomPad = layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.lg;
 
@@ -918,7 +1075,7 @@ export default function BudgetScreen() {
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
-      <MonthHeader month={selectedMonth} tbb={data?.tbb ?? 0} />
+      <MonthHeader month={selectedMonth} tbb={data?.tbb ?? 0} onAutoAssign={() => setShowAutoAssign(true)} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -936,19 +1093,32 @@ export default function BudgetScreen() {
             <GroupHeader
               group={group}
               isCollapsed={collapsedGroups.has(group.id)}
-              onPress={() => toggleGroup(group.id)}
+              onPress={() => {
+                if (group.is_hidden) {
+                  setUnhideTarget({ id: group.id, name: group.name, type: 'group' });
+                } else {
+                  toggleGroup(group.id);
+                }
+              }}
             />
-            {!collapsedGroups.has(group.id) && group.categories.map((cat) => (
+            {!group.is_hidden && !collapsedGroups.has(group.id) && group.categories.map((cat) => (
               <CategoryRow
                 key={cat.id}
                 category={cat}
-                onPress={() => { Haptics.selectionAsync(); setSelectedCategory(cat); }}
+                onPress={() => {
+                  if (cat.is_hidden) {
+                    setUnhideTarget({ id: cat.id, name: cat.name, type: 'category' });
+                  } else {
+                    Haptics.selectionAsync();
+                    setSelectedCategory(cat);
+                  }
+                }}
               />
             ))}
           </View>
         ))}
 
-        {groups.length === 0 && (
+        {groups.length === 0 && !showHidden && (
           <View style={s.emptyState}>
             <Ionicons name="grid-outline" size={40} color={colors.textTertiary} />
             <Text style={[s.emptyText, { color: colors.textSecondary }]}>No budget groups yet.</Text>
@@ -956,6 +1126,20 @@ export default function BudgetScreen() {
               <Text style={[s.emptyLink, { color: colors.brand }]}>Set up your budget →</Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        {hiddenCount > 0 && (
+          <TouchableOpacity
+            style={s.hiddenToggle}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowHidden(v => !v); }}
+            accessibilityRole="button"
+            accessibilityLabel={showHidden ? 'Hide hidden items' : `Show ${hiddenCount} hidden item${hiddenCount === 1 ? '' : 's'}`}
+          >
+            <Ionicons name={showHidden ? 'eye-off-outline' : 'eye-outline'} size={13} color={colors.textMeta} />
+            <Text style={[s.hiddenToggleTxt, { color: colors.textMeta }]}>
+              {showHidden ? 'Hide hidden items' : `Show hidden (${hiddenCount})`}
+            </Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
 
@@ -966,6 +1150,22 @@ export default function BudgetScreen() {
         allCategories={allCategories}
         onClose={() => setSelectedCategory(null)}
       />
+
+      <UnhideSheet
+        item={unhideTarget}
+        month={selectedMonth}
+        onClose={() => setUnhideTarget(null)}
+      />
+
+      {showAutoAssign && (
+        <AutoAssignSheet
+          visible={showAutoAssign}
+          month={selectedMonth}
+          tbb={data?.tbb ?? 0}
+          budgetData={data}
+          onClose={() => setShowAutoAssign(false)}
+        />
+      )}
 
     </View>
   );
@@ -998,5 +1198,14 @@ const s = StyleSheet.create({
   },
   emptyText: { ...ff(600), fontSize: 16 },
   emptyLink: { ...ff(600), fontSize: 14, marginTop: 4 },
+  hiddenToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  hiddenToggleTxt: { ...ff(500), fontSize: 13 },
 });
 
