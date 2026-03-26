@@ -90,12 +90,12 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             return {"status": "skipped", "reason": "account_not_found"}
 
         # Fetch since last sync (or all available if never synced).
-        # Pass start=last_synced_at and end=now so we always request the
-        # open-ended period [last_sync, now].  Passing end=start was a bug
-        # that caused Mono to return zero transactions after the first sync.
+        # Mono requires both start and end, or neither.  On the initial sync
+        # we omit both to retrieve the full available history.  On subsequent
+        # syncs we pass start=last_synced_at and end=now.
         is_initial_sync = account.last_synced_at is None
         start_date = account.last_synced_at
-        end_date = datetime.now(timezone.utc)
+        end_date = datetime.now(timezone.utc) if start_date is not None else None
         raw_txns = _run_async(
             mono_client.get_transactions(
                 mono_account_id, start=start_date, end=end_date
