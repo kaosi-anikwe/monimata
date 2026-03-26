@@ -5,10 +5,11 @@
  * Navigated to from the Transaction Detail screen via an action on a manual transaction.
  *
  * Route: /split-transaction?id=<txId>
- */
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+*/
 import { useMemo, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import Svg, { Path, Polyline } from 'react-native-svg';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ScrollView,
   StyleSheet,
@@ -18,18 +19,17 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Polyline } from 'react-native-svg';
 
-import { useToast } from '@/components/Toast';
-import { BottomSheet } from '@/components/ui/BottomSheet';
-import { Button } from '@/components/ui/Button';
-import { useCategoryGroups } from '@/hooks/useCategories';
-import { useTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
-import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { formatNaira } from '@/utils/money';
+import { useToast } from '@/components/Toast';
+import { radius, spacing } from '@/lib/tokens';
+import { Button } from '@/components/ui/Button';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { useCategoryGroups } from '@/hooks/useCategories';
+import type { CategoryGroup, CategoryItem } from '@/types/category';
+import { useTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

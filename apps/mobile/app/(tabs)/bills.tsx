@@ -28,9 +28,9 @@
  * Flow:  categories → billers → payment_items → customer_form → confirm → receipt
  */
 
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -57,11 +57,12 @@ import {
   usePaymentStatus,
   useValidateCustomer,
 } from '@/hooks/useBills';
-import { useCategoryGroups } from '@/hooks/useCategories';
 import { useTheme } from '@/lib/theme';
-import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
+import type { CategoryItem } from '@/types/category';
+import { useCategoryGroups } from '@/hooks/useCategories';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import type {
   Biller,
   BillerCategory,
@@ -70,7 +71,6 @@ import type {
   CustomerValidationResponse,
   PaymentItem,
 } from '@/types/bills';
-import type { CategoryItem } from '@/types/category';
 import { formatNaira, koboToNaira, nairaStringToKobo } from '@/utils/money';
 
 // ─── Step type ────────────────────────────────────────────────────────────────

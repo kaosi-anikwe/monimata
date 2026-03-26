@@ -25,10 +25,10 @@
  *  - Budget data comes from the API via React Query
  *  - FAB (Add Transaction) is rendered by the tab _layout.tsx
  */
-import { Feather, Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -44,15 +44,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useTheme } from '@/lib/theme';
 import { ProgressBar } from '@/components/ui';
 import { syncDatabase } from '@/database/sync';
-import { useAssignCategory, useBudget, useMoveMoney } from '@/hooks/useBudget';
-import { useTheme } from '@/lib/theme';
-import { glass, layout, radius, spacing } from '@/lib/tokens';
 import { ff, formatMoney } from '@/lib/typography';
 import { nextMonth, prevMonth } from '@/store/budgetSlice';
+import { glass, layout, radius, spacing } from '@/lib/tokens';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import type { BudgetCategory, BudgetGroup } from '@/types/budget';
+import { useAssignCategory, useBudget, useMoveMoney } from '@/hooks/useBudget';
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

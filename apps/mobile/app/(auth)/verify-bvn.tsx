@@ -19,16 +19,17 @@
  * Calls POST /auth/verify-bvn with the user's 11-digit BVN.
  * On success → navigates to Link Bank Account screen.
  */
-import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
+import { z } from 'zod';
+import { router } from 'expo-router';
 import { ff } from '@/lib/typography';
-import { clearError, verifyBVN } from '@/store/authSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useTheme } from '@/lib/theme';
+import { StatusBar } from 'expo-status-bar';
+import { radius, spacing } from '@/lib/tokens';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { Controller, useForm } from 'react-hook-form';
+import { clearError, verifyBVN } from '@/store/authSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -39,7 +40,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { z } from 'zod';
+
 import { AuthHdr, BackBtn, TrustCard, s as authS } from './_authShared';
 
 const schema = z.object({

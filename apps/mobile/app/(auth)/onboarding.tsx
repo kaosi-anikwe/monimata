@@ -30,17 +30,17 @@
  *   On error show a toast and let the user retry or skip.
  */
 
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useState } from 'react';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { useTheme, type ThemeColors } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
+import { radius, spacing } from '@/lib/tokens';
+import { useTheme, type ThemeColors } from '@/lib/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

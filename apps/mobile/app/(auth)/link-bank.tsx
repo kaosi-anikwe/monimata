@@ -21,22 +21,22 @@
  *
  * Set EXPO_PUBLIC_MONO_PUBLIC_KEY in apps/mobile/.env
  */
-import { MonoProvider, useMonoConnect } from '@mono.co/connect-react-native';
-import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { useSelector } from 'react-redux';
+import { useMutation } from '@tanstack/react-query';
+import { MonoProvider, useMonoConnect } from '@mono.co/connect-react-native';
 import {
   ActivityIndicator,
   StyleSheet,
   Text, TouchableOpacity,
   View,
 } from 'react-native';
-import { useSelector } from 'react-redux';
 
-import { useToast } from '@/components/Toast';
+import api from '@/services/api';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
-import api from '@/services/api';
 import type { RootState } from '@/store';
+import { useToast } from '@/components/Toast';
 import { AuthHdr, BackBtn, TrustCard, s as authS } from './_authShared';
 
 // ── Inner component — must live inside <MonoProvider> to use the hook ────────

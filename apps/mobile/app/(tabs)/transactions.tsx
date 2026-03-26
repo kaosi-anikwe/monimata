@@ -21,12 +21,12 @@
  * Pull-to-refresh triggers a WatermelonDB sync.
  * Search bar + filter chips (All / Uncategorised / Debits / Credits / per-account).
  */
-import { Ionicons } from '@expo/vector-icons';
-import { FlashList } from '@shopify/flash-list';
-import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
+import { FlashList } from '@shopify/flash-list';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -39,24 +39,24 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { useTheme } from '@/lib/theme';
+import { type_ } from '@/lib/typography';
+import { formatNaira } from '@/utils/money';
 import { Chip } from '@/components/ui/Chip';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { queryKeys } from '@/lib/queryKeys';
 import { syncDatabase } from '@/database/sync';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useCategoryGroups } from '@/hooks/useCategories';
-import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
-import { queryKeys } from '@/lib/queryKeys';
-import { useTheme } from '@/lib/theme';
-import { layout, radius, shadow, spacing } from '@/lib/tokens';
-import { type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
 import type { CategoryGroup } from '@/types/category';
 import type { Transaction } from '@/types/transaction';
-import { formatNaira } from '@/utils/money';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { useCategoryGroups } from '@/hooks/useCategories';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
+import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
 
 // ─── Filter type ──────────────────────────────────────────────────────────────
 

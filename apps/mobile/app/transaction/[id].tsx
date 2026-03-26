@@ -23,11 +23,13 @@
  *
  * Route: /transaction/[id]
  */
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import Svg, { Circle, Path, Polyline } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import {
   ActivityIndicator,
   Animated,
@@ -40,29 +42,27 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 
+import { type_ } from '@/lib/typography';
 import { useToast } from '@/components/Toast';
-import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
+import { GRADIENTS, useTheme } from '@/lib/theme';
 import { useAccounts } from '@/hooks/useAccounts';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useCategoryGroups } from '@/hooks/useCategories';
-import { useCreateRecurringRule, useDeactivateRecurringRule } from '@/hooks/useRecurring';
+import type { CategoryGroup, CategoryItem } from '@/types/category';
 import {
   useDeleteTransaction,
   useTransaction,
   useUpdateTransaction,
   type ManualTransactionBody,
 } from '@/hooks/useTransactions';
-import { GRADIENTS, useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
-import { type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
-import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
 import type { Transaction } from '@/types/transaction';
 import { computeNextDue, nairaStringToKobo } from '@/utils/money';
+import { useCreateRecurringRule, useDeactivateRecurringRule } from '@/hooks/useRecurring';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

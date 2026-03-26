@@ -19,10 +19,9 @@
  */
 
 import { useMemo } from 'react';
-
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ScrollView,
   StyleSheet,
@@ -33,16 +32,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useToast } from '@/components/Toast';
-import { AmountDisplay, Avatar, Badge, Button, ListRow, SectionHeader } from '@/components/ui';
-import { useAccounts } from '@/hooks/useAccounts';
-import { useBiometricLock } from '@/hooks/useBiometricLock';
-import { useNudgeSettings, useNudgeUnreadCount, useUpdateNudgeSettings } from '@/hooks/useNudges';
-import { useTheme, useThemePreference } from '@/lib/theme';
-import { radius, shadow, spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
 import { logout } from '@/store/authSlice';
+import { ff, type_ } from '@/lib/typography';
+import { useToast } from '@/components/Toast';
+import { useAccounts } from '@/hooks/useAccounts';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { useTheme, useThemePreference } from '@/lib/theme';
+import { useBiometricLock } from '@/hooks/useBiometricLock';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { AmountDisplay, Avatar, Badge, Button, ListRow, SectionHeader } from '@/components/ui';
+import { useNudgeSettings, useNudgeUnreadCount, useUpdateNudgeSettings } from '@/hooks/useNudges';
 
 // ── Hardcoded gamification constants (Phase 14 will fetch from API) ──────────
 const FAKE_LEVEL = 7;
