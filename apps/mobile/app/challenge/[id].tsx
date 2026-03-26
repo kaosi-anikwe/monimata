@@ -20,11 +20,11 @@
  * Route: /challenge/[id]  (Expo Router dynamic segment)
  */
 
+import React, { useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -34,10 +34,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useToast } from '@/components/Toast';
-import { useTheme } from '@/lib/theme';
-import { hitSlop, layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
+import { useTheme } from '@/lib/theme';
+import { useToast } from '@/components/Toast';
+import { hitSlop, layout, radius, shadow, spacing } from '@/lib/tokens';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

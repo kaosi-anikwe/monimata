@@ -19,7 +19,6 @@
  *
  * Route: /add-transaction
  */
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import * as Haptics from "expo-haptics"
 import { StatusBar } from 'expo-status-bar';
@@ -35,22 +34,23 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Polyline } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { useTheme } from '@/lib/theme';
+import { type_ } from '@/lib/typography';
+import { radius, spacing } from '@/lib/tokens';
 import { Button } from '@/components/ui/Button';
 import { useAccounts } from '@/hooks/useAccounts';
+import type { BankAccount } from '@/types/account';
+import { RECURRENCE_OPTIONS } from '@/types/recurring';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCreateRecurringRule } from '@/hooks/useRecurring';
 import { useCreateTransaction } from '@/hooks/useTransactions';
-import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
-import { type_ } from '@/lib/typography';
-import type { BankAccount } from '@/types/account';
-import type { CategoryGroup, CategoryItem } from '@/types/category';
-import { RECURRENCE_OPTIONS } from '@/types/recurring';
 import { computeNextDue, nairaStringToKobo } from '@/utils/money';
+import type { CategoryGroup, CategoryItem } from '@/types/category';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

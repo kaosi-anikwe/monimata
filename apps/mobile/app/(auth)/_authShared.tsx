@@ -29,14 +29,14 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRef, type ReactNode } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { StyleProp, TextInputProps, TextStyle, ViewStyle } from 'react-native';
 import { Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { useTheme, type ThemeColors } from '@/lib/theme';
-import { glass, radius, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
+import { glass, radius, spacing } from '@/lib/tokens';
+import { useTheme, type ThemeColors } from '@/lib/theme';
 
 // ─── AuthInput ────────────────────────────────────────────────────────────────
 // Matches .inp: height 48, radius --rm (16), border 1.5px, focus → brand green glow.

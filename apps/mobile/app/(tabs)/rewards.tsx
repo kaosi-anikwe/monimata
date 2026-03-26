@@ -24,10 +24,10 @@
  * Tapping a challenge navigates to /challenge/[id].
  */
 
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ScrollView,
   StyleSheet,
@@ -37,11 +37,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ff } from '@/lib/typography';
+import { useTheme } from '@/lib/theme';
 import { useToast } from '@/components/Toast';
 import { Badge, Button, ProgressBar } from '@/components/ui';
-import { useTheme } from '@/lib/theme';
 import { hitSlop, layout, radius, shadow, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
 
 // ── Fake seed data ────────────────────────────────────────────────────────────
 // Phase 16 replaces with useGamification() / useStreak() / useBadges() / useChallenges().

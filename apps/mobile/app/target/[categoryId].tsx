@@ -23,11 +23,11 @@
  *
  * Route: /target/[categoryId]
  */
+import { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -43,14 +43,14 @@ import {
 import Animated, { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useBudget } from '@/hooks/useBudget';
-import { useTarget, useUpsertTarget } from '@/hooks/useTargets';
-import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
+import { useTheme } from '@/lib/theme';
+import { useBudget } from '@/hooks/useBudget';
+import { radius, spacing } from '@/lib/tokens';
 import { useAppSelector } from '@/store/hooks';
-import type { TargetBehavior, TargetFrequency } from '@/types/target';
 import { nairaStringToKobo } from '@/utils/money';
+import { useTarget, useUpsertTarget } from '@/hooks/useTargets';
+import type { TargetBehavior, TargetFrequency } from '@/types/target';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

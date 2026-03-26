@@ -19,8 +19,8 @@ import { Tabs, useRouter, useSegments } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MainTabBar } from '@/components/ui/TabBar';
 import { useTheme } from '@/lib/theme';
+import { MainTabBar } from '@/components/ui/TabBar';
 import { layout, shadow, spacing } from '@/lib/tokens';
 
 /**

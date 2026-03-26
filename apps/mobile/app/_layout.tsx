@@ -29,36 +29,36 @@ import {
   PlusJakartaSans_800ExtraBold_Italic,
   useFonts,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import { Provider } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Provider } from 'react-redux';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ActivityIndicator, AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { AppLockScreen } from '@/components/AppLockScreen';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ToastProvider } from '@/components/Toast';
+import { store } from '@/store';
+import { ff } from '@/lib/typography';
 import { initDatabase } from '@/database';
 import { syncDatabase } from '@/database/sync';
-import { useBiometricLock } from '@/hooks/useBiometricLock';
-import { useJobEvents } from '@/hooks/useJobEvents';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { initSentry, Sentry } from '@/lib/sentry';
-import { getTheme, useTheme } from '@/lib/theme';
-import { ThemeProvider } from '@/lib/ThemeProvider';
-import { radius, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
-import { setLogoutHandler } from '@/services/api';
-import { store } from '@/store';
-import { clearAuth, restoreSession } from '@/store/authSlice';
-import { syncToCurrentMonth } from '@/store/budgetSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { Database } from '@nozbe/watermelondb';
+import { radius, spacing } from '@/lib/tokens';
+import { getTheme, useTheme } from '@/lib/theme';
+import { initSentry, Sentry } from '@/lib/sentry';
+import { setLogoutHandler } from '@/services/api';
+import { ToastProvider } from '@/components/Toast';
+import { ThemeProvider } from '@/lib/ThemeProvider';
+import { useJobEvents } from '@/hooks/useJobEvents';
+import { syncToCurrentMonth } from '@/store/budgetSlice';
+import { AppLockScreen } from '@/components/AppLockScreen';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useBiometricLock } from '@/hooks/useBiometricLock';
+import { clearAuth, restoreSession } from '@/store/authSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // Initialise Sentry before the app renders so the first frame is covered.
 initSentry();

@@ -17,10 +17,11 @@
 /**
  * Accounts tab — manage bank accounts (manual and Mono-linked).
  */
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,14 +33,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useToast } from '@/components/Toast';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Divider } from '@/components/ui/Divider';
-import { Input } from '@/components/ui/Input';
 import { ListRow } from '@/components/ui/ListRow';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import {
   useAccounts,
   useAddManualAccount,

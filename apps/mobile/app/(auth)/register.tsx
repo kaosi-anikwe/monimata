@@ -18,12 +18,13 @@
  * Register screen — email, password, first/last name, phone.
  * On success → navigates to BVN verification.
  */
-import { clearError, register } from '@/store/authSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
+import { clearError, register } from '@/store/authSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -32,11 +33,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { z } from 'zod';
 
-import { Button, Input } from '@/components/ui';
-import { useTheme } from '@/lib/theme';
 import { ff } from '@/lib/typography';
+import { useTheme } from '@/lib/theme';
+import { Button, Input } from '@/components/ui';
 import { AuthHdr, BackBtn, s } from './_authShared';
 
 const schema = z.object({

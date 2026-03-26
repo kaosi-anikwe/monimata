@@ -21,7 +21,6 @@
  */
 
 import { useState } from 'react';
-
 import { router } from 'expo-router';
 import {
   KeyboardAvoidingView,
@@ -36,13 +35,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useTheme } from '@/lib/theme';
+import { ff, type_ } from '@/lib/typography';
 import { useToast } from '@/components/Toast';
+import { radius, spacing } from '@/lib/tokens';
+import type { NudgeSettings } from '@/types/nudge';
 import { Button, SectionHeader, ScreenHeader } from '@/components/ui';
 import { useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
-import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
-import type { NudgeSettings } from '@/types/nudge';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 

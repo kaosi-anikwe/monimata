@@ -17,17 +17,17 @@
 /**
  * Welcome screen — entry point for unauthenticated users.
  */
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { useTheme, type ThemeColors } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
+import { radius, spacing } from '@/lib/tokens';
+import { useTheme, type ThemeColors } from '@/lib/theme';
 
 // ─── Carousel data ────────────────────────────────────────────────────────────
 

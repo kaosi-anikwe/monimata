@@ -38,6 +38,7 @@ import { Platform } from 'react-native';
 import { useSelector } from 'react-redux';
 
 import { useToast } from '@/components/Toast';
+import { lightColors } from '@/lib/theme';
 import type { RootState } from '../store';
 import { useRegisterDevice } from './useNudges';
 
@@ -137,7 +138,7 @@ export function usePushNotifications(): PushNotificationConsent {
         name: 'MoniMata Nudges',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#0F7B3F',
+        lightColor: lightColors.brand,
       });
     }
 

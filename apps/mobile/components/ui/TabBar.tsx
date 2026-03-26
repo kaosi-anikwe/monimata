@@ -278,7 +278,6 @@ const s = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 2,

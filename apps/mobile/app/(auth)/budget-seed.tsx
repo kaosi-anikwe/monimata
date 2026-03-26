@@ -35,20 +35,20 @@
  *   Returns: { groups: SeedGroup[] }
  */
 
+import { useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { useTheme, type ThemeColors } from '@/lib/theme';
-import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
-import { markOnboarded } from '@/store/authSlice';
 import { useAppDispatch } from '@/store/hooks';
+import { markOnboarded } from '@/store/authSlice';
 import type { OnboardingAnswers } from './onboarding';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { useTheme, type ThemeColors } from '@/lib/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

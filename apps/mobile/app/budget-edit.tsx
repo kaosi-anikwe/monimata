@@ -24,12 +24,12 @@
  * - Drag-to-reorder: long-press the ≡ handle on a group or category row to
  *   drag it to a new position. Groups collapse while a group is being dragged.
  */
-import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -69,9 +69,9 @@ import {
   useReorderGroups,
 } from '@/hooks/useBudget';
 import { useTheme } from '@/lib/theme';
-import { glass, radius, shadow, spacing } from '@/lib/tokens';
-import { ff, formatMoney } from '@/lib/typography';
 import { useAppSelector } from '@/store/hooks';
+import { ff, formatMoney } from '@/lib/typography';
+import { glass, radius, shadow, spacing } from '@/lib/tokens';
 import type { BudgetCategory, BudgetGroup } from '@/types/budget';
 
 

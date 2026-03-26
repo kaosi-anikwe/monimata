@@ -20,12 +20,12 @@
  * FAB note: the lime "+" FAB lives in (tabs)/_layout.tsx (bottom-right), not here.
  */
 
+import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { StatusBar } from 'expo-status-bar';
 import { ProgressBar } from '@/components/ui';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -38,14 +38,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useTheme } from '@/lib/theme';
+import { useBudget } from '@/hooks/useBudget';
+import { useAppSelector } from '@/store/hooks';
 import { syncDatabase } from '@/database/sync';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useBudget } from '@/hooks/useBudget';
-import { useDismissNudge, useNudgeUnreadCount, useNudges } from '@/hooks/useNudges';
-import { useTheme } from '@/lib/theme';
-import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, formatMoney } from '@/lib/typography';
-import { useAppSelector } from '@/store/hooks';
+import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
+import { useDismissNudge, useNudgeUnreadCount, useNudges } from '@/hooks/useNudges';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

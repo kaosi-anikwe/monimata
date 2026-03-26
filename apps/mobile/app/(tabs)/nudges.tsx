@@ -26,9 +26,9 @@
  * which also shows an unread count badge (managed in _layout.tsx).
  */
 
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -42,10 +42,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BottomSheet, Badge, Button, EmptyState, ListRow, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
-import { radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { BottomSheet, Badge, Button, EmptyState, ListRow, ScreenHeader } from '@/components/ui';
 import {
   useDismissNudge,
   useMarkAllNudgesRead,
