@@ -18,7 +18,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, BackHandler, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, BackHandler, Text, View } from 'react-native';
 
 import { ss } from './_components';
 import { useTheme } from '@/lib/theme';
@@ -51,14 +51,31 @@ export default function ProcessingScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRef]);
 
+  // Refetch immediately when the app returns to the foreground — the payment
+  // may have completed while timers and the WS were suspended in the background.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') refetch();
+    });
+    return () => sub.remove();
+  }, [refetch]);
+
   // Subscribe to WS bill_payment_update so we react immediately instead of
   // waiting for the next poll tick.
   useEffect(() => {
-    const unsub = subscribeBillPaymentUpdate(pendingRef, () => {
+    const unsub = subscribeBillPaymentUpdate(pendingRef, (wsState) => {
+      if (wsState === 'FAILED' || wsState === 'REFUNDED') {
+        // We know the outcome immediately — no need to wait for a refetch.
+        error('Payment Failed', 'Your payment could not be completed. Please try again.');
+        router.back();
+        return;
+      }
+      // For COMPLETED we still refetch to get the full PaymentStatusResponse
+      // (amount, narration, date) needed by the receipt screen.
       refetch();
     });
     return unsub;
-  }, [pendingRef, refetch]);
+  }, [pendingRef, refetch, error, router]);
 
   // Watch for terminal states from polling or WS-triggered refetch.
   // flow, router, and error are stable references; status.state drives the logic.

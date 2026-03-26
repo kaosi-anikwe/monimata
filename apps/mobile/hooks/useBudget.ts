@@ -357,6 +357,26 @@ export function useHideCategory(month: string) {
   });
 }
 
+export function useUnhideCategory(month: string) {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: async (categoryId: string) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        const cat = await db.get<CategoryModel>('categories').find(categoryId);
+        await cat.update(c => {
+          c.isHidden = false;
+          c.updatedAt = new Date();
+        });
+      });
+      syncDatabase().catch(console.warn);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
+    onError: () => error('Error', 'Could not unhide category.'),
+  });
+}
+
 export function useDeleteCategory(month: string) {
   const qc = useQueryClient();
   const { error } = useToast();
@@ -449,6 +469,26 @@ export function useHideGroup(month: string) {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
     onError: () => error('Error', 'Could not hide group.'),
+  });
+}
+
+export function useUnhideGroup(month: string) {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: async (groupId: string) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        const grp = await db.get<CategoryGroupModel>('category_groups').find(groupId);
+        await grp.update(g => {
+          g.isHidden = false;
+          g.updatedAt = new Date();
+        });
+      });
+      syncDatabase().catch(console.warn);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
+    onError: () => error('Error', 'Could not unhide group.'),
   });
 }
 
@@ -553,5 +593,290 @@ export function useReorderCategories(month: string) {
       syncDatabase().catch(console.warn);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
+  });
+}
+
+// ── Auto-Assign ───────────────────────────────────────────────────────────────
+
+export type AutoAssignStrategy =
+  | 'underfunded'
+  | 'assigned_last_month'
+  | 'spent_last_month'
+  | 'avg_assigned'
+  | 'avg_spent';
+
+export interface AutoAssignItem {
+  categoryId: string;
+  categoryName: string;
+  currentAssigned: number; // kobo
+  proposedAssigned: number; // kobo
+}
+
+export interface AutoAssignPreview {
+  strategy: AutoAssignStrategy;
+  /** Only categories where proposed !== current */
+  items: AutoAssignItem[];
+  /** Sum of all (proposed - current) deltas; kobo */
+  totalDelta: number;
+  /** Projected TBB after applying this strategy; kobo */
+  newTbb: number;
+}
+
+export type AutoAssignAllPreviews = Record<AutoAssignStrategy, AutoAssignPreview>;
+
+/**
+ * Computes auto-assign strategy previews from WatermelonDB.
+ * Uses the already-computed BudgetResponse (current month + live activity)
+ * and looks up last 3 months of historical budget_months rows.
+ *
+ * Mode is derived from TBB:
+ *   TBB > 0 → "assign" mode: each strategy only keeps items where
+ *             proposedAssigned > currentAssigned (we are filling, not reducing).
+ *   TBB < 0 → "fix" mode: underfunded strategy is excluded entirely;
+ *             each strategy only keeps items where proposedAssigned < currentAssigned
+ *             (we are reducing over-assignment to bring TBB back to 0).
+ *
+ * Enabled only when budgetData is present and tbb !== 0.
+ */
+export function useAutoAssignPreviews(
+  month: string,
+  budgetData: BudgetResponse | undefined,
+) {
+  return useQuery({
+    queryKey: ['auto-assign-previews', month] as const,
+    queryFn: async (): Promise<AutoAssignAllPreviews> => {
+      const db = getDatabase();
+
+      const allCats = (budgetData?.groups ?? [])
+        .filter((g) => !g.is_hidden)
+        .flatMap((g) => g.categories.filter((c) => !c.is_hidden));
+
+      const prev1 = prevMonth(month);
+      const prev2 = prevMonth(prev1);
+      const prev3 = prevMonth(prev2);
+      const histMonths = [prev1, prev2, prev3];
+      const catIds = allCats.map((c) => c.id);
+
+      const [historicalBMs, allTargets] = await Promise.all([
+        catIds.length > 0
+          ? db
+              .get<BudgetMonthModel>('budget_months')
+              .query(
+                Q.where('category_id', Q.oneOf(catIds)),
+                Q.where('month', Q.oneOf(histMonths)),
+              )
+              .fetch()
+          : Promise.resolve([]),
+        db.get<CategoryTargetModel>('category_targets').query().fetch(),
+      ]);
+
+      // Index: categoryId → month → record
+      const bmIndex = new Map<string, Map<string, BudgetMonthModel>>();
+      for (const bm of historicalBMs) {
+        if (!bmIndex.has(bm.categoryId)) bmIndex.set(bm.categoryId, new Map());
+        bmIndex.get(bm.categoryId)!.set(bm.month, bm);
+      }
+
+      // Index: categoryId → target (needed for underfunded priority sort)
+      const targetMap = new Map(allTargets.map((t) => [t.categoryId, t]));
+
+      const strategies: AutoAssignStrategy[] = [
+        'underfunded',
+        'assigned_last_month',
+        'spent_last_month',
+        'avg_assigned',
+        'avg_spent',
+      ];
+
+      const result = {} as AutoAssignAllPreviews;
+      const today = new Date();
+      const tbb = budgetData?.tbb ?? 0;
+      // assign mode (tbb > 0): only keep items that increase assignments (we're filling).
+      // fix mode    (tbb < 0): only keep items that decrease assignments (we're reducing).
+      const mode: 'assign' | 'fix' = tbb >= 0 ? 'assign' : 'fix';
+
+      for (const strategy of strategies) {
+        // Underfunded is about topping categories up — no place in fix mode.
+        if (strategy === 'underfunded' && mode === 'fix') {
+          result[strategy] = { strategy, items: [], totalDelta: 0, newTbb: tbb };
+          continue;
+        }
+
+        const items: AutoAssignItem[] = [];
+
+        if (strategy === 'underfunded') {
+          // Build priority-sorted candidates and simulate TBB-cap: min(shortfall, remaining).
+          type Candidate = { cat: BudgetCategory; shortfall: number };
+          const candidates: Candidate[] = allCats
+            .filter((cat) => cat.required_this_month !== null && cat.required_this_month > 0)
+            .map((cat) => ({ cat, shortfall: cat.required_this_month! }));
+
+          // Priority rank matches the backend sort:
+          //   [0, daysAway] → by_date targets (closest deadline first)
+          //   [1, 0]        → monthly set_aside
+          //   [2, 0]        → monthly refill / balance
+          //   [3, 0]        → weekly
+          //   [4, 0]        → other / no target
+          const rank = (cat: BudgetCategory): [number, number] => {
+            const target = targetMap.get(cat.id);
+            if (!target) return [4, 0];
+            if (
+              (target.frequency === 'yearly' || target.frequency === 'custom') &&
+              target.targetDate
+            ) {
+              const daysAway = Math.floor(
+                (new Date(target.targetDate).getTime() - today.getTime()) / 86_400_000,
+              );
+              return [0, daysAway];
+            }
+            if (target.frequency === 'monthly' && target.behavior === 'set_aside') return [1, 0];
+            if (target.frequency === 'monthly') return [2, 0];
+            if (target.frequency === 'weekly') return [3, 0];
+            return [4, 0];
+          };
+
+          candidates.sort((a, b) => {
+            const [pa, da] = rank(a.cat);
+            const [pb, db_] = rank(b.cat);
+            return pa !== pb ? pa - pb : da - db_;
+          });
+
+          let remainingTbb = tbb;
+          for (const { cat, shortfall } of candidates) {
+            if (remainingTbb <= 0) break;
+            const toAssign = Math.min(shortfall, remainingTbb);
+            items.push({
+              categoryId: cat.id,
+              categoryName: cat.name,
+              currentAssigned: cat.assigned,
+              proposedAssigned: cat.assigned + toAssign,
+            });
+            remainingTbb -= toAssign;
+          }
+        } else {
+          // Historical strategies — iterate all visible categories
+          for (const cat of allCats) {
+            const catBMs = bmIndex.get(cat.id);
+            let proposed: number;
+
+            switch (strategy) {
+              case 'assigned_last_month': {
+                proposed = catBMs?.get(prev1)?.assigned ?? 0;
+                break;
+              }
+              case 'spent_last_month': {
+                // activity is stored negative for debits; abs gives the spend amount
+                proposed = Math.abs(catBMs?.get(prev1)?.activity ?? 0);
+                break;
+              }
+              case 'avg_assigned': {
+                const vals = histMonths
+                  .map((m) => catBMs?.get(m)?.assigned ?? 0)
+                  .filter((v) => v > 0);
+                proposed =
+                  vals.length > 0
+                    ? Math.ceil(vals.reduce((a, b) => a + b, 0) / vals.length)
+                    : 0;
+                break;
+              }
+              case 'avg_spent': {
+                const vals = histMonths
+                  .map((m) => Math.abs(catBMs?.get(m)?.activity ?? 0))
+                  .filter((v) => v > 0);
+                proposed =
+                  vals.length > 0
+                    ? Math.ceil(vals.reduce((a, b) => a + b, 0) / vals.length)
+                    : 0;
+                break;
+              }
+              default:
+                proposed = cat.assigned;
+            }
+
+            if (proposed !== cat.assigned) {
+              items.push({
+                categoryId: cat.id,
+                categoryName: cat.name,
+                currentAssigned: cat.assigned,
+                proposedAssigned: proposed,
+              });
+            }
+          }
+        }
+
+        // Mode filter applied after computing all candidates:
+        //   assign mode → only increases (we are distributing unassigned money)
+        //   fix mode    → only decreases (we are pulling money back to TBB)
+        const filteredItems =
+          mode === 'assign'
+            ? items.filter((it) => it.proposedAssigned > it.currentAssigned)
+            : items.filter((it) => it.proposedAssigned < it.currentAssigned);
+
+        const totalDelta = filteredItems.reduce(
+          (s, it) => s + (it.proposedAssigned - it.currentAssigned),
+          0,
+        );
+
+        result[strategy] = {
+          strategy,
+          items: filteredItems,
+          totalDelta,
+          newTbb: tbb - totalDelta,
+        };
+      }
+
+      return result;
+    },
+    enabled: !!budgetData && (budgetData?.tbb ?? 0) !== 0,
+    staleTime: 15_000, // previews stay fresh for 15 s
+  });
+}
+
+/**
+ * Applies an auto-assign preview: writes proposed assigned amounts to
+ * WatermelonDB for all affected categories, then triggers a background sync.
+ */
+export function useApplyAutoAssign(month: string) {
+  const qc = useQueryClient();
+  const { error: showError, success } = useToast();
+  const userId = useAppSelector((state) => state.auth.user?.id ?? '');
+
+  return useMutation({
+    mutationFn: async (items: AutoAssignItem[]) => {
+      const db = getDatabase();
+      await db.write(async () => {
+        for (const item of items) {
+          const existing = await db
+            .get<BudgetMonthModel>('budget_months')
+            .query(Q.where('category_id', item.categoryId), Q.where('month', month))
+            .fetch();
+          if (existing.length > 0) {
+            await existing[0].update((bm) => {
+              bm.assigned = item.proposedAssigned;
+              bm.updatedAt = new Date();
+            });
+          } else {
+            await db.get<BudgetMonthModel>('budget_months').create((bm) => {
+              bm.userId = userId;
+              bm.categoryId = item.categoryId;
+              bm.month = month;
+              bm.assigned = item.proposedAssigned;
+              bm.activity = 0;
+            });
+          }
+        }
+      });
+      syncDatabase().catch(console.warn);
+    },
+    onSuccess: (_, items) => {
+      qc.invalidateQueries({ queryKey: queryKeys.budget(month) });
+      qc.invalidateQueries({ queryKey: ['auto-assign-previews', month] });
+      const n = items.length;
+      success(
+        'Assignments applied',
+        `${n} categor${n === 1 ? 'y' : 'ies'} updated.`,
+      );
+    },
+    onError: () => showError('Error', 'Could not apply auto-assign.'),
   });
 }

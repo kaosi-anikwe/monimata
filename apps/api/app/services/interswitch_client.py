@@ -84,12 +84,19 @@ class InterswitchClient:
         """
         cache_key = TOKEN_CACHE_KEY_OWN if own else TOKEN_CACHE_KEY
         client_id = (
-            settings.INTERSWITCH_OWN_CLIENT_ID if own else settings.INTERSWITCH_CLIENT_ID
+            settings.INTERSWITCH_OWN_CLIENT_ID
+            if own
+            else settings.INTERSWITCH_CLIENT_ID
         )
         client_secret = (
             settings.INTERSWITCH_OWN_CLIENT_SECRET
             if own
             else settings.INTERSWITCH_CLIENT_SECRET
+        )
+        url = (
+            settings.INTERSWITCH_OWN_PASSPORT_URL
+            if own
+            else settings.INTERSWITCH_PASSPORT_URL
         )
 
         r = get_redis()
@@ -97,13 +104,11 @@ class InterswitchClient:
         if cached:
             return cached if isinstance(cached, str) else cached.decode()
 
-        credentials = base64.b64encode(
-            f"{client_id}:{client_secret}".encode()
-        ).decode()
+        credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
 
         async with self._client() as http:
             response = await http.post(
-                f"{settings.INTERSWITCH_PASSPORT_URL}/passport/oauth/token",
+                f"{url}/passport/oauth/token",
                 headers={
                     "Authorization": f"Basic {credentials}",
                     "Content-Type": "application/x-www-form-urlencoded",
@@ -267,7 +272,8 @@ class InterswitchClient:
                 headers=self._headers(token),
                 json=payload,
             )
-            response.raise_for_status()
+            # TODO: raise for status
+            # response.raise_for_status()
             return response.json()
 
     # ── Quickteller — query ───────────────────────────────────────────────────

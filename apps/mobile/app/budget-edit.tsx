@@ -67,6 +67,8 @@ import {
   useRenameGroup,
   useReorderCategories,
   useReorderGroups,
+  useUnhideCategory,
+  useUnhideGroup,
 } from '@/hooks/useBudget';
 import { useTheme } from '@/lib/theme';
 import { useAppSelector } from '@/store/hooks';
@@ -466,13 +468,35 @@ function CategoryEditRow({
   onOptions,
   onNavigateTarget,
   drag,
+  onUnhide,
 }: {
   category: BudgetCategory;
   onOptions: () => void;
   onNavigateTarget: (categoryId: string) => void;
   drag: () => void;
+  onUnhide?: () => void;
 }) {
   const colors = useTheme();
+
+  if (category.is_hidden) {
+    return (
+      <TouchableOpacity
+        style={[ss.catRow, { borderBottomColor: colors.separator, opacity: 0.45 }]}
+        onPress={onUnhide}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${category.name}, hidden. Tap to unhide.`}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[ss.catName, { color: colors.textPrimary }]} numberOfLines={1}>
+            {category.name}
+          </Text>
+        </View>
+        <Ionicons name="eye-off-outline" size={16} color={colors.textMeta} />
+      </TouchableOpacity>
+    );
+  }
+
   const label = targetLabel(category);
   return (
     <View style={[ss.catRow, { borderBottomColor: colors.separator }]}>
@@ -517,13 +541,33 @@ function GroupEditHeader({
   onAddCategory,
   onOptions,
   drag,
+  onUnhide,
 }: {
   group: BudgetGroup;
   onAddCategory: () => void;
   onOptions: () => void;
   drag: () => void;
+  onUnhide?: () => void;
 }) {
   const colors = useTheme();
+
+  if (group.is_hidden) {
+    return (
+      <TouchableOpacity
+        style={[ss.groupHdr, { backgroundColor: colors.surface, borderBottomColor: colors.border, opacity: 0.45 }]}
+        onPress={onUnhide}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${group.name}, hidden group. Tap to unhide.`}
+      >
+        <Text style={[ss.groupName, { color: colors.textSecondary, flex: 1 }]} numberOfLines={1}>
+          {group.name.toUpperCase()}
+        </Text>
+        <Ionicons name="eye-off-outline" size={15} color={colors.textMeta} />
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <View style={[ss.groupHdr, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       {/* Drag handle — long-press to start group drag */}
@@ -559,6 +603,68 @@ function GroupEditHeader({
   );
 }
 
+// ─── Unhide sheet (edit screen) ─────────────────────────────────────────────
+
+function UnhideSheetEdit({
+  item,
+  month,
+  onClose,
+}: {
+  item: { id: string; name: string; type: 'category' | 'group' } | null;
+  month: string;
+  onClose: () => void;
+}) {
+  const colors = useTheme();
+  const unhideCat = useUnhideCategory(month);
+  const unhideGrp = useUnhideGroup(month);
+
+  if (!item) return null;
+
+  const mutation = item.type === 'category' ? unhideCat : unhideGrp;
+
+  function handleUnhide() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    mutation.mutate(item!.id, { onSuccess: onClose });
+  }
+
+  return (
+    <BottomSheet
+      visible
+      onClose={onClose}
+      title={`Unhide ${item.type === 'category' ? 'Category' : 'Group'}?`}
+      scrollable={false}
+    >
+      <View style={ss.unhideContent}>
+        <Ionicons name="eye-outline" size={24} color={colors.brand} style={{ alignSelf: 'center', marginBottom: 4 }} />
+        <Text style={[ss.unhideSub, { color: colors.textMeta }]}>
+          &quot;{item.name}&quot; will appear in your budget again.
+        </Text>
+        <View style={ss.unhideFooter}>
+          <TouchableOpacity
+            style={[ss.unhideBtn, { flex: 1, backgroundColor: colors.surface }]}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+          >
+            <Text style={[ss.unhideBtnTxt, { color: colors.textSecondary }]}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[ss.unhideBtn, { flex: 2, backgroundColor: colors.brand }, mutation.isPending && { opacity: 0.6 }]}
+            onPress={handleUnhide}
+            disabled={mutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel={`Unhide ${item.name}`}
+          >
+            {mutation.isPending
+              ? <ActivityIndicator color={colors.white} />
+              : <Text style={[ss.unhideBtnTxt, { color: colors.white }]}>Unhide</Text>}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </BottomSheet>
+  );
+}
+
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function BudgetEditScreen() {
@@ -572,6 +678,8 @@ export default function BudgetEditScreen() {
   const [addGroupOpen, setAddGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [groupDragging, setGroupDragging] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [unhideTarget, setUnhideTarget] = useState<{ id: string; name: string; type: 'category' | 'group' } | null>(null);
 
   const reorderGroups = useReorderGroups(selectedMonth);
   const reorderCategories = useReorderCategories(selectedMonth);
@@ -579,18 +687,34 @@ export default function BudgetEditScreen() {
   const { data, isLoading, error } = useBudget(selectedMonth);
   const createGroup = useCreateGroup(selectedMonth);
 
-  const groups = data?.groups ?? [];
+  const groups = useMemo(
+    () =>
+      (data?.groups ?? [])
+        .filter((g) => showHidden || !g.is_hidden)
+        .map((g) => ({ ...g, categories: g.categories.filter((c) => showHidden || !c.is_hidden) })),
+    [data, showHidden],
+  );
 
-  // "Cost to be me" = sum of all target amounts
-  const costToBeMe = useMemo(() => {
-    if (!data) return 0;
-    return data.groups.flatMap((g) => g.categories).reduce((sum, c) => sum + (c.target_amount ?? 0), 0);
+  const hiddenCount = useMemo(() => {
+    if (!data?.groups) return 0;
+    const hiddenGroups = data.groups.filter((g) => g.is_hidden).length;
+    const hiddenCats = data.groups
+      .filter((g) => !g.is_hidden)
+      .flatMap((g) => g.categories)
+      .filter((c) => c.is_hidden).length;
+    return hiddenGroups + hiddenCats;
   }, [data]);
 
-  const assignedTotal = useMemo(() => {
-    if (!data) return 0;
-    return data.groups.flatMap((g) => g.categories).reduce((sum, c) => sum + c.assigned, 0);
-  }, [data]);
+  // "Cost to be me" = sum of all target amounts (visible only)
+  const costToBeMe = useMemo(
+    () => groups.flatMap((g) => g.categories).reduce((sum, c) => sum + (c.target_amount ?? 0), 0),
+    [groups],
+  );
+
+  const assignedTotal = useMemo(
+    () => groups.flatMap((g) => g.categories).reduce((sum, c) => sum + c.assigned, 0),
+    [groups],
+  );
 
   const progress = costToBeMe > 0 ? Math.min(assignedTotal / costToBeMe, 1) : 0;
 
@@ -644,6 +768,7 @@ export default function BudgetEditScreen() {
             onOptions={() => setCatOptions(cat)}
             onNavigateTarget={(catId) => router.push(`/target/${catId}`)}
             drag={catDrag}
+            onUnhide={cat.is_hidden ? () => setUnhideTarget({ id: cat.id, name: cat.name, type: 'category' }) : undefined}
           />
         </View>
       </ScaleDecorator>
@@ -728,7 +853,7 @@ export default function BudgetEditScreen() {
                       borderColor: isActive ? colors.brand : colors.border,
                       ...shadow.sm,
                     },
-                    (group.categories.length === 0) && {
+                    (group.is_hidden || group.categories.length === 0) && {
                       borderBottomLeftRadius: radius.md,
                       borderBottomRightRadius: radius.md,
                     },
@@ -739,29 +864,45 @@ export default function BudgetEditScreen() {
                     onAddCategory={() => setAddCatGroupId(group.id)}
                     onOptions={() => setGroupOptions(group)}
                     drag={drag}
+                    onUnhide={group.is_hidden ? () => setUnhideTarget({ id: group.id, name: group.name, type: 'group' }) : undefined}
                   />
                 </View>
 
-                {/* Category rows — keep mounted during group drag so heights stay stable */}
-                <View pointerEvents={groupDragging ? 'none' : 'auto'}>
-                  <NestableDraggableFlatList<BudgetCategory>
-                    data={group.categories}
-                    keyExtractor={(c) => c.id}
-                    onDragBegin={() =>
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-                    }
-                    onDragEnd={({ data: newCats }) =>
-                      reorderCategories.mutate(newCats.map((c) => c.id))
-                    }
-                    renderItem={(params) =>
-                      renderCategoryItem(params, group.categories.length)
-                    }
-                  />
-                </View>
+                {!group.is_hidden && (
+                  <View pointerEvents={groupDragging ? 'none' : 'auto'}>
+                    <NestableDraggableFlatList<BudgetCategory>
+                      data={group.categories}
+                      keyExtractor={(c) => c.id}
+                      onDragBegin={() =>
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+                      }
+                      onDragEnd={({ data: newCats }) =>
+                        reorderCategories.mutate(newCats.map((c) => c.id))
+                      }
+                      renderItem={(params) =>
+                        renderCategoryItem(params, group.categories.length)
+                      }
+                    />
+                  </View>
+                )}
               </View>
             </ScaleDecorator>
           )}
         />
+
+        {hiddenCount > 0 && (
+          <TouchableOpacity
+            style={ss.hiddenToggle}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowHidden(v => !v); }}
+            accessibilityRole="button"
+            accessibilityLabel={showHidden ? 'Hide hidden items' : `Show ${hiddenCount} hidden item${hiddenCount === 1 ? '' : 's'}`}
+          >
+            <Ionicons name={showHidden ? 'eye-off-outline' : 'eye-outline'} size={13} color={colors.textMeta} />
+            <Text style={[ss.hiddenToggleTxt, { color: colors.textMeta }]}>
+              {showHidden ? 'Hide hidden items' : `Show hidden (${hiddenCount})`}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Add Group button */}
         <TouchableOpacity
@@ -852,6 +993,12 @@ export default function BudgetEditScreen() {
         group={groupOptions}
         month={selectedMonth}
         onClose={() => setGroupOptions(null)}
+      />
+
+      <UnhideSheetEdit
+        item={unhideTarget}
+        month={selectedMonth}
+        onClose={() => setUnhideTarget(null)}
       />
     </View>
   );
@@ -1087,4 +1234,25 @@ const ss = StyleSheet.create({
   errorContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 6 },
   errorText: { fontSize: 16, ...ff(600), textAlign: 'center' },
   errorSub: { fontSize: 13, textAlign: 'center' },
+
+  // ── Hidden toggle + unhide sheet ─────────────────────────────────────────
+  hiddenToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  hiddenToggleTxt: { ...ff(500), fontSize: 13 },
+  unhideContent: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: 10,
+  },
+  unhideSub: { ...ff(400), fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  unhideFooter: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  unhideBtn: { flex: 1, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  unhideBtnTxt: { ...ff(700), fontSize: 14 },
 });

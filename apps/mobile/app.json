@@ -73,7 +73,8 @@
           "project": "react-native",
           "organization": "desktop-technologies-limited"
         }
-      ]
+      ],
+      "./plugins/withWatermelonDBJSI"
     ],
     "experiments": {
       "typedRoutes": true,

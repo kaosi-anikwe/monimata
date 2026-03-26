@@ -43,7 +43,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/lib/theme';
-import { type_ } from '@/lib/typography';
+import { ff, type_ } from '@/lib/typography';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { BottomSheet, Badge, Button, EmptyState, ListRow, ScreenHeader } from '@/components/ui';
 import {
@@ -319,7 +319,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
               color={colors.textMeta}
               style={{ marginTop: 1 }}
             />
-            <Text style={[ss.whyText, { color: colors.textSecondary }]}>{why}</Text>
+            <Text style={[type_.bodyReg, { color: colors.textSecondary }]}>{why}</Text>
           </View>
         </View>
       ) : null}
@@ -353,7 +353,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
       <Button
         variant="ghost"
         onPress={handleDismiss}
-        style={{ borderColor: colors.border, marginHorizontal: spacing.xl, marginTop: spacing.mdn }}
+        style={{ borderColor: colors.border, marginHorizontal: "auto", marginTop: spacing.mdn }}
         textStyle={{ color: colors.textMeta }}
       >
         Dismiss
@@ -399,7 +399,7 @@ function NudgeCard({ nudge, onPress }: NudgeCardProps) {
         <View style={ss.cardTopRow}>
           <Text
             style={[
-              ss.cardTitle,
+              type_.body, ff(700),
               { color: nudge.is_dismissed ? colors.textMeta : colors.textPrimary },
             ]}
             numberOfLines={1}
@@ -412,7 +412,7 @@ function NudgeCard({ nudge, onPress }: NudgeCardProps) {
         </View>
         <Text
           style={[
-            ss.cardMessage,
+            type_.small, ff(400),
             { color: nudge.is_dismissed ? colors.textMeta : colors.textSecondary },
           ]}
           numberOfLines={2}

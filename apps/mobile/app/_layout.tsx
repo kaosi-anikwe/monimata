@@ -31,7 +31,7 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { Provider } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -104,6 +104,36 @@ function RootNavigator() {
   const colors = useTheme();
   const ns = makeNsStyles(colors);
 
+  // Track the current deep path so we can restore it after a password-fallback
+  // re-login (biometric unlock preserves navigation automatically via overlay).
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+
+  useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
+
+  const postLockReturnPath = useRef<string | null>(null);
+
+  // When isAuthenticated flips false → true and we have a saved path, restore it.
+  const prevAuthenticated = useRef(isAuthenticated);
+  useEffect(() => {
+    if (!prevAuthenticated.current && isAuthenticated && postLockReturnPath.current) {
+      const path = postLockReturnPath.current;
+      postLockReturnPath.current = null;
+      // Double-rAF: first frame queues after the current paint, second fires
+      // after layout has committed — standard post-InteractionManager pattern.
+      let cancelled = false;
+      const id = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!cancelled) {
+            try { router.replace(path as never); } catch { /* path no longer valid */ }
+          }
+        });
+      });
+      return () => { cancelled = true; cancelAnimationFrame(id); };
+    }
+    prevAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated, router]);
+
   useEffect(() => {
     dispatch(restoreSession());
   }, [dispatch]);
@@ -119,12 +149,20 @@ function RootNavigator() {
   // Sync WatermelonDB whenever app comes to the foreground
   useEffect(() => {
     if (!isAuthenticated) return;
-    // Initial sync on mount
-    syncDatabase().catch(console.warn);
+
+    // Sync then invalidate all TanStack Query caches so every screen re-reads
+    // from WatermelonDB without requiring a manual pull-to-refresh.
+    const syncAndInvalidate = () =>
+      syncDatabase()
+        .then(() => queryClient.invalidateQueries())
+        .catch(console.warn);
+
+    // Initial sync on mount (first login or cold start)
+    syncAndInvalidate();
 
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
-        syncDatabase().catch(console.warn);
+        syncAndInvalidate();
         // Advance selectedMonth if the calendar month rolled over while backgrounded.
         dispatch(syncToCurrentMonth());
       }
@@ -135,11 +173,6 @@ function RootNavigator() {
 
   if (!isInitialised) return null;
 
-  // Show the lock screen over all content when biometric lock is active.
-  if (isLocked && isAuthenticated) {
-    return <AppLockScreen onUnlock={unlock} />;
-  }
-
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
@@ -149,6 +182,16 @@ function RootNavigator() {
           <Stack.Screen name="(auth)" />
         )}
       </Stack>
+
+      {/* Lock screen — rendered as an absolute overlay so the Stack stays mounted.
+           This preserves deep navigation for biometric unlocks. For the
+           password fallback the path is saved/restored via postLockReturnPath. */}
+      {isLocked && isAuthenticated && (
+        <AppLockScreen
+          onUnlock={unlock}
+          onPasswordLogin={() => { postLockReturnPath.current = pathnameRef.current; }}
+        />
+      )}
 
       {/* Pre-permission explanatory modal — shown once before the OS dialog */}
       <Modal

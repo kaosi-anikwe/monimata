@@ -16,10 +16,19 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from uuid import UUID
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
+
+
+class AutoAssignStrategy(str, Enum):
+    underfunded = "underfunded"
+    assigned_last_month = "assigned_last_month"
+    spent_last_month = "spent_last_month"
+    avg_assigned = "avg_assigned"
+    avg_spent = "avg_spent"
 
 
 class BudgetCategoryResponse(BaseModel):
@@ -89,8 +98,9 @@ class UnderfundedCategoryResponse(BaseModel):
 
 class AutoAssignResponse(BaseModel):
     month: str
+    strategy: AutoAssignStrategy
     assignments_made: int
-    total_assigned: int  # kobo
+    total_assigned: int  # kobo — net delta; positive = net increase, negative = net reduction
     still_underfunded: list[
         UUID
-    ]  # categories that couldn't be fully funded (TBB ran out)
+    ]  # underfunded strategy only: categories TBB ran out before reaching

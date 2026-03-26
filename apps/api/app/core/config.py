@@ -67,6 +67,7 @@ class Settings(BaseSettings):
 
     # INTERSWITCH_PASSPORT_URL: str = "https://passport-v2.k8.isw.la"
     INTERSWITCH_PASSPORT_URL: str = "https://apps.qa.interswitchng.com"
+    INTERSWITCH_OWN_PASSPORT_URL: str = "https://qa.interswitchng.com"
 
     # Quickteller bill-payment API (sandbox vs production base URLs differ).
     # Sandbox:    https://qa.interswitchng.com/quicktellerservice/api/v5
