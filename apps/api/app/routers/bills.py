@@ -43,31 +43,43 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from typing import cast
 
 import httpx
+
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
+from fastapi.responses import HTMLResponse
 
 from app.models.user import User
 from app.core.database import get_db
 from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.bank_account import BankAccount
+from app.models.pending_bill_payment import PendingBillPayment
 from app.core.deps import get_current_user, get_verified_user
 from app.schemas.bills import (
     BillerCategory,
     Biller,
     BillHistoryItem,
+    BillPayInitiateResponse,
     BillPayRequest,
-    BillPayResponse,
     CustomerValidationResponse,
     PaymentItem,
     PaymentStatusResponse,
     ValidateCustomerRequest,
 )
 from app.services.interswitch_client import interswitch_client
-from app.services.budget_logic import get_or_create_budget_month
+from app.worker.celery_app import CeleryTask
 
 logger = logging.getLogger(__name__)
 
@@ -78,62 +90,14 @@ router = APIRouter()
 _ISW_SUCCESS_CODES = {"00", "90000"}
 
 
+def _enqueue_phase3(ref: str) -> None:
+    """Enqueue the dispatch_bill_phase3 Celery task (lazy import avoids circulars)."""
+    from app.worker.tasks import dispatch_bill_phase3
+
+    cast(CeleryTask, dispatch_bill_phase3).delay(ref)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-def _month_for(dt: datetime) -> str:
-    """Return "YYYY-MM" string for the given datetime."""
-    return dt.strftime("%Y-%m")
-
-
-def _schedule_bill_nudge(
-    background_tasks: "BackgroundTasks",
-    user: User,
-    tx: Transaction,
-    biller_name: str,
-    category_id: str | None,
-) -> None:
-    """
-    Schedule a bill_payment nudge to be evaluated after the HTTP response is sent.
-    Snapshots the IDs we need; the nudge engine opens its own DB session.
-    """
-    from app.services.nudge_engine import evaluate_bill_payment_nudge
-
-    user_id = user.id
-    tx_id = tx.id
-    tx_category_id = tx.category_id
-
-    def _run() -> None:
-        from app.core.database import SessionLocal
-        from app.models.transaction import Transaction as TxModel
-        from app.models.user import User as UserModel
-        from app.models.category import Category as CatModel
-        import logging as _logging
-
-        db = SessionLocal()
-        try:
-            fresh_user = db.get(UserModel, user_id)
-            fresh_tx = db.get(TxModel, tx_id)
-            if not fresh_user or not fresh_tx:
-                return
-
-            cat_name: str | None = None
-            if tx_category_id:
-                cat = db.get(CatModel, tx_category_id)
-                if cat:
-                    cat_name = cat.name
-
-            evaluate_bill_payment_nudge(db, fresh_user, fresh_tx, biller_name, cat_name)
-            db.commit()
-        except Exception:
-            db.rollback()
-            _logging.getLogger(__name__).exception(
-                "_schedule_bill_nudge background task failed for tx=%s", tx_id
-            )
-        finally:
-            db.close()
-
-    background_tasks.add_task(_run)
 
 
 def _parse_biller_category(raw: dict) -> BillerCategory:
@@ -320,29 +284,23 @@ async def validate_customer(
 
 @router.post(
     "/pay",
-    response_model=BillPayResponse,
+    response_model=BillPayInitiateResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Execute a bill payment",
+    summary="Initiate a bill payment (Phase 1 → create pending record + checkout URL)",
 )
 async def pay_bill(
     body: BillPayRequest,
-    background_tasks: BackgroundTasks,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_verified_user),
-) -> BillPayResponse:
+) -> BillPayInitiateResponse:
     """
-    Initiates a bill payment via Interswitch Quickteller.
+    Phase 1 of the 3-phase Interswitch bill payment flow.
 
-    On success:
-    - A Transaction record is created immediately (source="interswitch") so the
-      budget reflects the payment without waiting for Mono's 24-hour sync.
-    - If category_id is provided, budget_months.activity is updated so the
-      category's available balance drops in real time.
-
-    Idempotency: the requestReference is a UUID generated server-side.  If the
-    network drops after ISW accepts the request but before we respond, the client
-    should use GET /bills/pay/{ref}/status with the reference from any partial
-    response, or retry via GET /bills/history.
+    Creates a PendingBillPayment record and returns a checkout_url that the
+    client should open in an in-app WebView.  The actual payment collection and
+    SendBillPaymentAdvice (Phase 3) happen asynchronously after the user
+    completes the Web Checkout.
 
     Requires BVN identity_verified = true.
     """
@@ -378,169 +336,185 @@ async def pay_bill(
                 detail="Category not found or does not belong to you.",
             )
 
-    request_reference = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    ref = str(uuid.uuid4())
 
-    try:
-        isw_result = await interswitch_client.initiate_payment(
-            request_reference=request_reference,
-            payment_code=body.payment_code,
-            customer_id=body.customer_id,
-            amount=body.amount,
-            customer_mobile=body.customer_mobile or "",
-            customer_email=body.customer_email or "",
-        )
-    except httpx.HTTPStatusError as exc:
-        logger.error(
-            "ISW initiate_payment failed (ref=%s, user=%s): %s",
-            request_reference,
-            current_user.id,
-            exc,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Payment could not be processed by the payment provider. Please try again.",
-        )
-
-    response_code: str = str(
-        isw_result.get("ResponseCode") or isw_result.get("responseCode") or "99"
-    )
-    if response_code not in _ISW_SUCCESS_CODES:
-        logger.warning(
-            "ISW payment rejected (ref=%s, code=%s): %s",
-            request_reference,
-            response_code,
-            isw_result.get("ResponseDescription"),
-        )
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=isw_result.get("ResponseDescription")
-            or "Payment was declined by the payment provider.",
-        )
-
-    # Build a human-readable narration from what we know.
-    biller_label = body.biller_name or "Biller"
-    narration = f"{biller_label} via Interswitch"
-
-    # Create a Transaction record immediately — source="interswitch", debit.
-    tx = Transaction(
+    pending = PendingBillPayment(
         user_id=current_user.id,
+        ref=ref,
+        payment_code=body.payment_code,
+        customer_id=body.customer_id,
+        customer_email=body.customer_email or "",
+        customer_mobile=body.customer_mobile,
+        biller_name=body.biller_name,
         account_id=body.account_id,
-        date=now,
-        # Debits are stored as negative kobo values.
-        amount=-body.amount,
-        narration=narration,
-        type="debit",
-        source="interswitch",
-        interswitch_ref=request_reference,
         category_id=body.category_id,
-        is_manual=False,
+        amount=body.amount,
+        state="PENDING_CHECKOUT",
     )
-    db.add(tx)
-    db.flush()  # get tx.id without committing
-
-    # Update budget activity if a category was provided.
-    if body.category_id:
-        month_str = _month_for(now)
-        bm = get_or_create_budget_month(
-            db, current_user.id, body.category_id, month_str
-        )
-        # tx.amount is already negative, so adding it decreases available balance.
-        bm.activity += tx.amount
-        db.flush()
-
+    db.add(pending)
     db.commit()
-    db.refresh(tx)
 
-    payment_status = "pending" if response_code == "90000" else "success"
-
-    isw_tx_ref = isw_result.get("TransactionRef") or isw_result.get("transactionRef")
-    recharge_pin = isw_result.get("RechargePIN") or isw_result.get("rechargePIN")
-
-    # Trigger a confirmation nudge in the background after the response is sent.
-    _schedule_bill_nudge(
-        background_tasks, current_user, tx, biller_label, body.category_id
-    )
-
-    return BillPayResponse(
-        id=tx.id,
-        reference=request_reference,
-        status=payment_status,
-        amount=tx.amount,
-        narration=narration,
-        date=tx.date,
-        category_id=tx.category_id,
-        account_id=tx.account_id,
-        transaction_ref=isw_tx_ref,
-        recharge_pin=recharge_pin,
-    )
+    checkout_url = str(request.url_for("checkout_redirect", ref=ref))
+    return BillPayInitiateResponse(ref=ref, checkout_url=checkout_url)
 
 
 @router.get(
-    "/pay/{reference}/status",
-    response_model=PaymentStatusResponse,
-    summary="Check payment status",
+    "/checkout/{ref}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
 )
-async def get_payment_status(
-    reference: str,
+def checkout_redirect(
+    ref: str,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> PaymentStatusResponse:
+) -> HTMLResponse:
     """
-    Queries Interswitch for the current status of a payment.  Use this to poll
-    for payments that returned status="pending" from POST /bills/pay.
+    Serves an auto-submitting HTML form that POSTs the user's browser to the
+    Interswitch Web Checkout page.
 
-    Ownership check: the reference must correspond to a transaction that belongs
-    to the calling user.
+    Intentionally unauthenticated — the UUID ref (122 bits) acts as an opaque
+    token.  Only works while state == PENDING_CHECKOUT to prevent replay.
     """
-    tx: Transaction | None = (
-        db.query(Transaction)
+    pending: PendingBillPayment | None = (
+        db.query(PendingBillPayment)
         .filter(
-            Transaction.interswitch_ref == reference,
-            Transaction.user_id == current_user.id,
+            PendingBillPayment.ref == ref,
+            PendingBillPayment.state == "PENDING_CHECKOUT",
         )
         .first()
     )
-    if tx is None:
+    if pending is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment reference not found or already processed.",
+        )
+
+    callback_url = str(request.url_for("checkout_callback"))
+    html = interswitch_client.build_checkout_html(
+        ref=ref,
+        amount_kobo=pending.amount,
+        cust_email=pending.customer_email,
+        site_redirect_url=callback_url,
+    )
+    return HTMLResponse(content=html)
+
+
+@router.post(
+    "/callback",
+    include_in_schema=False,
+)
+async def checkout_callback(
+    txnref: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Interswitch Web Checkout redirect target.
+
+    ISW POSTs the browser back here with `txnref` (or `txn_ref`) after payment.
+    We enqueue Phase 3 dispatch and return a simple page so the user's browser
+    (WebView) has something to display while the mobile app detects the URL
+    change and transitions to the processing step.
+    """
+    ref = txnref
+    if not ref:
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
+
+    pending: PendingBillPayment | None = (
+        db.query(PendingBillPayment).filter(PendingBillPayment.ref == ref).first()
+    )
+    if pending is None:
+        logger.warning("checkout_callback: unknown ref=%s", ref)
+        return Response(status_code=status.HTTP_200_OK)
+
+    if pending.state == "PENDING_CHECKOUT":
+        _enqueue_phase3(ref)
+        logger.info("checkout_callback: enqueued phase3 for ref=%s", ref)
+
+    return HTMLResponse(
+        content="<!DOCTYPE html><html><head><meta charset='utf-8'></head>"
+        "<body><p style='font-family:sans-serif;text-align:center;margin-top:40px;'>"
+        "Payment received. Return to the app to check your status.</p></body></html>",
+        status_code=status.HTTP_200_OK,
+    )
+
+
+@router.post(
+    "/verify/{ref}",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger Phase 3 dispatch after WebView checkout intercept",
+)
+def verify_payment(
+    ref: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Called by the mobile app immediately after the WebView detects navigation
+    to the callback URL.  Enqueues dispatch_bill_phase3 if not already running.
+
+    Returns the current state of the pending payment.
+    """
+    pending: PendingBillPayment | None = (
+        db.query(PendingBillPayment)
+        .filter(
+            PendingBillPayment.ref == ref,
+            PendingBillPayment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if pending is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment reference not found.",
         )
 
-    try:
-        result = await interswitch_client.query_payment_status(reference)
-    except httpx.HTTPStatusError as exc:
-        logger.error("ISW query_payment_status(%s) failed: %s", reference, exc)
+    if pending.state == "PENDING_CHECKOUT":
+        _enqueue_phase3(ref)
+        logger.info("verify_payment: enqueued phase3 for ref=%s", ref)
+
+    return {"ref": ref, "state": pending.state}
+
+
+@router.get(
+    "/pay/{ref}/status",
+    response_model=PaymentStatusResponse,
+    summary="Poll payment state machine status",
+)
+def get_payment_status(
+    ref: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PaymentStatusResponse:
+    """
+    Returns the current state-machine status of a pending bill payment.
+
+    Poll this endpoint until state is COMPLETED or FAILED.  When COMPLETED,
+    the response also includes amount, narration, and date for the receipt.
+    """
+    pending: PendingBillPayment | None = (
+        db.query(PendingBillPayment)
+        .filter(
+            PendingBillPayment.ref == ref,
+            PendingBillPayment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if pending is None:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not retrieve payment status from provider.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment reference not found.",
         )
 
-    response_code = str(
-        result.get("ResponseCode")
-        or result.get("TransactionResponseCode")
-        or result.get("responseCode")
-        or "99"
-    )
-    isw_status = result.get("Status") or result.get("status")
-    human_status = (
-        "success"
-        if (isw_status or "").lower() == "complete"
-        or response_code in _ISW_SUCCESS_CODES
-        else "failed"
-    )
-    tx_ref = result.get("TransactionRef") or result.get("transactionRef")
+    resp = PaymentStatusResponse(ref=ref, state=pending.state)
 
-    return PaymentStatusResponse(
-        reference=reference,
-        status=human_status,
-        response_code=response_code,
-        response_description=str(
-            result.get("ResponseDescription") or result.get("responseDescription") or ""
-        ),
-        transaction_ref=tx_ref,
-        isw_status=isw_status,
-    )
+    if pending.state == "COMPLETED" and pending.transaction_id:
+        tx: Transaction | None = db.get(Transaction, pending.transaction_id)
+        if tx:
+            resp.amount = tx.amount
+            resp.narration = tx.narration
+            resp.date = tx.date
+
+    return resp
 
 
 @router.get(

@@ -29,6 +29,7 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 from app.worker.celery_app import CeleryTask
 from app.worker.tasks import fetch_transactions
 from app.services.mono_client import verify_mono_webhook
+from app.services.interswitch_client import verify_interswitch_webhook
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -105,5 +106,81 @@ async def mono_webhook(
 
     else:
         logger.info(f"webhook: Mono webhook event={event} — no action taken")
+
+    return {"received": True}
+
+
+@router.post("/interswitch", status_code=status.HTTP_200_OK)
+async def interswitch_webhook(
+    request: Request,
+    x_interswitch_signature: str = Header(default="", alias="x-interswitch-signature"),
+) -> dict:
+    """
+    Receives Interswitch TRANSACTION.COMPLETED webhook notifications.
+
+    Security: the payload is verified against the HMAC-SHA512 signature in the
+    ``x-interswitch-signature`` header before any processing occurs.
+
+    We use this as a backup trigger for Phase 3 dispatch — the primary trigger
+    is POST /bills/verify/{ref} called by the mobile app after the WebView
+    detects the callback redirect.
+
+    Idempotency: dispatch_bill_phase3 checks the current state before acting,
+    so duplicate events are safe.
+
+    ISW payload shape (TRANSACTION.COMPLETED):
+    {
+      "event": "TRANSACTION.COMPLETED",
+      "data": {
+        "merchantReference": "<our txn_ref>",
+        "responseCode": "00",
+        "responseDescription": "Approved by Financial Institution",
+        ...
+      }
+    }
+    """
+    raw_body = await request.body()
+
+    if not verify_interswitch_webhook(raw_body, x_interswitch_signature):
+        logger.warning("Interswitch webhook received with invalid signature — rejected")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature",
+        )
+
+    payload = await request.json()
+    event: str = payload.get("event") or ""
+    data: dict = payload.get("data") or {}
+
+    # The merchant-assigned reference is in data.merchantReference.
+    # This is what we passed as txn_ref when building the checkout form.
+    txn_ref: str = data.get("merchantReference") or ""
+    response_code: str = data.get("responseCode") or ""
+
+    logger.info(
+        "interswitch_webhook: event=%s merchantReference=%s responseCode=%s",
+        event,
+        txn_ref,
+        response_code,
+    )
+
+    # Only dispatch Phase 3 for a confirmed successful payment.
+    if event == "TRANSACTION.COMPLETED" and response_code == "00" and txn_ref:
+        from app.core.database import SessionLocal
+        from app.models.pending_bill_payment import PendingBillPayment
+        from app.worker.tasks import dispatch_bill_phase3
+
+        db = SessionLocal()
+        try:
+            pending = (
+                db.query(PendingBillPayment)
+                .filter(PendingBillPayment.ref == txn_ref)
+                .first()
+            )
+            if pending and pending.state == "PENDING_CHECKOUT":
+                cast(CeleryTask, dispatch_bill_phase3).delay(txn_ref)
+                logger.info("interswitch_webhook: enqueued phase3 for ref=%s", txn_ref)
+        finally:
+            db.close()
 
     return {"received": True}

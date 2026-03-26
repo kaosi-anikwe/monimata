@@ -73,6 +73,18 @@ export interface BillPayRequest {
   category_id?: string;
 }
 
+/**
+ * Returned by POST /bills/pay (3-phase flow).
+ * Open checkout_url in an in-app WebView; detect navigation to the callback
+ * URL to transition to the processing step.
+ */
+export interface BillPayInitiateResponse {
+  ref: string;
+  checkout_url: string;
+  state: 'PENDING_CHECKOUT';
+}
+
+/** @deprecated Used only for the old single-phase flow. */
 export interface BillPayResponse {
   id: string;
   reference: string;
@@ -85,11 +97,26 @@ export interface BillPayResponse {
   account_id: string;
 }
 
+/**
+ * Returned by GET /bills/pay/{ref}/status.
+ *
+ * Poll until state is COMPLETED or FAILED.
+ * amount, narration, and date are populated only when state === 'COMPLETED'.
+ */
 export interface PaymentStatusResponse {
-  reference: string;
-  status: string;
-  response_code: string;
-  response_description: string;
+  ref: string;
+  state:
+  | 'PENDING_CHECKOUT'
+  | 'CHECKOUT_VERIFIED'
+  | 'BILL_DISPATCHED'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'REFUNDED';
+  /** kobo (negative = debit); present when state === 'COMPLETED' */
+  amount?: number;
+  narration?: string;
+  /** ISO 8601 string; present when state === 'COMPLETED' */
+  date?: string;
 }
 
 export interface BillHistoryItem {

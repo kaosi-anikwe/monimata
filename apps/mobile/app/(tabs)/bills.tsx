@@ -44,6 +44,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/Toast';
@@ -56,6 +57,7 @@ import {
   usePayBill,
   usePaymentStatus,
   useValidateCustomer,
+  useVerifyBill,
 } from '@/hooks/useBills';
 import { useTheme } from '@/lib/theme';
 import { type_ } from '@/lib/typography';
@@ -63,13 +65,14 @@ import type { BankAccount } from '@/types/account';
 import type { CategoryItem } from '@/types/category';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
+import { subscribeBillPaymentUpdate } from '@/hooks/useJobEvents';
 import type {
   Biller,
   BillerCategory,
   BillHistoryItem,
-  BillPayResponse,
   CustomerValidationResponse,
   PaymentItem,
+  PaymentStatusResponse,
 } from '@/types/bills';
 import { formatNaira, koboToNaira, nairaStringToKobo } from '@/utils/money';
 
@@ -81,6 +84,8 @@ type BillStep =
   | 'payment_items'
   | 'customer_form'
   | 'confirm'
+  | 'webview'
+  | 'processing'
   | 'receipt';
 
 // ─── Back-step map ────────────────────────────────────────────────────────────
@@ -90,6 +95,7 @@ const PREV_STEP: Partial<Record<BillStep, BillStep>> = {
   payment_items: 'billers',
   customer_form: 'payment_items',
   confirm: 'customer_form',
+  webview: 'confirm',
 };
 
 // ─── Category icon + background helpers ──────────────────────────────────────
@@ -610,26 +616,11 @@ function ReceiptStep({
   payResult,
   onDone,
 }: {
-  payResult: BillPayResponse;
+  payResult: PaymentStatusResponse;
   onDone: () => void;
 }) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
-
-  const isPending = payResult.status === 'pending';
-  const { data: liveStatus } = usePaymentStatus(
-    isPending ? payResult.reference : null,
-  );
-
-  const resolvedStatus = liveStatus?.status ?? payResult.status;
-  const isStillPending = resolvedStatus === 'pending';
-  const isSuccess = resolvedStatus === 'success';
-
-  const title = isStillPending
-    ? 'Payment Processing\u2026'
-    : isSuccess
-      ? 'Payment Successful'
-      : 'Payment Failed';
 
   return (
     <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
@@ -643,7 +634,7 @@ function ReceiptStep({
       >
         <View style={[ss.detailHeaderRow, { paddingTop: insets.top + spacing.sm }]}>
           <View style={ss.backBtn} />
-          <Text style={[ss.detailTitle, { color: colors.textPrimary }]}>{title}</Text>
+          <Text style={[ss.detailTitle, { color: colors.textPrimary }]}>Payment Successful</Text>
           <View style={ss.backBtn} />
         </View>
       </View>
@@ -651,41 +642,22 @@ function ReceiptStep({
       <ScrollView contentContainerStyle={ss.formContent}>
         {/* Status icon */}
         <View style={ss.receiptIconWrap}>
-          {isStillPending ? (
-            <ActivityIndicator size={56} color={colors.warning} />
-          ) : (
-            <View
-              style={[
-                ss.receiptCheckCircle,
-                { backgroundColor: isSuccess ? colors.brand : colors.error },
-              ]}
-            >
-              <Ionicons
-                name={isSuccess ? 'checkmark' : 'close'}
-                size={32}
-                color={colors.white}
-              />
-            </View>
-          )}
+          <View
+            style={[ss.receiptCheckCircle, { backgroundColor: colors.brand }]}
+          >
+            <Ionicons name="checkmark" size={32} color={colors.white} />
+          </View>
         </View>
 
         <Text style={[ss.receiptStatusLbl, { color: colors.brand }]}>
-          {title.toUpperCase()}
+          PAYMENT SUCCESSFUL
         </Text>
         <Text style={[ss.receiptAmount, { color: colors.textPrimary }]}>
-          {formatNaira(Math.abs(payResult.amount))}
+          {payResult.amount != null ? formatNaira(Math.abs(payResult.amount)) : '\u2014'}
         </Text>
         <Text style={[ss.receiptNarration, { color: colors.textMeta }]}>
-          {payResult.narration}
+          {payResult.narration ?? ''}
         </Text>
-
-        {isStillPending && (
-          <View style={[ss.pendingNote, { backgroundColor: colors.warningSubtle }]}>
-            <Text style={[ss.pendingNoteTxt, { color: colors.warningText }]}>
-              Your payment is being processed. This page refreshes automatically.
-            </Text>
-          </View>
-        )}
 
         <View
           style={[ss.receiptCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
@@ -694,18 +666,20 @@ function ReceiptStep({
             Payment Details
           </Text>
           <View style={[ss.confirmDivider, { backgroundColor: colors.separator }]} />
-          <SummaryRow label="Reference" value={payResult.reference} />
-          <SummaryRow label="Status" value={resolvedStatus.toUpperCase()} bold={isSuccess} />
-          <SummaryRow
-            label="Date"
-            value={new Date(payResult.date).toLocaleString('en-NG', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          />
+          <SummaryRow label="Reference" value={payResult.ref} />
+          <SummaryRow label="Status" value="COMPLETED" bold />
+          {payResult.date ? (
+            <SummaryRow
+              label="Date"
+              value={new Date(payResult.date).toLocaleString('en-NG', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            />
+          ) : null}
         </View>
 
         <TouchableOpacity
@@ -716,6 +690,66 @@ function ReceiptStep({
           <Text style={[ss.limeBtnText, { color: colors.darkGreen }]}>Done</Text>
         </TouchableOpacity>
       </ScrollView>
+    </View>
+  );
+}
+
+// ─── Processing step ──────────────────────────────────────────────────────────
+
+function ProcessingStep({
+  pendingRef,
+  onComplete,
+  onFailed,
+}: {
+  pendingRef: string;
+  onComplete: (result: PaymentStatusResponse) => void;
+  onFailed: () => void;
+}) {
+  const colors = useTheme();
+  const verifyMutation = useVerifyBill();
+  const { data: status, refetch } = usePaymentStatus(pendingRef);
+
+  // Trigger Phase 3 dispatch on mount.
+  useEffect(() => {
+    verifyMutation.mutate(pendingRef);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRef]);
+
+  // Subscribe to pushed WS bill_payment_update events so we react immediately
+  // rather than waiting for the next 5-second poll tick.
+  useEffect(() => {
+    const unsub = subscribeBillPaymentUpdate(pendingRef, (_state) => {
+      // Force an immediate refetch — the polling hook will then see the
+      // terminal state and trigger onComplete / onFailed via the effect below.
+      refetch();
+    });
+    return unsub;
+  }, [pendingRef, refetch]);
+
+  // Watch for terminal states (from either polling or WS-triggered refetch).
+  useEffect(() => {
+    if (!status) return;
+    if (status.state === 'COMPLETED') onComplete(status);
+    else if (status.state === 'FAILED' || status.state === 'REFUNDED') onFailed();
+  }, [onComplete, onFailed, status, status?.state]);
+
+  return (
+    <View
+      style={[
+        ss.screenFlex,
+        { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+      ]}
+    >
+      <StatusBar style="dark" />
+      <ActivityIndicator size="large" color={colors.brand} />
+      <Text
+        style={[
+          type_.body,
+          { color: colors.textSecondary, marginTop: spacing.lg, textAlign: 'center' },
+        ]}
+      >
+        Processing your payment&hellip;{'\n'}Please wait.
+      </Text>
     </View>
   );
 }
@@ -743,7 +777,9 @@ export default function BillsScreen() {
   const [validationResult, setValidationResult] = useState<CustomerValidationResponse | null>(null);
 
   // ── Receipt state ──
-  const [payResult, setPayResult] = useState<BillPayResponse | null>(null);
+  const [payResult, setPayResult] = useState<PaymentStatusResponse | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [pendingRef, setPendingRef] = useState<string | null>(null);
 
   // ── Data hooks ──
   const { data: categories = [], isLoading: loadingCategories } = useBillCategories();
@@ -807,6 +843,8 @@ export default function BillsScreen() {
     setSelectedItem(null);
     resetForm();
     setPayResult(null);
+    setCheckoutUrl(null);
+    setPendingRef(null);
   }
 
   function resetForm() {
@@ -897,8 +935,9 @@ export default function BillsScreen() {
       },
       {
         onSuccess: (result) => {
-          setPayResult(result);
-          setStep('receipt');
+          setCheckoutUrl(result.checkout_url);
+          setPendingRef(result.ref);
+          setStep('webview');
         },
         onError: (err: unknown) => {
           const message =
@@ -923,6 +962,54 @@ export default function BillsScreen() {
     }
     const kobo = nairaStringToKobo(amountNaira);
     return kobo > 0 ? formatNaira(kobo) : '\u2014';
+  }
+
+  // ── WEBVIEW (Phase 2: Interswitch Web Checkout) ──────────────────────────────
+  if (step === 'webview' && checkoutUrl) {
+    return (
+      <View style={[ss.screenFlex, { backgroundColor: colors.background }]}>
+        <StatusBar style="dark" />
+        <DetailHeader
+          title="Secure Checkout"
+          step={step}
+          onBack={() => setStep('confirm')}
+        />
+        <WebView
+          source={{ uri: checkoutUrl }}
+          onShouldStartLoadWithRequest={(request) => {
+            // Detect the ISW callback redirect and transition to processing.
+            if (request.url.includes('/bills/callback')) {
+              setStep('processing');
+              return false; // prevent WebView from loading our backend page
+            }
+            return true;
+          }}
+          startInLoadingState
+          renderLoading={() => (
+            <View style={[ss.screenFlex, { justifyContent: 'center', alignItems: 'center' }]}>
+              <ActivityIndicator size="large" color={colors.brand} />
+            </View>
+          )}
+        />
+      </View>
+    );
+  }
+
+  // ── PROCESSING (Phase 3: dispatch + polling) ──────────────────────────────────
+  if (step === 'processing' && pendingRef) {
+    return (
+      <ProcessingStep
+        pendingRef={pendingRef}
+        onComplete={(result) => {
+          setPayResult(result);
+          setStep('receipt');
+        }}
+        onFailed={() => {
+          error('Payment Failed', 'Your payment could not be completed. Please try again.');
+          setStep('confirm');
+        }}
+      />
+    );
   }
 
   // ── RECEIPT ──────────────────────────────────────────────────────────────────

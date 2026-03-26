@@ -24,6 +24,7 @@ from app.models.recurring_rule import RecurringRule
 from app.models.category import CategoryGroup, Category
 from app.models.narration_map import NarrationCategoryMap
 from app.models.transaction import Transaction, TransactionSplit
+from app.models.pending_bill_payment import PendingBillPayment
 
 __all__ = [
     "User",
@@ -38,4 +39,5 @@ __all__ = [
     "NarrationCategoryMap",
     "Nudge",
     "Article",
+    "PendingBillPayment",
 ]

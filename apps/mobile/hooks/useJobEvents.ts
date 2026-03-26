@@ -55,13 +55,13 @@
  * Override with EXPO_PUBLIC_WS_URL if your WS server is on a different host.
  */
 
-import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
 import { useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
+import { AppState, AppStateStatus } from 'react-native';
 
-import { getAccessToken } from '@/services/api';
 import type { RootState } from '@/store';
+import { getAccessToken } from '@/services/api';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 const WS_BASE =
@@ -73,7 +73,25 @@ interface InvalidateEvent {
   keys: string[];
 }
 
-type ServerEvent = InvalidateEvent;
+interface BillPaymentUpdateEvent {
+  type: 'bill_payment_update';
+  ref: string;
+  state: 'COMPLETED' | 'FAILED' | 'REFUNDED';
+}
+
+type ServerEvent = InvalidateEvent | BillPaymentUpdateEvent;
+
+// ─── Bill payment update observers ───────────────────────────────────────────
+// ProcessingStep registers a callback keyed by ref so it can react immediately
+// to a pushed state change rather than waiting for the next poll tick.
+
+type BillStateCallback = (state: BillPaymentUpdateEvent['state']) => void;
+const _billObservers = new Map<string, BillStateCallback>();
+
+export function subscribeBillPaymentUpdate(ref: string, cb: BillStateCallback): () => void {
+  _billObservers.set(ref, cb);
+  return () => _billObservers.delete(ref);
+}
 
 const MAX_RETRIES = 5;
 const BASE_BACKOFF_MS = 1_000;
@@ -126,6 +144,12 @@ export function useJobEvents(): void {
               msg.keys.forEach(key => {
                 qc.invalidateQueries({ queryKey: [key] });
               });
+            } else if (msg.type === 'bill_payment_update') {
+              // Invalidate status query so polling picks up the new state.
+              qc.invalidateQueries({ queryKey: ['bill-payment-status', msg.ref] });
+              // Immediately notify any mounted ProcessingStep.
+              const cb = _billObservers.get(msg.ref);
+              if (cb) cb(msg.state);
             }
           } catch {
             // Ignore malformed or unrecognised messages.

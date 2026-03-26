@@ -34,7 +34,7 @@ import type {
   ValidateCustomerRequest,
   CustomerValidationResponse,
   BillPayRequest,
-  BillPayResponse,
+  BillPayInitiateResponse,
   PaymentStatusResponse,
   BillHistoryItem,
 } from '@/types/bills';
@@ -91,28 +91,26 @@ export function useBillHistory() {
 }
 
 /**
- * Poll the status of a specific Interswitch payment by reference.
+ * Poll the state-machine status of a pending bill payment by its ref.
  *
- * Polling is active only while the status is "pending" (ISW async path).
- * Once the status resolves to "success" or "failed" the interval stops
- * automatically via `refetchInterval` returning false.
- *
- * Pass `reference: null` to disable the query entirely (e.g. before payment).
+ * Polling runs every 5 s until state reaches a terminal value
+ * (COMPLETED, FAILED, or REFUNDED).  Pass `ref: null` to disable entirely.
  */
-export function usePaymentStatus(reference: string | null) {
+export function usePaymentStatus(ref: string | null) {
   return useQuery({
-    queryKey: ['bill-payment-status', reference],
+    queryKey: ['bill-payment-status', ref],
     queryFn: async () => {
       const { data } = await api.get<PaymentStatusResponse>(
-        `/bills/pay/${reference}/status`,
+        `/bills/pay/${ref}/status`,
       );
       return data;
     },
-    enabled: !!reference,
-    // Keep polling every 5 s while the payment is still pending.
+    enabled: !!ref,
     refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === 'pending' ? 5_000 : false;
+      const state = query.state.data?.state;
+      return state && ['COMPLETED', 'FAILED', 'REFUNDED'].includes(state)
+        ? false
+        : 5_000;
     },
   });
 }
@@ -139,21 +137,32 @@ export function useValidateCustomer() {
 
 /**
  * Submit a bill payment through Interswitch.
- * On success the bill history query is invalidated so the history tab
- * reflects the new transaction immediately.
+ * Returns a checkout_url and ref for the 3-phase Web Checkout flow.
+ * The bill history query is NOT invalidated here — it's invalidated once
+ * the payment reaches COMPLETED state (after dispatch_bill_phase3 runs).
  */
 export function usePayBill() {
-  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: BillPayRequest): Promise<BillPayResponse> => {
-      const { data } = await api.post<BillPayResponse>('/bills/pay', payload);
+    mutationFn: async (payload: BillPayRequest): Promise<BillPayInitiateResponse> => {
+      const { data } = await api.post<BillPayInitiateResponse>('/bills/pay', payload);
       return data;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.billHistory() });
-      // Budget data also changes when category_id is supplied — invalidate so
-      // the Budget tab stays consistent without needing a manual refresh.
-      qc.invalidateQueries({ queryKey: ['budget'] });
+  });
+}
+
+/**
+ * Trigger Phase 3 dispatch after the WebView detects the callback redirect.
+ * Call once when transitioning to the processing step.
+ */
+export function useVerifyBill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ref: string): Promise<void> => {
+      await api.post(`/bills/verify/${ref}`);
+    },
+    onSuccess: (_data, ref) => {
+      // Kick off polling by invalidating the status query for this ref.
+      qc.invalidateQueries({ queryKey: ['bill-payment-status', ref] });
     },
   });
 }

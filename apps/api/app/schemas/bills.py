@@ -133,15 +133,37 @@ class BillPayResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class BillPayInitiateResponse(BaseModel):
+    """
+    Returned by POST /bills/pay (3-phase flow).
+
+    The client should open checkout_url in an in-app WebView and detect
+    navigation back to the callback URL to proceed to the processing step.
+    """
+
+    ref: str
+    checkout_url: str
+    state: str = "PENDING_CHECKOUT"
+
+
 class PaymentStatusResponse(BaseModel):
-    reference: str
-    status: str  # "success" | "failed"
-    response_code: str
-    response_description: str
-    # ISW's TransactionRef (may differ from our requestReference).
-    transaction_ref: str | None = None
-    # Raw ISW Status string (e.g. "Complete").
-    isw_status: str | None = None
+    """
+    Returned by GET /bills/pay/{ref}/status.
+
+    state progresses through the 3-phase lifecycle:
+    PENDING_CHECKOUT → CHECKOUT_VERIFIED → BILL_DISPATCHED
+    → COMPLETED → FAILED → REFUNDED
+
+    Receipt fields (amount, narration, date) are only populated when
+    state == "COMPLETED".
+    """
+
+    ref: str
+    state: str  # see state machine above
+    # Populated when state == "COMPLETED"
+    amount: int | None = None  # kobo (negative = debit)
+    narration: str | None = None
+    date: datetime | None = None
 
 
 class BillHistoryItem(BaseModel):
