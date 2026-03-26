@@ -55,6 +55,8 @@ import { type_ } from '@/lib/typography';
 export interface ListRowProps {
   title: string;
   subtitle?: string;
+  /** Override the title text colour/style (e.g. error red for destructive rows). */
+  titleStyle?: StyleProp<import('react-native').TextStyle>;
   /** Node rendered in the 36×36 icon bubble. */
   leftIcon?: React.ReactNode;
   /** Background colour of the icon bubble. Defaults to surface. */
@@ -82,6 +84,7 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 export function ListRow({
   title,
   subtitle,
+  titleStyle,
   leftIcon,
   iconBg,
   right,
@@ -123,7 +126,7 @@ export function ListRow({
 
       <View style={[s.textArea, indented && s.indentedText]}>
         <Text
-          style={[s.title, { color: colors.textPrimary }]}
+          style={[s.title, { color: colors.textPrimary }, titleStyle]}
           numberOfLines={1}
         >
           {title}

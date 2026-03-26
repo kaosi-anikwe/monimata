@@ -42,7 +42,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BottomSheet } from '@/components/ui';
+import { BottomSheet, Badge, Button, EmptyState, ListRow, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
@@ -335,34 +335,29 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
           >
             What you can do
           </Text>
-          {actions.map((action) => (
-            <TouchableOpacity
+          {actions.map((action, index) => (
+            <ListRow
               key={action.label}
-              style={[ss.actionButton, { borderBottomColor: colors.surface }]}
+              leftIcon={<Ionicons name={action.icon} size={20} color={colors.brand} />}
+              iconBg={colors.surface}
+              title={action.label}
               onPress={() => handleAction(action.route)}
-              activeOpacity={0.75}
-            >
-              <Ionicons
-                name={action.icon}
-                size={20}
-                color={colors.brand}
-                style={ss.actionIcon}
-              />
-              <Text style={[ss.actionLabel, { color: colors.textPrimary }]}>{action.label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMeta} />
-            </TouchableOpacity>
+              showChevron
+              separator={index < actions.length - 1}
+            />
           ))}
         </View>
       ) : null}
 
       {/* Dismiss */}
-      <TouchableOpacity
-        style={[ss.dismissButton, { borderColor: colors.border }]}
+      <Button
+        variant="ghost"
         onPress={handleDismiss}
-        activeOpacity={0.75}
+        style={{ borderColor: colors.border, marginHorizontal: spacing.xl, marginTop: spacing.mdn }}
+        textStyle={{ color: colors.textMeta }}
       >
-        <Text style={[type_.body, { color: colors.textMeta, fontWeight: '600' }]}>Dismiss</Text>
-      </TouchableOpacity>
+        Dismiss
+      </Button>
     </BottomSheet>
   );
 }
@@ -460,53 +455,31 @@ export default function NudgesScreen() {
     <View style={[ss.root, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
       {/* Dark-green header */}
-      <View
-        style={[
-          ss.header,
-          { backgroundColor: colors.darkGreen, paddingTop: insets.top + 16 },
-        ]}
-      >
-        <View style={ss.headerRow}>
-          {/* Back button — frosted glass */}
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[
-              ss.backBtn,
-              { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder },
-            ]}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="arrow-back" size={18} color={colors.white} />
-          </TouchableOpacity>
-
-          {/* Centered title + badge */}
-          <View style={ss.headerCenter}>
-            <Text style={[type_.h1, { color: colors.white, fontWeight: '700' }]}>Nudges</Text>
-            {unreadCount > 0 && (
-              <View style={[ss.badge, { backgroundColor: colors.error }]}>
-                <Text style={[ss.badgeText, { color: colors.white }]}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Mark all read — frosted green, always visible */}
+      <ScreenHeader
+        title="Nudges"
+        titleBadge={
+          unreadCount > 0
+            ? <Badge variant="error" size="sm">{unreadCount > 99 ? '99+' : unreadCount}</Badge>
+            : undefined
+        }
+        onBack={() => router.back()}
+        rightSlot={
           <TouchableOpacity
             onPress={() => markAllRead.mutate()}
-            style={[
-              ss.markAllBtn,
-              { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder },
-            ]}
+            style={[ss.markAllBtn, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Mark all nudges as read"
           >
-            <Text style={[ss.markAllText, { color: colors.lime }]}>Mark all read</Text>
+            <Text style={[ss.markAllText, { color: colors.lime }]}>Mark all</Text>
           </TouchableOpacity>
-        </View>
-        <Text style={[type_.small, { color: colors.textMeta, marginVertical: spacing.sm }]}>
+        }
+        paddingTop={insets.top + 16}
+      >
+        <Text style={[type_.small, { color: colors.textMeta, marginTop: spacing.sm }]}>
           Your AI-powered spending insights
         </Text>
-      </View>
+      </ScreenHeader>
 
       {/* Content */}
       {isLoading ? (
@@ -525,13 +498,11 @@ export default function NudgesScreen() {
             />
           }
         >
-          <Ionicons name="notifications-off-outline" size={56} color={colors.border} />
-          <Text style={[type_.h3, { color: colors.textSecondary }]}>No nudges yet</Text>
-          <Text
-            style={[type_.body, { color: colors.textMeta, textAlign: 'center', lineHeight: 20 }]}
-          >
-            MoniMata will notify you here when you hit budget milestones or receive money.
-          </Text>
+          <EmptyState
+            icon={<Ionicons name="notifications-off-outline" size={36} color={colors.border} />}
+            title="No nudges yet"
+            body="MoniMata will notify you here when you hit budget milestones or receive money."
+          />
         </ScrollView>
       ) : (
         <FlatList
@@ -566,43 +537,6 @@ export default function NudgesScreen() {
 
 const ss = StyleSheet.create({
   root: { flex: 1 },
-  // header
-  header: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  badge: {
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: { fontSize: 10, fontWeight: '700' },
   markAllBtn: {
     borderWidth: 1,
     borderRadius: 10,
@@ -672,20 +606,4 @@ const ss = StyleSheet.create({
   sheetSection: { marginBottom: 20 },
   whyCard: { flexDirection: 'row', gap: 10, padding: 12 },
   whyText: { flex: 1, fontSize: 14, lineHeight: 20 },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  actionIcon: { width: 24, textAlign: 'center' },
-  actionLabel: { flex: 1, fontSize: 15, fontWeight: '500' },
-  dismissButton: {
-    marginTop: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-  },
 });

@@ -38,6 +38,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/Toast';
+import { Badge, Button, ProgressBar } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { hitSlop, layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
@@ -254,34 +255,25 @@ function ChallengeCard({
           {challenge.description}
         </Text>
         <View style={ss.chalFoot}>
-          <View style={[ss.chalXpBadge, { backgroundColor: colors.surface }]}>
-            <Text style={[ss.chalXpTxt, { color: colors.brand, ...ff(700) }]}>
-              +{challenge.xp} XP
-            </Text>
-          </View>
+          <Badge variant="neutral" size="sm">+{challenge.xp} XP</Badge>
           <Text style={[ss.chalProgTxt, { color: colors.textMeta }]}>
             {challenge.progressLabel}
           </Text>
         </View>
         {challenge.progressPct > 0 && (
-          <View style={[ss.chalBar, { backgroundColor: colors.surfaceElevated }]}>
-            <View
-              style={[
-                ss.chalFill,
-                { backgroundColor: progColor, width: `${challenge.progressPct * 100}%` },
-              ]}
-            />
-          </View>
+          <ProgressBar
+            progress={challenge.progressPct}
+            fillColor={progColor}
+            size="sm"
+            animate
+            style={{ marginTop: 7 }}
+          />
         )}
       </View>
 
       {/* Right badge / join button */}
       {challenge.joined ? (
-        <View style={[ss.joinedBadge, { backgroundColor: colors.successSubtle }]}>
-          <Text style={[ss.joinedTxt, { color: colors.successText, ...ff(700) }]}>
-            ✓ Joined
-          </Text>
-        </View>
+        <Badge variant="success" style={{ alignSelf: 'center' }}>✓ Joined</Badge>
       ) : (
         <TouchableOpacity
           style={[ss.joinBtn, { backgroundColor: colors.brand }]}
@@ -327,14 +319,13 @@ function XpBar({
           {currentXp.toLocaleString()}/{nextLevelXp.toLocaleString()} XP
         </Text>
       </View>
-      <View style={[ss.xpBarBg, { backgroundColor: colors.overlayGhost }]}>
-        <View
-          style={[
-            ss.xpBarFill,
-            { width: `${pct * 100}%` },
-          ]}
-        />
-      </View>
+      <ProgressBar
+        progress={pct}
+        fillColor={colors.lime}
+        size="lg"
+        animate
+        style={{ backgroundColor: colors.overlayGhost }}
+      />
       <View style={ss.xpMetaRow}>
         <Text style={[ss.xpMetaTxt, { color: colors.textInverseFaint }]}>Current level</Text>
         <Text style={[ss.xpMetaTxt, { color: colors.textInverseFaint }]}>
@@ -381,15 +372,14 @@ export default function RewardsScreen() {
               Level {FAKE_LEVEL} · {FAKE_XP_CURRENT.toLocaleString()} XP
             </Text>
           </View>
-          <TouchableOpacity
-            style={[ss.backBtn, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}
+          <Button
+            variant="icon"
+            iconTheme="dark"
             onPress={() => router.back()}
-            hitSlop={hitSlop(36)}
-            accessibilityRole="button"
             accessibilityLabel="Go back"
           >
             <Ionicons name="arrow-back" size={layout.iconMd} color={colors.white} />
-          </TouchableOpacity>
+          </Button>
         </View>
 
         <XpBar
@@ -540,14 +530,6 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     },
     levelTitle: { fontSize: 22, letterSpacing: -0.3 },
     levelSub: { fontSize: 13, marginTop: 3 },
-    backBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 11,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
 
     // ── XP bar ───────────────────────────────────────────────────────────────
     xpWrap: { marginTop: 2 },
@@ -559,18 +541,6 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     },
     xpLev: { fontSize: 13 },
     xpPts: { fontSize: 12 },
-    xpBarBg: {
-      height: 8,
-      borderRadius: 4,
-      overflow: 'hidden',
-    },
-    xpBarFill: {
-      height: '100%',
-      borderRadius: 4,
-      // gradient: brand → lime
-      backgroundColor: colors.lime,
-      // Phase 16: replace with LinearGradient
-    },
     xpMetaRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -684,21 +654,9 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       justifyContent: 'space-between',
       marginTop: 8,
     },
-    chalXpBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-    chalXpTxt: { fontSize: 11 },
     chalProgTxt: { fontSize: 11 },
-    chalBar: { height: 4, borderRadius: 2, marginTop: 7, overflow: 'hidden' },
-    chalFill: { height: '100%', borderRadius: 2 },
 
-    // Joined badge
-    joinedBadge: {
-      flexShrink: 0,
-      alignSelf: 'center',
-      borderRadius: 10,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
-    joinedTxt: { fontSize: 11 },
+    // Joined badge → replaced by <Badge variant="success">
 
     // Join button
     joinBtn: {

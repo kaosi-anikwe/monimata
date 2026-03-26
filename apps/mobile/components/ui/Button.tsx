@@ -45,7 +45,7 @@ import { type_ } from '@/lib/typography';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type ButtonVariant = 'lime' | 'green' | 'red' | 'ghost' | 'icon';
+export type ButtonVariant = 'lime' | 'green' | 'red' | 'ghost' | 'icon' | 'destructive';
 
 export interface ButtonProps {
   variant?: ButtonVariant;
@@ -208,6 +208,17 @@ function resolveVariantStyle(
         },
         text: { color: colors.textInverseHigh },
         loaderColor: colors.textInverseHigh,
+      };
+    case 'destructive':
+      return {
+        container: {
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderColor: colors.errorBorder,
+          height: 52,
+        },
+        text: { color: colors.error },
+        loaderColor: colors.error,
       };
   }
 }

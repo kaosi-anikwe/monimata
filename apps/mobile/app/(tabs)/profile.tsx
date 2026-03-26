@@ -34,6 +34,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/Toast';
+import { AmountDisplay, Avatar, Badge, Button, ListRow, SectionHeader } from '@/components/ui';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBiometricLock } from '@/hooks/useBiometricLock';
 import { useNudgeSettings, useNudgeUnreadCount, useUpdateNudgeSettings } from '@/hooks/useNudges';
@@ -42,7 +43,6 @@ import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import { logout } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { formatNairaCompact } from '@/utils/money';
 
 // ── Hardcoded gamification constants (Phase 14 will fetch from API) ──────────
 const FAKE_LEVEL = 7;
@@ -51,65 +51,7 @@ const FAKE_STREAK = 14;
 const FAKE_BADGES = 8;
 const FAKE_XP_TO_NEXT = 1360;
 
-// ── Helper: initials from name ────────────────────────────────────────────────
-function getInitials(firstName?: string | null, lastName?: string | null): string {
-  return [firstName?.[0], lastName?.[0]].filter(Boolean).join('').toUpperCase() || '?';
-}
-
 // ── ProfileRow — reusable menu row ────────────────────────────────────────────
-interface ProfileRowProps {
-  iconBg: string;
-  iconColor: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  label: string;
-  sub?: string;
-  onPress?: () => void;
-  rightBadge?: React.ReactNode;
-  rightSwitch?: React.ReactNode;
-  isLast?: boolean;
-  colors: ReturnType<typeof useTheme>;
-}
-
-function ProfileRow({
-  iconBg,
-  iconColor,
-  icon,
-  label,
-  sub,
-  onPress,
-  rightBadge,
-  rightSwitch,
-  isLast,
-  colors,
-}: ProfileRowProps) {
-  const ss = makeStyles(colors);
-  return (
-    <TouchableOpacity
-      style={[ss.profRow, isLast && ss.profRowLast]}
-      onPress={onPress}
-      activeOpacity={onPress ? 0.75 : 1}
-      accessibilityRole={onPress ? 'button' : 'none'}
-      accessibilityLabel={label}
-    >
-      <View style={[ss.profRowIc, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={17} color={iconColor} />
-      </View>
-      <View style={ss.profRowTxt}>
-        <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>{label}</Text>
-        {sub ? (
-          <Text style={[type_.caption, { color: colors.textMeta, marginTop: 1 }]}>{sub}</Text>
-        ) : null}
-      </View>
-      <View style={ss.profRowEnd}>
-        {rightBadge}
-        {rightSwitch ?? (
-          onPress ? <Ionicons name="chevron-forward" size={15} color={colors.textTertiary} /> : null
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
@@ -137,8 +79,6 @@ export default function ProfileScreen() {
     () => (accounts ?? []).filter((a) => a.is_active).reduce((s, a) => s + a.balance, 0),
     [accounts],
   );
-
-  const initials = getInitials(user?.first_name, user?.last_name);
 
   function handleLogout() {
     confirm({
@@ -171,9 +111,10 @@ export default function ProfileScreen() {
       >
         {/* Avatar + name + email */}
         <View style={ss.avWrap}>
-          <View style={ss.avatar}>
-            <Text style={[ss.avatarText, { color: colors.lime, ...ff(800) }]}>{initials}</Text>
-          </View>
+          <Avatar
+            name={user ? `${user.first_name} ${user.last_name}` : undefined}
+            size="lg"
+          />
           <View>
             <Text style={[ss.profName, { color: colors.white, ...ff(800) }]}>
               {user ? `${user.first_name} ${user.last_name}` : 'Hey there'}
@@ -186,21 +127,9 @@ export default function ProfileScreen() {
 
         {/* Gamification badge pills */}
         <View style={ss.badges}>
-          <View style={ss.badge}>
-            <Text style={[ss.badgeText, { color: colors.lime, ...ff(700) }]}>
-              Level {FAKE_LEVEL} ⚔️
-            </Text>
-          </View>
-          <View style={ss.badge}>
-            <Text style={[ss.badgeText, { color: colors.lime, ...ff(700) }]}>
-              {FAKE_STREAK}-day streak 🔥
-            </Text>
-          </View>
-          <View style={ss.badge}>
-            <Text style={[ss.badgeText, { color: colors.lime, ...ff(700) }]}>
-              {FAKE_BADGES} badges 🏅
-            </Text>
-          </View>
+          <Badge variant="lime">Level {FAKE_LEVEL} ⚔️</Badge>
+          <Badge variant="lime">{FAKE_STREAK}-day streak 🔥</Badge>
+          <Badge variant="lime">{FAKE_BADGES} badges 🏅</Badge>
         </View>
       </View>
 
@@ -242,9 +171,12 @@ export default function ProfileScreen() {
         {/* Stats grid */}
         <View style={ss.statsGrid}>
           <View style={[ss.statCell, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
-            <Text style={[ss.statNum, { color: colors.textPrimary, ...ff(800) }]}>
-              {formatNairaCompact(netWorth)}
-            </Text>
+            <AmountDisplay
+              kobo={netWorth}
+              size="md"
+              compact
+              style={{ fontSize: 22, letterSpacing: -0.5 }}
+            />
             <Text style={[ss.statLbl, { color: colors.textMeta, ...ff(600) }]}>Net Worth</Text>
           </View>
           <View style={[ss.statCell, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
@@ -260,69 +192,64 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── Account & Security section ───────────────────────────────── */}
-        <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Account & Security</Text>
+        <SectionHeader
+          title="Account & Security"
+          variant="group"
+          paddingHorizontal={spacing.lg}
+          style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
+        />
         <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
           {user?.identity_verified ? (
-            <ProfileRow
+            <ListRow
               iconBg={colors.surface}
-              iconColor={colors.brand}
-              icon="shield-checkmark-outline"
-              label="Identity Verified ✓"
-              sub="BVN verified · bank sync enabled"
-              rightBadge={
-                <View style={[ss.pill, { backgroundColor: colors.surface }]}>
-                  <Text style={[ss.pillText, { color: colors.brand, ...ff(700) }]}>✓</Text>
-                </View>
-              }
-              colors={colors}
+              leftIcon={<Ionicons name="shield-checkmark-outline" size={17} color={colors.brand} />}
+              title="Identity Verified ✓"
+              subtitle="BVN verified · bank sync enabled"
+              right={<Badge variant="success" size="sm">✓</Badge>}
             />
           ) : (
-            <ProfileRow
+            <ListRow
               iconBg={colors.warningSubtle}
-              iconColor={colors.warning}
-              icon="shield-outline"
-              label="Verify Identity"
-              sub="Tap to complete BVN verification"
+              leftIcon={<Ionicons name="shield-outline" size={17} color={colors.warning} />}
+              title="Verify Identity"
+              subtitle="Tap to complete BVN verification"
               onPress={() => router.push('/(auth)/verify-bvn')}
-              colors={colors}
+              showChevron
             />
           )}
-          <ProfileRow
+          <ListRow
             iconBg={colors.surface}
-            iconColor={colors.brand}
-            icon="business-outline"
-            label="Accounts"
-            sub="Connected bank accounts"
-            onPress={() => router.push("/(tabs)/accounts")}
-            colors={colors}
+            leftIcon={<Ionicons name="business-outline" size={17} color={colors.brand} />}
+            title="Accounts"
+            subtitle="Connected bank accounts"
+            onPress={() => router.push('/(tabs)/accounts')}
+            showChevron
           />
-          <ProfileRow
+          <ListRow
             iconBg={colors.surface}
-            iconColor={colors.brand}
-            icon="person-outline"
-            label="Edit Profile"
-            sub="Name, email, avatar"
+            leftIcon={<Ionicons name="person-outline" size={17} color={colors.brand} />}
+            title="Edit Profile"
+            subtitle="Name, email, avatar"
             onPress={() => comingSoon('Edit Profile')}
-            colors={colors}
+            showChevron
           />
-          <ProfileRow
+          <ListRow
             iconBg={colors.infoSubtle}
-            iconColor={colors.info}
-            icon="notifications-outline"
-            label="Notification Settings"
-            sub="Tone, frequency, quiet hours"
+            leftIcon={<Ionicons name="notifications-outline" size={17} color={colors.info} />}
+            title="Notification Settings"
+            subtitle="Tone, frequency, quiet hours"
             onPress={() => router.push('/notification-settings')}
-            colors={colors}
+            showChevron
+            separator={isEnrolled}
           />
           {isEnrolled && (
-            <ProfileRow
+            <ListRow
               iconBg={colors.surface}
-              iconColor={colors.brand}
-              icon="finger-print-outline"
-              label="Biometric Lock"
-              sub={biometricEnabled ? 'Enabled' : 'Disabled'}
+              leftIcon={<Ionicons name="finger-print-outline" size={17} color={colors.brand} />}
+              title="Biometric Lock"
+              subtitle={biometricEnabled ? 'Enabled' : 'Disabled'}
               onPress={toggleBiometric}
-              rightSwitch={
+              right={
                 <Switch
                   value={biometricEnabled}
                   onValueChange={toggleBiometric}
@@ -332,167 +259,157 @@ export default function ProfileScreen() {
                   pointerEvents="none"
                 />
               }
-              isLast
-              colors={colors}
+              separator={false}
             />
-          )}
-          {/* If biometric not enrolled, the last row above (Notification Settings) is last */}
-          {!isEnrolled && (
-            <View style={ss.profRowLast} />
           )}
         </View>
 
         {/* ── Activity section ──────────────────────────────────────────── */}
-        <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Activity</Text>
+        <SectionHeader
+          title="Activity"
+          variant="group"
+          paddingHorizontal={spacing.lg}
+          style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
+        />
         <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
-          <ProfileRow
+          <ListRow
             iconBg={colors.warningSubtle}
-            iconColor={colors.warning}
-            icon="star-outline"
-            label="Rewards & XP"
-            sub={`Level ${FAKE_LEVEL} · ${FAKE_XP.toLocaleString()} XP · ${FAKE_XP_TO_NEXT.toLocaleString()} to Level ${FAKE_LEVEL + 1}`}
+            leftIcon={<Ionicons name="star-outline" size={17} color={colors.warning} />}
+            title="Rewards & XP"
+            subtitle={`Level ${FAKE_LEVEL} · ${FAKE_XP.toLocaleString()} XP · ${FAKE_XP_TO_NEXT.toLocaleString()} to Level ${FAKE_LEVEL + 1}`}
             onPress={() => router.push('/(tabs)/rewards')}
-            colors={colors}
+            showChevron
           />
-          <ProfileRow
+          <ListRow
             iconBg={colors.warningSubtle}
-            iconColor={colors.warning}
-            icon="stats-chart-outline"
-            label="Leaderboard"
-            sub="See how you rank this week"
+            leftIcon={<Ionicons name="stats-chart-outline" size={17} color={colors.warning} />}
+            title="Leaderboard"
+            subtitle="See how you rank this week"
             onPress={() => comingSoon('Leaderboard')}
-            colors={colors}
+            showChevron
           />
-          <ProfileRow
+          <ListRow
             iconBg={colors.errorSubtle}
-            iconColor={colors.error}
-            icon="notifications-outline"
-            label="Nudges"
-            sub="AI-powered spending alerts"
+            leftIcon={<Ionicons name="notifications-outline" size={17} color={colors.error} />}
+            title="Nudges"
+            subtitle="AI-powered spending alerts"
             onPress={() => router.push('/(tabs)/nudges')}
-            rightBadge={
-              nudgeUnread > 0 ? (
-                <View style={[ss.pill, { backgroundColor: colors.errorSubtle }]}>
-                  <Text style={[ss.pillText, { color: colors.error, ...ff(700) }]}>
-                    {nudgeUnread > 99 ? '99+' : nudgeUnread} new
-                  </Text>
-                </View>
-              ) : undefined
+            right={
+              nudgeUnread > 0
+                ? <Badge variant="error" size="sm">{nudgeUnread > 99 ? '99+' : nudgeUnread} new</Badge>
+                : undefined
             }
-            isLast
-            colors={colors}
+            showChevron={nudgeUnread === 0}
+            separator={false}
           />
         </View>
 
         {/* ── Learn & Reports section ──────────────────────────────────── */}
-        <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Learn & Reports</Text>
+        <SectionHeader
+          title="Learn & Reports"
+          variant="group"
+          paddingHorizontal={spacing.lg}
+          style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
+        />
         <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
-          <ProfileRow
+          <ListRow
             iconBg={colors.infoSubtle}
-            iconColor={colors.info}
-            icon="book-outline"
-            label="Knowledge Hub"
-            sub="Articles, courses, quizzes"
+            leftIcon={<Ionicons name="book-outline" size={17} color={colors.info} />}
+            title="Knowledge Hub"
+            subtitle="Articles, courses, quizzes"
             onPress={() => router.push('/(tabs)/hub')}
-            colors={colors}
+            showChevron
           />
-          <ProfileRow
+          <ListRow
             iconBg={colors.purpleSubtle}
-            iconColor={colors.purple}
-            icon="bar-chart-outline"
-            label="Reports"
-            sub="Spending, income, and net worth"
+            leftIcon={<Ionicons name="bar-chart-outline" size={17} color={colors.purple} />}
+            title="Reports"
+            subtitle="Spending, income, and net worth"
             onPress={() => comingSoon('Reports')}
-            isLast
-            colors={colors}
+            showChevron
+            separator={false}
           />
         </View>
 
         {/* ── Preferences section ──────────────────────────────────────── */}
-        <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Preferences</Text>
+        <SectionHeader
+          title="Preferences"
+          variant="group"
+          paddingHorizontal={spacing.lg}
+          style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
+        />
         <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
           {/* Dark Mode toggle */}
-          <View style={[ss.prefRow, { borderBottomColor: colors.border }]}>
-            <View style={ss.prefRowLeft}>
-              <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>Dark Mode</Text>
-              <Text style={[type_.caption, { color: colors.textMeta, marginTop: 1 }]}>
-                Switch between light and dark theme
-              </Text>
-            </View>
-            <Switch
-              value={isDark}
-              onValueChange={setIsDark}
-              trackColor={{ false: colors.surfaceHigh, true: colors.brand }}
-              thumbColor={colors.white}
-              accessibilityLabel="Toggle dark mode"
-            />
-          </View>
-          {/* Nudge Language — wired in Phase 16 */}
-          <View style={ss.prefRowLast}>
-            <View style={ss.prefRowLeft}>
-              <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>Nudge Language</Text>
-              <Text style={[type_.caption, { color: colors.textMeta, marginTop: 1 }]}>
-                Pidgin or formal English
-              </Text>
-            </View>
-            <View style={[ss.langToggle, { backgroundColor: colors.surface }]}>
-              <TouchableOpacity
-                style={[
-                  ss.langBtn,
-                  nudgeLang === 'pidgin' && { backgroundColor: colors.brand },
-                ]}
-                onPress={() => setNudgeLang('pidgin')}
-                accessibilityRole="button"
-                accessibilityLabel="Pidgin language"
-                accessibilityState={{ selected: nudgeLang === 'pidgin' }}
-              >
-                <Text
-                  style={[
-                    type_.caption,
-                    nudgeLang === 'pidgin'
-                      ? { color: colors.white, ...ff(700) }
-                      : { color: colors.textMeta, ...ff(600) },
-                  ]}
+          <ListRow
+            title="Dark Mode"
+            subtitle="Switch between light and dark theme"
+            right={
+              <Switch
+                value={isDark}
+                onValueChange={setIsDark}
+                trackColor={{ false: colors.surfaceHigh, true: colors.brand }}
+                thumbColor={colors.white}
+                accessibilityLabel="Toggle dark mode"
+              />
+            }
+          />
+          {/* Nudge Language */}
+          <ListRow
+            title="Nudge Language"
+            subtitle="Pidgin or formal English"
+            right={
+              <View style={[ss.langToggle, { backgroundColor: colors.surface }]}>
+                <TouchableOpacity
+                  style={[ss.langBtn, nudgeLang === 'pidgin' && { backgroundColor: colors.brand }]}
+                  onPress={() => setNudgeLang('pidgin')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Pidgin language"
+                  accessibilityState={{ selected: nudgeLang === 'pidgin' }}
                 >
-                  Pidgin
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  ss.langBtn,
-                  nudgeLang === 'formal' && { backgroundColor: colors.brand },
-                ]}
-                onPress={() => setNudgeLang('formal')}
-                accessibilityRole="button"
-                accessibilityLabel="Formal English language"
-                accessibilityState={{ selected: nudgeLang === 'formal' }}
-              >
-                <Text
-                  style={[
-                    type_.caption,
-                    nudgeLang === 'formal'
-                      ? { color: colors.white, ...ff(700) }
-                      : { color: colors.textMeta, ...ff(600) },
-                  ]}
+                  <Text
+                    style={[
+                      type_.caption,
+                      nudgeLang === 'pidgin'
+                        ? { color: colors.white, ...ff(700) }
+                        : { color: colors.textMeta, ...ff(600) },
+                    ]}
+                  >
+                    Pidgin
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[ss.langBtn, nudgeLang === 'formal' && { backgroundColor: colors.brand }]}
+                  onPress={() => setNudgeLang('formal')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Formal English language"
+                  accessibilityState={{ selected: nudgeLang === 'formal' }}
                 >
-                  Formal
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                  <Text
+                    style={[
+                      type_.caption,
+                      nudgeLang === 'formal'
+                        ? { color: colors.white, ...ff(700) }
+                        : { color: colors.textMeta, ...ff(600) },
+                    ]}
+                  >
+                    Formal
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            }
+            separator={false}
+          />
         </View>
 
         {/* Log out */}
         <View style={ss.logoutWrap}>
-          <TouchableOpacity
-            style={[ss.logoutBtn, { borderColor: colors.errorBorder }]}
+          <Button
+            variant="destructive"
             onPress={handleLogout}
-            activeOpacity={0.75}
-            accessibilityRole="button"
             accessibilityLabel="Log out"
           >
-            <Text style={[type_.body, { color: colors.error, ...ff(700) }]}>Log Out</Text>
-          </TouchableOpacity>
+            Log Out
+          </Button>
         </View>
       </ScrollView>
     </View>
@@ -517,30 +434,9 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       gap: spacing.md,
       marginBottom: spacing.md,
     },
-    avatar: {
-      width: 58,
-      height: 58,
-      borderRadius: 17,
-      backgroundColor: colors.brand,
-      borderWidth: 2.5,
-      borderColor: colors.limeBorderStrong,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    },
-    avatarText: { fontSize: 23, lineHeight: 28 },
     profName: { fontSize: 19, letterSpacing: -0.3 },
     profEmail: { fontSize: 13, marginTop: 1 },
     badges: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-    badge: {
-      backgroundColor: colors.limeBadgeBg,
-      borderWidth: 1,
-      borderColor: colors.limeGlow,
-      borderRadius: radius.xs,
-      paddingHorizontal: spacing.smd,
-      paddingVertical: 4,
-    },
-    badgeText: { fontSize: 11 },
     // scroll
     scroll: { flex: 1 },
     scrollContent: { paddingBottom: spacing.xxxl + spacing.xl },
@@ -586,65 +482,12 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    // section
-    sectionLbl: {
-      fontSize: 11,
-      textTransform: 'uppercase',
-      letterSpacing: 1.2,
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.mdn,
-      paddingBottom: 6,
-    },
     menu: {
       borderRadius: radius.md,
       marginHorizontal: spacing.lg,
       overflow: 'hidden',
       borderWidth: 1,
     },
-    // profile rows
-    profRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 11,
-      paddingVertical: 14,
-      paddingHorizontal: spacing.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    profRowLast: { borderBottomWidth: 0 },
-    profRowIc: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    },
-    profRowTxt: { flex: 1 },
-    profRowEnd: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    pill: {
-      borderRadius: 6,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
-    },
-    pillText: { fontSize: 11 },
-    // preferences
-    prefRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 14,
-      paddingHorizontal: spacing.lg,
-      borderBottomWidth: 1,
-    },
-    prefRowLast: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 14,
-      paddingHorizontal: spacing.lg,
-    },
-    prefRowLeft: { flex: 1, marginRight: spacing.md },
     langToggle: {
       flexDirection: 'row',
       borderRadius: 10,
@@ -661,13 +504,6 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,
       paddingBottom: spacing.xxxl,
-    },
-    logoutBtn: {
-      borderWidth: 1.5,
-      borderRadius: radius.md,
-      height: 50,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
   });
 }

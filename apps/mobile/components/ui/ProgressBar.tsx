@@ -50,6 +50,8 @@ export interface ProgressBarProps {
   animate?: boolean;
   /** Render a brand→lime linear gradient fill (e.g. goals, CTBM). Default false. */
   gradient?: boolean;
+  /** Override the fill colour directly (takes precedence over `state`). */
+  fillColor?: string;
   style?: StyleProp<ViewStyle>;
   trackStyle?: StyleProp<ViewStyle>;
 }
@@ -66,6 +68,7 @@ export function ProgressBar({
   size = 'sm',
   animate = false,
   gradient = false,
+  fillColor,
   style,
   trackStyle,
 }: ProgressBarProps) {
@@ -87,7 +90,7 @@ export function ProgressBar({
     width: `${width.value * 100}%`,
   }));
 
-  const fillColor = resolveFillColor(state, colors);
+  const resolvedFillColor = fillColor ?? resolveFillColor(state, colors);
 
   return (
     <View
@@ -102,7 +105,7 @@ export function ProgressBar({
         style={[
           s.fill,
           { height },
-          gradient ? undefined : { backgroundColor: fillColor },
+          gradient ? undefined : { backgroundColor: resolvedFillColor },
           fillAnim,
         ]}
       >
