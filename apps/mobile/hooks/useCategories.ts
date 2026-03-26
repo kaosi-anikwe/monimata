@@ -18,10 +18,10 @@ import { Q } from '@nozbe/watermelondb';
 import { useQuery } from '@tanstack/react-query';
 
 import { getDatabase } from '@/database';
-import CategoryModel from '@/database/models/Category';
-import CategoryGroupModel from '@/database/models/CategoryGroup';
 import { queryKeys } from '@/lib/queryKeys';
 import type { CategoryGroup } from '@/types/category';
+import CategoryModel from '@/database/models/Category';
+import CategoryGroupModel from '@/database/models/CategoryGroup';
 
 export function useCategoryGroups() {
   return useQuery({

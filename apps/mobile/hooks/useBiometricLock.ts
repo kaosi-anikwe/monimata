@@ -34,11 +34,11 @@
  *  - The lock is only active if BOTH `isEnabled` AND `isEnrolled` are true.
  */
 
-import * as LocalAuthentication from 'expo-local-authentication';
+import { useSelector } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { useSelector } from 'react-redux';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 import type { RootState } from '@/store';
 

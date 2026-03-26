@@ -16,12 +16,12 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { useToast } from '@/components/Toast';
 import { getDatabase } from '@/database';
-import RecurringRuleModel from '@/database/models/RecurringRule';
-import { syncDatabase } from '@/database/sync';
 import { queryKeys } from '@/lib/queryKeys';
+import { useToast } from '@/components/Toast';
+import { syncDatabase } from '@/database/sync';
 import { useAppSelector } from '@/store/hooks';
+import RecurringRuleModel from '@/database/models/RecurringRule';
 import type { RecurringFrequency, RecurringRule, RecurringTemplate } from '@/types/recurring';
 
 export interface RecurringRuleBody {
