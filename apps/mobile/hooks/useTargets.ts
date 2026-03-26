@@ -17,11 +17,11 @@
 import { Q } from '@nozbe/watermelondb';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { useToast } from '@/components/Toast';
 import { getDatabase } from '@/database';
-import CategoryTargetModel from '@/database/models/CategoryTarget';
-import { syncDatabase } from '@/database/sync';
 import { queryKeys } from '@/lib/queryKeys';
+import { useToast } from '@/components/Toast';
+import { syncDatabase } from '@/database/sync';
+import CategoryTargetModel from '@/database/models/CategoryTarget';
 import type { CategoryTarget, CategoryTargetUpsert } from '@/types/target';
 
 function targetModelToDto(m: CategoryTargetModel): CategoryTarget {
