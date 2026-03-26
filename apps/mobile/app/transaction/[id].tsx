@@ -94,7 +94,7 @@ function formatTxDatetime(dateStr: string): string {
 
 function Numpad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const colors = useTheme();
-  const keyStyle = [ss.numKey, { backgroundColor: colors.white }];
+  const keyStyle = [ss.numKey, { backgroundColor: colors.cardBg }];
   const K = (v: string) => (
     <TouchableOpacity key={v} style={keyStyle} onPress={() => {
       if (value === '0') { onChange(v); return; }
@@ -357,7 +357,7 @@ function BankViewForm({
   return (
     <>
       {/* Fixed details card */}
-      <View style={[ss.detailCard, { borderColor: colors.border, backgroundColor: colors.white }]}>
+      <View style={[ss.detailCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
         <DetailRow label="Narration" value={tx.narration} />
         <DetailRow label="Date" value={formatTxDatetime(tx.date)} />
         <DetailRow label="Source" value={tx.source} isLast={!tx.recurrence_id} />
@@ -365,7 +365,7 @@ function BankViewForm({
       </View>
 
       {/* Editable section: category + memo */}
-      <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.white }]}>
+      <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
         <Frow label="Category">
           <TouchableOpacity
             style={ss.frowTouchable}
@@ -587,7 +587,7 @@ function ManualEditForm({
       </View>
 
       {/* Form card */}
-      <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.white }]}>
+      <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
         <Frow label="What for?">
           <TextInput
             style={[ss.frowInput, { color: colors.textPrimary }]}
@@ -743,7 +743,7 @@ function ManualEditForm({
         Platform.OS === 'ios' ? (
           <Modal visible transparent animationType="fade">
             <TouchableOpacity style={[ss.dtBackdrop, { backgroundColor: colors.overlayNeutral }]} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
-            <View style={[ss.dtSheet, { backgroundColor: colors.white }]}>
+            <View style={[ss.dtSheet, { backgroundColor: colors.cardBg }]}>
               <DateTimePicker
                 value={txDatetime}
                 mode="datetime"
@@ -859,7 +859,7 @@ export default function TransactionDetailsScreen() {
   if (!tx) {
     return (
       <View style={[ss.safe, { backgroundColor: colors.background }]}>
-        <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
+        <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
           <TouchableOpacity
             style={[ss.backBtn, { backgroundColor: colors.surface }]}
             onPress={() => router.back()}
@@ -884,7 +884,7 @@ export default function TransactionDetailsScreen() {
       <StatusBar style={tx.is_manual ? 'dark' : 'light'} />
       {/* ── Header: white for manual, dark gradient hero for bank ── */}
       {tx.is_manual ? (
-        <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
+        <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
           <TouchableOpacity
             style={[ss.backBtn, { backgroundColor: colors.surface }]}
             onPress={() => router.back()}

@@ -166,7 +166,7 @@ export function BottomSheet({
     <Animated.View
       style={[
         s.sheet,
-        { backgroundColor: colors.white, maxHeight: MAX_SHEET_H },
+        { backgroundColor: colors.cardBg, maxHeight: MAX_SHEET_H },
         sheetStyle,
       ]}
     >

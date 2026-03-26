@@ -270,7 +270,7 @@ export default function HomeScreen() {
           </View>
           <View style={s.statGrid}>
             {/* Income */}
-            <View style={[s.statCard, { backgroundColor: colors.white, borderColor: colors.border }, shadow.sm]}>
+            <View style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}>
               <View style={s.statTop}>
                 <View style={[s.statIcon, { backgroundColor: colors.successSubtle }]}>
                   <Ionicons name="arrow-down-outline" size={17} color={colors.successText} />
@@ -284,7 +284,7 @@ export default function HomeScreen() {
             </View>
 
             {/* Expenses */}
-            <View style={[s.statCard, { backgroundColor: colors.white, borderColor: colors.border }, shadow.sm]}>
+            <View style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}>
               <View style={s.statTop}>
                 <View style={[s.statIcon, { backgroundColor: colors.errorSubtle }]}>
                   <Ionicons name="arrow-up-outline" size={17} color={colors.error} />
@@ -407,7 +407,7 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={goal.id}
-                  style={[s.goalRow, { backgroundColor: colors.white, borderColor: colors.border }, shadow.sm]}
+                  style={[s.goalRow, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}
                   onPress={() => router.push(`/target/${goal.id}`)}
                   activeOpacity={0.8}
                   accessibilityRole="button"

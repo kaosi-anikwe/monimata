@@ -248,7 +248,7 @@ function DetailHeader({
     <View
       style={[
         ss.detailHeaderWrap,
-        { backgroundColor: colors.white, borderBottomColor: colors.border },
+        { backgroundColor: colors.cardBg, borderBottomColor: colors.border },
       ]}
     >
       <View style={[ss.detailHeaderRow, { paddingTop: insets.top + spacing.sm }]}>
@@ -282,7 +282,7 @@ function CategoryCard({
 
   return (
     <TouchableOpacity
-      style={[ss.categoryCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+      style={[ss.categoryCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.75}
     >
@@ -313,7 +313,7 @@ function BillListRow({
 
   return (
     <TouchableOpacity
-      style={[ss.listRow, { backgroundColor: colors.white }]}
+      style={[ss.listRow, { backgroundColor: colors.cardBg }]}
       onPress={onPress}
       activeOpacity={0.75}
     >
@@ -360,7 +360,7 @@ function AccountPicker({
               ss.accountChip,
               {
                 borderColor: active ? colors.brand : colors.border,
-                backgroundColor: active ? colors.surfaceElevated : colors.white,
+                backgroundColor: active ? colors.surfaceElevated : colors.cardBg,
               },
             ]}
             onPress={() => onSelect(a.id)}
@@ -418,7 +418,7 @@ function CategoryPickerField({
       <TouchableOpacity
         style={[
           ss.catPickerTrigger,
-          { backgroundColor: colors.white, borderColor: colors.border },
+          { backgroundColor: colors.cardBg, borderColor: colors.border },
         ]}
         onPress={() => setOpen((v) => !v)}
         activeOpacity={0.75}
@@ -446,7 +446,7 @@ function CategoryPickerField({
             style={[
               ss.catChip,
               {
-                backgroundColor: !selectedId ? colors.brand : colors.white,
+                backgroundColor: !selectedId ? colors.brand : colors.cardBg,
                 borderColor: !selectedId ? colors.brand : colors.border,
               },
             ]}
@@ -477,7 +477,7 @@ function CategoryPickerField({
                         style={[
                           ss.catChip,
                           {
-                            backgroundColor: active ? colors.brand : colors.white,
+                            backgroundColor: active ? colors.brand : colors.cardBg,
                             borderColor: active ? colors.brand : colors.border,
                           },
                         ]}
@@ -511,7 +511,7 @@ function HistoryRow({ item }: { item: BillHistoryItem }) {
   const colors = useTheme();
 
   return (
-    <View style={[ss.historyRow, { backgroundColor: colors.white }]}>
+    <View style={[ss.historyRow, { backgroundColor: colors.cardBg }]}>
       <View style={[ss.historyIconTile, { backgroundColor: colors.surface }]}>
         <Ionicons name="receipt-outline" size={18} color={colors.brand} />
       </View>
@@ -638,7 +638,7 @@ function ReceiptStep({
       <View
         style={[
           ss.detailHeaderWrap,
-          { backgroundColor: colors.white, borderBottomColor: colors.border },
+          { backgroundColor: colors.cardBg, borderBottomColor: colors.border },
         ]}
       >
         <View style={[ss.detailHeaderRow, { paddingTop: insets.top + spacing.sm }]}>
@@ -688,7 +688,7 @@ function ReceiptStep({
         )}
 
         <View
-          style={[ss.receiptCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+          style={[ss.receiptCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
         >
           <Text style={[ss.summaryGroupLabel, { color: colors.textSecondary }]}>
             Payment Details
@@ -1048,7 +1048,7 @@ export default function BillsScreen() {
               style={[
                 ss.input,
                 {
-                  backgroundColor: colors.white,
+                  backgroundColor: colors.cardBg,
                   borderColor: colors.border,
                   color: colors.textPrimary,
                 },
@@ -1071,7 +1071,7 @@ export default function BillsScreen() {
                   style={[
                     ss.input,
                     {
-                      backgroundColor: colors.white,
+                      backgroundColor: colors.cardBg,
                       borderColor: colors.border,
                       color: colors.textPrimary,
                     },
@@ -1303,7 +1303,7 @@ export default function BillsScreen() {
               <View
                 style={[
                   ss.recentCard,
-                  { backgroundColor: colors.white, borderColor: colors.border },
+                  { backgroundColor: colors.cardBg, borderColor: colors.border },
                 ]}
               >
                 {recentHistory.map((item, index) => (

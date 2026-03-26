@@ -74,7 +74,7 @@ export function Chip({
     transform: [{ scale: scale.value }],
   }));
 
-  const bg = selected ? colors.brand : colors.white;
+  const bg = selected ? colors.brand : colors.cardBg;
   const border = selected ? colors.brand : colors.borderStrong;
   const textColor = selected ? colors.white : colors.textSecondary;
 

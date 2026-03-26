@@ -121,7 +121,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         style={[
           s.fieldWrap,
           {
-            backgroundColor: colors.white,
+            backgroundColor: colors.cardBg,
             borderColor: error ? colors.error : colors.border,
           },
           borderAnim,

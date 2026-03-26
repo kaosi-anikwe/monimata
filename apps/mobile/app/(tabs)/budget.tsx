@@ -79,7 +79,7 @@ function MonthHeader({ month, tbb }: { month: string; tbb: number }) {
     <View
       style={[
         ms.hdr,
-        { backgroundColor: colors.white, paddingTop: insets.top + 10, borderBottomColor: colors.border },
+        { backgroundColor: colors.cardBg, paddingTop: insets.top + 10, borderBottomColor: colors.border },
       ]}
     >
       {/* Title row */}
@@ -256,7 +256,7 @@ function CategoryRow({
 
   return (
     <TouchableOpacity
-      style={[cr.wrap, { backgroundColor: colors.white, borderBottomColor: colors.separator }]}
+      style={[cr.wrap, { backgroundColor: colors.cardBg, borderBottomColor: colors.separator }]}
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
@@ -306,7 +306,7 @@ const cr = StyleSheet.create({
 
 function NumpadGrid({ onKey, onDel }: { onKey: (k: string) => void; onDel: () => void }) {
   const colors = useTheme();
-  const keyStyle = [np.key, { backgroundColor: colors.white }];
+  const keyStyle = [np.key, { backgroundColor: colors.cardBg }];
   const K = (v: string) => (
     <TouchableOpacity
       key={v}
@@ -425,7 +425,7 @@ function AssignSheet({
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <TouchableOpacity style={[sh.backdrop, { backgroundColor: colors.overlayNeutral }]} activeOpacity={1} onPress={onClose} />
       <View style={sh.outer}>
-        <View style={[sh.sheet, { backgroundColor: colors.white }]}>
+        <View style={[sh.sheet, { backgroundColor: colors.cardBg }]}>
           {/* Handle */}
           <View style={[sh.handle, { backgroundColor: colors.borderStrong }]} />
 
@@ -491,7 +491,7 @@ function AssignSheet({
               >
                 {category.required_this_month !== null && (
                   <TouchableOpacity
-                    style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
+                    style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       const needed = Math.max(0, category.assigned + category.required_this_month! - category.available);
@@ -504,7 +504,7 @@ function AssignSheet({
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
+                  style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
                   onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAssignStr(String(Math.round(Math.max(0, tbb) / 100))); }}
                   accessibilityRole="button"
                   accessibilityLabel="Assign all available to budget"
@@ -512,7 +512,7 @@ function AssignSheet({
                   <Text style={[sh.qfTxt, { color: colors.textSecondary }]} numberOfLines={1}>Assign all TBB</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
+                  style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
                   onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAssignStr('0'); }}
                   accessibilityRole="button"
                   accessibilityLabel="Zero out assignment"
@@ -520,7 +520,7 @@ function AssignSheet({
                   <Text style={[sh.qfTxt, { color: colors.textSecondary }]} numberOfLines={1}>Zero out</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
+                  style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
                   onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowMove(true); setMoveStr('0'); setMoveTarget(null); }}
                   accessibilityRole="button"
                   accessibilityLabel="Move money to another category instead"
@@ -587,7 +587,7 @@ function AssignSheet({
               {/* Quick fills */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={sh.qfRow} style={sh.qfScroll}>
                 <TouchableOpacity
-                  style={[sh.qfChip, { backgroundColor: colors.white, borderColor: colors.borderStrong }]}
+                  style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
                   onPress={() => setMoveStr(String(Math.round(Math.max(0, category.available) / 100)))}
                 >
                   <Text style={[sh.qfTxt, { color: colors.textSecondary }]}>Move all available</Text>
@@ -931,7 +931,7 @@ export default function BudgetScreen() {
         {groups.map((group) => (
           <View
             key={group.id}
-            style={[s.grpCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+            style={[s.grpCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
           >
             <GroupHeader
               group={group}

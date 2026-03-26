@@ -82,7 +82,7 @@ export function Card({
   }));
 
   const cardStyle: ViewStyle = {
-    backgroundColor: variant === 'dark' ? colors.darkGreen : colors.white,
+    backgroundColor: variant === 'dark' ? colors.darkGreen : colors.cardBg,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: variant === 'dark'

@@ -107,7 +107,7 @@ export default function NotificationSettingsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* ── Master settings card ──────────────────────────────────────── */}
-        <View style={[ss.card, { backgroundColor: colors.white, borderColor: colors.border }]}>
+        <View style={[ss.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           {/* Enable AI Nudges */}
           <View style={[ss.settingRow, { borderBottomColor: colors.border }]}>
             <View style={ss.settingLeft}>
@@ -245,7 +245,7 @@ export default function NotificationSettingsScreen() {
               ss.toneOpt,
               {
                 borderColor: draft.language === 'pidgin' ? colors.brand : colors.border,
-                backgroundColor: draft.language === 'pidgin' ? colors.surface : colors.white,
+                backgroundColor: draft.language === 'pidgin' ? colors.surface : colors.cardBg,
               },
             ]}
             onPress={() => setDraft((d) => ({ ...d, language: 'pidgin' }))}
@@ -279,7 +279,7 @@ export default function NotificationSettingsScreen() {
               ss.toneOpt,
               {
                 borderColor: draft.language === 'formal' ? colors.brand : colors.border,
-                backgroundColor: draft.language === 'formal' ? colors.surface : colors.white,
+                backgroundColor: draft.language === 'formal' ? colors.surface : colors.cardBg,
               },
             ]}
             onPress={() => setDraft((d) => ({ ...d, language: 'formal' }))}

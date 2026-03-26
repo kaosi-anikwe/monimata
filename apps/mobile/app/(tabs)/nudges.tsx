@@ -378,7 +378,7 @@ function NudgeCard({ nudge, onPress }: NudgeCardProps) {
     <TouchableOpacity
       style={[
         ss.card,
-        { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm },
+        { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm },
         nudge.is_dismissed && ss.cardDismissed,
       ]}
       onPress={() => onPress(nudge)}

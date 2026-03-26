@@ -186,7 +186,7 @@ function BadgeCell({
       style={[
         ss.bdgCell,
         {
-          backgroundColor: colors.white,
+          backgroundColor: colors.cardBg,
           borderColor: colors.border,
           opacity: badge.earned ? 1 : 0.55,
         },
@@ -235,7 +235,7 @@ function ChallengeCard({
 
   return (
     <TouchableOpacity
-      style={[ss.chalCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+      style={[ss.chalCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.88}
       accessibilityRole="button"
@@ -401,7 +401,7 @@ export default function RewardsScreen() {
       >
         {/* ── Streak banner ─────────────────────────────────────────────── */}
         <View
-          style={[ss.streakBanner, { backgroundColor: colors.white, borderColor: colors.border }]}
+          style={[ss.streakBanner, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
         >
           {/* Left: fire + big number */}
           <View style={ss.streakLeft}>

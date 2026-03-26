@@ -277,7 +277,7 @@ function DayGroupCard({ group, categoryMap, accountMap, onTxPress, onCategoryPre
       </View>
 
       {/* Day card */}
-      <View style={[ss.dayCard, { borderColor: colors.border, backgroundColor: colors.white }, shadow.sm]}>
+      <View style={[ss.dayCard, { borderColor: colors.border, backgroundColor: colors.cardBg }, shadow.sm]}>
         {group.txs.map((tx, i) => {
           const account = accountMap.get(tx.account_id);
           const accountLabel = account ? (account.alias ?? account.institution) : null;
@@ -427,7 +427,7 @@ export default function TransactionsScreen() {
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
       {/* ── Header ── */}
-      <View style={[ss.header, { backgroundColor: colors.white, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
+      <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         {/* Title row */}
         <View style={ss.hdrTopRow}>
           <TouchableOpacity
@@ -454,7 +454,7 @@ export default function TransactionsScreen() {
         </View>
 
         {/* Search bar */}
-        <View style={[ss.searchBar, { backgroundColor: colors.white, borderColor: colors.border }]}>
+        <View style={[ss.searchBar, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
             <Circle cx={11} cy={11} r={8} stroke={colors.textTertiary} strokeWidth={2} />
             <Path d="M21 21l-4.35-4.35" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
