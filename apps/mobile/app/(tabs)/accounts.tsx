@@ -37,7 +37,9 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { useToast } from '@/components/Toast';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
+import { Divider } from '@/components/ui/Divider';
 import { Input } from '@/components/ui/Input';
+import { ListRow } from '@/components/ui/ListRow';
 import {
   useAccounts,
   useAddManualAccount,
@@ -375,107 +377,88 @@ function MoreActionsSheet({
     <BottomSheet visible={!!account} onClose={onClose} title={account.alias ?? account.account_name}>
       <View style={ss.ashList}>
         {/* Rename */}
-        <TouchableOpacity
-          style={ss.ashRow}
-          onPress={() => action(onRename)}
-          accessibilityRole="button"
-          accessibilityLabel="Rename account"
-        >
-          <View style={[ss.ashIc, { backgroundColor: colors.surface }]}>
+        <ListRow
+          leftIcon={
             <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
               <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-          </View>
-          <View style={ss.ashText}>
-            <Text style={[type_.body, { color: colors.textPrimary }]}>Rename</Text>
-            <Text style={[type_.caption, { color: colors.textMeta }]}>Change the display name</Text>
-          </View>
-        </TouchableOpacity>
+          }
+          iconBg={colors.surface}
+          title="Rename"
+          subtitle="Change the display name"
+          onPress={() => action(onRename)}
+          showChevron
+        />
 
         {/* Update Balance (manual only) */}
         {!isLinked && (
-          <TouchableOpacity
-            style={ss.ashRow}
-            onPress={() => action(onUpdateBalance)}
-            accessibilityRole="button"
-            accessibilityLabel="Update balance"
-          >
-            <View style={[ss.ashIc, { backgroundColor: colors.warningSubtle }]}>
+          <ListRow
+            leftIcon={
               <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
                 <Path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
-            </View>
-            <View style={ss.ashText}>
-              <Text style={[type_.body, { color: colors.textPrimary }]}>Update Balance</Text>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Manually set the current balance</Text>
-            </View>
-          </TouchableOpacity>
+            }
+            iconBg={colors.warningSubtle}
+            title="Update Balance"
+            subtitle="Manually set the current balance"
+            onPress={() => action(onUpdateBalance)}
+            showChevron
+          />
         )}
 
         {/* Link to Mono (manual only) */}
         {!isLinked && (
-          <TouchableOpacity
-            style={ss.ashRow}
-            onPress={() => {
-              onClose();
-              router.push({ pathname: '/(auth)/link-bank', params: { accountId: account.id } });
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Link to Mono"
-          >
-            <View style={[ss.ashIc, { backgroundColor: colors.infoSubtle }]}>
+          <ListRow
+            leftIcon={
               <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
                 <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
-            </View>
-            <View style={ss.ashText}>
-              <Text style={[type_.body, { color: colors.textPrimary }]}>Link to Mono</Text>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Enable automatic sync</Text>
-            </View>
-          </TouchableOpacity>
+            }
+            iconBg={colors.infoSubtle}
+            title="Link to Mono"
+            subtitle="Enable automatic sync"
+            onPress={() => {
+              onClose();
+              router.push({ pathname: '/(auth)/link-bank', params: { accountId: account.id } });
+            }}
+            showChevron
+          />
         )}
 
         {/* Disconnect Mono (linked only) */}
         {isLinked && (
-          <TouchableOpacity
-            style={ss.ashRow}
-            onPress={() => action(onUnlink)}
-            accessibilityRole="button"
-            accessibilityLabel="Disconnect Mono"
-          >
-            <View style={[ss.ashIc, { backgroundColor: colors.warningSubtle }]}>
+          <ListRow
+            leftIcon={
               <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
                 <Path d="M18.84 12.25l1.72-1.71a4.91 4.91 0 00-6.94-6.94l-1.72 1.71M5.17 8l-2.14 2.14a4.91 4.91 0 006.94 6.94l2.14-2.13M2 2l20 20" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
-            </View>
-            <View style={ss.ashText}>
-              <Text style={[type_.body, { color: colors.textPrimary }]}>Disconnect Mono</Text>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Stop automatic sync</Text>
-            </View>
-          </TouchableOpacity>
+            }
+            iconBg={colors.warningSubtle}
+            title="Disconnect Mono"
+            subtitle="Stop automatic sync"
+            onPress={() => action(onUnlink)}
+            showChevron
+          />
         )}
 
-        <View style={[ss.ashDivider, { backgroundColor: colors.border }]} />
+        <Divider verticalMargin={spacing.xs} />
 
         {/* Delete */}
-        <TouchableOpacity
-          style={ss.ashRow}
-          onPress={() => action(onDelete)}
-          accessibilityRole="button"
-          accessibilityLabel="Remove account"
-        >
-          <View style={[ss.ashIc, { backgroundColor: colors.errorSubtle }]}>
+        <ListRow
+          leftIcon={
             <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
               <Path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-          </View>
-          <View style={ss.ashText}>
-            <Text style={[type_.body, { color: colors.error }]}>Remove Account</Text>
-            <Text style={[type_.caption, { color: colors.textMeta }]}>Transaction history is preserved</Text>
-          </View>
-        </TouchableOpacity>
+          }
+          iconBg={colors.errorSubtle}
+          title="Remove Account"
+          titleStyle={{ color: colors.error }}
+          subtitle="Transaction history is preserved"
+          onPress={() => action(onDelete)}
+          showChevron
+        />
       </View>
     </BottomSheet>
   );
@@ -1146,25 +1129,7 @@ const ss = StyleSheet.create({
   },
 
   // More actions sheet  — ash-list pattern
-  ashList: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
-  ashRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  ashIc: {
-    width: 36,
-    height: 36,
-    borderRadius: spacing.smd,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  ashText: { flex: 1 },
-  ashDivider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
+  ashList: { paddingBottom: spacing.xxxl },
 
   // Error state
   errorContainer: {

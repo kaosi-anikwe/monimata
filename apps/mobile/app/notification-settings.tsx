@@ -17,13 +17,11 @@
 /**
  * Notification Settings screen — full-page promoted from the old modal.
  *
- * Persisted to API: enabled, quiet_hours_start, quiet_hours_end, fatigue_limit.
- * Message Tone (Pidgin/Formal) is local state only — API support in a future phase.
+ * Persisted to API: enabled, quiet_hours_start, quiet_hours_end, fatigue_limit, language.
  */
 
 import { useState } from 'react';
 
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import {
   KeyboardAvoidingView,
@@ -39,32 +37,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/Toast';
+import { Button, SectionHeader, ScreenHeader } from '@/components/ui';
 import { useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import type { NudgeSettings } from '@/types/nudge';
-
-// ── Setting section header ────────────────────────────────────────────────────
-function SectionLabel({ label, colors }: { label: string; colors: ReturnType<typeof useTheme> }) {
-  return (
-    <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 6 }}>
-      <Text
-        style={[
-          type_.caption,
-          {
-            color: colors.textSecondary,
-            textTransform: 'uppercase',
-            letterSpacing: 1,
-            ...ff(700),
-          },
-        ]}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -83,11 +61,11 @@ export default function NotificationSettingsScreen() {
       quiet_hours_start: '23:00',
       quiet_hours_end: '07:00',
       fatigue_limit: 3,
+      language: 'formal',
     },
   );
 
-  // Message Tone — visual only, API support in future phase
-  const [tone, setTone] = useState<'pidgin' | 'formal'>('pidgin');
+  // Message Tone — persisted via draft.language
 
   // Sync draft when settings load from API (first mount)
   // Using a ref to only do this once
@@ -115,29 +93,12 @@ export default function NotificationSettingsScreen() {
       style={[ss.root, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* ── Dark-green header ─────────────────────────────────────────────── */}
-      <View
-        style={[
-          ss.header,
-          {
-            paddingTop: insets.top + 14,
-            backgroundColor: colors.darkGreen,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={ss.backBtn}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Ionicons name="arrow-back" size={18} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={[ss.headerTitle, { color: colors.white, ...ff(700) }]}>Nudge Settings</Text>
-        <Text style={[ss.headerSub, { color: colors.textInverseFaint }]}>
-          Control how and when AI alerts reach you
-        </Text>
-      </View>
+      <ScreenHeader
+        title="Nudge Settings"
+        subtitle="Control how and when AI alerts reach you"
+        onBack={() => router.back()}
+        paddingTop={insets.top + 14}
+      />
 
       {/* ── Scrollable body ───────────────────────────────────────────────── */}
       <ScrollView
@@ -273,31 +234,36 @@ export default function NotificationSettingsScreen() {
         </View>
 
         {/* ── Message Tone ──────────────────────────────────────────────── */}
-        <SectionLabel label="Message Tone" colors={colors} />
+        <SectionHeader
+          title="Message Tone"
+          variant="group"
+          paddingHorizontal={spacing.lg}
+          style={{ paddingTop: spacing.lg, marginBottom: 6 }}
+        />
         <View style={[ss.toneWrap, { paddingHorizontal: spacing.lg }]}>
           <TouchableOpacity
             style={[
               ss.toneOpt,
               {
-                borderColor: tone === 'pidgin' ? colors.brand : colors.border,
-                backgroundColor: tone === 'pidgin' ? colors.surface : colors.white,
+                borderColor: draft.language === 'pidgin' ? colors.brand : colors.border,
+                backgroundColor: draft.language === 'pidgin' ? colors.surface : colors.white,
               },
             ]}
-            onPress={() => setTone('pidgin')}
+            onPress={() => setDraft((d) => ({ ...d, language: 'pidgin' }))}
             activeOpacity={0.75}
             accessibilityRole="radio"
-            accessibilityState={{ checked: tone === 'pidgin' }}
+            accessibilityState={{ checked: draft.language === 'pidgin' }}
             accessibilityLabel="Pidgin tone"
           >
             <View
               style={[
                 ss.toneRadio,
                 {
-                  borderColor: tone === 'pidgin' ? colors.brand : colors.borderStrong,
+                  borderColor: draft.language === 'pidgin' ? colors.brand : colors.borderStrong,
                 },
               ]}
             >
-              {tone === 'pidgin' && (
+              {draft.language === 'pidgin' && (
                 <View style={[ss.toneRadioInner, { backgroundColor: colors.brand }]} />
               )}
             </View>
@@ -313,25 +279,25 @@ export default function NotificationSettingsScreen() {
             style={[
               ss.toneOpt,
               {
-                borderColor: tone === 'formal' ? colors.brand : colors.border,
-                backgroundColor: tone === 'formal' ? colors.surface : colors.white,
+                borderColor: draft.language === 'formal' ? colors.brand : colors.border,
+                backgroundColor: draft.language === 'formal' ? colors.surface : colors.white,
               },
             ]}
-            onPress={() => setTone('formal')}
+            onPress={() => setDraft((d) => ({ ...d, language: 'formal' }))}
             activeOpacity={0.75}
             accessibilityRole="radio"
-            accessibilityState={{ checked: tone === 'formal' }}
+            accessibilityState={{ checked: draft.language === 'formal' }}
             accessibilityLabel="Formal English tone"
           >
             <View
               style={[
                 ss.toneRadio,
                 {
-                  borderColor: tone === 'formal' ? colors.brand : colors.borderStrong,
+                  borderColor: draft.language === 'formal' ? colors.brand : colors.borderStrong,
                 },
               ]}
             >
-              {tone === 'formal' && (
+              {draft.language === 'formal' && (
                 <View style={[ss.toneRadioInner, { backgroundColor: colors.brand }]} />
               )}
             </View>
@@ -346,22 +312,15 @@ export default function NotificationSettingsScreen() {
 
         {/* ── Save button ───────────────────────────────────────────────── */}
         <View style={ss.saveWrap}>
-          <TouchableOpacity
-            style={[
-              ss.saveBtn,
-              { backgroundColor: colors.brand },
-              updateSettings.isPending && ss.saveBtnDisabled,
-            ]}
+          <Button
+            variant="green"
             onPress={handleSave}
             disabled={updateSettings.isPending}
-            activeOpacity={0.85}
-            accessibilityRole="button"
+            loading={updateSettings.isPending}
             accessibilityLabel="Save settings"
           >
-            <Text style={[type_.body, { color: colors.white, ...ff(700) }]}>
-              {updateSettings.isPending ? 'Saving…' : 'Save Settings'}
-            </Text>
-          </TouchableOpacity>
+            Save Settings
+          </Button>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -373,26 +332,6 @@ export default function NotificationSettingsScreen() {
 function makeStyles(colors: ReturnType<typeof useTheme>) {
   return StyleSheet.create({
     root: { flex: 1 },
-    // header
-    header: {
-      paddingHorizontal: spacing.xl,
-      paddingBottom: spacing.xl,
-      borderBottomLeftRadius: 26,
-      borderBottomRightRadius: 26,
-    },
-    backBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 11,
-      backgroundColor: colors.overlayGhost,
-      borderWidth: 1,
-      borderColor: colors.overlayGhostBorder,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.mdn,
-    },
-    headerTitle: { fontSize: 22, letterSpacing: -0.4 },
-    headerSub: { fontSize: 13, marginTop: 4 },
     // scroll
     scroll: { flex: 1 },
     scrollContent: { paddingBottom: spacing.xxxl + spacing.xl },
@@ -476,12 +415,5 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       paddingTop: spacing.xl,
       paddingBottom: spacing.xxxl,
     },
-    saveBtn: {
-      height: 54,
-      borderRadius: radius.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    saveBtnDisabled: { opacity: 0.6 },
   });
 }

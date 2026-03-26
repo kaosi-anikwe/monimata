@@ -25,7 +25,6 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Controller, useForm } from 'react-hook-form';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -35,9 +34,10 @@ import {
 } from 'react-native';
 import { z } from 'zod';
 
+import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { ff } from '@/lib/typography';
-import { AuthHdr, AuthInput, BackBtn, s } from './_authShared';
+import { AuthHdr, BackBtn, s } from './_authShared';
 
 const schema = z.object({
   first_name: z.string().min(1, 'First name is required'),
@@ -112,89 +112,116 @@ export default function RegisterScreen() {
             </View>
           ) : null}
 
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ gap: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Controller
+                control={control}
+                name="first_name"
+                render={({ field: { value, onChange, onBlur } }) => (
+                  <Input
+                    label="First Name"
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    placeholder="Emeka"
+                    error={errors.first_name?.message}
+                    containerStyle={{ flex: 1 }}
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="last_name"
+                render={({ field: { value, onChange, onBlur } }) => (
+                  <Input
+                    label="Last Name"
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    placeholder="Okafor"
+                    error={errors.last_name?.message}
+                    containerStyle={{ flex: 1 }}
+                  />
+                )}
+              />
+            </View>
+
             <Controller
               control={control}
-              name="first_name"
+              name="email"
               render={({ field: { value, onChange, onBlur } }) => (
-                <View style={[s.field, { flex: 1 }]}>
-                  <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>First Name</Text>
-                  <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Emeka" hasError={!!errors.first_name} colors={colors} />
-                  {errors.first_name ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.first_name.message}</Text> : null}
-                </View>
+                <Input
+                  label="Email Address"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  placeholder="emeka@example.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  error={errors.email?.message}
+                />
               )}
             />
+
             <Controller
               control={control}
-              name="last_name"
+              name="phone"
               render={({ field: { value, onChange, onBlur } }) => (
-                <View style={[s.field, { flex: 1 }]}>
-                  <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Last Name</Text>
-                  <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Okafor" hasError={!!errors.last_name} colors={colors} />
-                  {errors.last_name ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.last_name.message}</Text> : null}
-                </View>
+                <Input
+                  label="Phone (optional)"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  placeholder="08012345678"
+                  keyboardType="phone-pad"
+                  error={errors.phone?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { value, onChange, onBlur } }) => (
+                <Input
+                  label="Password"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  placeholder="Min. 8 characters"
+                  secureTextEntry
+                  error={errors.password?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="confirm_password"
+              render={({ field: { value, onChange, onBlur } }) => (
+                <Input
+                  label="Confirm Password"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  placeholder="Repeat password"
+                  secureTextEntry
+                  error={errors.confirm_password?.message}
+                />
               )}
             />
           </View>
 
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <View style={s.field}>
-                <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Email Address</Text>
-                <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="emeka@example.com" keyboardType="email-address" autoCapitalize="none" hasError={!!errors.email} colors={colors} />
-                {errors.email ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.email.message}</Text> : null}
-              </View>
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="phone"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <View style={s.field}>
-                <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Phone (optional)</Text>
-                <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="08012345678" keyboardType="phone-pad" hasError={!!errors.phone} colors={colors} />
-                {errors.phone ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.phone.message}</Text> : null}
-              </View>
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <View style={s.field}>
-                <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Password</Text>
-                <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Min. 8 characters" secureTextEntry hasError={!!errors.password} colors={colors} />
-                {errors.password ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.password.message}</Text> : null}
-              </View>
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="confirm_password"
-            render={({ field: { value, onChange, onBlur } }) => (
-              <View style={s.field}>
-                <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Confirm Password</Text>
-                <AuthInput value={value} onChangeText={onChange} onBlur={onBlur} placeholder="Repeat password" secureTextEntry hasError={!!errors.confirm_password} colors={colors} />
-                {errors.confirm_password ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.confirm_password.message}</Text> : null}
-              </View>
-            )}
-          />
-
-          <TouchableOpacity
-            style={[s.btnGreen, { backgroundColor: colors.brand }, loading && s.btnDisabled]}
+          <Button
+            variant="green"
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
-            accessibilityRole="button"
+            loading={loading}
+            style={{ marginTop: 8 }}
             accessibilityLabel="Create account"
-            accessibilityState={{ disabled: loading, busy: loading }}
           >
-            {loading ? <ActivityIndicator color={colors.white} /> : <Text style={[s.btnText, { color: colors.white }]}>Create Account</Text>}
-          </TouchableOpacity>
+            Create Account
+          </Button>
 
           <View style={s.tosWrap}>
             <Text style={[s.tosText, { color: colors.textMeta }]}>

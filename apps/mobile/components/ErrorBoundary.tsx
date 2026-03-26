@@ -19,6 +19,8 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { ff } from '@/lib/typography';
 
 interface Props {
   children: React.ReactNode;
@@ -35,15 +37,37 @@ interface State {
 function ErrorFallback({ message, onReset }: { message: string; onReset: () => void }) {
   const colors = useTheme();
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
-      <Text style={s.icon}>⚠️</Text>
-      <Text style={[s.title, { color: colors.textPrimary }]}>Something went wrong</Text>
-      <Text style={[s.message, { color: colors.textMeta }]} numberOfLines={4}>
-        {message}
-      </Text>
-      <TouchableOpacity style={[s.btn, { backgroundColor: colors.brand }]} onPress={onReset} activeOpacity={0.8}>
-        <Text style={[s.btnText, { color: colors.white }]}>Try Again</Text>
-      </TouchableOpacity>
+    <View style={[s.root, { backgroundColor: colors.background }]}>
+      {/* Dark-green header band — matches ScreenHeader / profile header */}
+      <View style={[s.header, { backgroundColor: colors.darkGreen }]}>
+        <View style={[s.iconBubble, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}>
+          <Text style={s.iconText}>⚠️</Text>
+        </View>
+        <Text style={[s.heading, { color: colors.white, ...ff(800) }]}>
+          Something went wrong
+        </Text>
+        <Text style={[s.sub, { color: colors.textInverseFaint, ...ff(400) }]}>
+          MoniMata hit an unexpected error
+        </Text>
+      </View>
+
+      {/* Body card */}
+      <View style={s.body}>
+        <View style={[s.card, { backgroundColor: colors.white, borderColor: colors.border }, shadow.sm]}>
+          <Text style={[s.errorLabel, { color: colors.textMeta, ...ff(600) }]}>Error details</Text>
+          <Text style={[s.errorMsg, { color: colors.textPrimary, ...ff(400) }]} numberOfLines={5}>
+            {message}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[s.btn, { backgroundColor: colors.lime }]}
+          onPress={onReset}
+          activeOpacity={0.82}
+        >
+          <Text style={[s.btnText, { color: colors.darkGreen, ...ff(700) }]}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -72,7 +96,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     // Forward to Sentry for production crash tracking.
     Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
     if (__DEV__) {
-      console.error('[ErrorBoundary] Uncaught error:', error, info.componentStack);
+      console.error('[ErrorBoundary] Rendering fallback for error:', error, info.componentStack);
     }
   }
 
@@ -95,29 +119,52 @@ export class ErrorBoundary extends React.Component<Props, State> {
 }
 
 const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
+  root: { flex: 1 },
+
+  // Dark-green header — mirrors ScreenHeader / profile header
+  header: {
+    paddingTop: 80,
+    paddingBottom: spacing.xxxl,
+    paddingHorizontal: spacing.xl,
     alignItems: 'center',
-    padding: 32,
+    gap: spacing.md,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
   },
-  icon: { fontSize: 40, marginBottom: 16 },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 8,
-    textAlign: 'center',
+  iconBubble: {
+    width: 60,
+    height: 60,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
-  message: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 28,
-    lineHeight: 20,
+  iconText: { fontSize: 28, lineHeight: 34 },
+  heading: { fontSize: 22, letterSpacing: -0.3, textAlign: 'center' },
+  sub: { fontSize: 13, textAlign: 'center' },
+
+  // Body
+  body: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
+    gap: spacing.lg,
   },
+  card: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: spacing.lg,
+    gap: spacing.smd,
+  },
+  errorLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8 },
+  errorMsg: { fontSize: 13, lineHeight: 20 },
+
+  // CTA button — lime/dark-green, matches primary buttons
   btn: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.sm,
+    paddingVertical: 15,
+    alignItems: 'center',
   },
-  btnText: { fontSize: 15, fontWeight: '700' },
+  btnText: { fontSize: 15 },
 });

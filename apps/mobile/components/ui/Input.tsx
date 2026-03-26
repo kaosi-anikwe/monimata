@@ -19,6 +19,7 @@
  *
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import React, { forwardRef, useState } from 'react';
 import {
   StyleProp,
@@ -151,10 +152,11 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             accessibilityLabel={secureVisible ? 'Hide password' : 'Show password'}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            {/* Uses a simple text toggle; replace with Ionicons in screens if preferred */}
-            <Text style={{ color: colors.textMeta, fontSize: 13 }}>
-              {secureVisible ? 'Hide' : 'Show'}
-            </Text>
+            <Ionicons
+              name={secureVisible ? 'eye-off-outline' : 'eye-outline'}
+              size={18}
+              color={colors.textMeta}
+            />
           </TouchableOpacity>
         ) : rightSlot ? (
           <View style={s.rightSlot}>{rightSlot}</View>

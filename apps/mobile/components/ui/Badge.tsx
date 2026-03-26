@@ -44,7 +44,7 @@ import { type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type BadgeVariant = 'success' | 'error' | 'warning' | 'info' | 'purple' | 'neutral';
+export type BadgeVariant = 'success' | 'error' | 'warning' | 'info' | 'purple' | 'neutral' | 'lime';
 export type BadgeSize = 'sm' | 'md' | 'lg';
 
 export interface BadgeProps {
@@ -97,6 +97,8 @@ function resolveColors(
     case 'neutral':
     default:
       return { bg: colors.surface, fg: colors.textSecondary };
+    case 'lime':
+      return { bg: colors.limeBadgeBg, fg: colors.lime };
   }
 }
 

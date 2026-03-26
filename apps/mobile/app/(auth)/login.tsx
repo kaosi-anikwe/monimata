@@ -20,10 +20,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -33,11 +31,12 @@ import {
 } from 'react-native';
 import { z } from 'zod';
 
+import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { ff } from '@/lib/typography';
 import { clearError, login } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { AuthHdr, AuthInput, BackBtn, EyeIcon, s } from './_authShared';
+import { AuthHdr, BackBtn, s } from './_authShared';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -50,7 +49,6 @@ export default function LoginScreen() {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((st) => st.auth);
   const colors = useTheme();
-  const [showPw, setShowPw] = useState(false);
   const { prefillEmail } = useLocalSearchParams<{ prefillEmail?: string }>();
 
   const {
@@ -100,74 +98,63 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          {/* Email */}
-          <View style={s.field}>
-            <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Email Address</Text>
+          <View style={{ gap: 14 }}>
+            {/* Email */}
             <Controller
               control={control}
               name="email"
               render={({ field: { value, onChange, onBlur } }) => (
-                <AuthInput
+                <Input
+                  label="Email Address"
                   value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
                   placeholder="adaeze@email.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  hasError={!!errors.email}
-                  colors={colors}
+                  error={errors.email?.message}
                 />
               )}
             />
-            {errors.email ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.email.message}</Text> : null}
-          </View>
 
-          {/* Password */}
-          <View style={s.field}>
-            <Text style={[s.fieldLbl, { color: colors.textSecondary }]}>Password</Text>
-            <View style={s.pwWrap}>
+            {/* Password */}
+            <View>
               <Controller
                 control={control}
                 name="password"
                 render={({ field: { value, onChange, onBlur } }) => (
-                  <AuthInput
+                  <Input
+                    label="Password"
                     value={value}
                     onChangeText={onChange}
                     onBlur={onBlur}
                     placeholder="Your password"
-                    secureTextEntry={!showPw}
-                    hasError={!!errors.password}
-                    colors={colors}
+                    secureTextEntry
+                    error={errors.password?.message}
                   />
                 )}
               />
-              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw((v) => !v)}>
-                <EyeIcon open={showPw} color={colors.textMeta} />
+              {/* Forgot password */}
+              <TouchableOpacity style={{ alignSelf: 'flex-end', marginTop: 6 }}>
+                <Text style={[s.forgot, { color: colors.textMeta }]}>
+                  Forgot password?{' '}
+                  <Text style={{ color: colors.brand, ...ff(600) }}>Reset</Text>
+                </Text>
               </TouchableOpacity>
             </View>
-            {errors.password ? <Text style={[s.fieldErr, { color: colors.error }]}>{errors.password.message}</Text> : null}
-            {/* Forgot password */}
-            <TouchableOpacity style={{ alignSelf: 'flex-end', marginTop: 6 }}>
-              <Text style={[s.forgot, { color: colors.textMeta }]}>
-                Forgot password?{' '}
-                <Text style={{ color: colors.brand, ...ff(600) }}>Reset</Text>
-              </Text>
-            </TouchableOpacity>
           </View>
 
           {/* Submit */}
-          <TouchableOpacity
-            style={[s.btnGreen, { backgroundColor: colors.brand }, loading && s.btnDisabled]}
+          <Button
+            variant="green"
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
-            accessibilityRole="button"
+            loading={loading}
+            style={{ marginTop: 8 }}
             accessibilityLabel="Log in to your account"
-            accessibilityState={{ disabled: loading, busy: loading }}
           >
-            {loading
-              ? <ActivityIndicator color={colors.white} />
-              : <Text style={[s.btnText, { color: colors.white }]}>Log In</Text>}
-          </TouchableOpacity>
+            Log In
+          </Button>
 
           {/* Sign-up link */}
           <TouchableOpacity onPress={() => router.replace('/(auth)/register')} style={s.navLink}>
