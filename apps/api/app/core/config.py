@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     INTERSWITCH_CLIENT_SECRET: str = ""
     INTERSWITCH_ENV: str = "sandbox"  # "sandbox" | "production"
 
+    # Our own Quickteller Business credentials — used exclusively for the
+    # Web Checkout Collections re-query (verify_web_payment).  All other
+    # Interswitch calls use the test credentials above (provided by ISW devs).
+    INTERSWITCH_OWN_CLIENT_ID: str = ""
+    INTERSWITCH_OWN_CLIENT_SECRET: str = ""
+
     INTERSWITCH_BASE_URL: str = (
         "https://api-marketplace-routing.k8.isw.la/marketplace-routing/api/v1"
     )

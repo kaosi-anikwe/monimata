@@ -48,6 +48,7 @@ from app.core.redis_client import get_redis
 logger = logging.getLogger(__name__)
 
 TOKEN_CACHE_KEY = "interswitch:access_token"
+TOKEN_CACHE_KEY_OWN = "interswitch:access_token:own"
 TOKEN_TTL_BUFFER_SECONDS = 60  # refresh 60 s before actual expiry
 
 
@@ -64,14 +65,40 @@ class InterswitchClient:
 
     # ── OAuth token ───────────────────────────────────────────────────────────
 
-    async def _get_access_token(self) -> str:
+    async def _get_access_token(self, *, own: bool = False) -> str:
+        """
+        Fetch (or return a cached) Interswitch OAuth 2.0 access token.
+
+        own=False (default): uses the ISW-developer-provided test credentials
+            (INTERSWITCH_CLIENT_ID / INTERSWITCH_CLIENT_SECRET).  Used for all
+            VAS calls: biller discovery, customer validation, bill payment advice.
+
+        own=True: uses our own Quickteller Business credentials
+            (INTERSWITCH_OWN_CLIENT_ID / INTERSWITCH_OWN_CLIENT_SECRET).  Used
+            exclusively for the Web Checkout Collections re-query
+            (verify_web_payment), which must be authenticated as the merchant
+            that originally created the checkout transaction.
+
+        Each credential set is cached under a separate Redis key so the two
+        tokens never overwrite each other.
+        """
+        cache_key = TOKEN_CACHE_KEY_OWN if own else TOKEN_CACHE_KEY
+        client_id = (
+            settings.INTERSWITCH_OWN_CLIENT_ID if own else settings.INTERSWITCH_CLIENT_ID
+        )
+        client_secret = (
+            settings.INTERSWITCH_OWN_CLIENT_SECRET
+            if own
+            else settings.INTERSWITCH_CLIENT_SECRET
+        )
+
         r = get_redis()
-        cached = cast(str | None, r.get(TOKEN_CACHE_KEY))
+        cached = cast(str | None, r.get(cache_key))
         if cached:
             return cached if isinstance(cached, str) else cached.decode()
 
         credentials = base64.b64encode(
-            f"{settings.INTERSWITCH_CLIENT_ID}:{settings.INTERSWITCH_CLIENT_SECRET}".encode()
+            f"{client_id}:{client_secret}".encode()
         ).decode()
 
         async with self._client() as http:
@@ -89,7 +116,7 @@ class InterswitchClient:
         access_token: str = data["access_token"]
         expires_in: int = int(data.get("expires_in", 3600))
         ttl = max(expires_in - TOKEN_TTL_BUFFER_SECONDS, 30)
-        r.setex(TOKEN_CACHE_KEY, timedelta(seconds=ttl), access_token)
+        r.setex(cache_key, timedelta(seconds=ttl), access_token)
         return access_token
 
     def _headers(
@@ -192,10 +219,12 @@ class InterswitchClient:
             "customers": [{"PaymentCode": payment_code, "CustomerId": customer_id}],
             "TerminalId": settings.INTERSWITCH_TERMINAL_ID,
         }
+        headers = self._headers(token)
+        headers["terminalId"] = settings.INTERSWITCH_TERMINAL_ID
         async with self._client() as http:
             response = await http.post(
                 f"{self._qt}/Transactions/validatecustomers",
-                headers=self._headers(token),
+                headers=headers,
                 json=payload,
             )
             response.raise_for_status()
@@ -319,8 +348,12 @@ class InterswitchClient:
 
         Returns the raw ISW response dict.  Callers should check
         result["ResponseCode"] == "00" for success.
+
+        Uses our own Quickteller Business credentials (own=True) because the
+        Collections API authenticates against the merchant that created the
+        original Web Checkout transaction — not the ISW test credentials.
         """
-        token = await self._get_access_token()
+        token = await self._get_access_token(own=True)
         collections_base = settings.INTERSWITCH_COLLECTIONS_URL.rstrip("/")
         async with self._client() as http:
             response = await http.get(
