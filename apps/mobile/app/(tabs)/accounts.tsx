@@ -34,7 +34,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/components/Toast';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
@@ -665,7 +664,7 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
-function AccountsContent() {
+export default function AccountsScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { confirm } = useToast();
@@ -908,14 +907,6 @@ function AccountsContent() {
         onDelete={() => moreAccount && handleDelete(moreAccount)}
       />
     </View>
-  );
-}
-
-export default function AccountsScreen() {
-  return (
-    <ErrorBoundary>
-      <AccountsContent />
-    </ErrorBoundary>
   );
 }
 

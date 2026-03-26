@@ -58,6 +58,7 @@ class NudgeSettingsUpdate(BaseModel):
         description="HH:MM format, e.g. '07:00'",
     )
     fatigue_limit: int | None = Field(None, ge=1, le=10)
+    language: str | None = Field(None, pattern=r"^(pidgin|formal)$")
 
 
 class NudgeSettingsResponse(BaseModel):
@@ -65,6 +66,7 @@ class NudgeSettingsResponse(BaseModel):
     quiet_hours_start: str
     quiet_hours_end: str
     fatigue_limit: int
+    language: str
 
 
 class RegisterDeviceRequest(BaseModel):

@@ -179,6 +179,21 @@ export const restoreSession = createAsyncThunk('auth/restoreSession', async (_, 
     }
 });
 
+export const markOnboardedThunk = createAsyncThunk(
+    'auth/markOnboarded',
+    async (_, { rejectWithValue }) => {
+        try {
+            const { data } = await api.patch('/auth/me', { onboarded: true });
+            return data as AuthUser;
+        } catch (err: unknown) {
+            if (isAxiosError(err)) {
+                return rejectWithValue(err.response?.data?.detail ?? 'Failed to update onboarding status');
+            }
+            return rejectWithValue('Failed to update onboarding status');
+        }
+    },
+);
+
 export const verifyBVN = createAsyncThunk(
     'auth/verifyBVN',
     async (bvn: string, { rejectWithValue }) => {
@@ -207,11 +222,6 @@ const authSlice = createSlice({
         },
         clearError(state) {
             state.error = null;
-        },
-        /** Called by budget-seed when the user taps "Let's start budgeting!".
-         *  Sets user.onboarded = true so the root navigator switches to (tabs). */
-        markOnboarded(state) {
-            if (state.user) state.user.onboarded = true;
         },
     },
     extraReducers: (builder) => {
@@ -249,9 +259,13 @@ const authSlice = createSlice({
                 state.loading = false;
                 if (state.user) state.user.identity_verified = true;
             })
-            .addCase(verifyBVN.rejected, setError);
+            .addCase(verifyBVN.rejected, setError)
+            .addCase(markOnboardedThunk.pending, setLoading)
+            .addCase(markOnboardedThunk.fulfilled, setUser)
+            .addCase(markOnboardedThunk.rejected, setError);
     },
 });
 
-export const { clearAuth, clearError, markOnboarded } = authSlice.actions;
+export const { clearAuth, clearError } = authSlice.actions;
+export const markOnboarded = markOnboardedThunk;
 export default authSlice.reducer;

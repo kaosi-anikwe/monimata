@@ -131,6 +131,7 @@ def get_settings(
         quiet_hours_start=ns.get("quiet_hours_start", "23:00"),
         quiet_hours_end=ns.get("quiet_hours_end", "07:00"),
         fatigue_limit=int(ns.get("fatigue_limit", 3)),
+        language=ns.get("language", "pidgin"),
     )
 
 
@@ -153,6 +154,8 @@ def update_settings(
         ns["quiet_hours_end"] = body.quiet_hours_end
     if body.fatigue_limit is not None:
         ns["fatigue_limit"] = body.fatigue_limit
+    if body.language is not None:
+        ns["language"] = body.language
 
     current_user.nudge_settings = ns
     db.add(current_user)
@@ -162,6 +165,7 @@ def update_settings(
         quiet_hours_start=ns.get("quiet_hours_start", "23:00"),
         quiet_hours_end=ns.get("quiet_hours_end", "07:00"),
         fatigue_limit=int(ns.get("fatigue_limit", 3)),
+        language=ns.get("language", "pidgin"),
     )
 
 

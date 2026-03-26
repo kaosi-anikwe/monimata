@@ -363,7 +363,14 @@ export default function TransactionsScreen() {
     let result = allTx;
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter((tx) => tx.narration.toLowerCase().includes(q));
+      result = result.filter((tx) => {
+        if (tx.narration.toLowerCase().includes(q)) return true;
+        if (tx.memo?.toLowerCase().includes(q)) return true;
+        // Match amount: strip currency symbols/commas and compare against kobo or naira string
+        const absNaira = (Math.abs(tx.amount) / 100).toFixed(2);
+        if (absNaira.includes(q) || String(Math.abs(tx.amount)).includes(q)) return true;
+        return false;
+      });
     }
     if (activeFilter === 'uncategorised') {
       result = result.filter((tx) => !tx.category_id);
@@ -386,7 +393,7 @@ export default function TransactionsScreen() {
     }
     return Array.from(map.entries()).map(([day, txs]) => ({
       day,
-      net: txs.reduce((sum, t) => sum + (t.type === 'credit' ? t.amount : -t.amount), 0),
+      net: txs.reduce((sum, t) => sum + t.amount, 0),
       txs,
     }));
   }, [filteredTx]);

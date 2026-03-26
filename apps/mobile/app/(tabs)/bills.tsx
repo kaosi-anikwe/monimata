@@ -46,7 +46,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/components/Toast';
 import { useAccounts } from '@/hooks/useAccounts';
 import {
@@ -60,7 +59,7 @@ import {
 } from '@/hooks/useBills';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useTheme } from '@/lib/theme';
-import { radius, shadow, spacing } from '@/lib/tokens';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
 import type {
@@ -723,8 +722,9 @@ function ReceiptStep({
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-function BillsContent() {
+export default function BillsScreen() {
   const colors = useTheme();
+  const insets = useSafeAreaInsets()
 
   // ── Step state ──
   const [step, setStep] = useState<BillStep>('categories');
@@ -760,6 +760,8 @@ function BillsContent() {
   const validateMutation = useValidateCustomer();
   const payMutation = usePayBill();
   const { error } = useToast();
+
+  const bottomPad = layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.lg;
 
   // Auto-select first account when accounts load
   useEffect(() => {
@@ -860,8 +862,11 @@ function BillsContent() {
           setValidationResult(result);
           setStep('confirm');
         },
-        onError: () => {
-          error('Validation Error', 'Could not validate at this time. Please try again.');
+        onError: (err: unknown) => {
+          const message =
+            (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+            'Could not validate at this time. Please try again.';
+          error('Validation Error', message);
         },
       },
     );
@@ -1032,7 +1037,7 @@ function BillsContent() {
             <View style={[ss.contextChip, { backgroundColor: colors.surfaceElevated }]}>
               <Ionicons name="business-outline" size={14} color={colors.brand} />
               <Text style={[ss.contextChipText, { color: colors.textSecondary }]}>
-                {selectedBiller?.name} \u00b7 {selectedItem?.name}
+                {selectedBiller?.name} {"\u00b7"} {selectedItem?.name}
               </Text>
             </View>
 
@@ -1262,7 +1267,7 @@ function BillsContent() {
       ) : loadingCategories ? (
         <ActivityIndicator style={ss.loader} color={colors.brand} />
       ) : (
-        <ScrollView contentContainerStyle={ss.categoriesScrollContent}>
+        <ScrollView contentContainerStyle={{ paddingBottom: bottomPad }}>
           {/* All Categories label */}
           <View style={ss.sectionLabelRow}>
             <Text style={[ss.sectionLabel, { color: colors.textSecondary }]}>
@@ -1327,16 +1332,6 @@ function BillsContent() {
         </ScrollView>
       )}
     </View>
-  );
-}
-
-// ─── Exports ──────────────────────────────────────────────────────────────────
-
-export default function BillsScreen() {
-  return (
-    <ErrorBoundary>
-      <BillsContent />
-    </ErrorBoundary>
   );
 }
 
@@ -1431,7 +1426,6 @@ const ss = StyleSheet.create({
   },
 
   // ── Categories grid ────────────────────────────────────────────────────────
-  categoriesScrollContent: { paddingBottom: 48 },
   sectionLabelRow: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.mdn,

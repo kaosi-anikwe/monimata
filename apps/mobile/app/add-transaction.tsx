@@ -21,6 +21,7 @@
  */
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
+import * as Haptics from "expo-haptics"
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -112,7 +113,7 @@ function TypeToggle({
       )}
       <TouchableOpacity
         style={ss.typeBtn}
-        onPress={() => onChange('debit')}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onChange('debit') }}
         accessibilityRole="radio"
         accessibilityState={{ checked: isDebit }}
         accessibilityLabel="Debit"
@@ -121,7 +122,7 @@ function TypeToggle({
       </TouchableOpacity>
       <TouchableOpacity
         style={ss.typeBtn}
-        onPress={() => onChange('credit')}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onChange('credit') }}
         accessibilityRole="radio"
         accessibilityState={{ checked: !isDebit }}
         accessibilityLabel="Credit"
@@ -139,6 +140,7 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
   const keyStyle = [ss.numKey, { backgroundColor: colors.white }];
   const K = (v: string) => (
     <TouchableOpacity key={v} style={keyStyle} onPress={() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (value === '0') { onChange(v); return; }
       onChange(value + v);
     }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel={v}>
