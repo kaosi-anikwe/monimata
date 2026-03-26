@@ -18,7 +18,7 @@
  * Profile tab — user card, gamification stats, settings links, and log-out.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -36,7 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBiometricLock } from '@/hooks/useBiometricLock';
-import { useNudgeUnreadCount } from '@/hooks/useNudges';
+import { useNudgeSettings, useNudgeUnreadCount, useUpdateNudgeSettings } from '@/hooks/useNudges';
 import { useTheme, useThemePreference } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
@@ -125,8 +125,13 @@ export default function ProfileScreen() {
   const { isEnrolled, isEnabled: biometricEnabled, toggleEnabled: toggleBiometric } = useBiometricLock();
 
   const { isDark, setIsDark } = useThemePreference();
-  // Nudge language preference (visual only — wired in Phase 16)
-  const [nudgeLang, setNudgeLang] = useState<'pidgin' | 'formal'>('pidgin');
+  const { data: nudgeSettings } = useNudgeSettings();
+  const updateNudgeSettings = useUpdateNudgeSettings();
+  const nudgeLang = nudgeSettings?.language ?? 'pidgin';
+
+  function setNudgeLang(lang: 'pidgin' | 'formal') {
+    updateNudgeSettings.mutate({ language: lang });
+  }
 
   const netWorth = useMemo(
     () => (accounts ?? []).filter((a) => a.is_active).reduce((s, a) => s + a.balance, 0),
@@ -254,72 +259,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── Activity section ──────────────────────────────────────────── */}
-        <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Activity</Text>
-        <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
-          <ProfileRow
-            iconBg={colors.warningSubtle}
-            iconColor={colors.warning}
-            icon="star-outline"
-            label="Rewards & XP"
-            sub={`Level ${FAKE_LEVEL} · ${FAKE_XP.toLocaleString()} XP · ${FAKE_XP_TO_NEXT.toLocaleString()} to Level ${FAKE_LEVEL + 1}`}
-            onPress={() => router.push('/(tabs)/rewards')}
-            colors={colors}
-          />
-          <ProfileRow
-            iconBg={colors.warningSubtle}
-            iconColor={colors.warning}
-            icon="stats-chart-outline"
-            label="Leaderboard"
-            sub="See how you rank this week"
-            onPress={() => comingSoon('Leaderboard')}
-            colors={colors}
-          />
-          <ProfileRow
-            iconBg={colors.errorSubtle}
-            iconColor={colors.error}
-            icon="notifications-outline"
-            label="Nudges"
-            sub="AI-powered spending alerts"
-            onPress={() => router.push('/(tabs)/nudges')}
-            rightBadge={
-              nudgeUnread > 0 ? (
-                <View style={[ss.pill, { backgroundColor: colors.errorSubtle }]}>
-                  <Text style={[ss.pillText, { color: colors.error, ...ff(700) }]}>
-                    {nudgeUnread > 99 ? '99+' : nudgeUnread} new
-                  </Text>
-                </View>
-              ) : undefined
-            }
-            isLast
-            colors={colors}
-          />
-        </View>
-
-        {/* ── Learn & Reports section ──────────────────────────────────── */}
-        <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Learn & Reports</Text>
-        <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
-          <ProfileRow
-            iconBg={colors.infoSubtle}
-            iconColor={colors.info}
-            icon="book-outline"
-            label="Knowledge Hub"
-            sub="Articles, courses, quizzes"
-            onPress={() => router.push('/(tabs)/hub')}
-            colors={colors}
-          />
-          <ProfileRow
-            iconBg={colors.purpleSubtle}
-            iconColor={colors.purple}
-            icon="bar-chart-outline"
-            label="Reports"
-            sub="Spending, income, and net worth"
-            onPress={() => comingSoon('Reports')}
-            isLast
-            colors={colors}
-          />
-        </View>
-
         {/* ── Account & Security section ───────────────────────────────── */}
         <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Account & Security</Text>
         <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
@@ -401,6 +340,72 @@ export default function ProfileScreen() {
           {!isEnrolled && (
             <View style={ss.profRowLast} />
           )}
+        </View>
+
+        {/* ── Activity section ──────────────────────────────────────────── */}
+        <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Activity</Text>
+        <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+          <ProfileRow
+            iconBg={colors.warningSubtle}
+            iconColor={colors.warning}
+            icon="star-outline"
+            label="Rewards & XP"
+            sub={`Level ${FAKE_LEVEL} · ${FAKE_XP.toLocaleString()} XP · ${FAKE_XP_TO_NEXT.toLocaleString()} to Level ${FAKE_LEVEL + 1}`}
+            onPress={() => router.push('/(tabs)/rewards')}
+            colors={colors}
+          />
+          <ProfileRow
+            iconBg={colors.warningSubtle}
+            iconColor={colors.warning}
+            icon="stats-chart-outline"
+            label="Leaderboard"
+            sub="See how you rank this week"
+            onPress={() => comingSoon('Leaderboard')}
+            colors={colors}
+          />
+          <ProfileRow
+            iconBg={colors.errorSubtle}
+            iconColor={colors.error}
+            icon="notifications-outline"
+            label="Nudges"
+            sub="AI-powered spending alerts"
+            onPress={() => router.push('/(tabs)/nudges')}
+            rightBadge={
+              nudgeUnread > 0 ? (
+                <View style={[ss.pill, { backgroundColor: colors.errorSubtle }]}>
+                  <Text style={[ss.pillText, { color: colors.error, ...ff(700) }]}>
+                    {nudgeUnread > 99 ? '99+' : nudgeUnread} new
+                  </Text>
+                </View>
+              ) : undefined
+            }
+            isLast
+            colors={colors}
+          />
+        </View>
+
+        {/* ── Learn & Reports section ──────────────────────────────────── */}
+        <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(700) }]}>Learn & Reports</Text>
+        <View style={[ss.menu, { backgroundColor: colors.white, borderColor: colors.border, ...shadow.sm }]}>
+          <ProfileRow
+            iconBg={colors.infoSubtle}
+            iconColor={colors.info}
+            icon="book-outline"
+            label="Knowledge Hub"
+            sub="Articles, courses, quizzes"
+            onPress={() => router.push('/(tabs)/hub')}
+            colors={colors}
+          />
+          <ProfileRow
+            iconBg={colors.purpleSubtle}
+            iconColor={colors.purple}
+            icon="bar-chart-outline"
+            label="Reports"
+            sub="Spending, income, and net worth"
+            onPress={() => comingSoon('Reports')}
+            isLast
+            colors={colors}
+          />
         </View>
 
         {/* ── Preferences section ──────────────────────────────────────── */}

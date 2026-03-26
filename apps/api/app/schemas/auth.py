@@ -45,6 +45,14 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class UpdateProfileRequest(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    email: EmailStr | None = None
+    onboarded: bool | None = None
+
+
 class BVNVerifyRequest(BaseModel):
     bvn: str
 
@@ -68,6 +76,7 @@ class TokenResponse(BaseModel):
 
 class AccessTokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
 
 

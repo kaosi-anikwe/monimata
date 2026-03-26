@@ -103,6 +103,7 @@ export interface NudgeSettings {
   quiet_hours_start: string; // HH:MM
   quiet_hours_end: string;   // HH:MM
   fatigue_limit: number;
+  language: 'pidgin' | 'formal';
 }
 
 export interface NudgeSettingsUpdate {
@@ -110,4 +111,5 @@ export interface NudgeSettingsUpdate {
   quiet_hours_start?: string;
   quiet_hours_end?: string;
   fatigue_limit?: number;
+  language?: 'pidgin' | 'formal';
 }

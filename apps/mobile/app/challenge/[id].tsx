@@ -18,8 +18,6 @@
  * Challenge Detail screen — gradient hero, progress, leaderboard, rules, CTA.
  *
  * Route: /challenge/[id]  (Expo Router dynamic segment)
- * Phase 14 — all data is static seed matched to the seed in rewards.tsx.
- * Phase 16 will fetch `/gamification/challenges/:id` and wire join/leave mutations.
  */
 
 import { Ionicons } from '@expo/vector-icons';

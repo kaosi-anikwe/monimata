@@ -153,8 +153,10 @@ api.interceptors.response.use(
             });
 
             const newAccess: string = data.access_token;
+            const newRefresh: string = data.refresh_token;
             _cachedAccessToken = newAccess; // keep memory cache in sync
             await SecureStore.setItemAsync(SECURE_KEYS.ACCESS_TOKEN, newAccess);
+            await SecureStore.setItemAsync(SECURE_KEYS.REFRESH_TOKEN, newRefresh);
             processQueue(null, newAccess);
             originalRequest.headers.Authorization = `Bearer ${newAccess}`;
             return api(originalRequest);

@@ -55,6 +55,7 @@ from app.schemas.auth import (
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
+    UpdateProfileRequest,
     UserResponse,
 )
 from app.services.budget_logic import seed_default_categories
@@ -175,7 +176,7 @@ async def refresh_token(
     store_refresh_token(user.id, new_refresh)
 
     access_token = create_access_token(subject=user.id)
-    return AccessTokenResponse(access_token=access_token)
+    return AccessTokenResponse(access_token=access_token, refresh_token=new_refresh)
 
 
 # ── POST /auth/logout ─────────────────────────────────────────────────────────
@@ -213,6 +214,40 @@ async def logout(
 
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: User = Depends(get_current_user)) -> User:
+    return current_user
+
+
+# ── PATCH /auth/me ───────────────────────────────────────────────────────────
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_profile(
+    payload: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """Update mutable profile fields. Only provided (non-None) fields are changed."""
+    if payload.first_name is not None:
+        current_user.first_name = payload.first_name
+    if payload.last_name is not None:
+        current_user.last_name = payload.last_name
+    if payload.phone is not None:
+        current_user.phone = payload.phone
+    if payload.onboarded is not None:
+        current_user.onboarded = payload.onboarded
+    if payload.email is not None:
+        new_email = payload.email.lower()
+        if new_email != current_user.email:
+            existing = db.query(User).filter(User.email == new_email).first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Email already in use",
+                )
+            current_user.email = new_email
+
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

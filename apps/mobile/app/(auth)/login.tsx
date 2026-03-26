@@ -18,7 +18,7 @@
  * Login screen.
  */
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -51,6 +51,7 @@ export default function LoginScreen() {
   const { loading, error } = useAppSelector((st) => st.auth);
   const colors = useTheme();
   const [showPw, setShowPw] = useState(false);
+  const { prefillEmail } = useLocalSearchParams<{ prefillEmail?: string }>();
 
   const {
     control,
@@ -58,7 +59,7 @@ export default function LoginScreen() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: prefillEmail ?? '', password: '' },
   });
 
   async function onSubmit(data: FormValues) {

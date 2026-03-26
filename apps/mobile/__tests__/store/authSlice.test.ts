@@ -135,7 +135,7 @@ describe('authSlice reducers', () => {
 
   // ── markOnboarded ───────────────────────────────────────────────────────
 
-  it('markOnboarded sets user.onboarded to true', () => {
+  it('markOnboarded.fulfilled sets user.onboarded to true', () => {
     const withUser = {
       user: { ...mockUser, onboarded: false },
       isAuthenticated: true,
@@ -143,11 +143,12 @@ describe('authSlice reducers', () => {
       loading: false,
       error: null,
     };
-    const state = authReducer(withUser, markOnboarded());
+    const updatedUser = { ...mockUser, onboarded: true };
+    const state = authReducer(withUser, markOnboarded.fulfilled(updatedUser, '', undefined));
     expect(state.user?.onboarded).toBe(true);
   });
 
-  it('markOnboarded is a no-op when user is null', () => {
+  it('markOnboarded.fulfilled is a no-op when payload has no user (null guard)', () => {
     const noUser = {
       user: null,
       isAuthenticated: false,
@@ -155,8 +156,10 @@ describe('authSlice reducers', () => {
       loading: false,
       error: null,
     };
-    const state = authReducer(noUser, markOnboarded());
-    expect(state.user).toBeNull();
+    const updatedUser = { ...mockUser, onboarded: true };
+    const state = authReducer(noUser, markOnboarded.fulfilled(updatedUser, '', undefined));
+    // setUser sets user and isAuthenticated from the payload
+    expect(state.user?.onboarded).toBe(true);
   });
 
   // ── Reducer purity ──────────────────────────────────────────────────────

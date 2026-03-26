@@ -39,6 +39,7 @@ DEFAULT_NUDGE_SETTINGS = {
     "quiet_hours_end": "07:00",
     "fatigue_limit": 3,
     "enabled": True,
+    "language": "pidgin",
 }
 
 

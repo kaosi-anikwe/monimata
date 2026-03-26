@@ -32,7 +32,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -41,6 +41,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 
 import { AppLockScreen } from '@/components/AppLockScreen';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastProvider } from '@/components/Toast';
 import { initDatabase } from '@/database';
 import { syncDatabase } from '@/database/sync';
@@ -62,10 +63,6 @@ import { Database } from '@nozbe/watermelondb';
 // Initialise Sentry before the app renders so the first frame is covered.
 initSentry();
 
-// Register the logout handler for the API interceptor. This breaks the circular
-// dependency api.ts → store → authSlice → api.ts by wiring the callback here,
-// after both modules are fully initialised.
-setLogoutHandler(() => store.dispatch(clearAuth()));
 
 // Database is initialised lazily inside RootLayout (in the useEffect that runs
 // before <DatabaseProvider> renders). initDatabase() generates/retrieves the
@@ -84,6 +81,17 @@ function RootNavigator() {
   const dispatch = useAppDispatch();
   const { isAuthenticated, loading, isInitialised, user } = useAppSelector((s) => s.auth);
   const appState = useRef<AppStateStatus>(AppState.currentState);
+  const router = useRouter();
+
+  // Register the logout handler here (inside the component) so it:
+  // a) survives Fast Refresh re-evaluations of api.ts, and
+  // b) has access to router.replace for a guaranteed imperative navigation.
+  useEffect(() => {
+    setLogoutHandler(() => {
+      store.dispatch(clearAuth());
+      router.replace('/(auth)');
+    });
+  }, [router]);
 
   // Register for push notifications and send device token to backend
   const { showPrePrompt, handleAllow, handleDismiss } = usePushNotifications();
@@ -329,7 +337,9 @@ function RootLayout() {
             <DatabaseProvider database={db}>
               <SafeAreaProvider>
                 <ToastProvider>
-                  <RootNavigator />
+                  <ErrorBoundary>
+                    <RootNavigator />
+                  </ErrorBoundary>
                 </ToastProvider>
               </SafeAreaProvider>
             </DatabaseProvider>
