@@ -43,7 +43,7 @@ interface TourTargetProps {
 }
 
 export function TourTarget({ id, children }: TourTargetProps) {
-  const { activeTargetId, reportRect, notifyTargetMounted, registerTarget, unregisterTarget } = useTourContext();
+  const { activeTargetId, activeStepDelayMs, reportRect, notifyTargetMounted, registerTarget, unregisterTarget } = useTourContext();
   const ref = useRef<View>(null);
   // Track whether the native layout pass has run at least once.
   const hasLayoutRef = useRef(false);
@@ -91,13 +91,17 @@ export function TourTarget({ id, children }: TourTargetProps) {
   useEffect(() => {
     if (!isActive) return;
     if (hasLayoutRef.current) {
-      // View is already laid out — one animation frame is enough for the
-      // native bridge to have the latest geometry ready.
+      // If the step requested a delay (e.g. to let a scroll commit on the
+      // native side before measuring), honour it; otherwise one RAF is enough.
+      if (activeStepDelayMs > 0) {
+        const t = setTimeout(measure, activeStepDelayMs);
+        return () => clearTimeout(t);
+      }
       const raf = requestAnimationFrame(measure);
       return () => cancelAnimationFrame(raf);
     }
     // No layout yet — handleLayout will trigger the measure once it fires.
-  }, [isActive, measure]);
+  }, [isActive, activeStepDelayMs, measure]);
 
   return (
     <View ref={ref} collapsable={false} onLayout={handleLayout}>

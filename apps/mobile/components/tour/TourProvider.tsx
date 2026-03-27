@@ -71,6 +71,12 @@ export interface TourStep {
    * the tooltip is centred with a "not visible right now" notice.
    */
   fallbackFullscreen?: boolean;
+  /**
+   * Delay in ms before calling measureInWindow for this step. Useful when the
+   * screen needs to scroll into view first — set this to give the native scroll
+   * commit time to complete before the spotlight position is measured.
+   */
+  delayMeasureMs?: number;
 }
 
 export interface TargetRect {
@@ -98,6 +104,8 @@ interface TourContextValue {
    *  persisted deferred steps from a previous visit. Each step will be shown
    *  the next time its TourTarget mounts on screen. */
   queueDeferred: (steps: TourStep[]) => void;
+  /** Delay (ms) for measureInWindow on the current active step. 0 when not set. */
+  activeStepDelayMs: number;
   /** Called by TourTarget on layout when no tour is active — triggers a
    *  deferred mini-tour if this id was queued. */
   notifyTargetMounted: (id: string) => void;
@@ -115,6 +123,7 @@ export const TourContext = createContext<TourContextValue>({
   next: () => { },
   skip: () => { },
   queueDeferred: () => { },
+  activeStepDelayMs: 0,
   notifyTargetMounted: () => { },
   registerTarget: () => { },
   unregisterTarget: () => { },
@@ -316,6 +325,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   }, [rect, insets, spotX, spotY, spotW, spotH]);
 
   const activeTargetId = activeTour ? activeTour[stepIndex]?.targetId ?? null : null;
+  const activeStepDelayMs = activeTour ? (activeTour[stepIndex]?.delayMeasureMs ?? 0) : 0;
 
   // Shared advance logic — used by the Next / Finish button.
   const advanceStep = useCallback(() => {
@@ -444,7 +454,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   }, [startTour]);
 
   return (
-    <TourContext.Provider value={{ activeTargetId, reportRect, startTour, next, skip, queueDeferred, notifyTargetMounted, registerTarget, unregisterTarget }}>
+    <TourContext.Provider value={{ activeTargetId, activeStepDelayMs, reportRect, startTour, next, skip, queueDeferred, notifyTargetMounted, registerTarget, unregisterTarget }}>
       {children}
 
       {/* Overlay — rendered as a transparent Modal to sit above all navigation */}

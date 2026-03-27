@@ -26,7 +26,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ProgressBar } from '@/components/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -47,7 +47,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { ff, formatMoney } from '@/lib/typography';
 import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
 import { useDismissNudge, useNudgeUnreadCount, useNudges } from '@/hooks/useNudges';
-import { TourTarget, useTour, type TourStep } from '@/components/tour';
+import { TourTarget, useTour, useTourContext, type TourStep } from '@/components/tour';
 import { releasePrompt } from '@/lib/notifPromptBridge';
 import { onWelcomeDone } from '@/lib/welcomeBridge';
 
@@ -82,11 +82,19 @@ const HOME_TOUR: TourStep[] = [
     fallbackFullscreen: true,
   },
   {
+    targetId: 'home-nudge-pill',
+    title: 'Spending nudges',
+    body: 'MoniMata watches your budget and surfaces smart alerts here — in Pidgin or Formal English. Tap the pill to act on it, or head to the Nudges tab to see all of them.',
+    tooltipSide: 'below',
+    fallbackFullscreen: true,
+  },
+  {
     targetId: 'home-first-goal',
     title: 'Track your goals',
     body: 'Categories with a custom savings deadline appear here. You can see progress at a glance and tap to adjust the target.',
     tooltipSide: 'above',
     fallbackFullscreen: true,
+    delayMeasureMs: 150,
   },
 ];
 
@@ -125,6 +133,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAppSelector((st) => st.auth.user);
   const startTourIfUnseen = useTour();
+  const { activeTargetId } = useTourContext();
+  const scrollRef = useRef<ScrollView>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -135,6 +145,16 @@ export default function HomeScreen() {
       });
     }, [startTourIfUnseen]),
   );
+
+  // Scroll the goals section into view (instantly) the moment the tour step
+  // targeting it becomes active. scrollToEnd with animated:false is synchronous
+  // on the JS side; the 150ms delayMeasureMs on the step gives the native layer
+  // time to commit before measureInWindow fires.
+  useEffect(() => {
+    if (activeTargetId === 'home-first-goal') {
+      scrollRef.current?.scrollToEnd({ animated: false });
+    }
+  }, [activeTargetId]);
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const currentMonth = useMemo(getCurrentMonth, []);
@@ -312,6 +332,7 @@ export default function HomeScreen() {
 
       {/* ── Scrollable body ───────────────────────────────────────────────── */}
       <ScrollView
+        ref={scrollRef}
         style={s.scroll}
         contentContainerStyle={{ paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
@@ -364,31 +385,33 @@ export default function HomeScreen() {
         {/* Nudge pill — first unread nudge */}
         {firstNudge ? (
           <View style={s.sec}>
-            <TouchableOpacity
-              style={[s.nudgePill, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorderLight }]}
-              onPress={() => router.push('/(tabs)/nudges')}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="View nudge"
-            >
-              <Ionicons name="bulb-outline" size={15} color={colors.warning} style={{ marginTop: 1, flexShrink: 0 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={[s.nudgeTxt, { color: colors.warningText }]} numberOfLines={2}>
-                  {firstNudge.title
-                    ? <Text style={ff(700)}>{firstNudge.title}: </Text>
-                    : null}
-                  {firstNudge.message}
-                </Text>
-              </View>
+            <TourTarget id="home-nudge-pill">
               <TouchableOpacity
-                onPress={() => dismissNudge.mutate(firstNudge.id)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={[s.nudgePill, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorderLight }]}
+                onPress={() => router.push('/(tabs)/nudges')}
+                activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel="Dismiss nudge"
+                accessibilityLabel="View nudge"
               >
-                <Ionicons name="close-outline" size={18} color={colors.warning} />
+                <Ionicons name="bulb-outline" size={15} color={colors.warning} style={{ marginTop: 1, flexShrink: 0 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.nudgeTxt, { color: colors.warningText }]} numberOfLines={2}>
+                    {firstNudge.title
+                      ? <Text style={ff(700)}>{firstNudge.title}: </Text>
+                      : null}
+                    {firstNudge.message}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => dismissNudge.mutate(firstNudge.id)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss nudge"
+                >
+                  <Ionicons name="close-outline" size={18} color={colors.warning} />
+                </TouchableOpacity>
               </TouchableOpacity>
-            </TouchableOpacity>
+            </TourTarget>
           </View>
         ) : null}
 

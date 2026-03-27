@@ -177,6 +177,7 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
       style={[
         s.container,
         {
+          height: layout.tabBarHeight + bottomPad,
           paddingBottom: bottomPad,
           backgroundColor: colors.cardBg,
           borderTopColor: colors.border,
@@ -232,7 +233,6 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: layout.tabBarHeight,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
 
