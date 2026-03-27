@@ -50,7 +50,7 @@ from __future__ import annotations
 import argparse
 import sys
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 # ── Bootstrap path so the script can import from apps/api/app ────────────────
 # Works when run from repo root:  python scripts/create_demo_account.py ...
@@ -95,6 +95,8 @@ def main() -> None:
     from app.models.budget import BudgetMonth
     from app.models.nudge import Nudge
     from app.models.category import Category
+    from app.models.target import CategoryTarget
+    from app.models.recurring_rule import RecurringRule
     from app.services.budget_logic import (
         seed_default_categories,
     )
@@ -156,6 +158,20 @@ def main() -> None:
             currency="NGN",
         )
         db.add(account)
+
+        # Second account — Kuda savings (demonstrates multi-account view)
+        account2 = BankAccount(
+            user_id=str(user.id),
+            institution="Kuda",
+            account_name=f"{args.first_name} {args.last_name}",
+            alias="Kuda Savings",
+            account_number=None,
+            account_type="SAVINGS",
+            balance=8_500_000,  # ₦85,000 in kobo
+            is_manual=True,
+            currency="NGN",
+        )
+        db.add(account2)
         db.flush()
 
         # ── Seed transactions ─────────────────────────────────────────────────
@@ -186,36 +202,44 @@ def main() -> None:
         tx("TRANSFER FROM KUDA",               2_500_000,  "credit", 20)  # ₦25,000
         tx("FREELANCE PAYMENT - DESIGNWORK",   5_000_000,  "credit",  5)  # ₦50,000
 
-        # Debits
+        # Debits — Food & Groceries (₦485 spend vs ₦580 budget = 83.6% → fires threshold_80)
         tx("SHOPRITE LEKKI",             -18_000,  "debit",  2, "Food & Groceries")
+        tx("UBER EATS",                   -8_500,  "debit",  7, "Food & Groceries")
+        tx("GROCERY PALACE IKEJA",       -22_000,  "debit", 14, "Food & Groceries")
+
+        # Debits — Transport (₦43 spend vs ₦30 budget = 143% → fires threshold_100)
         tx("BOLT RIDE",                   -2_500,  "debit",  3, "Transport")
+        tx("BOLT RIDE",                   -1_800,  "debit", 12, "Transport")
+
+        # Debits — other categories
         tx("MTN AIRTIME TOP-UP",          -5_000,  "debit",  4, "Airtime & Data")
         tx("DSTV SUBSCRIPTION",          -29_000,  "debit",  5, "Subscriptions")
-        tx("UBER EATS",                   -8_500,  "debit",  7, "Food & Groceries")
         tx("POS - EVERYDAY PHARMACY",    -12_000,  "debit",  8, "Health & Pharmacy")
         tx("COWRYWISE INVESTMENT",        -50_000,  "debit",  9, "Investments")
         tx("RENTS - APRIL 2026",       -9_000_000,  "debit", 10, "Rent / Housing")
         tx("EKEDC POSTPAID",             -15_000,  "debit", 11, "Electricity (NEPA)")
-        tx("BOLT RIDE",                   -1_800,  "debit", 12, "Transport")
-        tx("GROCERY PALACE IKEJA",       -22_000,  "debit", 14, "Food & Groceries")
         tx("NETFLIX DEBIT",              -14_000,  "debit", 15, "Subscriptions")
         tx("MTN DATA BUNDLE",            -10_000,  "debit", 16, "Airtime & Data")
         tx("ANCHOR SAVINGS TRANSFER",   -100_000,  "debit", 17, "Emergency Fund")
 
         # ── Seed budget allocations ───────────────────────────────────────────
+        # Food budget is tight (₦580) so 83.6% spend triggers a real threshold_80 nudge.
+        # Transport budget is very tight (₦30) so 143% spend triggers threshold_100.
+        # Travel and Savings are allocated to show progress on home-screen Goals.
         _BUDGET: list[tuple[str, int, int]] = [
             # (category name, assigned_kobo, activity_kobo)
             ("Rent / Housing",      9_000_000, -9_000_000),
             ("Electricity (NEPA)",     50_000,    -15_000),
             ("Internet",               30_000,          0),
-            ("Food & Groceries",      250_000,    -48_500),
-            ("Transport",              80_000,     -4_300),
+            ("Food & Groceries",       58_000,    -48_500),  # 83.6% spent
+            ("Transport",               3_000,     -4_300),  # 143% spent — over budget!
             ("Airtime & Data",         50_000,    -15_000),
             ("Subscriptions",          60_000,    -43_000),
             ("Health & Pharmacy",      30_000,    -12_000),
             ("Investments",           200_000,    -50_000),
             ("Emergency Fund",        150_000,   -100_000),
             ("Savings",               300_000,          0),
+            ("Travel",                150_000,          0),  # sinking fund for Christmas trip
         ]
 
         for cat_name, assigned, activity in _BUDGET:
@@ -233,19 +257,218 @@ def main() -> None:
                 )
             )
 
-        # ── Seed a sample nudge ───────────────────────────────────────────────
-        food_cat = cat_by_name.get("Food & Groceries")
-        db.add(
-            Nudge(
-                user_id=str(user.id),
-                trigger_type="threshold_80",
-                category_id=str(food_cat.id) if food_cat else None,
-                message=(
-                    "Oshey budget boss! Your Food & Groceries don reach 80% this month. "
-                    "Only ₦201,500 remain — make you watch am o!"
-                ),
-                delivered_at=datetime.now(timezone.utc) - timedelta(hours=3),
+        # ── Seed category targets ─────────────────────────────────────────────
+        # Targets drive the "Cost to Be Me" card and the Goals section.
+        # custom-frequency targets appear on the Home → Goals section.
+        _TARGETS: list[tuple[str, str, str, int, int | None, int | None, date | None]] = [
+            # (category, frequency, behavior, target_amount, day_of_week, day_of_month, target_date)
+            #
+            # Monthly bills — show target labels in Budget tab
+            ("Rent / Housing",  "monthly", "set_aside", 9_000_000, None, 1,    None),
+            ("Subscriptions",   "monthly", "set_aside",    60_000, None, 5,    None),
+            ("Airtime & Data",  "monthly", "set_aside",    50_000, None, 28,   None),
+            #
+            # Sinking funds — custom frequency → show on Home → Goals
+            ("Travel",    "custom", "set_aside", 500_000, None, None, date(today.year, 12, 20)),
+            ("Savings",   "custom", "balance",   1_000_000, None, None, date(today.year + 1, 3, 1)),
+        ]
+
+        for cat_name, freq, behavior, amt, dow, dom, tdate in _TARGETS:
+            category = cat_by_name.get(cat_name)
+            if not category:
+                print(f"  WARNING: category '{cat_name}' not found — skipping target.")
+                continue
+            db.add(
+                CategoryTarget(
+                    category_id=str(category.id),
+                    frequency=freq,
+                    behavior=behavior,
+                    target_amount=amt,
+                    day_of_week=dow,
+                    day_of_month=dom,
+                    target_date=tdate,
+                    repeats=(freq != "custom"),
+                )
             )
+
+        # ── Seed recurring rules ──────────────────────────────────────────────
+        # These demonstrate the Recurring Transactions feature.
+        # The Celery task generates actual transaction instances on each sync.
+        next_month_10th = date(today.year if today.month < 12 else today.year + 1,
+                               today.month % 12 + 1, 10)
+        next_month_5th  = date(today.year if today.month < 12 else today.year + 1,
+                               today.month % 12 + 1, 5)
+        # Next Monday
+        days_to_monday = (7 - today.weekday()) % 7 or 7
+        next_monday = today + timedelta(days=days_to_monday)
+
+        _RULES: list[tuple[str, str, int, int | None, int | None, date, dict]] = [
+            # (frequency, interval, day_of_week, day_of_month, next_due, template)
+            (
+                "monthly", 1, None, 10, next_month_10th,
+                {
+                    "account_id": str(account.id),
+                    "amount": -15_000,
+                    "narration": "EKEDC POSTPAID",
+                    "type": "debit",
+                    "category_id": cid("Electricity (NEPA)"),
+                    "memo": "Auto-pay electricity bill",
+                },
+            ),
+            (
+                "monthly", 1, None, 5, next_month_5th,
+                {
+                    "account_id": str(account.id),
+                    "amount": -29_000,
+                    "narration": "DSTV COMPACT PLUS",
+                    "type": "debit",
+                    "category_id": cid("Subscriptions"),
+                    "memo": "DStv monthly subscription",
+                },
+            ),
+            (
+                "weekly", 1, 0, None, next_monday,  # 0 = Monday
+                {
+                    "account_id": str(account.id),
+                    "amount": -2_500,
+                    "narration": "BOLT RIDE",
+                    "type": "debit",
+                    "category_id": cid("Transport"),
+                    "memo": "Weekly Bolt rides budget",
+                },
+            ),
+        ]
+
+        for freq, interval, dow, dom, next_due, template in _RULES:
+            db.add(
+                RecurringRule(
+                    user_id=str(user.id),
+                    frequency=freq,
+                    interval=interval,
+                    day_of_week=dow,
+                    day_of_month=dom,
+                    next_due=next_due,
+                    ends_on=None,
+                    is_active=True,
+                    template=template,
+                )
+            )
+
+        # ── Seed nudges (one per trigger type) ───────────────────────────────
+        # Pre-seed all five nudge variants so judges can explore the Nudges tab
+        # without waiting for real transactions to cross thresholds.
+        food_cat = cat_by_name.get("Food & Groceries")
+        transport_cat = cat_by_name.get("Transport")
+        rent_cat = cat_by_name.get("Rent / Housing")
+
+        def nudge(trigger: str, title_str: str, msg: str, ctx: dict,
+                  cat: "Category | None" = None, hours_ago: int = 1) -> None:
+            delivered = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
+            db.add(
+                Nudge(
+                    user_id=str(user.id),
+                    trigger_type=trigger,
+                    title=title_str,
+                    message=msg,
+                    context=ctx,
+                    category_id=str(cat.id) if cat else None,
+                    is_opened=False,
+                    is_dismissed=False,
+                    delivered_at=delivered,
+                )
+            )
+
+        nudge(
+            "threshold_80",
+            "⚠️ Food & Groceries don reach 84%",
+            (
+                "You don use 84% of your Food & Groceries budget. "
+                "Only ₦95 remain — use am wisely!"
+            ),
+            {
+                "category_name": "Food & Groceries",
+                "month": this_month,
+                "spent_kobo": 48_500,
+                "assigned_kobo": 58_000,
+                "remaining_kobo": 9_500,
+                "remaining_naira": "95",
+                "assigned_naira": "580",
+                "percentage": 84,
+            },
+            cat=food_cat,
+            hours_ago=6,
+        )
+
+        nudge(
+            "threshold_100",
+            "🚨 Transport budget don finish!",
+            (
+                "E don do for Transport. You overrun by ₦13 — control the situation."
+            ),
+            {
+                "category_name": "Transport",
+                "month": this_month,
+                "spent_kobo": 4_300,
+                "assigned_kobo": 3_000,
+                "overage_kobo": 1_300,
+                "overage_naira": "13",
+                "percentage": 143,
+            },
+            cat=transport_cat,
+            hours_ago=3,
+        )
+
+        nudge(
+            "large_single_tx",
+            "Big spend on Rent / Housing",
+            (
+                "Chai! ₦90k in Rent / Housing one time? "
+                "That na 100% of your monthly plan."
+            ),
+            {
+                "category_name": "Rent / Housing",
+                "tx_amount_kobo": -9_000_000,
+                "amount_naira": "90k",
+                "narration": "RENTS - APRIL 2026",
+                "assigned_kobo": 9_000_000,
+                "percentage": 100,
+                "tx_id": "00000000-0000-0000-0000-000000000001",
+            },
+            cat=rent_cat,
+            hours_ago=10,
+        )
+
+        nudge(
+            "pay_received",
+            "Money don enter! 🎉",
+            (
+                "₦350k credit don land! Time to give every kobo a job — "
+                "assign am to your budget."
+            ),
+            {
+                "amount_kobo": 35_000_000,
+                "amount_naira": "350k",
+                "narration": "SALARY CREDIT - TECHCORP LTD",
+                "account_id": str(account.id),
+            },
+            hours_ago=28 * 24,  # matches the salary tx seeded 28 days ago
+        )
+
+        nudge(
+            "bill_payment",
+            "DSTV payment done ✅",
+            (
+                "Your DSTV payment of ₦290 don go through. "
+                "Your budget don update automatically."
+            ),
+            {
+                "biller_name": "DSTV",
+                "amount_kobo": -29_000,
+                "amount_naira": "290",
+                "reference": "DEMO-DSTV-001",
+                "category_name": "Subscriptions",
+            },
+            hours_ago=5 * 24,
         )
 
         db.commit()

@@ -100,8 +100,10 @@ export function useRecategorize() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      // Recategorizing affects budget activity totals — invalidate all months
-      qc.invalidateQueries({ queryKey: queryKeys.budget("") });
+      // Use the bare ['budget'] prefix key so TanStack Query invalidates every
+      // budget query regardless of month (e.g. ['budget', '2026-03']).
+      // queryKeys.budget('') = ['budget', ''] which does NOT match ['budget', '2026-03'].
+      qc.invalidateQueries({ queryKey: ['budget'] });
     },
     onError: () => error('Error', 'Could not update category.'),
   });
@@ -148,7 +150,8 @@ export function useCreateTransaction() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      qc.invalidateQueries({ queryKey: queryKeys.budget('') });
+      // ['budget'] prefix invalidates all months — budget('')  would only match ['budget', ''].
+      qc.invalidateQueries({ queryKey: ['budget'] });
     },
     onError: () => error('Error', 'Could not create transaction.'),
   });
@@ -176,7 +179,8 @@ export function useUpdateTransaction() {
     },
     onSuccess: (_data, _vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      qc.invalidateQueries({ queryKey: queryKeys.budget("") });
+      // ['budget'] prefix invalidates all months — budget('')  would only match ['budget', ''].
+      qc.invalidateQueries({ queryKey: ['budget'] });
     },
     onError: () => error('Error', 'Could not update transaction.'),
   });
@@ -196,7 +200,8 @@ export function useDeleteTransaction() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      qc.invalidateQueries({ queryKey: queryKeys.budget("") });
+      // ['budget'] prefix invalidates all months — budget('')  would only match ['budget', ''].
+      qc.invalidateQueries({ queryKey: ['budget'] });
     },
     onError: () => error('Error', 'Could not delete transaction.'),
   });

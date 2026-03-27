@@ -37,6 +37,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useTheme } from '@/lib/theme';
 import { useBudget } from '@/hooks/useBudget';
@@ -46,6 +47,48 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { ff, formatMoney } from '@/lib/typography';
 import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
 import { useDismissNudge, useNudgeUnreadCount, useNudges } from '@/hooks/useNudges';
+import { TourTarget, useTour, type TourStep } from '@/components/tour';
+import { releasePrompt } from '@/lib/notifPromptBridge';
+import { onWelcomeDone } from '@/lib/welcomeBridge';
+
+// ── Tour definition ──────────────────────────────────────────────────────────────
+
+const HOME_TOUR: TourStep[] = [
+  {
+    targetId: 'home-profile',
+    title: 'Your profile',
+    body: 'Tap here to view your profile, manage security settings, and sign out.',
+    tooltipSide: 'below',
+  },
+  {
+    targetId: 'home-net-worth',
+    title: 'Your net worth',
+    body: 'All your account balances added together. It updates automatically as you link accounts and record transactions.',
+    tooltipSide: 'below',
+    fallbackFullscreen: true,
+  },
+  {
+    targetId: 'home-all-accounts',
+    title: 'View your accounts',
+    body: 'Tap here to see all your bank accounts, link a new one via Mono, or add a manual account. Accounts lives in the More tab.',
+    tooltipSide: 'below',
+    fallbackFullscreen: true,
+  },
+  {
+    targetId: 'home-this-month',
+    title: 'This month at a glance',
+    body: 'Total In is all the money you received this month. Total Out is everything you spent. Keep an eye on the gap!',
+    tooltipSide: 'below',
+    fallbackFullscreen: true,
+  },
+  {
+    targetId: 'home-first-goal',
+    title: 'Track your goals',
+    body: 'Categories with a custom savings deadline appear here. You can see progress at a glance and tap to adjust the target.',
+    tooltipSide: 'above',
+    fallbackFullscreen: true,
+  },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -81,6 +124,17 @@ export default function HomeScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const user = useAppSelector((st) => st.auth.user);
+  const startTourIfUnseen = useTour();
+
+  useFocusEffect(
+    useCallback(() => {
+      // Wait for AppWelcome to be dismissed before starting the tour so they
+      // don't overlap. onWelcomeDone fires immediately for returning users.
+      onWelcomeDone(() => {
+        startTourIfUnseen('home', HOME_TOUR, releasePrompt);
+      });
+    }, [startTourIfUnseen]),
+  );
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const currentMonth = useMemo(getCurrentMonth, []);
@@ -124,9 +178,9 @@ export default function HomeScreen() {
     return (budget?.tbb ?? 0) + assigned;
   }, [allCats, budget]);
 
-  // Categories with a savings target → goals section
+  // Categories with a custom (sinking fund / deadline) target → goals section
   const goals = useMemo(
-    () => allCats.filter((c) => c.target_amount !== null && !c.is_hidden),
+    () => allCats.filter((c) => c.target_frequency === 'custom' && !c.is_hidden),
     [allCats],
   );
 
@@ -177,21 +231,23 @@ export default function HomeScreen() {
         />
         {/* Top row: avatar + greeting | notification bell */}
         <View style={s.topRow}>
-          <TouchableOpacity
-            style={s.userRow}
-            onPress={() => router.push('/(tabs)/profile')}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Go to profile"
-          >
-            <View style={[s.avatar, { backgroundColor: colors.brand }]}>
-              <Text style={[s.avatarText, { color: colors.lime }]}>{initials}</Text>
-            </View>
-            <View>
-              <Text style={s.greetTxt}>{getGreeting()} 👋🏽</Text>
-              <Text style={[s.nameTxt, { color: colors.white }]}>{firstName}</Text>
-            </View>
-          </TouchableOpacity>
+          <TourTarget id="home-profile">
+            <TouchableOpacity
+              style={s.userRow}
+              onPress={() => router.push('/(tabs)/profile')}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Go to profile"
+            >
+              <View style={[s.avatar, { backgroundColor: colors.brand }]}>
+                <Text style={[s.avatarText, { color: colors.lime }]}>{initials}</Text>
+              </View>
+              <View>
+                <Text style={s.greetTxt}>{getGreeting()} 👋🏽</Text>
+                <Text style={[s.nameTxt, { color: colors.white }]}>{firstName}</Text>
+              </View>
+            </TouchableOpacity>
+          </TourTarget>
 
           <TouchableOpacity
             style={s.notifBtn}
@@ -209,45 +265,49 @@ export default function HomeScreen() {
         </View>
 
         {/* Balance card (.bal-card) — frosted glass, top-rounded only */}
-        <View style={s.balCard}>
-          <View style={s.balTop}>
-            <Text style={s.balLbl}>NET WORTH</Text>
-            <TouchableOpacity
-              style={s.balChip}
-              onPress={() => router.push('/(tabs)/accounts')}
-              activeOpacity={0.75}
-              accessibilityRole="link"
-              accessibilityLabel="View all accounts"
-            >
-              <Text style={[s.balChipTxt, { color: colors.lime }]}>All accounts</Text>
-            </TouchableOpacity>
+        <TourTarget id="home-net-worth">
+          <View style={s.balCard}>
+            <View style={s.balTop}>
+              <Text style={s.balLbl}>NET WORTH</Text>
+              <TourTarget id="home-all-accounts">
+                <TouchableOpacity
+                  style={s.balChip}
+                  onPress={() => router.push('/(tabs)/accounts')}
+                  activeOpacity={0.75}
+                  accessibilityRole="link"
+                  accessibilityLabel="View all accounts"
+                >
+                  <Text style={[s.balChipTxt, { color: colors.lime }]}>All accounts</Text>
+                </TouchableOpacity>
+              </TourTarget>
+            </View>
+            <Text style={[s.balAmt, { color: colors.white }]}>
+              {formatMoney(netWorth)}
+            </Text>
+            <View style={s.balActions}>
+              <TouchableOpacity
+                style={s.balBtnGhost}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/budget' as never); }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Go to budget"
+              >
+                <Ionicons name="card-outline" size={14} color={colors.white} />
+                <Text style={[s.balBtnTxt, { color: colors.white }]}>Budget</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.balBtnGhost, s.balBtnPrimary, { backgroundColor: colors.lime, borderColor: colors.lime }]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/add-transaction'); }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Add transaction"
+              >
+                <Ionicons name="add" size={14} color={colors.darkGreen} />
+                <Text style={[s.balBtnTxt, { color: colors.darkGreen }]}>Add Tx</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text style={[s.balAmt, { color: colors.white }]}>
-            {formatMoney(netWorth)}
-          </Text>
-          <View style={s.balActions}>
-            <TouchableOpacity
-              style={s.balBtnGhost}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/budget' as never); }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Go to budget"
-            >
-              <Ionicons name="card-outline" size={14} color={colors.white} />
-              <Text style={[s.balBtnTxt, { color: colors.white }]}>Budget</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.balBtnGhost, s.balBtnPrimary, { backgroundColor: colors.lime, borderColor: colors.lime }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/add-transaction'); }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Add transaction"
-            >
-              <Ionicons name="add" size={14} color={colors.darkGreen} />
-              <Text style={[s.balBtnTxt, { color: colors.darkGreen }]}>Add Tx</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        </TourTarget>
       </View>
 
       {/* ── Scrollable body ───────────────────────────────────────────────── */}
@@ -268,35 +328,37 @@ export default function HomeScreen() {
               <Text style={[s.secLink, { color: colors.brand }]}>See all</Text>
             </TouchableOpacity>
           </View>
-          <View style={s.statGrid}>
-            {/* Income */}
-            <View style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}>
-              <View style={s.statTop}>
-                <View style={[s.statIcon, { backgroundColor: colors.successSubtle }]}>
-                  <Ionicons name="arrow-down-outline" size={17} color={colors.successText} />
+          <TourTarget id="home-this-month">
+            <View style={s.statGrid}>
+              {/* Income */}
+              <View style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}>
+                <View style={s.statTop}>
+                  <View style={[s.statIcon, { backgroundColor: colors.successSubtle }]}>
+                    <Ionicons name="arrow-down-outline" size={17} color={colors.successText} />
+                  </View>
+                  <View style={[s.statBadge, { backgroundColor: colors.successSubtle }]}>
+                    <Text style={[s.statBadgeTxt, { color: colors.successText }]}>Income</Text>
+                  </View>
                 </View>
-                <View style={[s.statBadge, { backgroundColor: colors.successSubtle }]}>
-                  <Text style={[s.statBadgeTxt, { color: colors.successText }]}>Income</Text>
-                </View>
+                <Text style={[s.statLbl, { color: colors.textMeta }]}>Total in</Text>
+                <Text style={[s.statVal, { color: colors.textPrimary }]}>{formatMoney(totalIncome)}</Text>
               </View>
-              <Text style={[s.statLbl, { color: colors.textMeta }]}>Total in</Text>
-              <Text style={[s.statVal, { color: colors.textPrimary }]}>{formatMoney(totalIncome)}</Text>
-            </View>
 
-            {/* Expenses */}
-            <View style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}>
-              <View style={s.statTop}>
-                <View style={[s.statIcon, { backgroundColor: colors.errorSubtle }]}>
-                  <Ionicons name="arrow-up-outline" size={17} color={colors.error} />
+              {/* Expenses */}
+              <View style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}>
+                <View style={s.statTop}>
+                  <View style={[s.statIcon, { backgroundColor: colors.errorSubtle }]}>
+                    <Ionicons name="arrow-up-outline" size={17} color={colors.error} />
+                  </View>
+                  <View style={[s.statBadge, { backgroundColor: colors.errorSubtle }]}>
+                    <Text style={[s.statBadgeTxt, { color: colors.error }]}>Spent</Text>
+                  </View>
                 </View>
-                <View style={[s.statBadge, { backgroundColor: colors.errorSubtle }]}>
-                  <Text style={[s.statBadgeTxt, { color: colors.error }]}>Spent</Text>
-                </View>
+                <Text style={[s.statLbl, { color: colors.textMeta }]}>Total out</Text>
+                <Text style={[s.statVal, { color: colors.textPrimary }]}>{formatMoney(totalExpenses)}</Text>
               </View>
-              <Text style={[s.statLbl, { color: colors.textMeta }]}>Total out</Text>
-              <Text style={[s.statVal, { color: colors.textPrimary }]}>{formatMoney(totalExpenses)}</Text>
             </View>
-          </View>
+          </TourTarget>
         </View>
 
         {/* Nudge pill — first unread nudge */}
@@ -389,22 +451,22 @@ export default function HomeScreen() {
         <View style={[s.sec, { paddingBottom: spacing.md }]}>
           <View style={s.secRow}>
             <Text style={[s.secTitle, { color: colors.textPrimary }]}>Goals</Text>
-            <TouchableOpacity onPress={() => router.push('/')} accessibilityRole="link">
+            <TouchableOpacity onPress={() => router.push('/(tabs)/budget')} accessibilityRole="link">
               <Text style={[s.secLink, { color: colors.brand }]}>Budget →</Text>
             </TouchableOpacity>
           </View>
 
           {goals.length === 0 ? (
             <Text style={[s.emptyGoals, { color: colors.textMeta }]}>
-              Set targets on budget categories to track goals here.
+              Create a custom target with a deadline on a budget category to track your savings goals here.
             </Text>
           ) : (
-            goals.slice(0, 4).map((goal) => {
+            goals.map((goal, goalIdx) => {
               const pct = goal.target_amount
                 ? Math.min(1, Math.max(0, goal.available / goal.target_amount))
                 : 0;
 
-              return (
+              const card = (
                 <TouchableOpacity
                   key={goal.id}
                   style={[s.goalRow, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}
@@ -433,7 +495,7 @@ export default function HomeScreen() {
                   </View>
                   <TouchableOpacity
                     style={[s.goalAdd, { backgroundColor: colors.brand }]}
-                    onPress={() => router.push('/')}
+                    onPress={() => router.push('/(tabs)/budget')}
                     accessibilityRole="button"
                     accessibilityLabel={`Add to ${goal.name}`}
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -442,6 +504,11 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </TouchableOpacity>
               );
+
+              // Wrap the first goal in a TourTarget so the spotlight lands on it.
+              return goalIdx === 0 ? (
+                <TourTarget key={goal.id} id="home-first-goal">{card}</TourTarget>
+              ) : card;
             })
           )}
         </View>

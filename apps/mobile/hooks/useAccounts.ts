@@ -60,7 +60,12 @@ export function useAddManualAccount() {
   return useMutation({
     mutationFn: (payload: AddManualAccountPayload) =>
       api.post<BankAccount>('/accounts/manual', payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.accounts() });
+      // The opening balance transaction also affects TBB and the tx list.
+      qc.invalidateQueries({ queryKey: ['budget'] });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions() });
+    },
     onError: () => error('Could not add account', 'Check the details and try again.'),
   });
 }

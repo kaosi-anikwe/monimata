@@ -184,14 +184,42 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
                 .scalar()
                 or 0
             )
-            account.starting_balance = account.balance - tx_sum
-            logger.info(
-                "Set starting_balance=%d for account=%s (mono_balance=%d, tx_sum=%d)",
-                account.starting_balance,
-                account.id,
-                account.balance,
-                tx_sum,
-            )
+            computed_sb = account.balance - tx_sum
+
+            if computed_sb > 0:
+                # Funds existed in the account before our import window.  Create
+                # a credit transaction so they flow into TBB, then zero the
+                # anchor (the transaction now fully accounts for the gap).
+                opening_tx = Transaction(
+                    user_id=account.user_id,
+                    account_id=account.id,
+                    date=datetime.now(timezone.utc),
+                    amount=computed_sb,
+                    narration="Starting balance",
+                    type="credit",
+                    source="mono",
+                )
+                db.add(opening_tx)
+                new_ids.append(opening_tx.id)
+                account.starting_balance = 0
+                logger.info(
+                    "Created starting_balance tx=%d for account=%s (mono_balance=%d, tx_sum=%d)",
+                    computed_sb,
+                    account.id,
+                    account.balance,
+                    tx_sum,
+                )
+            else:
+                # Transactions sum exceeds Mono's reported balance (can happen in
+                # test mode or partial history).  Keep as an anchor; no tx created.
+                account.starting_balance = computed_sb
+                logger.info(
+                    "Set starting_balance=%d for account=%s (mono_balance=%d, tx_sum=%d)",
+                    computed_sb,
+                    account.id,
+                    account.balance,
+                    tx_sum,
+                )
 
         db.commit()
 

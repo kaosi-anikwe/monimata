@@ -42,9 +42,44 @@ import * as LocalAuthentication from 'expo-local-authentication';
 
 import type { RootState } from '@/store';
 
-const LOCK_ENABLED_KEY = 'mm_biometric_lock_enabled_v1';
 /** Number of seconds in background before the app locks on return. */
 const LOCK_AFTER_SECONDS = 5;
+
+// ── Module-level enabled-flag store ──────────────────────────────────────────
+// useBiometricLock() is called in multiple places (_layout.tsx, Profile screen,
+// etc.).  Each call creates an independent React state, so a SecureStore write
+// in one instance is invisible to the others until the app restarts.
+// Storing the flag here and broadcasting changes to all subscribers ensures
+// every instance stays in sync within the same JS session.
+
+type EnabledListener = (enabled: boolean) => void;
+
+/** Cache: `userId → enabled flag`.  null = not yet loaded from SecureStore. */
+const _cache = new Map<string, boolean>();
+const _listeners = new Set<EnabledListener>();
+
+function _lockKey(userId: string) {
+  return `mm_biometric_lock_enabled_v2_${userId}`;
+}
+
+async function _readEnabled(userId: string): Promise<boolean> {
+  if (_cache.has(userId)) return _cache.get(userId)!;
+  const raw = await SecureStore.getItemAsync(_lockKey(userId));
+  const val = raw === 'true';
+  _cache.set(userId, val);
+  return val;
+}
+
+async function _writeEnabled(userId: string, val: boolean): Promise<void> {
+  _cache.set(userId, val);
+  await SecureStore.setItemAsync(_lockKey(userId), String(val));
+  _listeners.forEach((l) => l(val));
+}
+
+function _subscribe(listener: EnabledListener): () => void {
+  _listeners.add(listener);
+  return () => _listeners.delete(listener);
+}
 
 export interface BiometricLockState {
   /** True when the lock screen should be shown. */
@@ -61,6 +96,7 @@ export interface BiometricLockState {
 
 export function useBiometricLock(): BiometricLockState {
   const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
+  const userId = useSelector((s: RootState) => s.auth.user?.id ?? '');
   const [isLocked, setIsLocked] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
@@ -71,18 +107,26 @@ export function useBiometricLock(): BiometricLockState {
   // immediately re-show the lock screen.
   const hasLockedThisProcess = useRef(false);
 
-  // Check device capability and user preference on mount.
+  // Load device capability and user preference.  Re-runs when userId changes
+  // so a different account login gets the correct setting immediately.
   useEffect(() => {
+    if (!userId) return;
+    let mounted = true;
     async function init() {
-      const [enrolled, enabledStr] = await Promise.all([
+      const [enrolled, enabled] = await Promise.all([
         LocalAuthentication.isEnrolledAsync(),
-        SecureStore.getItemAsync(LOCK_ENABLED_KEY),
+        _readEnabled(userId),
       ]);
+      if (!mounted) return;
       setIsEnrolled(enrolled);
-      setIsEnabled(enabledStr === 'true');
+      setIsEnabled(enabled);
     }
     init();
-  }, []);
+    // Subscribe to cross-instance changes (e.g. Profile screen toggles the
+    // setting; _layout.tsx instance hears it immediately without a restart).
+    const unsub = _subscribe((val) => { if (mounted) setIsEnabled(val); });
+    return () => { mounted = false; unsub(); };
+  }, [userId]);
 
   // Cold-start lock: fires once when all three conditions first become true
   // (session restored + biometric settings loaded). Covers the case where the
@@ -143,6 +187,7 @@ export function useBiometricLock(): BiometricLockState {
   }
 
   async function toggleEnabled(): Promise<void> {
+    if (!userId) return;
     if (!isEnabled) {
       // Require a successful auth before enabling — confirm biometrics work.
       const result = await LocalAuthentication.authenticateAsync({
@@ -152,8 +197,8 @@ export function useBiometricLock(): BiometricLockState {
       if (!result.success) return;
     }
     const next = !isEnabled;
-    await SecureStore.setItemAsync(LOCK_ENABLED_KEY, String(next));
-    setIsEnabled(next);
+    // _writeEnabled saves to SecureStore AND notifies all hook instances.
+    await _writeEnabled(userId, next);
     if (!next) setIsLocked(false);
   }
 

@@ -41,6 +41,7 @@ import { lightColors } from '@/lib/theme';
 import type { RootState } from '../store';
 import { useToast } from '@/components/Toast';
 import { useRegisterDevice } from './useNudges';
+import { registerPromptSetter, resetBridgeForUser } from '@/lib/notifPromptBridge';
 
 // Show notifications as banners even when the app is in the foreground.
 Notifications.setNotificationHandler({
@@ -52,8 +53,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/** Persisted key — once set, we never show the in-app pre-prompt again. */
-const PRIMED_KEY = 'notif_primed';
+/** Persisted key scoped to a user — once set, never show the pre-prompt for that account again. */
+function primedKey(userId: string) { return `notif_primed_${userId}`; }
 
 export interface PushNotificationConsent {
   showPrePrompt: boolean;
@@ -66,6 +67,7 @@ export function usePushNotifications(): PushNotificationConsent {
   const { confirm } = useToast();
   const registerDevice = useRegisterDevice();
   const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
+  const userId = useSelector((s: RootState) => s.auth.user?.id ?? '');
   const [showPrePrompt, setShowPrePrompt] = useState(false);
 
   const mountedRef = useRef(true);
@@ -93,7 +95,7 @@ export function usePushNotifications(): PushNotificationConsent {
 
   async function handleAllow() {
     setShowPrePrompt(false);
-    await SecureStore.setItemAsync(PRIMED_KEY, '1');
+    await SecureStore.setItemAsync(primedKey(userId), '1');
     try {
       const { status } = await Notifications.requestPermissionsAsync();
       if (status === 'granted') {
@@ -107,11 +109,14 @@ export function usePushNotifications(): PushNotificationConsent {
   function handleDismiss() {
     setShowPrePrompt(false);
     // Mark primed so we don't show again. Fire-and-forget.
-    SecureStore.setItemAsync(PRIMED_KEY, '1').catch(() => { });
+    SecureStore.setItemAsync(primedKey(userId), '1').catch(() => { });
   }
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !userId) return;
+
+    // Reset the bridge so a new user login always gets a fresh prompt decision.
+    resetBridgeForUser(userId);
 
     mountedRef.current = true;
 
@@ -152,9 +157,11 @@ export function usePushNotifications(): PushNotificationConsent {
         }
 
         // Check if the user has already seen our pre-prompt.
-        const primed = await SecureStore.getItemAsync(PRIMED_KEY);
+        const primed = await SecureStore.getItemAsync(primedKey(userId));
         if (!primed && mountedRef.current) {
-          setShowPrePrompt(true);
+          // Register the setter with the bridge — the home screen tour's onDone
+          // callback will call releasePrompt() to actually display this.
+          registerPromptSetter(() => { if (mountedRef.current) setShowPrePrompt(true); });
         }
       } catch (err) {
         console.warn('usePushNotifications: setup error', err);
@@ -168,7 +175,7 @@ export function usePushNotifications(): PushNotificationConsent {
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
-  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 

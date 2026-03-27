@@ -34,7 +34,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -51,6 +50,7 @@ import { useAppSelector } from '@/store/hooks';
 import { nairaStringToKobo } from '@/utils/money';
 import { useTarget, useUpsertTarget } from '@/hooks/useTargets';
 import type { TargetBehavior, TargetFrequency } from '@/types/target';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -258,6 +258,97 @@ function MonthlyTab({
   );
 }
 
+// ─── Date picker field ───────────────────────────────────────────────────────
+
+/**
+ * Tappable date button that opens an inline spinner (iOS) or native dialog
+ * (Android).  Passes the selected date back as a "YYYY-MM-DD" string.
+ */
+function DatePickerField({
+  value,
+  onChange,
+  showYear = true,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** Set to false on Yearly tab where the year is implicit. */
+  showYear?: boolean;
+}) {
+  const colors = useTheme();
+  const [open, setOpen] = useState(false);
+
+  const parts = value.split('-');
+  const dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  function handleChange(_: unknown, selected?: Date) {
+    if (Platform.OS === 'android') setOpen(false);
+    if (!selected) return;
+    const y = selected.getFullYear();
+    const m = String(selected.getMonth() + 1).padStart(2, '0');
+    const d = String(selected.getDate()).padStart(2, '0');
+    onChange(`${y}-${m}-${d}`);
+  }
+
+  const displayDate = dateObj.toLocaleDateString('en-NG', {
+    day: 'numeric',
+    month: 'long',
+    ...(showYear ? { year: 'numeric' } : {}),
+  });
+
+  return (
+    <View>
+      <TouchableOpacity
+        style={[ts.dateBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={() => setOpen((prev) => !prev)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Select date"
+      >
+        <Ionicons name="calendar-outline" size={16} color={colors.brand} />
+        <Text style={[ts.dateBtnTxt, { color: colors.textPrimary }]}>{displayDate}</Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMeta} />
+      </TouchableOpacity>
+
+      {open && (
+        Platform.OS === 'android' ? (
+          // On Android the picker is a native modal dialog — no wrapper needed.
+          <DateTimePicker
+            value={dateObj}
+            mode="date"
+            display="default"
+            onChange={handleChange}
+            minimumDate={today}
+          />
+        ) : (
+          // On iOS, render an inline spinner with our color scheme + a Done button.
+          <View style={[ts.datePickerWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <DateTimePicker
+              value={dateObj}
+              mode="date"
+              display="spinner"
+              onChange={handleChange}
+              minimumDate={today}
+              accentColor={colors.brand}
+              textColor={colors.textPrimary}
+              style={{ alignSelf: 'stretch' }}
+            />
+            <TouchableOpacity
+              style={[ts.datePickerDone, { backgroundColor: colors.brand }]}
+              onPress={() => setOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Confirm date"
+            >
+              <Text style={[ts.datePickerDoneTxt, { color: colors.white }]}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        )
+      )}
+    </View>
+  );
+}
+
 // ─── Yearly tab ───────────────────────────────────────────────────────────────
 
 function YearlyTab({
@@ -268,15 +359,6 @@ function YearlyTab({
   behavior: TargetBehavior; setBehavior: (v: TargetBehavior) => void;
 }) {
   const colors = useTheme();
-  const parts = targetDate ? targetDate.split('-') : ['', '12', '31'];
-  const mm = parts[1] ?? '12';
-  const dd = parts[2] ?? '31';
-
-  function updateDate(newMm: string, newDd: string) {
-    const year = new Date().getFullYear();
-    setTargetDate(`${year}-${newMm.padStart(2, '0')}-${newDd.padStart(2, '0')}`);
-  }
-
   return (
     <ScrollView contentContainerStyle={ts.tabContent}>
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>I need to save</Text>
@@ -285,27 +367,7 @@ function YearlyTab({
 
       <View style={ts.section}>
         <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Due on</Text>
-        <View style={ts.dateRow}>
-          <TextInput
-            style={[ts.dateInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
-            value={mm}
-            onChangeText={(v) => updateDate(v, dd)}
-            keyboardType="numeric"
-            maxLength={2}
-            placeholder="MM"
-            placeholderTextColor={colors.textTertiary}
-          />
-          <Text style={[ts.dateSep, { color: colors.textMeta }]}>/</Text>
-          <TextInput
-            style={[ts.dateInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
-            value={dd}
-            onChangeText={(v) => updateDate(mm, v)}
-            keyboardType="numeric"
-            maxLength={2}
-            placeholder="DD"
-            placeholderTextColor={colors.textTertiary}
-          />
-        </View>
+        <DatePickerField value={targetDate} onChange={setTargetDate} showYear={false} />
       </View>
 
       <BehaviorPicker value={behavior} onChange={setBehavior} frequency="yearly" amount={amount} />
@@ -320,23 +382,13 @@ function YearlyTab({
 // ─── Custom tab ───────────────────────────────────────────────────────────────
 
 function CustomTab({
-  amount, setAmount, targetDate, setTargetDate, repeats, setRepeats, behavior, setBehavior,
+  amount, setAmount, targetDate, setTargetDate, behavior, setBehavior,
 }: {
   amount: string; setAmount: (v: string) => void;
   targetDate: string; setTargetDate: (v: string) => void;
-  repeats: boolean; setRepeats: (v: boolean) => void;
   behavior: TargetBehavior; setBehavior: (v: TargetBehavior) => void;
 }) {
   const colors = useTheme();
-  const parts = targetDate ? targetDate.split('-') : [String(new Date().getFullYear()), '12', '31'];
-  const yyyy = parts[0] ?? String(new Date().getFullYear());
-  const mm = parts[1] ?? '12';
-  const dd = parts[2] ?? '31';
-
-  function updateDate(newYyyy: string, newMm: string, newDd: string) {
-    setTargetDate(`${newYyyy}-${newMm.padStart(2, '0')}-${newDd.padStart(2, '0')}`);
-  }
-
   return (
     <ScrollView contentContainerStyle={ts.tabContent}>
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>Amount</Text>
@@ -344,54 +396,7 @@ function CustomTab({
 
       <View style={ts.section}>
         <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Due on</Text>
-        <View style={ts.dateRow}>
-          <TextInput
-            style={[ts.dateInput, { minWidth: 60, borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
-            value={yyyy}
-            onChangeText={(v) => updateDate(v, mm, dd)}
-            keyboardType="numeric"
-            maxLength={4}
-            placeholder="YYYY"
-            placeholderTextColor={colors.textTertiary}
-          />
-          <Text style={[ts.dateSep, { color: colors.textMeta }]}>/</Text>
-          <TextInput
-            style={[ts.dateInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
-            value={mm}
-            onChangeText={(v) => updateDate(yyyy, v, dd)}
-            keyboardType="numeric"
-            maxLength={2}
-            placeholder="MM"
-            placeholderTextColor={colors.textTertiary}
-          />
-          <Text style={[ts.dateSep, { color: colors.textMeta }]}>/</Text>
-          <TextInput
-            style={[ts.dateInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface }]}
-            value={dd}
-            onChangeText={(v) => updateDate(yyyy, mm, v)}
-            keyboardType="numeric"
-            maxLength={2}
-            placeholder="DD"
-            placeholderTextColor={colors.textTertiary}
-          />
-        </View>
-      </View>
-
-      <View style={ts.section}>
-        <View style={ts.repeatRow}>
-          <View>
-            <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Repeats after target date</Text>
-            <Text style={[ts.hint, { marginTop: 2, color: colors.textTertiary }]}>
-              Create a new target after completion.
-            </Text>
-          </View>
-          <Switch
-            value={repeats}
-            onValueChange={setRepeats}
-            trackColor={{ true: colors.brand, false: colors.surfaceElevated }}
-            thumbColor={colors.white}
-          />
-        </View>
+        <DatePickerField value={targetDate} onChange={setTargetDate} />
       </View>
 
       <BehaviorPicker value={behavior} onChange={setBehavior} frequency="custom" amount={amount} />
@@ -437,13 +442,12 @@ export default function TargetEditScreen() {
   function handleTabPress(newTab: TargetFrequency) {
     const idx = TABS.indexOf(newTab);
     setSlideDir(idx >= TABS.indexOf(tab) ? 'forward' : 'back');
-    indicatorX.value = withTiming(idx * ((pillBarWidth - 6) / TABS.length), { duration: 250 });
     setTab(newTab);
+    // indicatorX is kept in sync by the tab/pillBarWidth useEffect below.
   }
   const [dayOfWeek, setDayOfWeek] = useState(5); // Saturday
   const [dayOfMonth, setDayOfMonth] = useState(0); // Last day of month
   const [targetDate, setTargetDate] = useState(`${new Date().getFullYear()}-12-31`);
-  const [repeats, setRepeats] = useState(false);
   const [behavior, setBehavior] = useState<TargetBehavior>('set_aside');
 
   // Pre-populate from existing target
@@ -454,9 +458,20 @@ export default function TargetEditScreen() {
     if (existingTarget.day_of_week != null) setDayOfWeek(existingTarget.day_of_week);
     if (existingTarget.day_of_month != null) setDayOfMonth(existingTarget.day_of_month);
     if (existingTarget.target_date) setTargetDate(existingTarget.target_date);
-    setRepeats(existingTarget.repeats ?? false);
     setBehavior(existingTarget.behavior);
   }, [existingTarget]);
+
+  // Keep the pill indicator in sync with the active tab.
+  // This must be a separate effect (not inline in onLayout or handleTabPress only)
+  // because the pre-population useEffect above calls setTab() directly, bypassing
+  // handleTabPress, so indicatorX would otherwise stay on the default 'monthly'
+  // position when editing an existing target.
+  useEffect(() => {
+    if (pillBarWidth === 0) return;
+    const idx = TABS.indexOf(tab);
+    indicatorX.value = withTiming(idx * ((pillBarWidth - 6) / TABS.length), { duration: 250 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, pillBarWidth]);
 
   function handleSave() {
     const koboAmount = nairaStringToKobo(amount);
@@ -472,18 +487,10 @@ export default function TargetEditScreen() {
           day_of_week: tab === 'weekly' ? dayOfWeek : null,
           day_of_month: tab === 'monthly' ? dayOfMonth : null,
           target_date: (tab === 'yearly' || tab === 'custom') ? targetDate : null,
-          repeats: tab === 'custom' ? repeats : false,
+          repeats: false,
         },
       },
       { onSuccess: () => router.back() },
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <View style={[ts.flex, { backgroundColor: colors.background }]}>
-        <ActivityIndicator style={ts.flex} color={colors.brand} />
-      </View>
     );
   }
 
@@ -522,12 +529,7 @@ export default function TargetEditScreen() {
         {/* Pill tab bar (.hub-tabs style) */}
         <View
           style={[ts.pillBar, { backgroundColor: colors.overlayGhost }]}
-          onLayout={(e) => {
-            const w = e.nativeEvent.layout.width;
-            setPillBarWidth(w);
-            // position indicator without animation on first layout
-            indicatorX.value = TABS.indexOf(tab) * ((w - 6) / TABS.length);
-          }}
+          onLayout={(e) => setPillBarWidth(e.nativeEvent.layout.width)}
         >
           {/* Sliding selected pill */}
           {pillBarWidth > 0 && (
@@ -591,7 +593,6 @@ export default function TargetEditScreen() {
               <CustomTab
                 amount={amount} setAmount={setAmount}
                 targetDate={targetDate} setTargetDate={setTargetDate}
-                repeats={repeats} setRepeats={setRepeats}
                 behavior={behavior} setBehavior={setBehavior}
               />
             )}
@@ -605,12 +606,12 @@ export default function TargetEditScreen() {
           paddingBottom: insets.bottom + spacing.mdn,
         }]}>
           <TouchableOpacity
-            style={[ts.saveBtn, { backgroundColor: colors.brand }, upsert.isPending && { opacity: 0.6 }]}
+            style={[ts.saveBtn, { backgroundColor: colors.brand }, (upsert.isPending || isLoading) && { opacity: 0.6 }]}
             onPress={handleSave}
-            disabled={upsert.isPending}
+            disabled={upsert.isPending || isLoading}
             activeOpacity={0.85}
           >
-            {upsert.isPending ? (
+            {(upsert.isPending || isLoading) ? (
               <ActivityIndicator color={colors.white} />
             ) : (
               <Text style={[ts.saveBtnText, { color: colors.white }]}>Save target</Text>
@@ -730,19 +731,31 @@ const ts = StyleSheet.create({
   },
   dayValue: { ...ff(800), fontSize: 24, minWidth: 44, textAlign: 'center' },
 
-  // ── Date row ──────────────────────────────────────────────────────────────
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dateInput: {
-    minWidth: 52,
+  // ── Date picker ───────────────────────────────────────────────────────────
+  dateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 18,
-    ...ff(700),
-    textAlign: 'center',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  dateSep: { ...ff(600), fontSize: 20 },
+  dateBtnTxt: { ...ff(600), fontSize: 15, flex: 1 },
+  datePickerWrap: {
+    borderWidth: 1,
+    borderRadius: 10,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  datePickerDone: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  datePickerDoneTxt: { ...ff(600), fontSize: 14 },
 
   // ── Repeats toggle ────────────────────────────────────────────────────────
   repeatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

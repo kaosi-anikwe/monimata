@@ -705,11 +705,53 @@ export default function BudgetEditScreen() {
     return hiddenGroups + hiddenCats;
   }, [data]);
 
-  // "Cost to be me" = sum of all target amounts (visible only)
-  const costToBeMe = useMemo(
-    () => groups.flatMap((g) => g.categories).reduce((sum, c) => sum + (c.target_amount ?? 0), 0),
-    [groups],
-  );
+  // "Cost to be me" = stable monthly equivalent cost of all targets.
+  //
+  // We must NOT use required_this_month here — that value decreases as categories
+  // are funded, which would shrink cost-to-be-me and make the progress bar
+  // meaningless (a fully-funded month would always show 100%).
+  //
+  // Instead we compute the steady-state monthly cost for each target:
+  //   monthly  → target_amount (full monthly bill, every month)
+  //   weekly   → target_amount × 4  (4 weeks/month)
+  //   yearly   → ceil(target_amount / 12)        (amortised annual cost)
+  //   balance  → required_this_month             (accumulation phase only;
+  //              drops to 0 once the savings floor is met — correct)
+  //   custom   → required_this_month             (sinking fund: varies by
+  //              remaining months until target_date, best approximation)
+  const costToBeMe = useMemo(() => {
+    return groups.flatMap((g) => g.categories).reduce((sum, c) => {
+      if (!c.target_amount || !c.target_frequency) return sum;
+      if (c.target_behavior === 'balance') {
+        // Balance targets (e.g. emergency fund): only costs money until the
+        // savings floor is reached, then ₦0/month — required_this_month
+        // already returns 0 once fully funded, which is the correct behaviour.
+        return sum + (c.required_this_month ?? 0);
+      }
+      switch (c.target_frequency) {
+        case 'monthly': return sum + c.target_amount;
+        case 'weekly': return sum + c.target_amount * 4;
+        case 'yearly': {
+          // Spread over the months remaining until the target deadline (Dec 31 of
+          // current year if no specific date), not a flat /12 annualised rate.
+          const today = new Date();
+          let tDate: Date;
+          if (c.target_date) {
+            const [y, mo, d] = c.target_date.split('-').map(Number);
+            tDate = new Date(y, mo - 1, d);
+          } else {
+            tDate = new Date(today.getFullYear(), 11, 31);
+          }
+          const monthsLeft = tDate > today
+            ? (tDate.getFullYear() - today.getFullYear()) * 12 + (tDate.getMonth() - today.getMonth()) + 1
+            : 1;
+          return sum + Math.ceil(c.target_amount / Math.max(1, monthsLeft));
+        }
+        case 'custom': return sum + (c.required_this_month ?? 0);
+        default: return sum;
+      }
+    }, 0);
+  }, [groups]);
 
   const assignedTotal = useMemo(
     () => groups.flatMap((g) => g.categories).reduce((sum, c) => sum + c.assigned, 0),

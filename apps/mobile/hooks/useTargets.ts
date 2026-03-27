@@ -90,7 +90,12 @@ export function useUpsertTarget(month: string) {
       });
       syncDatabase().catch(console.warn);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.budget(month) }),
+    onSuccess: (_data, variables) => {
+      // Invalidate both the target cache (so the edit screen re-reads fresh
+      // data on the next open) and the budget cache (required_this_month etc).
+      qc.invalidateQueries({ queryKey: queryKeys.target(variables.categoryId) });
+      qc.invalidateQueries({ queryKey: ['budget'] });
+    },
     onError: () => error('Error', 'Could not save target.'),
   });
 }

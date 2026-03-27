@@ -38,6 +38,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+
+import { releaseWelcome, resetWelcomeBridgeForUser } from '@/lib/welcomeBridge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ff } from '@/lib/typography';
@@ -112,9 +114,12 @@ const SCREEN_W = Dimensions.get('window').width;
 interface AppWelcomeProps {
   /** The currently logged-in user's ID — used to scope the seen flag. */
   userId: string;
+  /** Called when the welcome is dismissed OR was already seen (so callers can
+   *  always rely on this to know the welcome is out of the way). */
+  onDismiss?: () => void;
 }
 
-export function AppWelcome({ userId }: AppWelcomeProps) {
+export function AppWelcome({ userId, onDismiss }: AppWelcomeProps) {
   const [visible, setVisible] = useState(false);
   const [page, setPage] = useState(0);
   const pageRef = useRef(0);
@@ -127,15 +132,24 @@ export function AppWelcome({ userId }: AppWelcomeProps) {
 
   useEffect(() => {
     if (!userId) return;
+    resetWelcomeBridgeForUser(userId);
     const key = SEEN_PREFIX + userId;
     SecureStore.getItemAsync(key).then((seen) => {
-      if (!seen) setVisible(true);
-    }).catch(() => { });
-  }, [userId]);
+      if (!seen) {
+        setVisible(true);
+      } else {
+        // Returning user — welcome already seen; release immediately.
+        releaseWelcome();
+        onDismiss?.();
+      }
+    }).catch(() => { releaseWelcome(); onDismiss?.(); });
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function dismiss() {
     SecureStore.setItemAsync(SEEN_PREFIX + userId, '1').catch(() => { });
     setVisible(false);
+    releaseWelcome();
+    onDismiss?.();
   }
 
   function goToPage(idx: number) {

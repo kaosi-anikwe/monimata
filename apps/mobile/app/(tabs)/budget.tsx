@@ -84,7 +84,8 @@ const BUDGET_TOUR: TourStep[] = [
     targetId: "budget-progress-bar",
     title: "Budget Activity",
     body: "The bar shows how much you've assigned (filled) and how much you've spent (grayed). When the bar turns red, you've spent more than you assigned.",
-    tooltipSide: "below"
+    tooltipSide: "below",
+    fallbackFullscreen: true
   }
 ];
 
@@ -291,9 +292,11 @@ function getCatSpentProgress(c: BudgetCategory): number {
 function CategoryRow({
   category,
   onPress,
+  showTourTarget,
 }: {
   category: BudgetCategory;
   onPress: () => void;
+  showTourTarget?: boolean;
 }) {
   const colors = useTheme();
 
@@ -335,7 +338,7 @@ function CategoryRow({
     >
       {/* .bgt-ri — name + spend bar */}
       <View style={cr.left}>
-        <TourTarget id="budget-progress-bar">
+        <TourTarget id={showTourTarget ? 'budget-progress-bar' : `cat-${category.id}`}>
           <Text style={[cr.name, { color: colors.textPrimary }]} numberOfLines={1}>
             {category.name}
           </Text>
@@ -1146,10 +1149,11 @@ export default function BudgetScreen() {
                   }
                 }}
               />
-              {!group.is_hidden && !collapsedGroups.has(group.id) && group.categories.map((cat) => (
+              {!group.is_hidden && !collapsedGroups.has(group.id) && group.categories.map((cat, catIdx) => (
                 <CategoryRow
                   key={cat.id}
                   category={cat}
+                  showTourTarget={idx === 0 && catIdx === 0}
                   onPress={() => {
                     if (cat.is_hidden) {
                       setUnhideTarget({ id: cat.id, name: cat.name, type: 'category' });

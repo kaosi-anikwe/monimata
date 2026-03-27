@@ -64,6 +64,7 @@ from app.models.bank_account import BankAccount
 from app.worker.tasks import fetch_transactions
 from app.services.mono_client import mono_client
 from app.core.deps import get_current_user, get_verified_user
+from app.ws_manager import notify_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -119,6 +120,31 @@ async def add_manual_account(
     db.add(bank_account)
     db.commit()
     db.refresh(bank_account)
+
+    # Create a "Starting balance" credit transaction so the opening funds flow
+    # into TBB.  Without this, the balance lives only in bank_accounts.balance
+    # and TBB (which sums credit transactions) never sees it.
+    if bank_account.balance != 0:
+        opening_tx = Transaction(
+            user_id=current_user.id,
+            account_id=bank_account.id,
+            date=datetime.now(timezone.utc),
+            amount=bank_account.balance,
+            narration="Starting balance",
+            type="credit",
+            is_manual=True,
+            source="manual",
+        )
+        db.add(opening_tx)
+        # The transaction now accounts for the full opening balance; zero the
+        # anchor so it isn't double-counted if the account is later Mono-linked.
+        bank_account.starting_balance = 0
+        db.commit()
+
+    # Push invalidation so the mobile client refreshes TBB, net worth, and
+    # the transactions list without requiring a manual pull-to-refresh.
+    notify_user(current_user.id, ["accounts", "transactions", "budget"])
+
     return bank_account
 
 
