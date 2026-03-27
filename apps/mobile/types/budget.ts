@@ -27,6 +27,10 @@ export interface BudgetCategory {
   target_amount: number | null;
   /** "monthly" | "weekly" | "yearly" | "custom" | null */
   target_frequency: string | null;
+  /** "set_aside" | "refill" | "balance" | null */
+  target_behavior: string | null;
+  /** "YYYY-MM-DD" deadline for yearly/custom targets; null otherwise */
+  target_date: string | null;
 }
 
 export interface BudgetGroup {

@@ -56,6 +56,7 @@ from app.models.target import CategoryTarget
 from app.models.recurring_rule import RecurringRule
 from app.core.deps import get_current_user
 from app.models.transaction import Transaction
+from app.models.bank_account import BankAccount
 from app.models.category import Category, CategoryGroup
 from app.services.budget_logic import get_or_create_budget_month
 from app.ws_manager import notify_user
@@ -827,6 +828,20 @@ def push(
             bm.activity += tx.amount
             has_budget_changes = True
 
+        # Keep account.balance in sync for manual (non-Mono) accounts.
+        # Mono-linked accounts derive their balance from SUM(transactions) at
+        # read time, so they must not have balance mutated here.
+        _create_acct = (
+            db.query(BankAccount)
+            .filter(
+                BankAccount.id == record["account_id"],
+                BankAccount.user_id == user_id,
+            )
+            .first()
+        )
+        if _create_acct and not _create_acct.is_mono_linked:
+            _create_acct.balance += tx.amount
+
         new_tx_ids.append(record["id"])
         if tx.category_id is None:
             new_uncategorised_tx_ids.append(record["id"])
@@ -848,6 +863,9 @@ def push(
         # Manual transactions: all mutable fields are editable.
         # Mono/Interswitch transactions: only category_id and memo.
         if tx.is_manual:
+            _old_amount = tx.amount
+            _old_account_id = str(tx.account_id)
+
             if "type" in record:
                 tx.type = record["type"]
             if "date" in record:
@@ -858,6 +876,33 @@ def push(
                 tx.narration = record["narration"]
             if "amount" in record:
                 tx.amount = int(record["amount"])
+
+            # Adjust account balance(s) for manual (non-Mono) accounts.
+            _new_amount = tx.amount
+            _new_account_id = str(tx.account_id)
+            if _old_account_id != _new_account_id:
+                _old_upd_acct = (
+                    db.query(BankAccount)
+                    .filter(BankAccount.id == _old_account_id, BankAccount.user_id == user_id)
+                    .first()
+                )
+                if _old_upd_acct and not _old_upd_acct.is_mono_linked:
+                    _old_upd_acct.balance -= _old_amount
+                _new_upd_acct = (
+                    db.query(BankAccount)
+                    .filter(BankAccount.id == _new_account_id, BankAccount.user_id == user_id)
+                    .first()
+                )
+                if _new_upd_acct and not _new_upd_acct.is_mono_linked:
+                    _new_upd_acct.balance += _new_amount
+            elif _new_amount != _old_amount:
+                _upd_acct = (
+                    db.query(BankAccount)
+                    .filter(BankAccount.id == _old_account_id, BankAccount.user_id == user_id)
+                    .first()
+                )
+                if _upd_acct and not _upd_acct.is_mono_linked:
+                    _upd_acct.balance += (_new_amount - _old_amount)
 
         # Rebalance budget_months.activity when the category changes.
         old_category_id = str(tx.category_id) if tx.category_id else None
@@ -910,6 +955,15 @@ def push(
             bm.activity -= tx.amount
             has_budget_changes = True
 
+        # Reverse account balance for manual (non-Mono) accounts.
+        _del_acct = (
+            db.query(BankAccount)
+            .filter(BankAccount.id == tx.account_id, BankAccount.user_id == user_id)
+            .first()
+        )
+        if _del_acct and not _del_acct.is_mono_linked:
+            _del_acct.balance -= tx.amount
+
         db.delete(tx)
 
     # ── Commit ────────────────────────────────────────────────────────────────
@@ -953,6 +1007,10 @@ def push(
     invalidate_keys: list[str] = []
     if new_tx_ids or updated_tx_ids or tx_changes.get("deleted"):
         invalidate_keys.append("transactions")
+        # Account balances change whenever manual transactions are created,
+        # updated or deleted — invalidate so the client refreshes balances
+        # and net worth immediately after sync completes.
+        invalidate_keys.append("accounts")
     if has_budget_changes:
         invalidate_keys.append("budget")
     if has_category_changes:

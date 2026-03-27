@@ -67,13 +67,6 @@ const ACCOUNTS_TOUR: TourStep[] = [
     body: 'Connect GTBank, Kuda, Access, or any other Nigerian bank via Mono. Your transactions will sync automatically every day.',
     tooltipSide: 'below',
   },
-  {
-    targetId: 'accounts-total',
-    title: 'Your true total balance',
-    body: 'All linked and manual accounts are added up here so you always know your real financial position at a glance.',
-    tooltipSide: 'below',
-    fallbackFullscreen: true
-  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -826,21 +819,19 @@ export default function AccountsScreen() {
         ) : (
           <>
             {/* ── Total Balance Card ── */}
-            <TourTarget id="accounts-total">
-              <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
-                <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
-                <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
-                <View style={ss.syncNote}>
-                  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                    <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                  <Text style={[ss.syncNoteTxt, { color: colors.textInverseFaint }]}>
-                    Syncs every 12 AM
-                  </Text>
-                </View>
+            <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
+              <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
+              <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
+              <View style={ss.syncNote}>
+                <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                  <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+                <Text style={[ss.syncNoteTxt, { color: colors.textInverseFaint }]}>
+                  Syncs every 12 AM
+                </Text>
               </View>
-            </TourTarget>
+            </View>
 
             {/* ── Global re-auth warning banner ── */}
             {hasReauthAccount && (

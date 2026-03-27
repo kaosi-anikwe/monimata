@@ -31,6 +31,7 @@
 
 import { View } from 'react-native';
 import { useCallback, useEffect, useRef } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 
 import { useTourContext } from './TourProvider';
 
@@ -50,6 +51,12 @@ export function TourTarget({ id, children }: TourTargetProps) {
   const isActiveRef = useRef(false);
   isActiveRef.current = activeTargetId === id;
 
+  // Only trigger deferred mini-tours when this screen is actually focused.
+  // Without this guard, a TourTarget that mounts in the background (e.g. the
+  // home screen rendering new goals while Edit Budget is on top) would fire
+  // notifyTargetMounted and launch the tour overlay over the wrong screen.
+  const isFocused = useIsFocused();
+
   const isActive = activeTargetId === id;
 
   const measure = useCallback(() => {
@@ -68,10 +75,11 @@ export function TourTarget({ id, children }: TourTargetProps) {
     hasLayoutRef.current = true;
     if (isActiveRef.current) {
       requestAnimationFrame(measure);
-    } else {
+    } else if (isFocused) {
+      // Only notify for deferred steps when our screen is in the foreground.
       notifyTargetMounted(id);
     }
-  }, [measure, notifyTargetMounted, id]);
+  }, [measure, notifyTargetMounted, id, isFocused]);
 
   // Register this target as mounted so queueDeferred can immediately start
   // a deferred step if the SecureStore read arrives after onLayout has already fired.

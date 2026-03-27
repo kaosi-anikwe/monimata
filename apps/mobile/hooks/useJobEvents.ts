@@ -62,6 +62,7 @@ import { AppState, AppStateStatus } from 'react-native';
 
 import type { RootState } from '@/store';
 import { getAccessToken } from '@/services/api';
+import { syncDatabase } from '@/database/sync';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 const WS_BASE =
@@ -141,9 +142,20 @@ export function useJobEvents(): void {
           try {
             const msg = JSON.parse(event.data) as ServerEvent;
             if (msg.type === 'invalidate' && Array.isArray(msg.keys)) {
-              msg.keys.forEach(key => {
-                qc.invalidateQueries({ queryKey: [key] });
-              });
+              // Keys that indicate new server-side data (Mono sync, categorisation,
+              // nudge evaluation). We must pull WatermelonDB before invalidating React
+              // Query — otherwise the query re-runs against stale local SQLite data.
+              const needsSync = msg.keys.some((k) =>
+                k === 'transactions' || k === 'budget' || k === 'accounts',
+              );
+              const doInvalidate = () =>
+                msg.keys.forEach((key) => qc.invalidateQueries({ queryKey: [key] }));
+
+              if (needsSync) {
+                syncDatabase().then(doInvalidate).catch(() => doInvalidate());
+              } else {
+                doInvalidate();
+              }
             } else if (msg.type === 'bill_payment_update') {
               // Invalidate status query so polling picks up the new state.
               qc.invalidateQueries({ queryKey: ['bill-payment-status', msg.ref] });

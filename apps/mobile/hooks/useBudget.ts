@@ -78,7 +78,11 @@ function requiredThisMonth(
     if (behavior === 'balance') return Math.max(0, targetAmount - available);
     let tDate: Date;
     if (targetDate) {
-      tDate = new Date(targetDate);
+      // Parse as local midnight to match Python date comparison.
+      // new Date('YYYY-MM-DD') parses as UTC midnight, which lands on the
+      // previous calendar day in WAT/WAT+ timezones.
+      const [y, mo, d] = targetDate.split('-').map(Number);
+      tDate = new Date(y, mo - 1, d);
     } else if (frequency === 'yearly') {
       tDate = new Date(today.getFullYear(), 11, 31);
     } else {
@@ -223,6 +227,8 @@ export function useBudget(month: string) {
             required_this_month: target ? requiredThisMonth(target, available, today) : null,
             target_amount: target?.targetAmount ?? null,
             target_frequency: (target?.frequency ?? null) as string | null,
+            target_behavior: (target?.behavior ?? null) as string | null,
+            target_date: (target?.targetDate ?? null) as string | null,
           };
         });
         return {
@@ -660,12 +666,12 @@ export function useAutoAssignPreviews(
       const [historicalBMs, allTargets] = await Promise.all([
         catIds.length > 0
           ? db
-              .get<BudgetMonthModel>('budget_months')
-              .query(
-                Q.where('category_id', Q.oneOf(catIds)),
-                Q.where('month', Q.oneOf(histMonths)),
-              )
-              .fetch()
+            .get<BudgetMonthModel>('budget_months')
+            .query(
+              Q.where('category_id', Q.oneOf(catIds)),
+              Q.where('month', Q.oneOf(histMonths)),
+            )
+            .fetch()
           : Promise.resolve([]),
         db.get<CategoryTargetModel>('category_targets').query().fetch(),
       ]);
