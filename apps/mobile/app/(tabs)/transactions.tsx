@@ -28,6 +28,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -57,6 +58,25 @@ import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
+import { TourTarget, useTour, type TourStep } from '@/components/tour';
+
+// ── Tour definition ──────────────────────────────────────────────────────
+
+const TRANSACTIONS_TOUR: TourStep[] = [
+  {
+    targetId: 'tx-search',
+    title: 'Search & filter',
+    body: 'Search by name or amount. Use filter chips to view only debits, credits, or a specific account.',
+    tooltipSide: 'below',
+  },
+  {
+    targetId: 'tx-first-row',
+    title: 'Categorise transactions',
+    body: 'Tap the category chip on any transaction to assign it to a budget category. MoniMata will remember and auto-categorise similar ones.',
+    tooltipSide: 'below',
+    fallbackFullscreen: true,
+  },
+];
 
 // ─── Filter type ──────────────────────────────────────────────────────────────
 
@@ -310,6 +330,11 @@ export default function TransactionsScreen() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<TxFilter>('all');
 
+  const startTourIfUnseen = useTour();
+  useFocusEffect(
+    useCallback(() => { startTourIfUnseen('transactions', TRANSACTIONS_TOUR); }, [startTourIfUnseen]),
+  );
+
   const {
     data: txPages,
     isLoading,
@@ -454,21 +479,23 @@ export default function TransactionsScreen() {
         </View>
 
         {/* Search bar */}
-        <View style={[ss.searchBar, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Circle cx={11} cy={11} r={8} stroke={colors.textTertiary} strokeWidth={2} />
-            <Path d="M21 21l-4.35-4.35" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
-          </Svg>
-          <TextInput
-            style={[ss.searchInput, { color: colors.textPrimary }]}
-            placeholder="Search transactions…"
-            placeholderTextColor={colors.textTertiary}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            accessibilityLabel="Search transactions"
-          />
-        </View>
+        <TourTarget id="tx-search">
+          <View style={[ss.searchBar, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+              <Circle cx={11} cy={11} r={8} stroke={colors.textTertiary} strokeWidth={2} />
+              <Path d="M21 21l-4.35-4.35" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
+            </Svg>
+            <TextInput
+              style={[ss.searchInput, { color: colors.textPrimary }]}
+              placeholder="Search transactions…"
+              placeholderTextColor={colors.textTertiary}
+              value={search}
+              onChangeText={setSearch}
+              returnKeyType="search"
+              accessibilityLabel="Search transactions"
+            />
+          </View>
+        </TourTarget>
 
         {/* Filter chips */}
         <ScrollView
@@ -493,14 +520,16 @@ export default function TransactionsScreen() {
       <FlashList
         data={dayGroups}
         keyExtractor={(g) => g.day}
-        renderItem={({ item: group }) => (
-          <DayGroupCard
-            group={group}
-            categoryMap={categoryMap}
-            accountMap={accountMap}
-            onTxPress={(id) => router.push(`/transaction/${id}` as never)}
-            onCategoryPress={(id) => setPickerTxId(id)}
-          />
+        renderItem={({ item: group, index }) => (
+          <TourTarget id={index === 0 ? 'tx-first-row' : `day-${group.day}`}>
+            <DayGroupCard
+              group={group}
+              categoryMap={categoryMap}
+              accountMap={accountMap}
+              onTxPress={(id) => router.push(`/transaction/${id}` as never)}
+              onCategoryPress={(id) => setPickerTxId(id)}
+            />
+          </TourTarget>
         )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />

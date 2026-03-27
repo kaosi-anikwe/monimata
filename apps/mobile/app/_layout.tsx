@@ -31,9 +31,9 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { Provider } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
@@ -47,11 +47,13 @@ import { syncDatabase } from '@/database/sync';
 import { Database } from '@nozbe/watermelondb';
 import { radius, spacing } from '@/lib/tokens';
 import { getTheme, useTheme } from '@/lib/theme';
+import { TourProvider } from '@/components/tour';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { setLogoutHandler } from '@/services/api';
 import { ToastProvider } from '@/components/Toast';
 import { ThemeProvider } from '@/lib/ThemeProvider';
 import { useJobEvents } from '@/hooks/useJobEvents';
+import { AppWelcome } from '@/components/AppWelcome';
 import { syncToCurrentMonth } from '@/store/budgetSlice';
 import { AppLockScreen } from '@/components/AppLockScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -62,7 +64,6 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // Initialise Sentry before the app renders so the first frame is covered.
 initSentry();
-
 
 // Database is initialised lazily inside RootLayout (in the useEffect that runs
 // before <DatabaseProvider> renders). initDatabase() generates/retrieves the
@@ -191,6 +192,11 @@ function RootNavigator() {
           onUnlock={unlock}
           onPasswordLogin={() => { postLockReturnPath.current = pathnameRef.current; }}
         />
+      )}
+
+      {/* Welcome walkthrough — shown once per account on first app entry */}
+      {isAuthenticated && (user?.onboarded ?? false) && user?.id && (
+        <AppWelcome userId={user.id} />
       )}
 
       {/* Pre-permission explanatory modal — shown once before the OS dialog */}
@@ -380,9 +386,11 @@ function RootLayout() {
             <DatabaseProvider database={db}>
               <SafeAreaProvider>
                 <ToastProvider>
-                  <ErrorBoundary>
-                    <RootNavigator />
-                  </ErrorBoundary>
+                  <TourProvider>
+                    <ErrorBoundary>
+                      <RootNavigator />
+                    </ErrorBoundary>
+                  </TourProvider>
                 </ToastProvider>
               </SafeAreaProvider>
             </DatabaseProvider>
