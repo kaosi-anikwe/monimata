@@ -52,6 +52,7 @@ import { nextMonth, prevMonth } from '@/store/budgetSlice';
 import { glass, layout, radius, spacing } from '@/lib/tokens';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { AutoAssignSheet } from '@/components/AutoAssignSheet';
+import { BudgetWalkthrough } from '@/components/BudgetWalkthrough';
 import type { BudgetCategory, BudgetGroup } from '@/types/budget';
 import { useAssignCategory, useBudget, useMoveMoney, useUnhideCategory, useUnhideGroup } from '@/hooks/useBudget';
 
@@ -1166,6 +1167,9 @@ export default function BudgetScreen() {
           onClose={() => setShowAutoAssign(false)}
         />
       )}
+
+      {/* First-time onboarding walkthrough — self-managing, shows once */}
+      <BudgetWalkthrough />
 
     </View>
   );
