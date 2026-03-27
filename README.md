@@ -324,6 +324,15 @@ For building a release APK without EAS or the Play Store, see [docs/LOCAL_APK_BU
 
 ---
 
+## Team
+
+| Member | Role | Contributions |
+| --- | --- | --- |
+| **Kaosi Anikwe** | Full-Stack Developer | Entire codebase — FastAPI backend, WatermelonDB sync engine, React Native app, Celery workers, Mono & Interswitch integrations, CI/CD, deployment |
+| **Patricia Oko** | UI/UX Designer | App design, screen flows, visual identity, and authored this README |
+
+---
+
 ## License
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.  
