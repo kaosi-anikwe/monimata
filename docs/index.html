@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoniMata — Zero-Based Budgeting for Nigerians</title>
+  <meta name="description" content="Give every kobo a job. MoniMata is a zero-based budgeting app built for Nigeria — with Pidgin nudges, bill payments, Mono bank sync, and offline-first storage." />
+
+  <!-- Favicon: notification icon mark -->
+  <link rel="icon" type="image/png" href="images/favicon.png" />
+  <link rel="apple-touch-icon" href="images/favicon.png" />
+
+  <!-- Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Reset ──────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:        #2D6A2D;
+      --brand-bright: #4CAF50;
+      --lime:         #A8E063;
+      --dark-green:   #0D1F0D;
+      --dark-mid:     #1A3A1A;
+      --dark-deep:    #091409;
+      --surface:      #EEF9E4;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: var(--dark-deep);
+      color: #e8f5e8;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--lime); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Nav ──────────────────────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 clamp(1.25rem, 5vw, 3rem);
+      height: 60px;
+      background: rgba(9, 20, 9, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(45, 106, 45, 0.2);
+    }
+
+    .nav-logo {
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    /* The nav mark is the small notification icon; wordmark sits beside it */
+    .nav-logo img.mark { height: 28px; width: auto; }
+    .nav-logo img.wordmark {
+      height: 18px; width: auto;
+      /* wordmark is white-on-transparent — always visible on dark bg */
+    }
+
+    .nav-links {
+      display: flex; gap: 1.5rem; list-style: none;
+      font-size: 0.875rem; font-weight: 600;
+    }
+    .nav-links a { color: rgba(232,245,232,0.65); }
+    .nav-links a:hover { color: var(--lime); text-decoration: none; }
+
+    @media (max-width: 540px) { .nav-links { display: none; } }
+
+    /* ── Layout ───────────────────────────────────────────────────────────── */
+    .container { max-width: 1040px; margin: 0 auto; padding: 0 clamp(1.25rem, 5vw, 2.5rem); }
+    section { padding: 5rem 0; }
+    hr.divider { border: none; border-top: 1px solid rgba(45,106,45,0.15); margin: 0; }
+
+    /* ── Hero ─────────────────────────────────────────────────────────────── */
+    .hero {
+      position: relative; overflow: hidden;
+      padding: 6rem 0 4rem; text-align: center;
+      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(76,175,80,0.16), transparent);
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(circle at 15% 85%, rgba(45,106,45,0.12) 0%, transparent 50%),
+        radial-gradient(circle at 85% 20%, rgba(168,224,99,0.06) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.375rem;
+      padding: 0.3rem 0.85rem; border-radius: 9999px;
+      border: 1px solid rgba(168,224,99,0.3);
+      background: rgba(168,224,99,0.07);
+      font-size: 0.75rem; font-weight: 700; color: var(--lime);
+      letter-spacing: 0.06em; text-transform: uppercase;
+      margin-bottom: 1.75rem;
+    }
+
+    /* Hero logo: large mark + wordmark stacked */
+    .hero-brand {
+      display: flex; flex-direction: column; align-items: center; gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+    .hero-brand img.mark { height: 80px; width: auto; filter: drop-shadow(0 8px 32px rgba(76,175,80,0.35)); }
+    .hero-brand img.wordmark { height: 36px; width: auto; }
+
+    .hero h1 {
+      font-size: clamp(2.2rem, 5.5vw, 3.6rem);
+      font-weight: 800; line-height: 1.1;
+      letter-spacing: -0.03em; color: #fff;
+      margin-bottom: 1.1rem;
+    }
+    .hero h1 span { color: var(--lime); }
+
+    .hero-tagline {
+      font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+      color: rgba(232,245,232,0.6);
+      max-width: 540px; margin: 0 auto 2.5rem;
+      font-weight: 400;
+    }
+
+    /* ── Buttons ──────────────────────────────────────────────────────────── */
+    .cta-group {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.875rem; flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.8rem 1.75rem; border-radius: 12px;
+      font-family: inherit; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; border: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+      text-decoration: none;
+    }
+    .btn:hover { transform: translateY(-2px); text-decoration: none; }
+    .btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    .btn-primary {
+      background: var(--brand-bright); color: #fff;
+    }
+    .btn-primary:hover {
+      background: var(--lime); color: var(--dark-green);
+      box-shadow: 0 8px 28px rgba(76,175,80,0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(45,106,45,0.22); color: var(--lime);
+      border: 1px solid rgba(45,106,45,0.5);
+    }
+    .btn-secondary:hover {
+      background: rgba(45,106,45,0.38);
+      box-shadow: 0 8px 24px rgba(45,106,45,0.22);
+    }
+
+    .btn-outline {
+      background: transparent; color: rgba(232,245,232,0.55);
+      border: 1px solid rgba(232,245,232,0.18);
+      font-size: 0.875rem;
+    }
+    .btn-outline:hover { color: #fff; border-color: rgba(232,245,232,0.38); }
+
+    /* ── Screenshots ──────────────────────────────────────────────────────── */
+    .screenshots { padding: 3rem 0 5rem; }
+
+    .screenshots-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem; margin-top: 2.5rem;
+    }
+    @media (max-width: 640px) {
+      .screenshots-grid { grid-template-columns: 1fr; max-width: 300px; margin-left: auto; margin-right: auto; }
+    }
+
+    .screenshot-slot {
+      position: relative; border-radius: 20px; overflow: hidden;
+      aspect-ratio: 9 / 19.5;
+      background: var(--dark-mid);
+      border: 1px solid rgba(45,106,45,0.2);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 0.6rem;
+      color: rgba(232,245,232,0.28); font-size: 0.75rem;
+      text-align: center; padding: 1rem;
+    }
+    .screenshot-slot img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; object-fit: cover; border-radius: 20px;
+    }
+    .screenshot-slot .ph-icon { font-size: 2.25rem; line-height: 1; }
+    .screenshot-label {
+      margin-top: 0.75rem; font-size: 0.78rem; font-weight: 600;
+      color: rgba(232,245,232,0.45); text-align: center;
+    }
+
+    /* Demo GIF (hidden until added; swap with screenshots-grid visibility) */
+    .gif-slot {
+      display: none;
+      margin: 2.5rem auto 0; max-width: 340px;
+      border-radius: 24px; overflow: hidden;
+      border: 1px solid rgba(45,106,45,0.3);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    }
+    .gif-slot img { width: 100%; display: block; }
+
+    /* ── Section headings ─────────────────────────────────────────────────── */
+    .section-label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--lime); margin-bottom: 0.5rem;
+    }
+    .section-title {
+      font-size: clamp(1.6rem, 3.8vw, 2.3rem); font-weight: 800;
+      letter-spacing: -0.025em; color: #fff; line-height: 1.2;
+      margin-bottom: 0.65rem;
+    }
+    .section-subtitle {
+      font-size: 0.975rem; color: rgba(232,245,232,0.5); max-width: 520px;
+    }
+
+    /* ── Features ─────────────────────────────────────────────────────────── */
+    .features { background: rgba(13,31,13,0.5); }
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.1rem; margin-top: 2.75rem;
+    }
+    .feature-card {
+      background: rgba(26,58,26,0.45);
+      border: 1px solid rgba(45,106,45,0.18);
+      border-radius: 16px; padding: 1.4rem 1.5rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature-card:hover { border-color: rgba(76,175,80,0.4); transform: translateY(-2px); }
+    .feature-icon { font-size: 1.7rem; margin-bottom: 0.75rem; display: block; }
+    .feature-card h3 { font-size: 0.975rem; font-weight: 700; color: #fff; margin-bottom: 0.3rem; }
+    .feature-card p { font-size: 0.855rem; color: rgba(232,245,232,0.52); line-height: 1.6; }
+
+    .stack-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 2.5rem; }
+    .pill {
+      padding: 0.28rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;
+      background: rgba(45,106,45,0.18); border: 1px solid rgba(45,106,45,0.32); color: var(--lime);
+    }
+
+    /* ── Install banner ───────────────────────────────────────────────────── */
+    .install-banner {
+      background: linear-gradient(135deg, var(--dark-mid), rgba(26,58,26,0.8));
+      border: 1px solid rgba(45,106,45,0.28); border-radius: 20px;
+      padding: 2.25rem 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 2rem; flex-wrap: wrap; margin-bottom: 3rem;
+    }
+    .install-banner-text h3 { font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 0.2rem; }
+    .install-banner-text p { font-size: 0.855rem; color: rgba(232,245,232,0.5); }
+    .install-banner-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+    /* ── Testing guide ────────────────────────────────────────────────────── */
+    .testing { background: rgba(9,20,9,0.55); }
+    .testing-body {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1rem; margin-top: 2.5rem;
+    }
+    @media (max-width: 720px) { .testing-body { grid-template-columns: 1fr; } }
+
+    .test-step {
+      background: rgba(26,58,26,0.38);
+      border: 1px solid rgba(45,106,45,0.16);
+      border-radius: 14px; padding: 1.2rem 1.4rem;
+    }
+    .test-step h3 {
+      font-size: 0.92rem; font-weight: 700; color: var(--lime);
+      margin-bottom: 0.55rem; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .test-step ul { padding-left: 1.1rem; font-size: 0.85rem; color: rgba(232,245,232,0.62); }
+    .test-step ul li { margin-bottom: 0.28rem; line-height: 1.5; }
+    .test-step ul li strong { color: rgba(232,245,232,0.88); }
+
+    .nudge-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.5rem; }
+    .nudge-table td {
+      padding: 0.32rem 0.45rem; color: rgba(232,245,232,0.62);
+      border-bottom: 1px solid rgba(45,106,45,0.12);
+    }
+    .nudge-table tr:last-child td { border-bottom: none; }
+    .nudge-table td:first-child { color: rgba(232,245,232,0.88); }
+
+    code {
+      background: rgba(45,106,45,0.22); color: var(--lime); font-size: 0.78em;
+      padding: 0.1em 0.4em; border-radius: 4px;
+      font-family: 'Fira Code', 'Courier New', monospace;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid rgba(45,106,45,0.14);
+      padding: 2.25rem 0; text-align: center;
+      font-size: 0.8rem; color: rgba(232,245,232,0.3);
+    }
+    footer a { color: rgba(168,224,99,0.55); }
+    footer a:hover { color: var(--lime); text-decoration: none; }
+
+    .footer-logo {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.6rem; margin-bottom: 0.75rem;
+    }
+    .footer-logo img.mark { height: 22px; width: auto; opacity: 0.7; }
+    .footer-logo img.wordmark { height: 14px; width: auto; opacity: 0.5; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+  <nav>
+    <a class="nav-logo" href="#">
+      <img class="mark" src="images/favicon.png" alt="MoniMata mark" />
+      <img class="wordmark" src="images/wordmark.png" alt="MoniMata" />
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#testing">Testing Guide</a></li>
+      <li><a href="https://github.com/kaosi-anikwe/monimata" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+  </nav>
+
+
+  <!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+  <header class="hero">
+    <div class="container">
+
+      <div class="hero-badge">
+        <span>🇳🇬</span> Built for Nigeria &nbsp;·&nbsp; Hackathon 2026
+      </div>
+
+      <!-- Full logo mark + wordmark -->
+      <div class="hero-brand">
+        <img class="mark" src="images/logo.png" alt="MoniMata logo" />
+        <img class="wordmark" src="images/wordmark.png" alt="MoniMata" />
+      </div>
+
+      <h1>Give every <span>kobo</span> a job.</h1>
+
+      <p class="hero-tagline">
+        Zero-based budgeting for Nigerians — Pidgin nudges, Interswitch bill payments,
+        Mono bank sync, and offline-first storage.
+      </p>
+
+      <div class="cta-group">
+        <!-- Replace href with your Appetize.io URL when ready -->
+        <a href="#appetize-placeholder" class="btn btn-primary" id="try-btn-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><circle cx="12" cy="18" r="1"/></svg>
+          Try in Browser
+        </a>
+        <a href="https://github.com/kaosi-anikwe/monimata/releases/download/v1.0/MoniMata-v1.0-android.apk"
+           class="btn btn-secondary" download>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download APK (Android)
+        </a>
+        <a href="https://github.com/kaosi-anikwe/monimata" class="btn btn-outline"
+           target="_blank" rel="noopener">View Source ↗</a>
+      </div>
+
+    </div>
+  </header>
+
+
+  <!-- ── Screenshots ───────────────────────────────────────────────────────── -->
+  <section class="screenshots">
+    <div class="container">
+      <div class="section-label">Preview</div>
+      <h2 class="section-title">See it in action</h2>
+      <p class="section-subtitle">Screenshots coming soon — or watch the demo GIF below.</p>
+
+      <!--
+        ════════════════════════════════════════════════════════
+        SCREENSHOT INSTRUCTIONS
+        ────────────────────────────────────────────────────────
+        1. Take 3 screenshots on the device (or Appetize):
+             - Home screen (TBB chip + Goals section)
+             - Budget tab (Transport red, Food orange)
+             - Nudges tab (5 unread cards)
+        2. Save to:
+             docs/images/screen-home.png
+             docs/images/screen-budget.png
+             docs/images/screen-nudges.png
+        3. In each .screenshot-slot, uncomment the <img> tag
+           and remove the placeholder <span> elements.
+
+        GIF (optional — replaces the 3-column grid):
+        1. Record a 30-sec screen capture (tour → budget → nudge → bill).
+        2. Convert:  ffmpeg -i demo.mp4 -vf fps=18,scale=320:-1 demo.gif
+        3. Save as:  docs/images/demo.gif
+        4. Set  .gif-slot { display: block; }
+           and  .screenshots-grid { display: none; }
+        ════════════════════════════════════════════════════════
+      -->
+
+      <!-- Demo GIF (hidden until added) -->
+      <div class="gif-slot">
+        <img src="images/demo.gif" alt="MoniMata 30-second demo" />
+      </div>
+
+      <!-- Static screenshot grid -->
+      <div class="screenshots-grid">
+
+        <div>
+          <div class="screenshot-slot">
+            <!-- <img src="images/screen-home.png" alt="Home screen" /> -->
+            <span class="ph-icon">🏠</span>
+            <span>Home Screen<br/><small>TBB · Goals · Net Worth</small></span>
+          </div>
+          <p class="screenshot-label">Home — Ready to Assign</p>
+        </div>
+
+        <div>
+          <div class="screenshot-slot">
+            <!-- <img src="images/screen-budget.png" alt="Budget tab" /> -->
+            <span class="ph-icon">₦</span>
+            <span>Budget Tab<br/><small>Category groups · Auto-assign</small></span>
+          </div>
+          <p class="screenshot-label">Budget — Give Kobo a Job</p>
+        </div>
+
+        <div>
+          <div class="screenshot-slot">
+            <!-- <img src="images/screen-nudges.png" alt="Nudges tab" /> -->
+            <span class="ph-icon">🔔</span>
+            <span>Nudges Tab<br/><small>5 trigger types · Pidgin alerts</small></span>
+          </div>
+          <p class="screenshot-label">Nudges — In Pidgin &amp; English</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <hr class="divider" />
+
+
+  <!-- ── Features ──────────────────────────────────────────────────────────── -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-label">What's Inside</div>
+      <h2 class="section-title">Built for real Nigerian life</h2>
+      <p class="section-subtitle">
+        Every feature was designed around how Nigerians actually spend, save, and pay bills.
+      </p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <span class="feature-icon">⚖️</span>
+          <h3>Zero-Based Budgeting</h3>
+          <p>Every kobo is assigned to a category. Income minus all assignments always equals zero — the TBB chip updates live as you type.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🪄</span>
+          <h3>Auto-Assign (5 Strategies)</h3>
+          <p>Distribute your TBB in one tap: Underfunded, Last Month Assigned, Last Month Spent, 3-Month Average Assigned, or 3-Month Average Spent. Live preview before applying.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🔔</span>
+          <h3>Smart Nudges in Pidgin</h3>
+          <p>Five trigger types — 80% threshold, 100% exceeded, large single transaction, money received, bill paid. Quiet hours, fatigue limits, Pidgin ↔ Formal toggle.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">⚡</span>
+          <h3>Bill Payments (Interswitch)</h3>
+          <p>Pay DSTV, EKEDC, MTN, Glo, and 100+ billers via Interswitch Quickteller. 3-phase WebView checkout — customer validation → secure payment → live receipt.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🔁</span>
+          <h3>Recurring Transactions</h3>
+          <p>Schedule repeating debits and credits — daily, weekly, biweekly, monthly, or yearly. The server generates instances on each sync so you never miss a bill.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🎯</span>
+          <h3>Savings Targets &amp; Goals</h3>
+          <p>Weekly, monthly, yearly, or custom (deadline) targets per category. Custom targets appear as goal progress cards on the Home screen. Cost to Be Me shows your monthly floor.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🏦</span>
+          <h3>Mono Bank Sync</h3>
+          <p>Link any Nigerian bank via Mono Connect. Auto-categorises imported transactions using a narration-mapping engine. Opening balance flows straight into TBB.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📴</span>
+          <h3>Offline-First (WatermelonDB)</h3>
+          <p>The full budget works without internet. WatermelonDB syncs in the background using a delta protocol — only changed records travel over the wire.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🔐</span>
+          <h3>Biometric App Lock</h3>
+          <p>Fingerprint / Face ID lock with configurable timeout. Multi-instance safe — toggling from settings immediately affects all open screens without a restart.</p>
+        </div>
+      </div>
+
+      <div class="stack-pills">
+        <span class="pill">React Native (Expo)</span>
+        <span class="pill">FastAPI</span>
+        <span class="pill">WatermelonDB</span>
+        <span class="pill">PostgreSQL</span>
+        <span class="pill">Celery + Redis</span>
+        <span class="pill">TanStack Query v5</span>
+        <span class="pill">Redux Toolkit</span>
+        <span class="pill">Mono Connect</span>
+        <span class="pill">Interswitch Quickteller</span>
+        <span class="pill">Expo Router</span>
+        <span class="pill">SQLAlchemy + Alembic</span>
+        <span class="pill">WebSockets (live sync)</span>
+      </div>
+    </div>
+  </section>
+
+
+  <hr class="divider" />
+
+
+  <!-- ── Install banner ────────────────────────────────────────────────────── -->
+  <section style="padding:4rem 0 2rem;">
+    <div class="container">
+      <div class="install-banner">
+        <div class="install-banner-text">
+          <h3>Try MoniMata now</h3>
+          <p>No Play Store. No account needed to install. Sideload the APK directly onto any Android device.</p>
+        </div>
+        <div class="install-banner-actions">
+          <a href="#appetize-placeholder" class="btn btn-primary" id="try-btn-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><rect x="5" y="2" width="14" height="20" rx="3"/><circle cx="12" cy="18" r="1"/></svg>
+            Try in Browser (Appetize)
+          </a>
+          <a href="https://github.com/kaosi-anikwe/monimata/releases/download/v1.0/MoniMata-v1.0-android.apk"
+             class="btn btn-secondary" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download APK (Android)
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── Testing guide ──────────────────────────────────────────────────────── -->
+  <section class="testing" id="testing">
+    <div class="container">
+      <div class="section-label">For Judges</div>
+      <h2 class="section-title">Testing Guide</h2>
+      <p class="section-subtitle">
+        The demo account is pre-seeded with realistic Nigerian data — salary, rent,
+        nudges already firing, goals in progress. Run the seed script, then follow these steps.
+      </p>
+
+      <div class="testing-body">
+
+        <div class="test-step">
+          <h3>1 &nbsp;Home Screen Tour</h3>
+          <ul>
+            <li>Dismiss the <strong>Welcome</strong> card — a <strong>5-step spotlight tour</strong> starts.</li>
+            <li>Steps: Profile → Net Worth → All Accounts → This Month → Goals.</li>
+            <li>The <strong>Ready to Assign (TBB)</strong> chip shows your unassigned balance.</li>
+            <li><strong>Goals</strong> shows Travel &amp; Savings sinking funds with progress bars.</li>
+          </ul>
+        </div>
+
+        <div class="test-step">
+          <h3>2 &nbsp;Budget Tab</h3>
+          <ul>
+            <li><strong>Transport</strong> is red — 143% spent (over-budget).</li>
+            <li><strong>Food &amp; Groceries</strong> is orange — 84% spent.</li>
+            <li>Tap any amount → type to assign; TBB updates live.</li>
+            <li>Wand icon → pick strategy → preview → <strong>Apply</strong>.</li>
+            <li>Long-press a row to <strong>drag-reorder</strong> within its group.</li>
+            <li>Tap <strong>⋯</strong> to set a target, hide, or rename a category.</li>
+            <li><strong>"Cost to Be Me"</strong> card shows total monthly cost-of-living.</li>
+          </ul>
+        </div>
+
+        <div class="test-step">
+          <h3>3 &nbsp;Targets</h3>
+          <ul>
+            <li>Budget ⋯ menu → <strong>Set Target</strong>.</li>
+            <li>4 tabs: Weekly · Monthly · Yearly · <strong>Custom</strong> (deadline).</li>
+            <li><strong>Custom targets</strong> appear as Goal cards on the Home screen.</li>
+            <li>Behaviors: <em>Assign again</em> · <em>Refill up to</em> · <em>Maintain balance</em>.</li>
+            <li>Save → Home Goals &amp; Cost to Be Me update immediately.</li>
+          </ul>
+        </div>
+
+        <div class="test-step">
+          <h3>4 &nbsp;Transactions</h3>
+          <ul>
+            <li>Full history with category chips — tap any row for detail view.</li>
+            <li><strong>+</strong> → Add: amount, narration, debit/credit, account, category.</li>
+            <li>Tap <strong>Split</strong> to divide one transaction across multiple categories.</li>
+            <li><strong>Recurring</strong> tab — 3 seeded rules (EKEDC, DSTV, Bolt). Pause / delete inline.</li>
+            <li>Toggle <strong>"Repeat this transaction"</strong> to create a new recurring rule.</li>
+          </ul>
+        </div>
+
+        <div class="test-step">
+          <h3>5 &nbsp;Nudges Tab 🔔</h3>
+          <ul>
+            <li>Tab badge shows <strong>5 unread</strong> nudges (pre-seeded).</li>
+            <li>Tap any nudge → <strong>Detail Sheet</strong>: "Why you got this" + action deep-links.</li>
+            <li>Swipe or tap <strong>Dismiss</strong> to remove. <strong>✓✓</strong> marks all read.</li>
+          </ul>
+          <table class="nudge-table">
+            <tr><td>⚠️ Food &amp; Groceries 84%</td><td><code>threshold_80</code></td></tr>
+            <tr><td>🚨 Transport over budget</td><td><code>threshold_100</code></td></tr>
+            <tr><td>Big spend on Rent</td><td><code>large_single_tx</code></td></tr>
+            <tr><td>Money don enter 🎉</td><td><code>pay_received</code></td></tr>
+            <tr><td>DSTV payment done ✅</td><td><code>bill_payment</code></td></tr>
+          </table>
+        </div>
+
+        <div class="test-step">
+          <h3>6 &nbsp;Bills (Interswitch) ⚡</h3>
+          <ul>
+            <li><strong>Bills</strong> tab → browse categories.</li>
+            <li>Select <strong>TV/Cable → DStv → Compact Plus</strong>.</li>
+            <li>Enter any SmartCard number (sandbox), pick account + budget category.</li>
+            <li>Tap <strong>Pay</strong> → WebView checkout → 3-phase processing → receipt.</li>
+            <li>Subscriptions budget row updates automatically on completion.</li>
+          </ul>
+        </div>
+
+        <div class="test-step">
+          <h3>7 &nbsp;Accounts</h3>
+          <ul>
+            <li>Home → <strong>All accounts</strong> → GTBank ₦354k + Kuda ₦85k.</li>
+            <li><strong>+</strong> → add manual account with opening balance → TBB increases immediately.</li>
+            <li><strong>Link Bank Account</strong> starts the Mono Connect flow.</li>
+          </ul>
+        </div>
+
+        <div class="test-step">
+          <h3>8 &nbsp;Settings &amp; Biometric Lock</h3>
+          <ul>
+            <li><strong>Profile → Notification Settings</strong>: toggle nudges, Quiet Hours (23:00–07:00 WAT), fatigue limit, Pidgin / Formal.</li>
+            <li><strong>Profile → Biometric Lock</strong>: toggle ON → fingerprint prompt. Background app 30 s → lock on return. Toggle OFF → immediate unlock.</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+  <footer>
+    <div class="container">
+      <div class="footer-logo">
+        <img class="mark" src="images/favicon.png" alt="MoniMata" />
+        <img class="wordmark" src="images/wordmark.png" alt="MoniMata" />
+      </div>
+      <p>
+        Released under the
+        <a href="https://github.com/kaosi-anikwe/monimata/blob/main/LICENSE" target="_blank" rel="noopener">GNU AGPL v3</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/kaosi-anikwe/monimata" target="_blank" rel="noopener">GitHub</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/kaosi-anikwe/monimata/releases/tag/v1.0" target="_blank" rel="noopener">v1.0 Release</a>
+      </p>
+      <p style="margin-top:0.4rem;">Built with 💚 for the Nigerian financial ecosystem.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Show a reminder until the Appetize URL is set
+    const msg = 'Appetize.io URL not yet configured.\n\nUpload the APK to appetize.io, copy the public URL, then replace "#appetize-placeholder" in docs/index.html.';
+    document.querySelectorAll('[href="#appetize-placeholder"]').forEach(btn => {
+      btn.addEventListener('click', e => { e.preventDefault(); alert(msg); });
+    });
+  </script>
+
+</body>
+</html>
