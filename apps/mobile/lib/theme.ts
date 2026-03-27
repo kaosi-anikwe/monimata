@@ -498,8 +498,10 @@ export const ThemeContext = createContext<ThemeContextValue>({
  */
 export function useTheme(): ThemeColors {
   const { overrideScheme } = useContext(ThemeContext);
-  const deviceScheme = useColorScheme();
-  return getTheme(overrideScheme ?? deviceScheme);
+  // Don't default to dark mode
+  // const deviceScheme = useColorScheme();
+  // return getTheme(overrideScheme ?? deviceScheme);
+  return getTheme(overrideScheme);
 }
 
 /**

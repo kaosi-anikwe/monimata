@@ -68,6 +68,7 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
         )
         return {"status": "skipped", "reason": "no_mono_account_id"}
 
+    from app.ws_manager import notify_user
     from app.models.bank_account import BankAccount
     from app.models.transaction import Transaction
     from app.services.mono_client import mono_client
@@ -199,7 +200,7 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             cast(CeleryTask, categorize_transactions).delay(new_ids)
 
         # Notify connected WebSocket clients
-        _notify_sync_complete(account.user_id, account.id)
+        notify_user(account.user_id, ["accounts", "transactions", "budget"])
 
         return {"status": "ok", "new_transactions": len(new_ids)}
 
@@ -284,19 +285,6 @@ def _find_duplicate(db, account_id: str, tx_datetime: datetime, amount: int):
             Transaction.amount.between(-amount - 100, -amount + 100),
         )
         .first()
-    )
-
-
-def _notify_sync_complete(user_id: str, account_id: str) -> None:
-    """Publish a sync_complete event to the WebSocket channel (via Redis pub/sub)."""
-    import json
-    from app.core.redis_client import get_redis
-    from app.ws_manager import ws_channel
-
-    r = get_redis()
-    r.publish(
-        ws_channel(str(user_id)),
-        json.dumps({"type": "sync_complete", "account_id": str(account_id)}),
     )
 
 

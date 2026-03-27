@@ -23,6 +23,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -55,6 +56,25 @@ import { radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
 import { formatNaira } from '@/utils/money';
+import { TourTarget, useTour, type TourStep } from '@/components/tour';
+
+// ── Tour definition ─────────────────────────────────────────────────────
+
+const ACCOUNTS_TOUR: TourStep[] = [
+  {
+    targetId: 'accounts-link-bank',
+    title: 'Link your bank',
+    body: 'Connect GTBank, Kuda, Access, or any other Nigerian bank via Mono. Your transactions will sync automatically every day.',
+    tooltipSide: 'below',
+  },
+  {
+    targetId: 'accounts-total',
+    title: 'Your true total balance',
+    body: 'All linked and manual accounts are added up here so you always know your real financial position at a glance.',
+    tooltipSide: 'below',
+    fallbackFullscreen: true
+  },
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -666,6 +686,11 @@ export default function AccountsScreen() {
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
   const hasReauthAccount = accounts.some((a) => a.is_mono_linked && a.requires_reauth);
 
+  const startTourIfUnseen = useTour();
+  useFocusEffect(
+    useCallback(() => { startTourIfUnseen('accounts', ACCOUNTS_TOUR); }, [startTourIfUnseen]),
+  );
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refetch();
@@ -749,18 +774,20 @@ export default function AccountsScreen() {
             </Svg>
             <Text style={[ss.headerBtnTxt, { color: colors.brand }]}>Manual</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(auth)/link-bank'); }}
-            accessibilityRole="button"
-            accessibilityLabel="Link bank via Mono"
-          >
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-            <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Link Bank</Text>
-          </TouchableOpacity>
+          <TourTarget id="accounts-link-bank">
+            <TouchableOpacity
+              style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(auth)/link-bank'); }}
+              accessibilityRole="button"
+              accessibilityLabel="Link bank via Mono"
+            >
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Link Bank</Text>
+            </TouchableOpacity>
+          </TourTarget>
         </View>
       </View>
 
@@ -799,19 +826,21 @@ export default function AccountsScreen() {
         ) : (
           <>
             {/* ── Total Balance Card ── */}
-            <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
-              <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
-              <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
-              <View style={ss.syncNote}>
-                <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                  <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-                <Text style={[ss.syncNoteTxt, { color: colors.textInverseFaint }]}>
-                  Syncs every 12 AM
-                </Text>
+            <TourTarget id="accounts-total">
+              <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
+                <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
+                <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
+                <View style={ss.syncNote}>
+                  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                    <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <Text style={[ss.syncNoteTxt, { color: colors.textInverseFaint }]}>
+                    Syncs every 12 AM
+                  </Text>
+                </View>
               </View>
-            </View>
+            </TourTarget>
 
             {/* ── Global re-auth warning banner ── */}
             {hasReauthAccount && (

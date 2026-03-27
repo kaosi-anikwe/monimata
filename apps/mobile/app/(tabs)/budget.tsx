@@ -30,6 +30,7 @@ import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -53,8 +54,39 @@ import { glass, layout, radius, spacing } from '@/lib/tokens';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { AutoAssignSheet } from '@/components/AutoAssignSheet';
 import { BudgetWalkthrough } from '@/components/BudgetWalkthrough';
+import { TourTarget, useTour, type TourStep } from '@/components/tour';
 import type { BudgetCategory, BudgetGroup } from '@/types/budget';
 import { useAssignCategory, useBudget, useMoveMoney, useUnhideCategory, useUnhideGroup } from '@/hooks/useBudget';
+
+// ── Tour definition ───────────────────────────────────────────────────────────
+
+const BUDGET_TOUR: TourStep[] = [
+  {
+    targetId: 'budget-tbb',
+    title: 'To Be Budgeted (TBB)',
+    body: 'This is money you\'ve received but haven\'t given a job yet. Your goal: get this to ₦0 every month.',
+    tooltipSide: 'below',
+    fallbackFullscreen: true,
+  },
+  {
+    targetId: 'budget-first-group',
+    title: 'Budget categories',
+    body: 'Tap any category to assign money from your TBB. Green means funded. Red means overspent.',
+    tooltipSide: 'below',
+  },
+  {
+    targetId: 'budget-edit-btn',
+    title: 'Customise your budget',
+    body: 'Add groups, rename categories, set savings targets, and hide things you don\'t need.',
+    tooltipSide: 'below',
+  },
+  {
+    targetId: "budget-progress-bar",
+    title: "Budget Activity",
+    body: "The bar shows how much you've assigned (filled) and how much you've spent (grayed). When the bar turns red, you've spent more than you assigned.",
+    tooltipSide: "below"
+  }
+];
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -96,15 +128,17 @@ function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number;
           <Ionicons name="arrow-back" size={16} color={colors.brand} />
         </TouchableOpacity>
         <Text style={[ms.title, { color: colors.textPrimary }]}>Budget</Text>
-        <TouchableOpacity
-          style={[ms.editBtn, { backgroundColor: colors.surface }]}
-          onPress={() => router.push('/budget-edit' as never)}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Edit budget structure"
-        >
-          <Feather name='edit' size={16} color={colors.brand} />
-        </TouchableOpacity>
+        <TourTarget id="budget-edit-btn">
+          <TouchableOpacity
+            style={[ms.editBtn, { backgroundColor: colors.surface }]}
+            onPress={() => router.push('/budget-edit' as never)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Edit budget structure"
+          >
+            <Feather name='edit' size={16} color={colors.brand} />
+          </TouchableOpacity>
+        </TourTarget>
       </View>
 
       {/* Month navigator (.mnav) */}
@@ -132,29 +166,31 @@ function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number;
 
       {/* TBB card (.tbb-card) — hidden when fully assigned */}
       {tbb !== 0 && (
-        <View style={[ms.tbbCard, { backgroundColor: tbb < 0 ? colors.darkRed : colors.darkGreen }]}>
-          <View>
-            <Text style={ms.tbbLbl}>To Be Budgeted</Text>
-            <Text style={[ms.tbbVal, { color: tbb < 0 ? colors.error : colors.lime }]}>
-              {formatMoney(tbb)}
-            </Text>
-            <Text style={ms.tbbSub}>
-              {tbb < 0 ? `Over-assigned by ${formatMoney(Math.abs(tbb))}` : 'Assign this to categories'}
-            </Text>
+        <TourTarget id="budget-tbb">
+          <View style={[ms.tbbCard, { backgroundColor: tbb < 0 ? colors.darkRed : colors.darkGreen }]}>
+            <View>
+              <Text style={ms.tbbLbl}>To Be Budgeted</Text>
+              <Text style={[ms.tbbVal, { color: tbb < 0 ? colors.error : colors.lime }]}>
+                {formatMoney(tbb)}
+              </Text>
+              <Text style={ms.tbbSub}>
+                {tbb < 0 ? `Over-assigned by ${formatMoney(Math.abs(tbb))}` : 'Assign this to categories'}
+              </Text>
+            </View>
+            {/* Auto-assign / Fix button */}
+            <TouchableOpacity
+              style={[ms.aaBtn, tbb < 0 && { borderColor: colors.errorBadgeBorder, backgroundColor: colors.errorBadgeBg }]}
+              accessibilityRole="button"
+              accessibilityLabel={tbb < 0 ? 'Fix over-assignment' : 'Auto-assign'}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onAutoAssign(); }}
+            >
+              <Ionicons name={tbb < 0 ? 'warning-outline' : 'flash-outline'} size={13} color={tbb < 0 ? colors.error : colors.lime} />
+              <Text style={[ms.aaBtnTxt, { color: tbb < 0 ? colors.error : colors.lime }]}>
+                {tbb < 0 ? 'Fix' : 'Auto-assign'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          {/* Auto-assign / Fix button */}
-          <TouchableOpacity
-            style={[ms.aaBtn, tbb < 0 && { borderColor: colors.errorBadgeBorder, backgroundColor: colors.errorBadgeBg }]}
-            accessibilityRole="button"
-            accessibilityLabel={tbb < 0 ? 'Fix over-assignment' : 'Auto-assign'}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onAutoAssign(); }}
-          >
-            <Ionicons name={tbb < 0 ? 'warning-outline' : 'flash-outline'} size={13} color={tbb < 0 ? colors.error : colors.lime} />
-            <Text style={[ms.aaBtnTxt, { color: tbb < 0 ? colors.error : colors.lime }]}>
-              {tbb < 0 ? 'Fix' : 'Auto-assign'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        </TourTarget>
       )}
     </View>
   );
@@ -299,17 +335,19 @@ function CategoryRow({
     >
       {/* .bgt-ri — name + spend bar */}
       <View style={cr.left}>
-        <Text style={[cr.name, { color: colors.textPrimary }]} numberOfLines={1}>
-          {category.name}
-        </Text>
-        <ProgressBar
-          animate
-          progress={getCatAssignedProgress(category)}
-          secondProgress={getCatSpentProgress(category)}
-          state={state === 'empty' ? 'neutral' : state}
-          size="md"
-          trackStyle={{ marginTop: 5 }}
-        />
+        <TourTarget id="budget-progress-bar">
+          <Text style={[cr.name, { color: colors.textPrimary }]} numberOfLines={1}>
+            {category.name}
+          </Text>
+          <ProgressBar
+            animate
+            progress={getCatAssignedProgress(category)}
+            secondProgress={getCatSpentProgress(category)}
+            state={state === 'empty' ? 'neutral' : state}
+            size="md"
+            trackStyle={{ marginTop: 5 }}
+          />
+        </TourTarget>
       </View>
       {/* .bgt-ra — available + assigned */}
       <View style={cr.right}>
@@ -989,6 +1027,12 @@ export default function BudgetScreen() {
   const [showHidden, setShowHidden] = useState(false);
   const [unhideTarget, setUnhideTarget] = useState<UnhideTarget | null>(null);
   const [showAutoAssign, setShowAutoAssign] = useState(false);
+  const [walkthroughReady, setWalkthroughReady] = useState(false);
+
+  const startTourIfUnseen = useTour();
+  useFocusEffect(
+    useCallback(() => { startTourIfUnseen('budget', BUDGET_TOUR, () => setWalkthroughReady(true)); }, [startTourIfUnseen]),
+  );
 
   function toggleGroup(id: string) {
     LayoutAnimation.configureNext({
@@ -1086,37 +1130,38 @@ export default function BudgetScreen() {
         }
       >
         {/* Each group is a rounded card (.bgt-grp) */}
-        {groups.map((group) => (
-          <View
-            key={group.id}
-            style={[s.grpCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-          >
-            <GroupHeader
-              group={group}
-              isCollapsed={collapsedGroups.has(group.id)}
-              onPress={() => {
-                if (group.is_hidden) {
-                  setUnhideTarget({ id: group.id, name: group.name, type: 'group' });
-                } else {
-                  toggleGroup(group.id);
-                }
-              }}
-            />
-            {!group.is_hidden && !collapsedGroups.has(group.id) && group.categories.map((cat) => (
-              <CategoryRow
-                key={cat.id}
-                category={cat}
+        {groups.map((group, idx) => (
+          <TourTarget key={group.id} id={idx === 0 ? 'budget-first-group' : `group-${group.id}`}>
+            <View
+              style={[s.grpCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+            >
+              <GroupHeader
+                group={group}
+                isCollapsed={collapsedGroups.has(group.id)}
                 onPress={() => {
-                  if (cat.is_hidden) {
-                    setUnhideTarget({ id: cat.id, name: cat.name, type: 'category' });
+                  if (group.is_hidden) {
+                    setUnhideTarget({ id: group.id, name: group.name, type: 'group' });
                   } else {
-                    Haptics.selectionAsync();
-                    setSelectedCategory(cat);
+                    toggleGroup(group.id);
                   }
                 }}
               />
-            ))}
-          </View>
+              {!group.is_hidden && !collapsedGroups.has(group.id) && group.categories.map((cat) => (
+                <CategoryRow
+                  key={cat.id}
+                  category={cat}
+                  onPress={() => {
+                    if (cat.is_hidden) {
+                      setUnhideTarget({ id: cat.id, name: cat.name, type: 'category' });
+                    } else {
+                      Haptics.selectionAsync();
+                      setSelectedCategory(cat);
+                    }
+                  }}
+                />
+              ))}
+            </View>
+          </TourTarget>
         ))}
 
         {groups.length === 0 && !showHidden && (
@@ -1168,8 +1213,8 @@ export default function BudgetScreen() {
         />
       )}
 
-      {/* First-time onboarding walkthrough — self-managing, shows once */}
-      <BudgetWalkthrough />
+      {/* First-time onboarding walkthrough — shown only after the spotlight tour is done */}
+      {walkthroughReady && <BudgetWalkthrough />}
 
     </View>
   );

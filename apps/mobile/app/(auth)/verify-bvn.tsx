@@ -39,6 +39,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useEffect } from 'react';
 
 import { AuthHdr, BackBtn, TrustCard, s as authS } from './_authShared';
 
@@ -72,11 +73,16 @@ export default function VerifyBVNScreen() {
     }
   }
 
-  // If user already verified (returning user), skip onboarding and go to link-bank
-  if (user?.identity_verified) {
-    router.replace('/(auth)/link-bank');
-    return null;
-  }
+  // If user already verified (returning user), skip onboarding and go to link-bank.
+  // Must be in an effect — calling router.replace() during render triggers
+  // "setState during render" on NavigationContainerInner.
+  useEffect(() => {
+    if (user?.identity_verified) {
+      router.replace('/(auth)/link-bank');
+    }
+  }, [user?.identity_verified]);
+
+  if (user?.identity_verified) return null;
 
   return (
     <View style={[authS.screen, { backgroundColor: colors.cardBg }]}>

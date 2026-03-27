@@ -35,8 +35,8 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { scheduleOnRN } from 'react-native-worklets';
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -114,9 +114,10 @@ export function BottomSheet({
   const dismiss = useCallback(() => {
     translateY.value = withSpring(MAX_SHEET_H, { damping: 20, stiffness: 180 });
     backdropOpacity.value = withTiming(0, { duration: 220 }, (finished) => {
-      if (finished) runOnJS(setMounted)(false);
+      'worklet';
+      if (finished) scheduleOnRN(setMounted, false);
     });
-    if (!preventClose) runOnJS(onClose)();
+    if (!preventClose) onClose();
   }, [onClose, preventClose, translateY, backdropOpacity]);
 
   // Swipe-to-dismiss PanResponder
