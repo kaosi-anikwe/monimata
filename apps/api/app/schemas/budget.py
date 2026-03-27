@@ -100,7 +100,9 @@ class AutoAssignResponse(BaseModel):
     month: str
     strategy: AutoAssignStrategy
     assignments_made: int
-    total_assigned: int  # kobo — net delta; positive = net increase, negative = net reduction
+    total_assigned: (
+        int  # kobo — net delta; positive = net increase, negative = net reduction
+    )
     still_underfunded: list[
         UUID
     ]  # underfunded strategy only: categories TBB ran out before reaching
