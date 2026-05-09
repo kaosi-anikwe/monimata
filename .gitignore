@@ -184,3 +184,5 @@ vite.config.ts.timestamp-*
 
 # Keystore
 *.keystore
+temp_auto_push.bat
+temp_interactive_push.bat
