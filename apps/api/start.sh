@@ -7,6 +7,14 @@
 # by the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # API entrypoint: runs Alembic migrations then starts uvicorn.
 # Used as the default CMD in the Dockerfile.
 # The Celery worker+beat service overrides CMD directly — it does NOT use this script.
@@ -18,7 +26,7 @@ alembic upgrade head
 
 echo "==> Starting API server…"
 # 1 worker keeps RAM usage low on a constrained VPS.
-# Increase to 2–3 if you have headroom (formula: 2 × CPU + 1).
+# Increase to 2–3 if more headroom is available (formula: 2 × CPU + 1).
 exec uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \
