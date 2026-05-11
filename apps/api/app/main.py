@@ -24,6 +24,22 @@ from app.core.logging_config import configure_logging
 
 configure_logging(log_dir=settings.LOG_DIR, log_level=settings.LOG_LEVEL)
 
+# Initialise Sentry before importing routers so every module is instrumented.
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        integrations=[
+            StarletteIntegration(transaction_style="endpoint"),
+            FastApiIntegration(transaction_style="endpoint"),
+        ],
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        send_default_pii=False,
+    )
+
 from app.routers import (  # noqa: E402
     accounts,
     auth,

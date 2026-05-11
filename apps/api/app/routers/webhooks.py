@@ -15,17 +15,23 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Webhooks router — receives Mono account update events.
-CRITICAL: Always verify the Mono HMAC-SHA512 signature before processing.
+Webhooks router — receives Mono account update events and bank alert emails
+forwarded by the Cloudflare email-worker.
+
+CRITICAL: Always verify signatures / shared secrets before processing.
 """
 
 from __future__ import annotations
 
 import logging
+import secrets
 from typing import cast
 
+import sentry_sdk
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
+from app.core.config import settings
+from app.services.bank_alert_parser import ParsedBankAlert, parse_bank_alert
 from app.services.interswitch_client import verify_interswitch_webhook
 from app.services.mono_client import verify_mono_webhook
 from app.worker.celery_app import CeleryTask
@@ -33,6 +39,64 @@ from app.worker.tasks import fetch_transactions
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.post("/bank-alerts", status_code=status.HTTP_200_OK)
+async def bank_alert_webhook(
+    request: Request,
+    x_monimata_secret: str = Header(default="", alias="x-monimata-secret"),
+) -> dict:
+    """
+    Receives parsed bank-alert emails forwarded by the Cloudflare email-worker.
+
+    Security: constant-time comparison against BANK_ALERT_WEBHOOK_SECRET.
+    The endpoint returns 403 (not 401) to avoid leaking auth scheme details.
+
+    Payload shape (set by the email-worker):
+        { "to": str, "from": str, "subject": str|null, "body": str|null, "html": str|null }
+    """
+    if not settings.BANK_ALERT_WEBHOOK_SECRET:
+        logger.error("bank_alert_webhook: BANK_ALERT_WEBHOOK_SECRET is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Not configured"
+        )
+
+    if not secrets.compare_digest(x_monimata_secret, settings.BANK_ALERT_WEBHOOK_SECRET):
+        logger.warning("bank_alert_webhook: invalid secret — rejected")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized")
+
+    data = await request.json()
+    sender: str = data.get("from") or ""
+    recipient: str = data.get("to") or ""
+    body: str = data.get("body") or ""
+
+    alert: ParsedBankAlert | None = parse_bank_alert(body)
+
+    if alert is None:
+        sentry_sdk.set_context(
+            "alert_details",
+            {"subject": data.get("subject"), "sender": sender, "recipient": recipient},
+        )
+        sentry_sdk.capture_message("Regex parsing failed for bank alert email", level="warning")
+        logger.warning(
+            "bank_alert_webhook: parsing failed — from=%s subject=%s",
+            sender,
+            data.get("subject"),
+        )
+        return {"status": "skipped", "reason": "parsing_failed"}
+
+    alert.sender_email = sender
+    logger.info(
+        "bank_alert_webhook: parsed %s of %d kobo from %s (acct last4=%s)",
+        alert.transaction_type,
+        alert.amount_kobo,
+        sender,
+        alert.account_last4,
+    )
+
+    # TODO: match alert to a BankAccount and create/update a Transaction record.
+
+    return {"status": "ok"}
 
 
 @router.post("/mono", status_code=status.HTTP_200_OK)
