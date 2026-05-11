@@ -1,8 +1,11 @@
 {
-  "name": "monimata-email-worker",
+  "name": "monimata-email-parser",
   "version": "0.0.1",
   "private": true,
   "license": "AGPL-3.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "node scripts/deploy.mjs",
