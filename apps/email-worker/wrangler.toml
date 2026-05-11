@@ -1,0 +1,18 @@
+name = "monimata-parser"
+main = "src/index.ts"
+compatibility_date = "2026-05-11"
+compatibility_flags = ["nodejs_compat"]
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+
+# Bind secrets via `wrangler secret put` or set them in the Cloudflare dashboard:
+#   WEBHOOK_SECRET — shared secret checked by the FastAPI /webhooks/bank-alerts endpoint
+#   SENTRY_DSN     — Sentry DSN for error reporting
+
+# Email routing — configure your Cloudflare Email Routing rules to forward to this worker.
+# See: https://developers.cloudflare.com/email-routing/email-workers/

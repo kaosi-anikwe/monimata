@@ -1,0 +1,22 @@
+{
+  "name": "monimata-email-worker",
+  "version": "0.0.1",
+  "private": true,
+  "license": "AGPL-3.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "node scripts/deploy.mjs",
+    "tail": "wrangler tail",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sentry/cloudflare": "^9.0.0",
+    "postal-mime": "^2.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "@sentry/cli": "^2.58.4",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.0.0"
+  }
+}
