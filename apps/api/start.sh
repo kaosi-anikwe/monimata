@@ -27,7 +27,7 @@ uv run alembic upgrade head
 echo "==> Starting API server…"
 # 1 worker keeps RAM usage low on a constrained VPS.
 # Increase to 2–3 if more headroom is available (formula: 2 × CPU + 1).
-exec uvicorn app.main:app \
+exec uv run uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 2 \
