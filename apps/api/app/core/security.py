@@ -59,13 +59,13 @@ def verify_password(plain: str, hashed: str) -> bool:
 def _jwt_encode_key() -> str | dict:
     """Return the signing key. RS256 preferred; falls back to HS256 secret."""
     if settings.JWT_PRIVATE_KEY:
-        return settings.JWT_PRIVATE_KEY
+        return settings.JWT_PRIVATE_KEY.replace("\\n", "\n")
     return settings.SECRET_KEY
 
 
 def _jwt_decode_key() -> str | dict:
     if settings.JWT_PUBLIC_KEY:
-        return settings.JWT_PUBLIC_KEY
+        return settings.JWT_PUBLIC_KEY.replace("\\n", "\n")
     return settings.SECRET_KEY
 
 

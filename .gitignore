@@ -18,6 +18,12 @@ build/
 .env.*
 !.env.example
 
+# Cloudflare Workers local secrets
+.dev.vars
+
+# Sentry
+.sentryclirc
+
 # Node
 node_modules/
 .npm/
