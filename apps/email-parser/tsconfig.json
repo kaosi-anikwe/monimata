@@ -8,6 +8,7 @@
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*.ts"],
