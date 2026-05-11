@@ -63,6 +63,12 @@ MoniMata is a **cloud-primary, device-cached** system. Financial records are aut
       [REST API + WebSocket /ws/events]
                       ↕
           [React Native (Expo) App]
+
+[Bank alert email]
+      ↓
+[Cloudflare Email Routing] → [email-worker (postal-mime)]
+      ↓
+POST /webhooks/bank-alerts  (X-MoniMata-Secret)
               ├── Budget, Transactions, Accounts, Bills
               ├── Nudges, Reports, Hub, Profile
               └── [WatermelonDB + SQLCipher]  ← encrypted local cache
@@ -104,6 +110,15 @@ MoniMata is a **cloud-primary, device-cached** system. Financial records are aut
 | Animations      | React Native Reanimated 4               |
 | Lists           | Shopify FlashList                       |
 
+### Email Worker (`apps/email-worker`)
+
+| Layer           | Technology                    |
+| --------------- | ----------------------------- |
+| Runtime         | Cloudflare Workers            |
+| Email parsing   | postal-mime                   |
+| Error reporting | Sentry (`@sentry/cloudflare`) |
+| Deploy          | Wrangler 4                    |
+
 ### Monorepo
 
 | Tool         | Purpose                            |
@@ -130,6 +145,10 @@ monimata/
 │   │   │   ├── services/       # Mono client, Interswitch client, categorisation
 │   │   │   └── worker/         # Celery app, tasks, beat schedule
 │   │   └── alembic/            # Database migrations
+│   ├── email-worker/           # Cloudflare Email Worker
+│   │   ├── src/index.ts        # Worker entrypoint (postal-mime + Sentry)
+│   │   ├── scripts/deploy.mjs  # Cross-platform deploy + source map upload
+│   │   └── wrangler.toml       # Cloudflare Workers configuration
 │   └── mobile/                 # React Native (Expo) app
 │       ├── app/                # Expo Router screens
 │       │   ├── (auth)/         # Welcome, Register, Login, Verify BVN, Link Bank
@@ -249,28 +268,36 @@ python -c "import secrets; print(secrets.token_hex(32))"
 | `EXPO_PUBLIC_API_URL`    | Backend base URL — **required**, no fallback |
 | `EXPO_PUBLIC_SENTRY_DSN` | Sentry DSN for crash reporting               |
 
+### Email Worker (`apps/email-worker/.dev.vars` for local dev; Cloudflare secrets in production)
+
+| Variable         | Description                                                      |
+| ---------------- | ---------------------------------------------------------------- |
+| `WEBHOOK_SECRET` | Shared secret; must match `BANK_ALERT_WEBHOOK_SECRET` on the API |
+| `SENTRY_DSN`     | Sentry DSN for error reporting                                   |
+
 ---
 
 ## API Endpoints
 
-| Prefix             | Description                                  |
-| ------------------ | -------------------------------------------- |
-| `GET /health`      | Health check                                 |
-| `/auth`            | Register, login, token refresh               |
-| `/accounts`        | Bank account management                      |
-| `/transactions`    | Transaction CRUD and manual entry            |
-| `/budget`          | Budget month management                      |
-| `/categories`      | Category CRUD                                |
-| `/category-groups` | Category group CRUD                          |
-| `/recurring-rules` | Recurring transaction rules                  |
-| `/sync/pull`       | WatermelonDB delta pull                      |
-| `/sync/push`       | WatermelonDB delta push                      |
-| `/ws/events`       | WebSocket real-time events                   |
-| `/nudges`          | AI-generated spending nudges                 |
-| `/reports`         | Spending, income vs. expense, net worth      |
-| `/bills`           | Interswitch Quickteller bill payment         |
-| `/content`         | Knowledge Hub articles                       |
-| `/webhooks/mono`   | Mono webhook receiver (HMAC-SHA512 verified) |
+| Prefix                  | Description                                           |
+| ----------------------- | ----------------------------------------------------- |
+| `GET /health`           | Health check                                          |
+| `/auth`                 | Register, login, token refresh                        |
+| `/accounts`             | Bank account management                               |
+| `/transactions`         | Transaction CRUD and manual entry                     |
+| `/budget`               | Budget month management                               |
+| `/categories`           | Category CRUD                                         |
+| `/category-groups`      | Category group CRUD                                   |
+| `/recurring-rules`      | Recurring transaction rules                           |
+| `/sync/pull`            | WatermelonDB delta pull                               |
+| `/sync/push`            | WatermelonDB delta push                               |
+| `/ws/events`            | WebSocket real-time events                            |
+| `/nudges`               | AI-generated spending nudges                          |
+| `/reports`              | Spending, income vs. expense, net worth               |
+| `/bills`                | Interswitch Quickteller bill payment                  |
+| `/content`              | Knowledge Hub articles                                |
+| `/webhooks/mono`        | Mono webhook receiver (HMAC-SHA512 verified)          |
+| `/webhooks/bank-alerts` | Bank alert email receiver (forwarded by email-worker) |
 
 ---
 
