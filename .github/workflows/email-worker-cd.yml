@@ -4,12 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/email-worker/**"
+      - "apps/email-parser/**"
       - ".github/workflows/email-worker-cd.yml"
   pull_request:
     branches: [main]
     paths:
-      - "apps/email-worker/**"
+      - "apps/email-parser/**"
       - ".github/workflows/email-worker-cd.yml"
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: apps/email-worker
+        working-directory: apps/email-parser
 
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: apps/email-worker
+        working-directory: apps/email-parser
 
     steps:
       - uses: actions/checkout@v4
