@@ -22,8 +22,9 @@ Create Date: 2026-03-14
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0008"
@@ -37,9 +38,7 @@ def upgrade() -> None:
     op.alter_column("bank_accounts", "mono_account_id", nullable=True)
 
     # 2. Drop the global unique constraint on mono_account_id
-    op.drop_constraint(
-        "bank_accounts_mono_account_id_key", "bank_accounts", type_="unique"
-    )
+    op.drop_constraint("bank_accounts_mono_account_id_key", "bank_accounts", type_="unique")
 
     # 3. Create a partial unique index — unique only when value IS NOT NULL
     op.create_index(

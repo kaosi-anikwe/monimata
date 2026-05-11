@@ -24,8 +24,9 @@ Create Date: 2026-05-01
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 revision = "0010"
 down_revision = "0009"
@@ -74,19 +75,13 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["transaction_id"], ["transactions.id"]),
         sa.UniqueConstraint("ref"),
     )
-    op.create_index(
-        "ix_pending_bill_payments_user_id", "pending_bill_payments", ["user_id"]
-    )
+    op.create_index("ix_pending_bill_payments_user_id", "pending_bill_payments", ["user_id"])
     op.create_index("ix_pending_bill_payments_ref", "pending_bill_payments", ["ref"])
-    op.create_index(
-        "ix_pending_bill_payments_state", "pending_bill_payments", ["state"]
-    )
+    op.create_index("ix_pending_bill_payments_state", "pending_bill_payments", ["state"])
 
 
 def downgrade() -> None:
     op.drop_index("ix_pending_bill_payments_state", table_name="pending_bill_payments")
     op.drop_index("ix_pending_bill_payments_ref", table_name="pending_bill_payments")
-    op.drop_index(
-        "ix_pending_bill_payments_user_id", table_name="pending_bill_payments"
-    )
+    op.drop_index("ix_pending_bill_payments_user_id", table_name="pending_bill_payments")
     op.drop_table("pending_bill_payments")

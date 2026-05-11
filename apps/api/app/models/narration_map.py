@@ -15,11 +15,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from sqlalchemy import DateTime, Float, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime, Float, ForeignKey, Text, UniqueConstraint
 
 from app.core.database import Base
 
@@ -42,9 +42,7 @@ class NarrationCategoryMap(Base):
     user_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    narration_key: Mapped[str] = mapped_column(
-        Text, nullable=False
-    )  # normalized narration token
+    narration_key: Mapped[str] = mapped_column(Text, nullable=False)  # normalized narration token
     category_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("categories.id", ondelete="CASCADE"),
@@ -54,11 +52,11 @@ class NarrationCategoryMap(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )

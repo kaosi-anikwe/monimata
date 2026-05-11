@@ -24,18 +24,17 @@ All money values are in kobo.
 from __future__ import annotations
 
 import logging
-from math import ceil
-from typing import Optional
 from calendar import monthrange
-from datetime import datetime, timedelta, timezone, date
+from datetime import UTC, date, datetime, timedelta
+from math import ceil
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models.user import User
 from app.models.budget import BudgetMonth
-from app.models.transaction import Transaction
 from app.models.category import Category, CategoryGroup
+from app.models.transaction import Transaction
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +44,7 @@ logger = logging.getLogger(__name__)
 def month_date_range(month: str) -> tuple[datetime, datetime]:
     """Return (start_of_month, start_of_next_month) as UTC-aware datetimes."""
     dt = datetime.strptime(month, "%Y-%m")
-    first = dt.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
-    )
+    first = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
     _, last_day = monthrange(first.year, first.month)
     next_first = first.replace(day=last_day) + timedelta(days=1)
     return first, next_first
@@ -193,7 +190,7 @@ def get_or_create_budget_month(
 # ── required_this_month ───────────────────────────────────────────────────────
 
 
-def required_this_month(target, current_available: int, today: date) -> Optional[int]:
+def required_this_month(target, current_available: int, today: date) -> int | None:
     """
     Return the kobo amount that should be assigned this month to meet the target.
     Returns None if the target is unknown or inapplicable.
@@ -239,9 +236,7 @@ def required_this_month(target, current_available: int, today: date) -> Optional
             target_dt = _date(today.year, 12, 31)
         if target_dt <= today:
             return max(0, amount - current_available)
-        months_left = (
-            (target_dt.year - today.year) * 12 + (target_dt.month - today.month) + 1
-        )
+        months_left = (target_dt.year - today.year) * 12 + (target_dt.month - today.month) + 1
         total_needed = amount - current_available
         if total_needed <= 0:
             return 0
@@ -257,9 +252,7 @@ def required_this_month(target, current_available: int, today: date) -> Optional
             return None
         if target_dt <= today:
             return max(0, amount - current_available)
-        months_left = (
-            (target_dt.year - today.year) * 12 + (target_dt.month - today.month) + 1
-        )
+        months_left = (target_dt.year - today.year) * 12 + (target_dt.month - today.month) + 1
         total_needed = amount - current_available
         if total_needed <= 0:
             return 0

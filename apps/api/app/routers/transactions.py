@@ -21,20 +21,19 @@ Transactions router — list, detail, patch (re-categorize), split, manual entry
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from uuid import UUID
-from typing import Optional
-from datetime import datetime, timezone
 
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
-from app.models.user import User
 from app.core.database import get_db
-from app.models.category import Category
 from app.core.deps import get_current_user
 from app.models.bank_account import BankAccount
+from app.models.category import Category
 from app.models.narration_map import NarrationCategoryMap
 from app.models.transaction import Transaction, TransactionSplit
+from app.models.user import User
 from app.schemas.transactions import (
     ManualTransactionRequest,
     TransactionListResponse,
@@ -58,15 +57,11 @@ def _get_tx_or_404(db: Session, tx_id: str, user_id: str) -> Transaction:
         .first()
     )
     if tx is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
     return tx
 
 
-def _recalculate_budget_activity(
-    db: Session, tx: Transaction, old_category_id: Optional[str]
-) -> None:
+def _recalculate_budget_activity(db: Session, tx: Transaction, old_category_id: str | None) -> None:
     """
     When a transaction's category changes, subtract its amount from the OLD
     budget month and add to the NEW one.
@@ -74,21 +69,15 @@ def _recalculate_budget_activity(
     month_str = tx.date.strftime("%Y-%m")
 
     if old_category_id:
-        old_bm = get_or_create_budget_month(
-            db, str(tx.user_id), old_category_id, month_str
-        )
+        old_bm = get_or_create_budget_month(db, str(tx.user_id), old_category_id, month_str)
         old_bm.activity -= tx.amount  # undo the previous contribution
 
     if tx.category_id:
-        new_bm = get_or_create_budget_month(
-            db, str(tx.user_id), str(tx.category_id), month_str
-        )
+        new_bm = get_or_create_budget_month(db, str(tx.user_id), str(tx.category_id), month_str)
         new_bm.activity += tx.amount
 
 
-def _upsert_narration_map(
-    db: Session, user_id: str, narration: str, category_id: str
-) -> None:
+def _upsert_narration_map(db: Session, user_id: str, narration: str, category_id: str) -> None:
     """
     Store / update the user's narration→category mapping at confidence 1.0.
     Also retroactively categorizes uncategorized transactions with the same key.
@@ -144,11 +133,11 @@ def _upsert_narration_map(
 def list_transactions(
     page: int = Query(1, ge=1),
     limit: int = Query(30, ge=1, le=100),
-    account_id: Optional[UUID] = Query(None),
-    category_id: Optional[UUID] = Query(None),
-    start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    uncategorized: Optional[bool] = Query(None),
+    account_id: UUID | None = Query(None),
+    category_id: UUID | None = Query(None),
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
+    uncategorized: bool | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> TransactionListResponse:
@@ -166,9 +155,7 @@ def list_transactions(
         q = q.filter(Transaction.category_id.is_(None))
     if start_date:
         try:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=UTC)
             q = q.filter(Transaction.date >= start_dt)
         except ValueError:
             pass
@@ -176,7 +163,7 @@ def list_transactions(
         try:
             # end_date is inclusive — include all transactions up to end of that UTC day
             end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
-                hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc
+                hour=23, minute=59, second=59, microsecond=999999, tzinfo=UTC
             )
             q = q.filter(Transaction.date <= end_dt)
         except ValueError:
@@ -261,7 +248,7 @@ def patch_transaction(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Category not found",
             )
-        new_category_id: Optional[str] = str(body.category_id)
+        new_category_id: str | None = str(body.category_id)
     else:
         new_category_id = str(tx.category_id) if tx.category_id else None
 
@@ -270,9 +257,7 @@ def patch_transaction(
     old_month = tx.date.strftime("%Y-%m")
     new_month = new_date.strftime("%Y-%m")
     budget_changed = (
-        new_signed != tx.amount
-        or new_month != old_month
-        or new_category_id != old_category_id
+        new_signed != tx.amount or new_month != old_month or new_category_id != old_category_id
     )
 
     if budget_changed:
@@ -315,27 +300,15 @@ def patch_transaction(
         new_account_id_str = str(tx.account_id)  # may have been updated above
         if old_account_id_str != new_account_id_str:
             # Account changed: undo old amount from old account, apply new amount to new account
-            old_acct = (
-                db.query(BankAccount)
-                .filter(BankAccount.id == old_account_id_str)
-                .first()
-            )
-            new_acct = (
-                db.query(BankAccount)
-                .filter(BankAccount.id == new_account_id_str)
-                .first()
-            )
+            old_acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
+            new_acct = db.query(BankAccount).filter(BankAccount.id == new_account_id_str).first()
             if old_acct and not old_acct.is_mono_linked:
                 old_acct.balance -= old_amount
             if new_acct and not new_acct.is_mono_linked:
                 new_acct.balance += new_signed
         else:
             # Same account: apply the signed delta
-            acct = (
-                db.query(BankAccount)
-                .filter(BankAccount.id == old_account_id_str)
-                .first()
-            )
+            acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
             if acct and not acct.is_mono_linked:
                 acct.balance += new_signed - old_amount
 
@@ -344,14 +317,10 @@ def patch_transaction(
         tx.memo = body.memo
 
     # Upsert narration→category map when category is explicitly assigned
-    if (
-        body.category_id is not None
-        and new_category_id
-        and new_category_id != old_category_id
-    ):
+    if body.category_id is not None and new_category_id and new_category_id != old_category_id:
         _upsert_narration_map(db, str(current_user.id), tx.narration, new_category_id)
 
-    tx.updated_at = datetime.now(timezone.utc)
+    tx.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(tx)
 
@@ -452,14 +421,12 @@ def split_transaction(
                 memo=item.memo,
             )
         )
-        bm = get_or_create_budget_month(
-            db, str(current_user.id), str(item.category_id), month_str
-        )
+        bm = get_or_create_budget_month(db, str(current_user.id), str(item.category_id), month_str)
         bm.activity += sign * item.amount
 
     tx.category_id = None
     tx.is_split = True
-    tx.updated_at = datetime.now(timezone.utc)
+    tx.updated_at = datetime.now(UTC)
 
     db.commit()
     db.refresh(tx)
@@ -495,7 +462,7 @@ def remove_split(
 
     tx.is_split = False
     tx.category_id = None
-    tx.updated_at = datetime.now(timezone.utc)
+    tx.updated_at = datetime.now(UTC)
 
     db.commit()
     db.refresh(tx)
@@ -505,9 +472,7 @@ def remove_split(
 # ── POST /transactions/manual ─────────────────────────────────────────────────
 
 
-@router.post(
-    "/manual", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/manual", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 def create_manual_transaction(
     body: ManualTransactionRequest,
     current_user: User = Depends(get_current_user),
@@ -563,9 +528,7 @@ def create_manual_transaction(
 
     if body.category_id:
         month_str = body.date.strftime("%Y-%m")
-        bm = get_or_create_budget_month(
-            db, str(current_user.id), str(body.category_id), month_str
-        )
+        bm = get_or_create_budget_month(db, str(current_user.id), str(body.category_id), month_str)
         bm.activity += signed_amount
 
     # Keep the stored balance in sync for manual (non-Mono) accounts.
@@ -585,9 +548,7 @@ def create_manual_transaction(
             evaluate_transaction_nudges(db, tx)
             db.commit()
         except Exception:
-            logger.exception(
-                "evaluate_transaction_nudges failed for manual tx=%s", tx.id
-            )
+            logger.exception("evaluate_transaction_nudges failed for manual tx=%s", tx.id)
 
     return tx
 
@@ -612,9 +573,7 @@ def delete_transaction(
     # Undo budget activity
     if tx.category_id:
         month_str = tx.date.strftime("%Y-%m")
-        bm = get_or_create_budget_month(
-            db, str(current_user.id), str(tx.category_id), month_str
-        )
+        bm = get_or_create_budget_month(db, str(current_user.id), str(tx.category_id), month_str)
         bm.activity -= tx.amount
 
     # Reverse the balance adjustment on manual (non-Mono) accounts.

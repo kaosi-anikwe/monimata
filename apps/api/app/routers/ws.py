@@ -47,16 +47,16 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from jose import JWTError
 import redis.asyncio as aioredis
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from jose import JWTError
+from sqlalchemy.orm import Session
 
-from app.models.user import User
 from app.core.config import settings
 from app.core.database import get_db
-from app.ws_manager import ws_channel
 from app.core.security import decode_access_token
+from app.models.user import User
+from app.ws_manager import ws_channel
 
 logger = logging.getLogger(__name__)
 

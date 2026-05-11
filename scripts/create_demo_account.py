@@ -71,8 +71,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Create a seeded demo/test account for MoniMata."
     )
-    parser.add_argument("--email", required=True, help="Email address for the demo account")
-    parser.add_argument("--password", required=True, help="Password (plaintext, min 8 chars)")
+    parser.add_argument(
+        "--email", required=True, help="Email address for the demo account"
+    )
+    parser.add_argument(
+        "--password", required=True, help="Password (plaintext, min 8 chars)"
+    )
     parser.add_argument("--first-name", default="Adaeze", dest="first_name")
     parser.add_argument("--last-name", default="Johnson", dest="last_name")
     parser.add_argument(
@@ -103,7 +107,9 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        existing: User | None = db.query(User).filter(User.email == args.email.lower()).first()
+        existing: User | None = (
+            db.query(User).filter(User.email == args.email.lower()).first()
+        )
 
         if existing is not None:
             if not args.reset:
@@ -177,8 +183,8 @@ def main() -> None:
         # ── Seed transactions ─────────────────────────────────────────────────
         def tx(
             narration: str,
-            amount: int,    # kobo; positive = credit, negative = debit
-            tx_type: str,   # "credit" | "debit"
+            amount: int,  # kobo; positive = credit, negative = debit
+            tx_type: str,  # "credit" | "debit"
             days_ago: int,
             cat: str | None = None,
         ) -> None:
@@ -198,29 +204,29 @@ def main() -> None:
             )
 
         # Credits
-        tx("SALARY CREDIT - TECHCORP LTD",    35_000_000, "credit", 28)  # ₦350,000
-        tx("TRANSFER FROM KUDA",               2_500_000,  "credit", 20)  # ₦25,000
-        tx("FREELANCE PAYMENT - DESIGNWORK",   5_000_000,  "credit",  5)  # ₦50,000
+        tx("SALARY CREDIT - TECHCORP LTD", 35_000_000, "credit", 28)  # ₦350,000
+        tx("TRANSFER FROM KUDA", 2_500_000, "credit", 20)  # ₦25,000
+        tx("FREELANCE PAYMENT - DESIGNWORK", 5_000_000, "credit", 5)  # ₦50,000
 
         # Debits — Food & Groceries (₦485 spend vs ₦580 budget = 83.6% → fires threshold_80)
-        tx("SHOPRITE LEKKI",             -18_000,  "debit",  2, "Food & Groceries")
-        tx("UBER EATS",                   -8_500,  "debit",  7, "Food & Groceries")
-        tx("GROCERY PALACE IKEJA",       -22_000,  "debit", 14, "Food & Groceries")
+        tx("SHOPRITE LEKKI", -18_000, "debit", 2, "Food & Groceries")
+        tx("UBER EATS", -8_500, "debit", 7, "Food & Groceries")
+        tx("GROCERY PALACE IKEJA", -22_000, "debit", 14, "Food & Groceries")
 
         # Debits — Transport (₦43 spend vs ₦30 budget = 143% → fires threshold_100)
-        tx("BOLT RIDE",                   -2_500,  "debit",  3, "Transport")
-        tx("BOLT RIDE",                   -1_800,  "debit", 12, "Transport")
+        tx("BOLT RIDE", -2_500, "debit", 3, "Transport")
+        tx("BOLT RIDE", -1_800, "debit", 12, "Transport")
 
         # Debits — other categories
-        tx("MTN AIRTIME TOP-UP",          -5_000,  "debit",  4, "Airtime & Data")
-        tx("DSTV SUBSCRIPTION",          -29_000,  "debit",  5, "Subscriptions")
-        tx("POS - EVERYDAY PHARMACY",    -12_000,  "debit",  8, "Health & Pharmacy")
-        tx("COWRYWISE INVESTMENT",        -50_000,  "debit",  9, "Investments")
-        tx("RENTS - APRIL 2026",       -9_000_000,  "debit", 10, "Rent / Housing")
-        tx("EKEDC POSTPAID",             -15_000,  "debit", 11, "Electricity (NEPA)")
-        tx("NETFLIX DEBIT",              -14_000,  "debit", 15, "Subscriptions")
-        tx("MTN DATA BUNDLE",            -10_000,  "debit", 16, "Airtime & Data")
-        tx("ANCHOR SAVINGS TRANSFER",   -100_000,  "debit", 17, "Emergency Fund")
+        tx("MTN AIRTIME TOP-UP", -5_000, "debit", 4, "Airtime & Data")
+        tx("DSTV SUBSCRIPTION", -29_000, "debit", 5, "Subscriptions")
+        tx("POS - EVERYDAY PHARMACY", -12_000, "debit", 8, "Health & Pharmacy")
+        tx("COWRYWISE INVESTMENT", -50_000, "debit", 9, "Investments")
+        tx("RENTS - APRIL 2026", -9_000_000, "debit", 10, "Rent / Housing")
+        tx("EKEDC POSTPAID", -15_000, "debit", 11, "Electricity (NEPA)")
+        tx("NETFLIX DEBIT", -14_000, "debit", 15, "Subscriptions")
+        tx("MTN DATA BUNDLE", -10_000, "debit", 16, "Airtime & Data")
+        tx("ANCHOR SAVINGS TRANSFER", -100_000, "debit", 17, "Emergency Fund")
 
         # ── Seed budget allocations ───────────────────────────────────────────
         # Food budget is tight (₦580) so 83.6% spend triggers a real threshold_80 nudge.
@@ -228,24 +234,26 @@ def main() -> None:
         # Travel and Savings are allocated to show progress on home-screen Goals.
         _BUDGET: list[tuple[str, int, int]] = [
             # (category name, assigned_kobo, activity_kobo)
-            ("Rent / Housing",      9_000_000, -9_000_000),
-            ("Electricity (NEPA)",     50_000,    -15_000),
-            ("Internet",               30_000,          0),
-            ("Food & Groceries",       58_000,    -48_500),  # 83.6% spent
-            ("Transport",               3_000,     -4_300),  # 143% spent — over budget!
-            ("Airtime & Data",         50_000,    -15_000),
-            ("Subscriptions",          60_000,    -43_000),
-            ("Health & Pharmacy",      30_000,    -12_000),
-            ("Investments",           200_000,    -50_000),
-            ("Emergency Fund",        150_000,   -100_000),
-            ("Savings",               300_000,          0),
-            ("Travel",                150_000,          0),  # sinking fund for Christmas trip
+            ("Rent / Housing", 9_000_000, -9_000_000),
+            ("Electricity (NEPA)", 50_000, -15_000),
+            ("Internet", 30_000, 0),
+            ("Food & Groceries", 58_000, -48_500),  # 83.6% spent
+            ("Transport", 3_000, -4_300),  # 143% spent — over budget!
+            ("Airtime & Data", 50_000, -15_000),
+            ("Subscriptions", 60_000, -43_000),
+            ("Health & Pharmacy", 30_000, -12_000),
+            ("Investments", 200_000, -50_000),
+            ("Emergency Fund", 150_000, -100_000),
+            ("Savings", 300_000, 0),
+            ("Travel", 150_000, 0),  # sinking fund for Christmas trip
         ]
 
         for cat_name, assigned, activity in _BUDGET:
             category = cat_by_name.get(cat_name)
             if not category:
-                print(f"  WARNING: category '{cat_name}' not found — skipping budget row.")
+                print(
+                    f"  WARNING: category '{cat_name}' not found — skipping budget row."
+                )
                 continue
             db.add(
                 BudgetMonth(
@@ -260,17 +268,35 @@ def main() -> None:
         # ── Seed category targets ─────────────────────────────────────────────
         # Targets drive the "Cost to Be Me" card and the Goals section.
         # custom-frequency targets appear on the Home → Goals section.
-        _TARGETS: list[tuple[str, str, str, int, int | None, int | None, date | None]] = [
+        _TARGETS: list[
+            tuple[str, str, str, int, int | None, int | None, date | None]
+        ] = [
             # (category, frequency, behavior, target_amount, day_of_week, day_of_month, target_date)
             #
             # Monthly bills — show target labels in Budget tab
-            ("Rent / Housing",  "monthly", "set_aside", 9_000_000, None, 1,    None),
-            ("Subscriptions",   "monthly", "set_aside",    60_000, None, 5,    None),
-            ("Airtime & Data",  "monthly", "set_aside",    50_000, None, 28,   None),
+            ("Rent / Housing", "monthly", "set_aside", 9_000_000, None, 1, None),
+            ("Subscriptions", "monthly", "set_aside", 60_000, None, 5, None),
+            ("Airtime & Data", "monthly", "set_aside", 50_000, None, 28, None),
             #
             # Sinking funds — custom frequency → show on Home → Goals
-            ("Travel",    "custom", "set_aside", 500_000, None, None, date(today.year, 12, 20)),
-            ("Savings",   "custom", "balance",   1_000_000, None, None, date(today.year + 1, 3, 1)),
+            (
+                "Travel",
+                "custom",
+                "set_aside",
+                500_000,
+                None,
+                None,
+                date(today.year, 12, 20),
+            ),
+            (
+                "Savings",
+                "custom",
+                "balance",
+                1_000_000,
+                None,
+                None,
+                date(today.year + 1, 3, 1),
+            ),
         ]
 
         for cat_name, freq, behavior, amt, dow, dom, tdate in _TARGETS:
@@ -294,10 +320,12 @@ def main() -> None:
         # ── Seed recurring rules ──────────────────────────────────────────────
         # These demonstrate the Recurring Transactions feature.
         # The Celery task generates actual transaction instances on each sync.
-        next_month_10th = date(today.year if today.month < 12 else today.year + 1,
-                               today.month % 12 + 1, 10)
-        next_month_5th  = date(today.year if today.month < 12 else today.year + 1,
-                               today.month % 12 + 1, 5)
+        next_month_10th = date(
+            today.year if today.month < 12 else today.year + 1, today.month % 12 + 1, 10
+        )
+        next_month_5th = date(
+            today.year if today.month < 12 else today.year + 1, today.month % 12 + 1, 5
+        )
         # Next Monday
         days_to_monday = (7 - today.weekday()) % 7 or 7
         next_monday = today + timedelta(days=days_to_monday)
@@ -305,7 +333,11 @@ def main() -> None:
         _RULES: list[tuple[str, str, int, int | None, int | None, date, dict]] = [
             # (frequency, interval, day_of_week, day_of_month, next_due, template)
             (
-                "monthly", 1, None, 10, next_month_10th,
+                "monthly",
+                1,
+                None,
+                10,
+                next_month_10th,
                 {
                     "account_id": str(account.id),
                     "amount": -15_000,
@@ -316,7 +348,11 @@ def main() -> None:
                 },
             ),
             (
-                "monthly", 1, None, 5, next_month_5th,
+                "monthly",
+                1,
+                None,
+                5,
+                next_month_5th,
                 {
                     "account_id": str(account.id),
                     "amount": -29_000,
@@ -327,7 +363,11 @@ def main() -> None:
                 },
             ),
             (
-                "weekly", 1, 0, None, next_monday,  # 0 = Monday
+                "weekly",
+                1,
+                0,
+                None,
+                next_monday,  # 0 = Monday
                 {
                     "account_id": str(account.id),
                     "amount": -2_500,
@@ -361,8 +401,14 @@ def main() -> None:
         transport_cat = cat_by_name.get("Transport")
         rent_cat = cat_by_name.get("Rent / Housing")
 
-        def nudge(trigger: str, title_str: str, msg: str, ctx: dict,
-                  cat: "Category | None" = None, hours_ago: int = 1) -> None:
+        def nudge(
+            trigger: str,
+            title_str: str,
+            msg: str,
+            ctx: dict,
+            cat: "Category | None" = None,
+            hours_ago: int = 1,
+        ) -> None:
             delivered = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
             db.add(
                 Nudge(
@@ -402,9 +448,7 @@ def main() -> None:
         nudge(
             "threshold_100",
             "🚨 Transport budget don finish!",
-            (
-                "E don do for Transport. You overrun by ₦13 — control the situation."
-            ),
+            ("E don do for Transport. You overrun by ₦13 — control the situation."),
             {
                 "category_name": "Transport",
                 "month": this_month,

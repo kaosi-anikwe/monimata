@@ -26,10 +26,10 @@ from typing import cast
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
+from app.services.interswitch_client import verify_interswitch_webhook
+from app.services.mono_client import verify_mono_webhook
 from app.worker.celery_app import CeleryTask
 from app.worker.tasks import fetch_transactions
-from app.services.mono_client import verify_mono_webhook
-from app.services.interswitch_client import verify_interswitch_webhook
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -58,9 +58,7 @@ async def mono_webhook(
 
     if event == "mono.events.account_updated" and account_id:
         cast(CeleryTask, fetch_transactions).delay(account_id)
-        logger.info(
-            f"webhook: Enqueued fetch_transactions for mono_account_id={account_id}"
-        )
+        logger.info(f"webhook: Enqueued fetch_transactions for mono_account_id={account_id}")
 
     if event == "mono.events.reauthorisation_required" and account_id:
         # Set account.requires_reauth to True to reauthorize manually
@@ -74,7 +72,7 @@ async def mono_webhook(
                 db.query(BankAccount)
                 .filter(
                     BankAccount.mono_account_id == account_id,
-                    BankAccount.is_active == True,
+                    BankAccount.is_active,
                 )
                 .first()
             )
@@ -84,22 +82,20 @@ async def mono_webhook(
             else:
                 account.requires_reauth = True
                 db.commit()
-        except:
+        except Exception:
             db.rollback()
             logger.exception("webhook: Failed to update account record")
         finally:
             db.close()
 
-        logger.info(
-            f"webhook: Reauthorization required for mono_account_id={account_id}"
-        )
+        logger.info(f"webhook: Reauthorization required for mono_account_id={account_id}")
 
     if event == "mono.events.account_unlinked" and account_id:
         # TODO: send push notification
         logger.info(f"webhook: Account unlinked for mono_account_id={account_id}")
 
     if event == "mono.events.account_connected":
-        customer_id: str = payload.get("data", {}).get("id", "")
+        payload.get("data", {}).get("id", "")
         mono_account_id: str = payload.get("data", {}).get("id", "")
         # TODO: send push notification
         logger.info(f"webhook: Account connected, mono_account_id={mono_account_id}")
@@ -172,11 +168,7 @@ async def interswitch_webhook(
 
         db = SessionLocal()
         try:
-            pending = (
-                db.query(PendingBillPayment)
-                .filter(PendingBillPayment.ref == txn_ref)
-                .first()
-            )
+            pending = db.query(PendingBillPayment).filter(PendingBillPayment.ref == txn_ref).first()
             if pending and pending.state == "PENDING_CHECKOUT":
                 cast(CeleryTask, dispatch_bill_phase3).delay(txn_ref)
                 logger.info("interswitch_webhook: enqueued phase3 for ref=%s", txn_ref)

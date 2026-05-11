@@ -46,10 +46,10 @@ Push delivery:
 
 from __future__ import annotations
 
-import random
 import logging
-from typing import TYPE_CHECKING, Optional
-from datetime import datetime, time, timedelta, timezone
+import random
+from datetime import UTC, datetime, time, timedelta, timezone
+from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +60,9 @@ WAT = timezone(timedelta(hours=1))
 PAY_RECEIVED_THRESHOLD = 5_000_000
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.nudge import Nudge
     from app.models.transaction import Transaction
+    from app.models.user import User
 
 # ── Message templates ─────────────────────────────────────────────────────────
 
@@ -78,7 +78,8 @@ MESSAGES: dict[str, list[str]] = {
     "threshold_80": [
         "You don use {percentage}% of your {category_name} budget. "
         "Only ₦{remaining_naira} remain — use am wisely!",
-        "{category_name} almost done o! ₦{remaining_naira} remain from your ₦{assigned_naira} plan.",
+        "{category_name} almost done o! ₦{remaining_naira} remain from your "
+        "₦{assigned_naira} plan.",
         "Guy, you don reach {percentage}% for {category_name}. "
         "₦{remaining_naira} remain — no overdo am.",
     ],
@@ -98,7 +99,8 @@ MESSAGES: dict[str, list[str]] = {
     "pay_received": [
         "₦{amount_naira} credit don land! Time to give every kobo a job — "
         "assign am to your budget.",
-        "Money don enter — ₦{amount_naira}. Assign am to your budget categories before e disappear.",
+        "Money don enter — ₦{amount_naira}. Assign am to your budget categories "
+        "before e disappear.",
     ],
     "bill_payment": [
         "Your {biller_name} payment of ₦{amount_naira} don go through. "
@@ -142,15 +144,16 @@ def _is_quiet_hours(nudge_settings: dict) -> bool:
 def _today_wat_utc_start() -> datetime:
     """Return midnight WAT for the current WAT calendar day as a UTC-aware datetime."""
     today_wat = datetime.now(WAT).date()
-    return datetime(
-        today_wat.year, today_wat.month, today_wat.day, 0, 0, 0, tzinfo=WAT
-    ).astimezone(timezone.utc)
+    return datetime(today_wat.year, today_wat.month, today_wat.day, 0, 0, 0, tzinfo=WAT).astimezone(
+        UTC
+    )
 
 
 def _count_today_nudges(db, user_id: str) -> int:
     """Count nudges already created for this user today (WAT day)."""
-    from app.models.nudge import Nudge
     from sqlalchemy import func
+
+    from app.models.nudge import Nudge
 
     return (
         db.query(func.count(Nudge.id))
@@ -167,7 +170,7 @@ def _today_nudge_exists(
     db,
     user_id: str,
     trigger_type: str,
-    category_id: Optional[str],
+    category_id: str | None,
 ) -> bool:
     """Return True if an identical nudge (same type + category) was already created today."""
     from app.models.nudge import Nudge
@@ -186,9 +189,9 @@ def _today_nudge_exists(
 
 def can_send_nudge(
     db,
-    user: "User",
+    user: User,
     trigger_type: str,
-    category_id: Optional[str] = None,
+    category_id: str | None = None,
 ) -> bool:
     """
     Return False if any of these guards prevent sending a nudge:
@@ -212,15 +215,15 @@ def can_send_nudge(
 
 def create_nudge(
     db,
-    user: "User",
+    user: User,
     trigger_type: str,
     title: str,
     message: str,
     context: dict,
-    category_id: Optional[str] = None,
+    category_id: str | None = None,
     *,
     send_push: bool = True,
-) -> "Nudge":
+) -> Nudge:
     """
     Persist a Nudge row and optionally dispatch a push notification.
 
@@ -233,7 +236,7 @@ def create_nudge(
     from app.models.nudge import Nudge
     from app.services.push_service import send_push_notification
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     quiet = _is_quiet_hours(user.nudge_settings or {})
 
     nudge = Nudge(
@@ -269,7 +272,7 @@ def create_nudge(
 # ── Trigger evaluators ────────────────────────────────────────────────────────
 
 
-def evaluate_transaction_nudges(db, tx: "Transaction") -> None:
+def evaluate_transaction_nudges(db, tx: Transaction) -> None:
     """
     Evaluate all nudge triggers for a newly categorized transaction and create
     any applicable Nudge rows.
@@ -283,11 +286,11 @@ def evaluate_transaction_nudges(db, tx: "Transaction") -> None:
       - threshold_80    if debit category tx and budget month data exists
       - threshold_100   if debit category tx and budget month data exists
     """
-    from app.models.user import User
     from app.models.category import Category
+    from app.models.user import User
     from app.services.budget_logic import get_or_create_budget_month
 
-    user: Optional[User] = db.get(User, tx.user_id)
+    user: User | None = db.get(User, tx.user_id)
     if not user:
         return
     ns = user.nudge_settings or {}
@@ -299,9 +302,7 @@ def evaluate_transaction_nudges(db, tx: "Transaction") -> None:
         if can_send_nudge(db, user, "pay_received"):
             amount_str = _kobo_to_naira_str(tx.amount)
             title = TITLES["pay_received"]
-            message = random.choice(MESSAGES["pay_received"]).format(
-                amount_naira=amount_str
-            )
+            message = random.choice(MESSAGES["pay_received"]).format(amount_naira=amount_str)
             create_nudge(
                 db,
                 user,
@@ -320,7 +321,7 @@ def evaluate_transaction_nudges(db, tx: "Transaction") -> None:
     if tx.type != "debit" or not tx.category_id or tx.amount >= 0:
         return
 
-    cat: Optional[Category] = db.get(Category, tx.category_id)
+    cat: Category | None = db.get(Category, tx.category_id)
     if not cat:
         return
 
@@ -429,10 +430,10 @@ def evaluate_transaction_nudges(db, tx: "Transaction") -> None:
 
 def evaluate_bill_payment_nudge(
     db,
-    user: "User",
-    tx: "Transaction",
+    user: User,
+    tx: Transaction,
     biller_name: str,
-    category_name: Optional[str] = None,
+    category_name: str | None = None,
 ) -> None:
     """
     Create a bill_payment confirmation nudge after a successful Interswitch payment.

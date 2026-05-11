@@ -22,8 +22,8 @@ Provides a single shared Redis connection used for:
   - Celery broker (via Celery's own connection)
 """
 
-from typing import cast
 from datetime import timedelta
+from typing import cast
 
 import redis
 
@@ -90,9 +90,7 @@ def is_token_blocklisted(jti: str) -> bool:
 # ── Per-user rate limiter ─────────────────────────────────────────────────────
 
 
-def check_rate_limit(
-    user_id: str, action: str, limit: int, window_seconds: int
-) -> bool:
+def check_rate_limit(user_id: str, action: str, limit: int, window_seconds: int) -> bool:
     """
     Sliding-window rate limiter backed by a Redis counter.
 

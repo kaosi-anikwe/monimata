@@ -30,16 +30,17 @@ Changes:
   3. Add recurrence_id FK column to transactions
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 revision: str = "0003"
-down_revision: Union[str, None] = "0002"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0002"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -51,9 +52,7 @@ def upgrade() -> None:
 
     op.create_table(
         "category_targets",
-        sa.Column(
-            "id", postgresql.UUID(as_uuid=False), primary_key=True, nullable=False
-        ),
+        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, nullable=False),
         sa.Column(
             "category_id",
             postgresql.UUID(as_uuid=False),
@@ -71,9 +70,7 @@ def upgrade() -> None:
         sa.Column("day_of_month", sa.Integer(), nullable=True),  # 1-31; 0=last day
         sa.Column("target_date", sa.Date(), nullable=True),  # yearly / custom
         # Custom-only repeat toggle (weekly/monthly/yearly always repeat)
-        sa.Column(
-            "repeats", sa.Boolean(), nullable=False, server_default=sa.text("false")
-        ),
+        sa.Column("repeats", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -98,9 +95,7 @@ def upgrade() -> None:
     # ── 2. Create recurring_rules ─────────────────────────────────────────────
     op.create_table(
         "recurring_rules",
-        sa.Column(
-            "id", postgresql.UUID(as_uuid=False), primary_key=True, nullable=False
-        ),
+        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, nullable=False),
         sa.Column(
             "user_id",
             postgresql.UUID(as_uuid=False),
@@ -109,16 +104,12 @@ def upgrade() -> None:
         ),
         # daily | weekly | biweekly | monthly | yearly | custom
         sa.Column("frequency", sa.String(20), nullable=False),
-        sa.Column(
-            "interval", sa.Integer(), nullable=False, server_default=sa.text("1")
-        ),
+        sa.Column("interval", sa.Integer(), nullable=False, server_default=sa.text("1")),
         sa.Column("day_of_week", sa.Integer(), nullable=True),
         sa.Column("day_of_month", sa.Integer(), nullable=True),
         sa.Column("next_due", sa.Date(), nullable=False),
         sa.Column("ends_on", sa.Date(), nullable=True),
-        sa.Column(
-            "is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")
-        ),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("template", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
             "created_at",
@@ -165,9 +156,7 @@ def downgrade() -> None:
     # Restore original category_targets schema
     op.create_table(
         "category_targets",
-        sa.Column(
-            "id", postgresql.UUID(as_uuid=False), primary_key=True, nullable=False
-        ),
+        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, nullable=False),
         sa.Column(
             "category_id",
             postgresql.UUID(as_uuid=False),
@@ -178,9 +167,7 @@ def downgrade() -> None:
         sa.Column("target_type", sa.Text(), nullable=False),
         sa.Column("target_amount", sa.BigInteger(), nullable=False),
         sa.Column("target_date", sa.Date(), nullable=True),
-        sa.Column(
-            "repeats", sa.Boolean(), nullable=False, server_default=sa.text("false")
-        ),
+        sa.Column("repeats", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("repeat_cadence", sa.Text(), nullable=True),
         sa.Column("on_refill", sa.Text(), nullable=True),
         sa.Column(

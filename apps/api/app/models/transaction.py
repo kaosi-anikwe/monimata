@@ -17,17 +17,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.models.user import User
-from app.models.category import Category
-from app.models.bank_account import BankAccount
-
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text
+
+from app.models.bank_account import BankAccount
+from app.models.category import Category
+from app.models.user import User
 
 if TYPE_CHECKING:
     from app.models.recurring_rule import RecurringRule
@@ -64,9 +63,7 @@ class Transaction(Base):
     source: Mapped[str] = mapped_column(
         String(20), nullable=False, default="mono"
     )  # "mono" | "interswitch" | "manual"
-    interswitch_ref: Mapped[str | None] = mapped_column(
-        Text, unique=True, nullable=True
-    )
+    interswitch_ref: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
     recurrence_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("recurring_rules.id", ondelete="SET NULL"),
@@ -75,13 +72,13 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
     # relationships
@@ -91,9 +88,7 @@ class Transaction(Base):
     splits: Mapped[list[TransactionSplit]] = relationship(
         back_populates="transaction", cascade="all, delete-orphan"
     )
-    recurring_rule: Mapped["RecurringRule | None"] = relationship(
-        back_populates="transactions"
-    )
+    recurring_rule: Mapped[RecurringRule | None] = relationship(back_populates="transactions")
 
 
 class TransactionSplit(Base):
@@ -110,9 +105,7 @@ class TransactionSplit(Base):
     category_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), ForeignKey("categories.id"), nullable=False
     )
-    amount: Mapped[int] = mapped_column(
-        BigInteger, nullable=False
-    )  # kobo; positive only
+    amount: Mapped[int] = mapped_column(BigInteger, nullable=False)  # kobo; positive only
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # relationships

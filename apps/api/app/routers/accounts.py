@@ -40,17 +40,19 @@ Endpoints
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any, cast
-from datetime import datetime, timezone
 
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.database import get_db
-from app.models.user import User
+from app.core.deps import get_current_user, get_verified_user
+from app.models.bank_account import BankAccount
 from app.models.transaction import Transaction
+from app.models.user import User
 from app.schemas.accounts import (
     AddManualAccountRequest,
     BankAccountResponse,
@@ -59,11 +61,9 @@ from app.schemas.accounts import (
     UpdateAliasRequest,
     UpdateManualBalanceRequest,
 )
-from app.worker.celery_app import CeleryTask
-from app.models.bank_account import BankAccount
-from app.worker.tasks import fetch_transactions
 from app.services.mono_client import mono_client
-from app.core.deps import get_current_user, get_verified_user
+from app.worker.celery_app import CeleryTask
+from app.worker.tasks import fetch_transactions
 from app.ws_manager import notify_user
 
 logger = logging.getLogger(__name__)
@@ -73,9 +73,7 @@ router = APIRouter()
 # ── POST /accounts/manual ─────────────────────────────────────────────────────
 
 
-@router.post(
-    "/manual", response_model=BankAccountResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/manual", response_model=BankAccountResponse, status_code=status.HTTP_201_CREATED)
 async def add_manual_account(
     payload: AddManualAccountRequest,
     current_user: User = Depends(get_current_user),
@@ -114,7 +112,7 @@ async def add_manual_account(
         currency=payload.currency,
         balance=payload.balance,
         starting_balance=payload.balance,
-        balance_as_of=datetime.now(timezone.utc),
+        balance_as_of=datetime.now(UTC),
         is_mono_linked=False,
     )
     db.add(bank_account)
@@ -128,7 +126,7 @@ async def add_manual_account(
         opening_tx = Transaction(
             user_id=current_user.id,
             account_id=bank_account.id,
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             amount=bank_account.balance,
             narration="Starting balance",
             type="credit",
@@ -151,9 +149,7 @@ async def add_manual_account(
 # ── POST /accounts/connect ────────────────────────────────────────────────────
 
 
-@router.post(
-    "/connect", response_model=BankAccountResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/connect", response_model=BankAccountResponse, status_code=status.HTTP_201_CREATED)
 async def connect_account(
     payload: ConnectAccountRequest,
     current_user: User = Depends(get_verified_user),  # requires identity_verified
@@ -192,9 +188,7 @@ async def connect_account(
 
     # Check if this Mono account is already linked (cross-user conflict)
     existing_mono = (
-        db.query(BankAccount)
-        .filter(BankAccount.mono_account_id == mono_account_id)
-        .first()
+        db.query(BankAccount).filter(BankAccount.mono_account_id == mono_account_id).first()
     )
     if existing_mono:
         if existing_mono.user_id != current_user.id:
@@ -205,7 +199,7 @@ async def connect_account(
         # Re-activate if the account exists but was unlinked
         existing_mono.is_mono_linked = True
         existing_mono.is_active = True
-        existing_mono.linked_at = existing_mono.linked_at or datetime.now(timezone.utc)
+        existing_mono.linked_at = existing_mono.linked_at or datetime.now(UTC)
         existing_mono.unlinked_at = None
         db.commit()
         db.refresh(existing_mono)
@@ -222,13 +216,13 @@ async def connect_account(
             .filter(
                 BankAccount.user_id == current_user.id,
                 BankAccount.account_number == mono_account_number,
-                BankAccount.is_mono_linked == False,
+                not BankAccount.is_mono_linked,
                 BankAccount.deleted_at.is_(None),
             )
             .first()
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if manual_match:
         # Promote the existing manual account with Mono data.
@@ -238,9 +232,7 @@ async def connect_account(
             "name", manual_match.institution
         )
         manual_match.account_name = acct_info.get("name", manual_match.account_name)
-        manual_match.account_type = acct_info.get(
-            "type", manual_match.account_type
-        ).upper()
+        manual_match.account_type = acct_info.get("type", manual_match.account_type).upper()
         manual_match.currency = acct_info.get("currency", manual_match.currency)
         manual_match.balance = int(acct_info.get("balance", manual_match.balance))
         manual_match.is_mono_linked = True
@@ -368,12 +360,10 @@ async def link_account(
         )
 
     acct_info: dict = account_data.get("data", {}).get("account", account_data)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     account.mono_account_id = mono_account_id
-    account.institution = acct_info.get("institution", {}).get(
-        "name", account.institution
-    )
+    account.institution = acct_info.get("institution", {}).get("name", account.institution)
     # Mono overwrites account_name; alias is preserved as the user-facing display name
     account.account_name = acct_info.get("name", account.account_name)
     account.account_type = acct_info.get("type", account.account_type).upper()
@@ -411,11 +401,9 @@ async def unlink_account(
         await mono_client.unlink_account(account.mono_account_id)
     except httpx.HTTPStatusError as exc:
         # Log but proceed — local state must still be updated even if Mono call fails
-        logger.warning(
-            "Mono unlink call failed for account=%s: %s", account_id, exc.response.text
-        )
+        logger.warning("Mono unlink call failed for account=%s: %s", account_id, exc.response.text)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     account.previous_mono_account_id = account.mono_account_id
     account.mono_account_id = None
     account.is_mono_linked = False
@@ -463,7 +451,7 @@ def update_manual_balance(
             detail="Balance cannot be edited on Mono-linked accounts.",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     audit_entry: dict[str, Any] = {
         "previous_balance": account.balance,
         "new_balance": payload.balance,
@@ -473,9 +461,7 @@ def update_manual_balance(
         audit_entry["note"] = payload.note
 
     account.balance = payload.balance
-    account.starting_balance = (
-        payload.balance
-    )  # reset so computed_balance stays in sync
+    account.starting_balance = payload.balance  # reset so computed_balance stays in sync
     account.balance_as_of = now
     account.balance_adjustments = (account.balance_adjustments or []) + [audit_entry]
 
@@ -495,7 +481,7 @@ def delete_account(
 ) -> None:
     """Soft-delete an account. Transaction history is preserved."""
     account = _get_live_account_or_404(db, account_id, current_user.id)
-    account.deleted_at = datetime.now(timezone.utc)
+    account.deleted_at = datetime.now(UTC)
     db.commit()
 
 
@@ -553,7 +539,5 @@ def _get_live_account_or_404(db: Session, account_id: str, user_id: str) -> Bank
         .first()
     )
     if not account:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return account

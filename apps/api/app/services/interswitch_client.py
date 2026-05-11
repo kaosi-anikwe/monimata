@@ -37,8 +37,8 @@ import base64
 import hashlib
 import hmac
 import logging
-from typing import cast
 from datetime import timedelta
+from typing import cast
 
 import httpx
 
@@ -83,21 +83,11 @@ class InterswitchClient:
         tokens never overwrite each other.
         """
         cache_key = TOKEN_CACHE_KEY_OWN if own else TOKEN_CACHE_KEY
-        client_id = (
-            settings.INTERSWITCH_OWN_CLIENT_ID
-            if own
-            else settings.INTERSWITCH_CLIENT_ID
-        )
+        client_id = settings.INTERSWITCH_OWN_CLIENT_ID if own else settings.INTERSWITCH_CLIENT_ID
         client_secret = (
-            settings.INTERSWITCH_OWN_CLIENT_SECRET
-            if own
-            else settings.INTERSWITCH_CLIENT_SECRET
+            settings.INTERSWITCH_OWN_CLIENT_SECRET if own else settings.INTERSWITCH_CLIENT_SECRET
         )
-        url = (
-            settings.INTERSWITCH_OWN_PASSPORT_URL
-            if own
-            else settings.INTERSWITCH_PASSPORT_URL
-        )
+        url = settings.INTERSWITCH_OWN_PASSPORT_URL if own else settings.INTERSWITCH_PASSPORT_URL
 
         r = get_redis()
         cached = cast(str | None, r.get(cache_key))
@@ -124,9 +114,7 @@ class InterswitchClient:
         r.setex(cache_key, timedelta(seconds=ttl), access_token)
         return access_token
 
-    def _headers(
-        self, token: str, *, auth_key: str = "Authorization"
-    ) -> dict[str, str]:
+    def _headers(self, token: str, *, auth_key: str = "Authorization") -> dict[str, str]:
         """Build common headers.  auth_key differs for Quickteller payment POST."""
         return {
             auth_key: f"Bearer {token}",

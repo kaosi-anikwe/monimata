@@ -40,15 +40,16 @@ Changes:
   can make without re-fetching the full transaction history.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "0005"
-down_revision: Union[str, None] = "0004"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0004"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -69,9 +70,7 @@ def upgrade() -> None:
 
     # 3. Enforce NOT NULL with a default of 0 for any future rows created before
     #    fetch_transactions has a chance to set it.
-    op.alter_column(
-        "bank_accounts", "starting_balance", nullable=False, server_default="0"
-    )
+    op.alter_column("bank_accounts", "starting_balance", nullable=False, server_default="0")
 
 
 def downgrade() -> None:

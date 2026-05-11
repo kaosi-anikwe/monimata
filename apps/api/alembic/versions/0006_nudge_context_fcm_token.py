@@ -30,9 +30,10 @@ Changes:
                     NULL means the user has not granted notification permissions.
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0006"

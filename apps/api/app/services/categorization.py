@@ -28,8 +28,8 @@ Steps (in confidence order):
 
 from __future__ import annotations
 
-import re
 import logging
+import re
 
 from sqlalchemy.orm import Session
 
@@ -103,7 +103,7 @@ def _find_category_by_name(db: Session, user_id: str, name: str) -> str | None:
         .filter(
             Category.user_id == user_id,
             Category.name.ilike(f"%{name}%"),
-            Category.is_hidden == False,
+            not Category.is_hidden,
         )
         .first()
     )
@@ -115,8 +115,9 @@ def categorize_transaction(db: Session, tx) -> str | None:
     Run the full categorization pipeline for a single transaction.
     Returns a category_id string, or None if uncategorized.
     """
-    from app.models.narration_map import NarrationCategoryMap
     from thefuzz import fuzz
+
+    from app.models.narration_map import NarrationCategoryMap
 
     narration_norm = _normalize_narration(tx.narration)
 

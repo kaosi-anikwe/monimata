@@ -20,14 +20,13 @@ Alembic env.py — reads DATABASE_URL from environment so alembic.ini placeholde
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
-
-from app.core.config import settings
-from app.core.database import Base
 
 # Import all models so their metadata is registered before autogenerate runs
 import app.models  # noqa: F401
+from alembic import context
+from app.core.config import settings
+from app.core.database import Base
 
 config = context.config
 

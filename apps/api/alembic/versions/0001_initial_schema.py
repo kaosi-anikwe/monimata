@@ -21,16 +21,17 @@ Revises:
 Create Date: 2026-03-08
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 revision: str = "0001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -64,9 +65,7 @@ def upgrade() -> None:
             ),
         ),
         sa.Column("onboarded", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column(
-            "identity_verified", sa.Boolean(), nullable=False, server_default="false"
-        ),
+        sa.Column("identity_verified", sa.Boolean(), nullable=False, server_default="false"),
     )
 
     # ── bank_accounts ─────────────────────────────────────────────────────────
@@ -88,9 +87,7 @@ def upgrade() -> None:
         sa.Column("balance", sa.BigInteger(), nullable=False, server_default="0"),
         sa.Column("last_synced_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
-        sa.Column(
-            "requires_reauth", sa.Boolean(), nullable=False, server_default="false"
-        ),
+        sa.Column("requires_reauth", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -296,9 +293,7 @@ def upgrade() -> None:
             "user_id", "category_id", "month", name="uq_budget_months_user_cat_month"
         ),
     )
-    op.create_index(
-        "idx_budget_months_user_month", "budget_months", ["user_id", "month"]
-    )
+    op.create_index("idx_budget_months_user_month", "budget_months", ["user_id", "month"])
 
     # ── narration_category_map ────────────────────────────────────────────────
     op.create_table(
@@ -330,9 +325,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.UniqueConstraint(
-            "user_id", "narration_key", name="uq_narration_map_user_key"
-        ),
+        sa.UniqueConstraint("user_id", "narration_key", name="uq_narration_map_user_key"),
     )
 
     # ── nudges ────────────────────────────────────────────────────────────────
@@ -363,9 +356,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
     )
-    op.create_index(
-        "idx_nudges_user_id", "nudges", ["user_id", sa.text("created_at DESC")]
-    )
+    op.create_index("idx_nudges_user_id", "nudges", ["user_id", sa.text("created_at DESC")])
 
     # ── articles ──────────────────────────────────────────────────────────────
     op.create_table(
@@ -375,9 +366,7 @@ def upgrade() -> None:
         sa.Column("title", sa.Text(), nullable=False),
         sa.Column("body", sa.Text(), nullable=False),
         sa.Column("is_nugget", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column(
-            "tags", postgresql.ARRAY(sa.Text()), nullable=False, server_default="{}"
-        ),
+        sa.Column("tags", postgresql.ARRAY(sa.Text()), nullable=False, server_default="{}"),
         sa.Column("published", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column(
             "created_at",

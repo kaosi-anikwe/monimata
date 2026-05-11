@@ -17,11 +17,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
-from datetime import date, datetime, timezone
 
-from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import (
     Boolean,
     Date,
@@ -30,12 +28,14 @@ from sqlalchemy import (
     Integer,
     String,
 )
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.transaction import Transaction
+    from app.models.user import User
 
 
 class RecurringRule(Base):
@@ -100,17 +100,15 @@ class RecurringRule(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
     # relationships
-    user: Mapped["User"] = relationship(back_populates="recurring_rules")
-    transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="recurring_rule"
-    )
+    user: Mapped[User] = relationship(back_populates="recurring_rules")
+    transactions: Mapped[list[Transaction]] = relationship(back_populates="recurring_rule")

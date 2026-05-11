@@ -16,18 +16,18 @@
 
 from __future__ import annotations
 
-from uuid import UUID
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class TransactionSplitResponse(BaseModel):
     id: UUID
-    category_id: Optional[UUID]
+    category_id: UUID | None
     amount: int  # kobo
-    memo: Optional[str]
+    memo: str | None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -35,18 +35,18 @@ class TransactionSplitResponse(BaseModel):
 class TransactionResponse(BaseModel):
     id: UUID
     account_id: UUID
-    mono_id: Optional[str]
+    mono_id: str | None
     date: datetime
     amount: int  # kobo — negative = debit, positive = credit
     narration: str
     type: str  # "debit" | "credit"
-    balance_after: Optional[int]
-    category_id: Optional[UUID]
-    memo: Optional[str]
+    balance_after: int | None
+    category_id: UUID | None
+    memo: str | None
     is_split: bool
     is_manual: bool
     source: str
-    recurrence_id: Optional[UUID]
+    recurrence_id: UUID | None
     splits: list[TransactionSplitResponse]
     created_at: datetime
     updated_at: datetime
@@ -72,20 +72,20 @@ class TransactionPatchRequest(BaseModel):
     transactions (silently ignored for Mono/Interswitch imports).
     """
 
-    category_id: Optional[UUID] = None
-    memo: Optional[str] = None
+    category_id: UUID | None = None
+    memo: str | None = None
     # ── Manual transactions only ──────────────────────────────────────────────
-    type: Optional[Literal["debit", "credit"]] = None
-    amount: Optional[int] = None  # kobo, positive — sign derived from type
-    narration: Optional[str] = None
-    date: Optional[datetime] = None
-    account_id: Optional[UUID] = None
+    type: Literal["debit", "credit"] | None = None
+    amount: int | None = None  # kobo, positive — sign derived from type
+    narration: str | None = None
+    date: datetime | None = None
+    account_id: UUID | None = None
 
 
 class TransactionSplitItem(BaseModel):
     category_id: UUID
     amount: int  # kobo; must be > 0
-    memo: Optional[str] = None
+    memo: str | None = None
 
     @field_validator("amount")
     @classmethod
@@ -100,9 +100,7 @@ class TransactionSplitRequest(BaseModel):
 
     @field_validator("splits")
     @classmethod
-    def at_least_two_splits(
-        cls, v: list[TransactionSplitItem]
-    ) -> list[TransactionSplitItem]:
+    def at_least_two_splits(cls, v: list[TransactionSplitItem]) -> list[TransactionSplitItem]:
         if len(v) < 2:
             raise ValueError("A split requires at least 2 items")
         return v
@@ -114,8 +112,8 @@ class ManualTransactionRequest(BaseModel):
     amount: int  # kobo; negative = debit, positive = credit
     narration: str
     type: Literal["debit", "credit"]
-    category_id: Optional[UUID] = None
-    memo: Optional[str] = None
+    category_id: UUID | None = None
+    memo: str | None = None
 
     @field_validator("amount")
     @classmethod

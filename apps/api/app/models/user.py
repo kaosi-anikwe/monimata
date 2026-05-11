@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, String, Text
@@ -27,12 +27,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.nudge import Nudge
-    from app.models.budget import BudgetMonth
-    from app.models.transaction import Transaction
     from app.models.bank_account import BankAccount
+    from app.models.budget import BudgetMonth
     from app.models.category import Category, CategoryGroup
+    from app.models.nudge import Nudge
     from app.models.recurring_rule import RecurringRule
+    from app.models.transaction import Transaction
 
 DEFAULT_NUDGE_SETTINGS = {
     "quiet_hours_start": "23:00",
@@ -57,41 +57,35 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
-    last_login: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     nudge_settings: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=DEFAULT_NUDGE_SETTINGS
     )
     onboarded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    identity_verified: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
-    )
+    identity_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     expo_push_token: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # Expo push token ("ExponentPushToken[...]"); NULL = notifications not granted
 
     # relationships
-    bank_accounts: Mapped[list["BankAccount"]] = relationship(
+    bank_accounts: Mapped[list[BankAccount]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    transactions: Mapped[list["Transaction"]] = relationship(
+    transactions: Mapped[list[Transaction]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    category_groups: Mapped[list["CategoryGroup"]] = relationship(
+    category_groups: Mapped[list[CategoryGroup]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    categories: Mapped[list["Category"]] = relationship(
+    categories: Mapped[list[Category]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    budget_months: Mapped[list["BudgetMonth"]] = relationship(
+    budget_months: Mapped[list[BudgetMonth]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    nudges: Mapped[list["Nudge"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    recurring_rules: Mapped[list["RecurringRule"]] = relationship(
+    nudges: Mapped[list[Nudge]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    recurring_rules: Mapped[list[RecurringRule]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
