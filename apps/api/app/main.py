@@ -14,8 +14,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from rich.console import Console
 
 from app.core.config import settings
 from app.core.logging_config import configure_logging
@@ -43,6 +45,19 @@ app = FastAPI(
     description="Zero-based budgeting for Nigerians — Every Kobo, Accounted For.",
     version="0.0.1",
 )
+
+_console = Console(stderr=True)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Render unhandled exceptions with Rich and return a safe 500 response."""
+    _console.print_exception(max_frames=5, show_locals=True, word_wrap=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
 
 app.add_middleware(
     CORSMiddleware,
