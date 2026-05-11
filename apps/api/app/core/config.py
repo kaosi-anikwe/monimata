@@ -101,6 +101,14 @@ class Settings(BaseSettings):
     # 32-byte (64-char hex) key for AES-256-GCM used on PII columns
     AES_ENCRYPTION_KEY: str = ""
 
+    # ── Sentry ────────────────────────────────────────────────────────────────
+    SENTRY_DSN: str = ""  # Leave blank to disable Sentry
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.2  # Fraction of transactions to trace
+
+    # ── Email-worker webhook ──────────────────────────────────────────────────
+    # Shared secret that the Cloudflare email-worker sends in X-MoniMata-Secret.
+    BANK_ALERT_WEBHOOK_SECRET: str = ""
+
     # ── Logging ───────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"  # DEBUG | INFO | WARNING | ERROR
     LOG_DIR: str = "logs"  # relative to the working directory (apps/api)
