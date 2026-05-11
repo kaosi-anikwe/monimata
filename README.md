@@ -110,6 +110,8 @@ MoniMata is a **cloud-primary, device-cached** system. Financial records are aut
 | ------------ | ---------------------------------- |
 | Nx 18        | Task orchestration, caching        |
 | TypeScript 5 | Shared types (`libs/shared-types`) |
+| uv           | Python package manager (backend)   |
+| pre-commit   | Git hook runner (ruff lint/format) |
 
 ---
 
@@ -159,23 +161,24 @@ monimata/
 
 ### Backend
 
+The backend uses [uv](https://docs.astral.sh/uv/) for dependency management.
+
 ```bash
-# 1. Create and activate a virtual environment
+# 1. Install dependencies (creates .venv automatically)
 cd apps/api
-python3.11 -m venv .venv
+uv sync
+
+# Activate the virtual environment
 source .venv/bin/activate  # Windows: .venv\Scripts\Activate.ps1
 
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Configure environment
+# 2. Configure environment
 cp .env.example .env
 # Edit .env — set DATABASE_URL, REDIS_URL, JWT keys, Mono and Interswitch credentials
 
-# 4. Run database migrations
+# 3. Run database migrations
 alembic upgrade head
 
-# 5. Start the four required processes (in separate terminals)
+# 4. Start the four required processes (in separate terminals)
 uvicorn app.main:app --reload --port 8000
 celery -A app.worker.celery_app worker --loglevel=info
 celery -A app.worker.celery_app beat -l info
@@ -282,6 +285,35 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 ---
 
+## Code Quality
+
+A pre-commit hook runs automatically on every `git commit` and enforces code style on the Python backend.
+
+```bash
+# Install hooks after cloning (one-time)
+cd apps/api
+uv run pre-commit install
+
+# Run manually against all files
+uv run pre-commit run --all-files
+```
+
+The hook runs two steps via [ruff](https://docs.astral.sh/ruff/):
+
+| Step          | What it does                              |
+| ------------- | ----------------------------------------- |
+| `ruff check`  | Lint and auto-fix (E, F, I, UP rule sets) |
+| `ruff format` | Format code (Black-compatible)            |
+
+To add or update backend dependencies:
+
+```bash
+uv add <package>          # runtime dependency
+uv add --group dev <pkg>  # dev-only dependency
+```
+
+---
+
 ## Money Conventions
 
 - All money is stored as **kobo (integer)**. ₦150.00 → `15000`. Never use floats.
@@ -326,10 +358,10 @@ For building a release APK without EAS or the Play Store, see [docs/LOCAL_APK_BU
 
 ## Team
 
-| Member | Role | Contributions |
-| --- | --- | --- |
+| Member           | Role                 | Contributions                                                                                                                                     |
+| ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Kaosi Anikwe** | Full-Stack Developer | Entire codebase — FastAPI backend, WatermelonDB sync engine, React Native app, Celery workers, Mono & Interswitch integrations, CI/CD, deployment |
-| **Patricia Oko** | UI/UX Designer | App design, screen flows, visual identity, and authored this README |
+| **Patricia Oko** | UI/UX Designer       | App design, screen flows, visual identity, and authored this README                                                                               |
 
 ---
 
