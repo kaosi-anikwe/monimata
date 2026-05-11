@@ -538,15 +538,15 @@ def push(
     # ── categories ────────────────────────────────────────────────────────────
     cat_changes = changes.get("categories", {})
     for record in cat_changes.get("created", []) + cat_changes.get("updated", []):
-        existing = db.query(Category).filter(Category.id == record["id"]).first()
-        if existing:
-            if existing.user_id != user_id:
+        cat_existing = db.query(Category).filter(Category.id == record["id"]).first()
+        if cat_existing:
+            if cat_existing.user_id != user_id:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-            existing.name = record.get("name", existing.name)
-            existing.group_id = record.get("group_id", existing.group_id)
-            existing.sort_order = int(record.get("sort_order", existing.sort_order))
-            existing.is_hidden = bool(record.get("is_hidden", existing.is_hidden))
-            existing.updated_at = datetime.now(UTC)
+            cat_existing.name = record.get("name", cat_existing.name)
+            cat_existing.group_id = record.get("group_id", cat_existing.group_id)
+            cat_existing.sort_order = int(record.get("sort_order", cat_existing.sort_order))
+            cat_existing.is_hidden = bool(record.get("is_hidden", cat_existing.is_hidden))
+            cat_existing.updated_at = datetime.now(UTC)
         else:
             db.add(
                 Category(
@@ -561,23 +561,23 @@ def push(
         has_category_changes = True
 
     for record_id in cat_changes.get("deleted", []):
-        row = (
+        cat_row = (
             db.query(Category).filter(Category.id == record_id, Category.user_id == user_id).first()
         )
-        if row:
-            db.delete(row)
+        if cat_row:
+            db.delete(cat_row)
             has_category_changes = True
 
     # ── budget_months ─────────────────────────────────────────────────────────
     bm_changes = changes.get("budget_months", {})
     for record in bm_changes.get("created", []) + bm_changes.get("updated", []):
         # Look up by client-supplied ID first (idempotency on duplicate push).
-        existing = db.query(BudgetMonth).filter(BudgetMonth.id == record["id"]).first()
-        if existing:
-            if existing.user_id != user_id:
+        bm_existing = db.query(BudgetMonth).filter(BudgetMonth.id == record["id"]).first()
+        if bm_existing:
+            if bm_existing.user_id != user_id:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-            existing.assigned = int(record.get("assigned", existing.assigned))
-            existing.updated_at = datetime.now(UTC)
+            bm_existing.assigned = int(record.get("assigned", bm_existing.assigned))
+            bm_existing.updated_at = datetime.now(UTC)
         else:
             # A server-generated row may already exist for the same
             # (user, category, month) with a different UUID.  Update it so the
@@ -609,13 +609,13 @@ def push(
         has_budget_changes = True
 
     for record_id in bm_changes.get("deleted", []):
-        row = (
+        bm_row = (
             db.query(BudgetMonth)
             .filter(BudgetMonth.id == record_id, BudgetMonth.user_id == user_id)
             .first()
         )
-        if row:
-            db.delete(row)
+        if bm_row:
+            db.delete(bm_row)
             has_budget_changes = True
 
     # ── category_targets ──────────────────────────────────────────────────────
@@ -653,21 +653,21 @@ def push(
 
         # Look up existing target by category_id (the unique key), not by the
         # client-supplied primary key, to avoid creating duplicates.
-        existing = (
+        ct_existing = (
             db.query(CategoryTarget)
             .filter(CategoryTarget.category_id == record["category_id"])
             .first()
         )
-        if existing:
-            existing.frequency = record.get("frequency", existing.frequency)
-            existing.behavior = record.get("behavior", existing.behavior)
-            existing.target_amount = int(record.get("target_amount", existing.target_amount))
-            existing.day_of_week = record.get("day_of_week", existing.day_of_week)
-            existing.day_of_month = record.get("day_of_month", existing.day_of_month)
+        if ct_existing:
+            ct_existing.frequency = record.get("frequency", ct_existing.frequency)
+            ct_existing.behavior = record.get("behavior", ct_existing.behavior)
+            ct_existing.target_amount = int(record.get("target_amount", ct_existing.target_amount))
+            ct_existing.day_of_week = record.get("day_of_week", ct_existing.day_of_week)
+            ct_existing.day_of_month = record.get("day_of_month", ct_existing.day_of_month)
             if "target_date" in record:
-                existing.target_date = target_date_val
-            existing.repeats = bool(record.get("repeats", existing.repeats))
-            existing.updated_at = datetime.now(UTC)
+                ct_existing.target_date = target_date_val
+            ct_existing.repeats = bool(record.get("repeats", ct_existing.repeats))
+            ct_existing.updated_at = datetime.now(UTC)
         else:
             db.add(
                 CategoryTarget(
@@ -685,15 +685,15 @@ def push(
         has_category_changes = True
 
     for record_id in ct_changes.get("deleted", []):
-        row = (
+        ct_row = (
             db.query(CategoryTarget)
             .filter(CategoryTarget.id == record_id)
             .join(CategoryTarget.category)
             .filter(Category.user_id == user_id)
             .first()
         )
-        if row:
-            db.delete(row)
+        if ct_row:
+            db.delete(ct_row)
             has_category_changes = True
 
     # ── recurring_rules ───────────────────────────────────────────────────────
@@ -715,22 +715,22 @@ def push(
             except (ValueError, TypeError):
                 ends_on_val = None
 
-        existing = db.query(RecurringRule).filter(RecurringRule.id == record["id"]).first()
-        if existing:
-            if existing.user_id != user_id:
+        rr_existing = db.query(RecurringRule).filter(RecurringRule.id == record["id"]).first()
+        if rr_existing:
+            if rr_existing.user_id != user_id:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-            existing.frequency = record.get("frequency", existing.frequency)
-            existing.interval = int(record.get("interval", existing.interval))
-            existing.day_of_week = record.get("day_of_week", existing.day_of_week)
-            existing.day_of_month = record.get("day_of_month", existing.day_of_month)
+            rr_existing.frequency = record.get("frequency", rr_existing.frequency)
+            rr_existing.interval = int(record.get("interval", rr_existing.interval))
+            rr_existing.day_of_week = record.get("day_of_week", rr_existing.day_of_week)
+            rr_existing.day_of_month = record.get("day_of_month", rr_existing.day_of_month)
             if next_due_val is not None:
-                existing.next_due = next_due_val
+                rr_existing.next_due = next_due_val
             if "ends_on" in record:
-                existing.ends_on = ends_on_val
-            existing.is_active = bool(record.get("is_active", existing.is_active))
+                rr_existing.ends_on = ends_on_val
+            rr_existing.is_active = bool(record.get("is_active", rr_existing.is_active))
             if "template" in record:
-                existing.template = record["template"]
-            existing.updated_at = datetime.now(UTC)
+                rr_existing.template = record["template"]
+            rr_existing.updated_at = datetime.now(UTC)
         else:
             if next_due_val is None:
                 logger.warning(
@@ -754,13 +754,13 @@ def push(
             )
 
     for record_id in rr_changes.get("deleted", []):
-        row = (
+        rr_row = (
             db.query(RecurringRule)
             .filter(RecurringRule.id == record_id, RecurringRule.user_id == user_id)
             .first()
         )
-        if row:
-            db.delete(row)
+        if rr_row:
+            db.delete(rr_row)
 
     # ── transactions ──────────────────────────────────────────────────────────
     tx_changes = changes.get("transactions", {})
@@ -771,12 +771,12 @@ def push(
             logger.warning("Rejected push-create of non-manual transaction id=%s", record.get("id"))
             continue
 
-        existing = db.query(Transaction).filter(Transaction.id == record["id"]).first()
-        if existing:
+        tx_existing = db.query(Transaction).filter(Transaction.id == record["id"]).first()
+        if tx_existing:
             continue  # idempotent duplicate push
 
         tx_date = datetime.fromtimestamp(record["date"] / 1000, tz=UTC)
-        tx = Transaction(
+        new_tx = Transaction(
             id=record["id"],
             user_id=user_id,
             account_id=record["account_id"],
@@ -791,12 +791,12 @@ def push(
             source="manual",
             recurrence_id=record.get("recurrence_id"),
         )
-        db.add(tx)
+        db.add(new_tx)
 
-        if tx.category_id:
+        if new_tx.category_id:
             month_str = tx_date.strftime("%Y-%m")
-            bm = get_or_create_budget_month(db, user_id, str(tx.category_id), month_str)
-            bm.activity += tx.amount
+            bm = get_or_create_budget_month(db, user_id, str(new_tx.category_id), month_str)
+            bm.activity += new_tx.amount
             has_budget_changes = True
 
         # Keep account.balance in sync for manual (non-Mono) accounts.
@@ -811,10 +811,10 @@ def push(
             .first()
         )
         if _create_acct and not _create_acct.is_mono_linked:
-            _create_acct.balance += tx.amount
+            _create_acct.balance += new_tx.amount
 
         new_tx_ids.append(record["id"])
-        if tx.category_id is None:
+        if new_tx.category_id is None:
             new_uncategorised_tx_ids.append(record["id"])
 
     for record in tx_changes.get("updated", []):

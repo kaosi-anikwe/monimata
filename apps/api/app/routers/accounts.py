@@ -216,7 +216,7 @@ async def connect_account(
             .filter(
                 BankAccount.user_id == current_user.id,
                 BankAccount.account_number == mono_account_number,
-                not BankAccount.is_mono_linked,
+                ~BankAccount.is_mono_linked,
                 BankAccount.deleted_at.is_(None),
             )
             .first()

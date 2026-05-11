@@ -103,7 +103,7 @@ def _find_category_by_name(db: Session, user_id: str, name: str) -> str | None:
         .filter(
             Category.user_id == user_id,
             Category.name.ilike(f"%{name}%"),
-            not Category.is_hidden,
+            ~Category.is_hidden,
         )
         .first()
     )

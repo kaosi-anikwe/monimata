@@ -505,7 +505,7 @@ def nightly_reconciliation() -> None:
             db.query(BankAccount)
             .filter(
                 BankAccount.is_active,
-                (BankAccount.last_synced_at is None) | (BankAccount.last_synced_at < cutoff),
+                BankAccount.last_synced_at.is_(None) | (BankAccount.last_synced_at < cutoff),
             )
             .all()
         )

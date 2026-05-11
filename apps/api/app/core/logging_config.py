@@ -35,16 +35,34 @@ import logging
 import logging.config
 from pathlib import Path
 
+from rich import traceback as rich_traceback
+from rich.logging import RichHandler
+
+# Install Rich as the global unhandled-exception renderer.
+# max_frames=5 keeps tracebacks concise; show_locals exposes variable values on ERROR+.
+rich_traceback.install(max_frames=5, show_locals=True, word_wrap=True)
+
+_RICH_HANDLER = RichHandler(
+    rich_tracebacks=True,
+    tracebacks_max_frames=5,
+    tracebacks_show_locals=True,
+    tracebacks_word_wrap=True,
+    markup=True,
+    log_time_format="[%H:%M:%S]",
+    show_path=True,
+)
+
 
 def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
     """
-    Set up rotating file + console logging.
+    Set up Rich console + rotating file logging.
     Call once at application startup before any loggers are used.
     """
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
 
     level = log_level.upper()
+    _RICH_HANDLER.setLevel(level)
 
     config: dict = {
         "version": 1,
@@ -54,16 +72,10 @@ def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
                 "format": ("%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s"),
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
-            "console": {
-                "format": "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-                "datefmt": "%H:%M:%S",
-            },
         },
         "handlers": {
             "console": {
-                "class": "logging.StreamHandler",
-                "stream": "ext://sys.stdout",
-                "formatter": "console",
+                "()": lambda: _RICH_HANDLER,
                 "level": level,
             },
             "app_file": {
