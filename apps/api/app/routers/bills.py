@@ -46,8 +46,6 @@ import uuid
 from typing import cast
 
 import httpx
-
-from sqlalchemy.orm import Session
 from fastapi import (
     APIRouter,
     Depends,
@@ -59,17 +57,18 @@ from fastapi import (
     status,
 )
 from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
 
-from app.models.user import User
 from app.core.database import get_db
-from app.models.category import Category
-from app.models.transaction import Transaction
-from app.models.bank_account import BankAccount
-from app.models.pending_bill_payment import PendingBillPayment
 from app.core.deps import get_current_user, get_verified_user
+from app.models.bank_account import BankAccount
+from app.models.category import Category
+from app.models.pending_bill_payment import PendingBillPayment
+from app.models.transaction import Transaction
+from app.models.user import User
 from app.schemas.bills import (
-    BillerCategory,
     Biller,
+    BillerCategory,
     BillHistoryItem,
     BillPayInitiateResponse,
     BillPayRequest,
@@ -120,16 +119,9 @@ def _parse_biller(raw: dict) -> Biller:
 
 
 def _parse_payment_item(raw: dict) -> PaymentItem:
-    amount_str = (
-        raw.get("Amount")
-        or raw.get("ItemFee")
-        or raw.get("amount")
-        or raw.get("itemFee")
-    )
+    amount_str = raw.get("Amount") or raw.get("ItemFee") or raw.get("amount") or raw.get("itemFee")
     fixed_amount: int | None = None
-    is_fixed = bool(
-        raw.get("IsAmountFixed") or raw.get("isAmountFixed") or raw.get("isFixed")
-    )
+    is_fixed = bool(raw.get("IsAmountFixed") or raw.get("isAmountFixed") or raw.get("isFixed"))
     if is_fixed and amount_str:
         try:
             fixed_amount = int(amount_str)
@@ -178,9 +170,7 @@ async def list_biller_categories(
     summary="List billers in a category",
 )
 async def list_billers(
-    category_id: str = Query(
-        ..., description="Biller category ID from /bills/categories"
-    ),
+    category_id: str = Query(..., description="Biller category ID from /bills/categories"),
     _: User = Depends(get_current_user),
 ) -> list[Biller]:
     """Returns the billers available under the given category."""
@@ -238,9 +228,7 @@ async def validate_customer(
     This is a read-only ISW call — no charge is made here.
     """
     try:
-        result = await interswitch_client.validate_customer(
-            body.payment_code, body.customer_id
-        )
+        result = await interswitch_client.validate_customer(body.payment_code, body.customer_id)
     except httpx.HTTPStatusError as exc:
         logger.error("ISW validate_customer failed: %s", exc)
         raise HTTPException(
@@ -248,11 +236,9 @@ async def validate_customer(
             detail="Customer validation failed. Check the customer ID and try again.",
         )
 
-    response_code: str = str(
-        result.get("ResponseCode") or result.get("responseCode", "99")
-    )
+    response_code: str = str(result.get("ResponseCode") or result.get("responseCode", "99"))
     if response_code not in _ISW_SUCCESS_CODES:
-        logger.warning(f"Skipping validation error while in sandbox mode")
+        logger.warning("Skipping validation error while in sandbox mode")
         # raise HTTPException(
         #     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         #     detail=result.get("ResponseDescription") or "Customer not found.",
@@ -277,8 +263,7 @@ async def validate_customer(
         biller_name=result.get("BillerName") or result.get("billerName"),
         response_code=response_code,
         response_description=str(
-            result.get("ResponseDescription")
-            or result.get("responseDescription", "Successful")
+            result.get("ResponseDescription") or result.get("responseDescription", "Successful")
         ),
     )
 
@@ -311,7 +296,7 @@ async def pay_bill(
         .filter(
             BankAccount.id == body.account_id,
             BankAccount.user_id == current_user.id,
-            BankAccount.is_active == True,
+            BankAccount.is_active,
         )
         .first()
     )

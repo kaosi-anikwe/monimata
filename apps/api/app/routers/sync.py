@@ -39,28 +39,28 @@ arrays; a deletions log table will be added in Phase 2.
 
 from __future__ import annotations
 
-import time
 import logging
+import time
 import uuid
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
-from datetime import date, datetime, timedelta, timezone
+
 from dateutil.relativedelta import relativedelta
-
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
-from app.models.user import User
 from app.core.database import get_db
-from app.models.budget import BudgetMonth
-from app.models.target import CategoryTarget
-from app.models.recurring_rule import RecurringRule
 from app.core.deps import get_current_user
-from app.models.transaction import Transaction
+from app.core.redis_client import check_rate_limit
 from app.models.bank_account import BankAccount
+from app.models.budget import BudgetMonth
 from app.models.category import Category, CategoryGroup
+from app.models.recurring_rule import RecurringRule
+from app.models.target import CategoryTarget
+from app.models.transaction import Transaction
+from app.models.user import User
 from app.services.budget_logic import get_or_create_budget_month
 from app.ws_manager import notify_user
-from app.core.redis_client import check_rate_limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -71,7 +71,7 @@ router = APIRouter()
 
 def _ts_ms(dt: datetime) -> int:
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return int(dt.timestamp() * 1000)
 
 
@@ -181,9 +181,7 @@ def _advance_next_due(rule: RecurringRule, from_date: date) -> date:
         if rule.day_of_month is not None:
             if rule.day_of_month == 0:
                 # last day of the resulting month
-                next_d = (next_d.replace(day=1) + relativedelta(months=1)) - timedelta(
-                    days=1
-                )
+                next_d = (next_d.replace(day=1) + relativedelta(months=1)) - timedelta(days=1)
             else:
                 import calendar
 
@@ -243,9 +241,7 @@ def _generate_recurring_transactions(db: Session, user_id: str, today: date) -> 
             # Update budget activity if categorised
             if tx.category_id:
                 month_str = current_due.strftime("%Y-%m")
-                bm = get_or_create_budget_month(
-                    db, user_id, str(tx.category_id), month_str
-                )
+                bm = get_or_create_budget_month(db, user_id, str(tx.category_id), month_str)
                 bm.activity += tx.amount
 
             current_due = _advance_next_due(rule, current_due)
@@ -290,9 +286,9 @@ def pull(
     server_timestamp = int(time.time() * 1000)
 
     since = (
-        datetime.fromtimestamp(last_pulled_at / 1000, tz=timezone.utc)
+        datetime.fromtimestamp(last_pulled_at / 1000, tz=UTC)
         if last_pulled_at
-        else datetime.min.replace(tzinfo=timezone.utc)
+        else datetime.min.replace(tzinfo=UTC)
     )
 
     # ── Transactions — last 90 days ───────────────────────────────────────────
@@ -422,14 +418,10 @@ def pull(
             },
             "category_targets": {
                 "created": [
-                    _serialize_target(t)
-                    for t in targets
-                    if _ts_ms(t.created_at) > last_pulled_at
+                    _serialize_target(t) for t in targets if _ts_ms(t.created_at) > last_pulled_at
                 ],
                 "updated": [
-                    _serialize_target(t)
-                    for t in targets
-                    if _ts_ms(t.created_at) <= last_pulled_at
+                    _serialize_target(t) for t in targets if _ts_ms(t.created_at) <= last_pulled_at
                 ],
                 "deleted": [],
             },
@@ -465,9 +457,7 @@ def push(
     Rate-limited to 60 pushes per user per minute.
     """
     # ── Rate limit ────────────────────────────────────────────────────────────
-    if not check_rate_limit(
-        str(current_user.id), "sync_push", limit=60, window_seconds=60
-    ):
+    if not check_rate_limit(str(current_user.id), "sync_push", limit=60, window_seconds=60):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many sync requests. Please slow down.",
@@ -515,18 +505,14 @@ def push(
     # ── category_groups ───────────────────────────────────────────────────────
     cg_changes = changes.get("category_groups", {})
     for record in cg_changes.get("created", []) + cg_changes.get("updated", []):
-        existing = (
-            db.query(CategoryGroup).filter(CategoryGroup.id == record["id"]).first()
-        )
+        existing = db.query(CategoryGroup).filter(CategoryGroup.id == record["id"]).first()
         if existing:
             if existing.user_id != user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
-                )
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
             existing.name = record.get("name", existing.name)
             existing.sort_order = int(record.get("sort_order", existing.sort_order))
             existing.is_hidden = bool(record.get("is_hidden", existing.is_hidden))
-            existing.updated_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(UTC)
         else:
             db.add(
                 CategoryGroup(
@@ -555,14 +541,12 @@ def push(
         existing = db.query(Category).filter(Category.id == record["id"]).first()
         if existing:
             if existing.user_id != user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
-                )
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
             existing.name = record.get("name", existing.name)
             existing.group_id = record.get("group_id", existing.group_id)
             existing.sort_order = int(record.get("sort_order", existing.sort_order))
             existing.is_hidden = bool(record.get("is_hidden", existing.is_hidden))
-            existing.updated_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(UTC)
         else:
             db.add(
                 Category(
@@ -578,9 +562,7 @@ def push(
 
     for record_id in cat_changes.get("deleted", []):
         row = (
-            db.query(Category)
-            .filter(Category.id == record_id, Category.user_id == user_id)
-            .first()
+            db.query(Category).filter(Category.id == record_id, Category.user_id == user_id).first()
         )
         if row:
             db.delete(row)
@@ -593,11 +575,9 @@ def push(
         existing = db.query(BudgetMonth).filter(BudgetMonth.id == record["id"]).first()
         if existing:
             if existing.user_id != user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
-                )
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
             existing.assigned = int(record.get("assigned", existing.assigned))
-            existing.updated_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(UTC)
         else:
             # A server-generated row may already exist for the same
             # (user, category, month) with a different UUID.  Update it so the
@@ -614,7 +594,7 @@ def push(
             )
             if conflict:
                 conflict.assigned = int(record.get("assigned", conflict.assigned))
-                conflict.updated_at = datetime.now(timezone.utc)
+                conflict.updated_at = datetime.now(UTC)
             else:
                 db.add(
                     BudgetMonth(
@@ -658,8 +638,7 @@ def push(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    f"Forbidden: category {record.get('category_id')!r} "
-                    "not found for this user."
+                    f"Forbidden: category {record.get('category_id')!r} not found for this user."
                 ),
             )
 
@@ -682,15 +661,13 @@ def push(
         if existing:
             existing.frequency = record.get("frequency", existing.frequency)
             existing.behavior = record.get("behavior", existing.behavior)
-            existing.target_amount = int(
-                record.get("target_amount", existing.target_amount)
-            )
+            existing.target_amount = int(record.get("target_amount", existing.target_amount))
             existing.day_of_week = record.get("day_of_week", existing.day_of_week)
             existing.day_of_month = record.get("day_of_month", existing.day_of_month)
             if "target_date" in record:
                 existing.target_date = target_date_val
             existing.repeats = bool(record.get("repeats", existing.repeats))
-            existing.updated_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(UTC)
         else:
             db.add(
                 CategoryTarget(
@@ -738,14 +715,10 @@ def push(
             except (ValueError, TypeError):
                 ends_on_val = None
 
-        existing = (
-            db.query(RecurringRule).filter(RecurringRule.id == record["id"]).first()
-        )
+        existing = db.query(RecurringRule).filter(RecurringRule.id == record["id"]).first()
         if existing:
             if existing.user_id != user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
-                )
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
             existing.frequency = record.get("frequency", existing.frequency)
             existing.interval = int(record.get("interval", existing.interval))
             existing.day_of_week = record.get("day_of_week", existing.day_of_week)
@@ -757,7 +730,7 @@ def push(
             existing.is_active = bool(record.get("is_active", existing.is_active))
             if "template" in record:
                 existing.template = record["template"]
-            existing.updated_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(UTC)
         else:
             if next_due_val is None:
                 logger.warning(
@@ -795,16 +768,14 @@ def push(
     for record in tx_changes.get("created", []):
         # Only manual transactions may be created from the client.
         if not record.get("is_manual"):
-            logger.warning(
-                "Rejected push-create of non-manual transaction id=%s", record.get("id")
-            )
+            logger.warning("Rejected push-create of non-manual transaction id=%s", record.get("id"))
             continue
 
         existing = db.query(Transaction).filter(Transaction.id == record["id"]).first()
         if existing:
             continue  # idempotent duplicate push
 
-        tx_date = datetime.fromtimestamp(record["date"] / 1000, tz=timezone.utc)
+        tx_date = datetime.fromtimestamp(record["date"] / 1000, tz=UTC)
         tx = Transaction(
             id=record["id"],
             user_id=user_id,
@@ -869,7 +840,7 @@ def push(
             if "type" in record:
                 tx.type = record["type"]
             if "date" in record:
-                tx.date = datetime.fromtimestamp(record["date"] / 1000, tz=timezone.utc)
+                tx.date = datetime.fromtimestamp(record["date"] / 1000, tz=UTC)
             if "account_id" in record:
                 tx.account_id = record["account_id"]
             if "narration" in record:
@@ -902,7 +873,7 @@ def push(
                     .first()
                 )
                 if _upd_acct and not _upd_acct.is_mono_linked:
-                    _upd_acct.balance += (_new_amount - _old_amount)
+                    _upd_acct.balance += _new_amount - _old_amount
 
         # Rebalance budget_months.activity when the category changes.
         old_category_id = str(tx.category_id) if tx.category_id else None
@@ -917,18 +888,14 @@ def push(
         if old_category_id != new_category_id:
             tx_month = tx.date.strftime("%Y-%m")
             if old_category_id:
-                old_bm = get_or_create_budget_month(
-                    db, user_id, old_category_id, tx_month
-                )
+                old_bm = get_or_create_budget_month(db, user_id, old_category_id, tx_month)
                 old_bm.activity -= tx.amount
             if new_category_id:
-                new_bm = get_or_create_budget_month(
-                    db, user_id, new_category_id, tx_month
-                )
+                new_bm = get_or_create_budget_month(db, user_id, new_category_id, tx_month)
                 new_bm.activity += tx.amount
             has_budget_changes = True
 
-        tx.updated_at = datetime.now(timezone.utc)
+        tx.updated_at = datetime.now(UTC)
         updated_tx_ids.append(str(tx.id))
 
     for record_id in tx_changes.get("deleted", []):
@@ -972,17 +939,17 @@ def push(
     except Exception as exc:
         db.rollback()
         logger.exception("Sync push commit failed for user=%s", user_id)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
 
     # ── Post-push side effects ────────────────────────────────────────────────
     # Fire after commit so the new rows are visible to Celery workers.
 
     # 1. Categorise new transactions that have no category yet.
     if new_uncategorised_tx_ids:
-        from app.worker.celery_app import CeleryTask, celery_app as _celery
         from typing import cast
+
+        from app.worker.celery_app import CeleryTask
+        from app.worker.celery_app import celery_app as _celery
 
         cast(
             CeleryTask,
@@ -995,8 +962,10 @@ def push(
         tid for tid in new_tx_ids if tid not in new_uncategorised_tx_ids
     ] + updated_tx_ids
     if needs_nudge_eval:
-        from app.worker.celery_app import CeleryTask, celery_app as _celery
         from typing import cast
+
+        from app.worker.celery_app import CeleryTask
+        from app.worker.celery_app import celery_app as _celery
 
         cast(
             CeleryTask,

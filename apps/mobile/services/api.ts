@@ -36,7 +36,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 if (!BASE_URL) {
     throw new Error(
         '[MoniMata] EXPO_PUBLIC_API_URL is not set. ' +
-        'Create apps/mobile/.env with EXPO_PUBLIC_API_URL=https://api.monimata.ng'
+        'Create apps/mobile/.env with EXPO_PUBLIC_API_URL=https://api.moni-mata.ng'
     );
 }
 

@@ -78,9 +78,7 @@ def notify_user(user_id: str, keys: list[str]) -> None:
         r.publish(ws_channel(user_id), payload)
         logger.debug("notify_user user=%s keys=%s", user_id, keys)
     except Exception:
-        logger.exception(
-            "notify_user: Redis publish failed for user=%s keys=%s", user_id, keys
-        )
+        logger.exception("notify_user: Redis publish failed for user=%s keys=%s", user_id, keys)
 
 
 # ── Asynchronous publish (async FastAPI handlers, async tasks) ────────────────

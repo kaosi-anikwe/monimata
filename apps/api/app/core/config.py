@@ -16,22 +16,19 @@
 
 from __future__ import annotations
 
-from typing import List
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # ── Core ──────────────────────────────────────────────────────────────────
     # Empty default allows construction without args; validator below enforces
     # that the value is set via the .env file or environment variable at runtime.
     DATABASE_URL: str = ""
     REDIS_URL: str = "redis://localhost:6379/0"
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8081"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8081"]
 
     # ── JWT ───────────────────────────────────────────────────────────────────
     # RS256 keys — generate with: openssl genrsa -out private.pem 2048
@@ -72,9 +69,7 @@ class Settings(BaseSettings):
     # Quickteller bill-payment API (sandbox vs production base URLs differ).
     # Sandbox:    https://qa.interswitchng.com/quicktellerservice/api/v5
     # Production: https://api.interswitchng.com/quickteller/api/v5
-    INTERSWITCH_QUICKTELLER_URL: str = (
-        "https://qa.interswitchng.com/quicktellerservice/api/v5"
-    )
+    INTERSWITCH_QUICKTELLER_URL: str = "https://qa.interswitchng.com/quicktellerservice/api/v5"
     # TerminalId assigned by Interswitch during onboarding; default is the
     # public sandbox terminal used in Interswitch's own documentation examples.
     INTERSWITCH_TERMINAL_ID: str = "3pbl0001"
@@ -82,9 +77,7 @@ class Settings(BaseSettings):
     # ── Interswitch Web Checkout (Phase 2) ────────────────────────────────────
     # Sandbox:    https://newwebpay.qa.interswitchng.com/collections/w/pay
     # Production: https://newwebpay.interswitchng.com/collections/w/pay
-    INTERSWITCH_WEB_CHECKOUT_URL: str = (
-        "https://newwebpay.qa.interswitchng.com/collections/w/pay"
-    )
+    INTERSWITCH_WEB_CHECKOUT_URL: str = "https://newwebpay.qa.interswitchng.com/collections/w/pay"
     # Collections re-query endpoint used to verify a completed Web Checkout.
     # Sandbox:    https://qa.interswitchng.com/collections/api/v1
     # Production: https://api.interswitchng.com/collections/api/v1
@@ -113,7 +106,7 @@ class Settings(BaseSettings):
     LOG_DIR: str = "logs"  # relative to the working directory (apps/api)
 
     @model_validator(mode="after")
-    def _require_database_url(self) -> "Settings":
+    def _require_database_url(self) -> Settings:
         if not self.DATABASE_URL:
             raise ValueError(
                 "DATABASE_URL must be set via .env or the DATABASE_URL environment variable"

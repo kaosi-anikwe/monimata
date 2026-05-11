@@ -25,15 +25,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import List, cast
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import cast
 
-from sqlalchemy import and_, select
-
+import app.worker.beat_schedule as _beat_schedule  # noqa: F401 — registers beat schedule
 from app.core.database import SessionLocal
 from app.models.budget import BudgetMonth
 from app.worker.celery_app import CeleryTask, celery_app
-import app.worker.beat_schedule as _beat_schedule  # noqa: F401 — registers beat schedule
 
 logger = logging.getLogger(__name__)
 
@@ -63,15 +61,13 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
     Triggered by: Mono webhook, POST /accounts/{id}/sync, nightly reconciliation.
     """
     if not mono_account_id:
-        logger.warning(
-            "fetch_transactions called with empty mono_account_id — skipping"
-        )
+        logger.warning("fetch_transactions called with empty mono_account_id — skipping")
         return {"status": "skipped", "reason": "no_mono_account_id"}
 
-    from app.ws_manager import notify_user
     from app.models.bank_account import BankAccount
     from app.models.transaction import Transaction
     from app.services.mono_client import mono_client
+    from app.ws_manager import notify_user
 
     db = SessionLocal()
     try:
@@ -79,15 +75,13 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             db.query(BankAccount)
             .filter(
                 BankAccount.mono_account_id == mono_account_id,
-                BankAccount.is_active == True,
+                BankAccount.is_active,
             )
             .first()
         )
 
         if not account:
-            logger.warning(
-                "fetch_transactions: account not found for mono_id=%s", mono_account_id
-            )
+            logger.warning("fetch_transactions: account not found for mono_id=%s", mono_account_id)
             return {"status": "skipped", "reason": "account_not_found"}
 
         # Fetch since last sync (or all available if never synced).
@@ -96,11 +90,9 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
         # syncs we pass start=last_synced_at and end=now.
         is_initial_sync = account.last_synced_at is None
         start_date = account.last_synced_at
-        end_date = datetime.now(timezone.utc) if start_date is not None else None
+        end_date = datetime.now(UTC) if start_date is not None else None
         raw_txns = _run_async(
-            mono_client.get_transactions(
-                mono_account_id, start=start_date, end=end_date
-            )
+            mono_client.get_transactions(mono_account_id, start=start_date, end=end_date)
         )
 
         # Also refresh account balance
@@ -115,9 +107,7 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             if not mono_tx_id:
                 continue
 
-            existing = (
-                db.query(Transaction).filter(Transaction.mono_id == mono_tx_id).first()
-            )
+            existing = db.query(Transaction).filter(Transaction.mono_id == mono_tx_id).first()
             if existing:
                 continue  # already imported — skip
 
@@ -170,7 +160,7 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
             new_ids.append(txn.id)
 
         account.requires_reauth = False
-        account.last_synced_at = datetime.now(timezone.utc)
+        account.last_synced_at = datetime.now(UTC)
 
         # On the very first sync, anchor starting_balance so that:
         #   displayed_balance = starting_balance + SUM(transactions.amount)
@@ -193,7 +183,7 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
                 opening_tx = Transaction(
                     user_id=account.user_id,
                     account_id=account.id,
-                    date=datetime.now(timezone.utc),
+                    date=datetime.now(UTC),
                     amount=computed_sb,
                     narration="Starting balance",
                     type="credit",
@@ -234,9 +224,7 @@ def fetch_transactions(self, mono_account_id: str) -> dict:
 
     except Exception as exc:
         db.rollback()
-        logger.exception(
-            "fetch_transactions failed for mono_account_id=%s", mono_account_id
-        )
+        logger.exception("fetch_transactions failed for mono_account_id=%s", mono_account_id)
         raise self.retry(exc=exc)
     finally:
         db.close()
@@ -253,19 +241,19 @@ def _parse_mono_date(date_str: str) -> datetime:
     consistent TIMESTAMPTZ representation in the database.
     """
     if not date_str:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     # Full datetime with milliseconds
     for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
         try:
-            return datetime.strptime(date_str, fmt).replace(tzinfo=timezone.utc)
+            return datetime.strptime(date_str, fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
     # Date-only — promote to midnight UTC
     try:
-        return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
     except ValueError:
         pass
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _find_manual_match(db, account_id: str, tx_datetime: datetime, signed_amount: int):
@@ -278,8 +266,9 @@ def _find_manual_match(db, account_id: str, tx_datetime: datetime, signed_amount
     A 2-hour window handles network/posting delays while preventing false
     positives for users who make the same-amount purchase every day.
     """
-    from app.models.transaction import Transaction
     from datetime import timedelta
+
+    from app.models.transaction import Transaction
 
     return (
         db.query(Transaction)
@@ -299,8 +288,9 @@ def _find_manual_match(db, account_id: str, tx_datetime: datetime, signed_amount
 def _find_duplicate(db, account_id: str, tx_datetime: datetime, amount: int):
     """Return an existing Interswitch transaction that matches this Mono debit
     (within ±100 kobo, within ±1 day to handle posting-date lag)."""
-    from app.models.transaction import Transaction
     from datetime import timedelta
+
+    from app.models.transaction import Transaction
 
     return (
         db.query(Transaction)
@@ -331,8 +321,9 @@ def _notify_bill_payment(
     immediately rather than waiting for the next 5-second poll tick.
     """
     import json
+
     from app.core.redis_client import get_redis
-    from app.ws_manager import ws_channel, notify_user
+    from app.ws_manager import notify_user, ws_channel
 
     # ── WebSocket event ───────────────────────────────────────────────────────
     try:
@@ -350,9 +341,7 @@ def _notify_bill_payment(
         # Also invalidate the bills/history and budget query caches.
         notify_user(str(user_id), ["billHistory", "budget"])
     except Exception:
-        logger.exception(
-            "_notify_bill_payment: WS publish failed ref=%s state=%s", ref, state
-        )
+        logger.exception("_notify_bill_payment: WS publish failed ref=%s state=%s", ref, state)
 
     # ── Push notification ─────────────────────────────────────────────────────
     try:
@@ -366,9 +355,7 @@ def _notify_bill_payment(
                 naira = amount_kobo / 100
                 if state == "COMPLETED":
                     title = "Payment Successful"
-                    body = (
-                        f"Your ₦{naira:,.2f} payment to {biller_name} was successful."
-                    )
+                    body = f"Your ₦{naira:,.2f} payment to {biller_name} was successful."
                 else:
                     title = "Payment Failed"
                     body = (
@@ -393,7 +380,7 @@ def _notify_bill_payment(
 
 
 @celery_app.task(name="app.worker.tasks.categorize_transactions", bind=True)
-def categorize_transactions(self, transaction_ids: List[str]) -> None:
+def categorize_transactions(self, transaction_ids: list[str]) -> None:
     """Run the categorization pipeline for a list of transaction IDs."""
     from app.services.categorization import categorize_transaction
     from app.services.nudge_engine import evaluate_transaction_nudges
@@ -417,9 +404,7 @@ def categorize_transactions(self, transaction_ids: List[str]) -> None:
                     try:
                         evaluate_transaction_nudges(db, tx)
                     except Exception:
-                        logger.exception(
-                            "evaluate_transaction_nudges failed for tx=%s", tx_id
-                        )
+                        logger.exception("evaluate_transaction_nudges failed for tx=%s", tx_id)
             if tx:
                 user_ids.add(str(tx.user_id))
         db.commit()
@@ -439,7 +424,7 @@ def categorize_transactions(self, transaction_ids: List[str]) -> None:
 
 
 @celery_app.task(name="app.worker.tasks.evaluate_nudges_for_transactions")
-def evaluate_nudges_for_transactions(transaction_ids: List[str]) -> None:
+def evaluate_nudges_for_transactions(transaction_ids: list[str]) -> None:
     """
     Evaluate nudge triggers for transactions that were pushed by the client
     with a category already set (so categorize_transactions won't run for them).
@@ -459,9 +444,7 @@ def evaluate_nudges_for_transactions(transaction_ids: List[str]) -> None:
                 try:
                     evaluate_transaction_nudges(db, tx)
                 except Exception:
-                    logger.exception(
-                        "evaluate_transaction_nudges failed for tx=%s", tx_id
-                    )
+                    logger.exception("evaluate_transaction_nudges failed for tx=%s", tx_id)
                 user_ids.add(str(tx.user_id))
         db.commit()
 
@@ -517,13 +500,12 @@ def nightly_reconciliation() -> None:
 
     db = SessionLocal()
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=26)
+        cutoff = datetime.now(UTC) - timedelta(hours=26)
         stale_accounts = (
             db.query(BankAccount)
             .filter(
-                BankAccount.is_active == True,
-                (BankAccount.last_synced_at == None)
-                | (BankAccount.last_synced_at < cutoff),
+                BankAccount.is_active,
+                (BankAccount.last_synced_at is None) | (BankAccount.last_synced_at < cutoff),
             )
             .all()
         )
@@ -553,7 +535,7 @@ def deliver_queued_nudges() -> None:
 
     db = SessionLocal()
     try:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         queued = (
             db.query(Nudge)
             .filter(
@@ -614,7 +596,7 @@ def reconcile_budget_activity() -> None:
     Only rows where abs(stored - correct) > 0 are written, so the typical
     no-op case is cheap (read-only).
     """
-    from sqlalchemy import func, text
+    from sqlalchemy import text
 
     db = SessionLocal()
     try:
@@ -622,7 +604,8 @@ def reconcile_budget_activity() -> None:
         # We join against budget_months to limit work to rows that already exist;
         # missing budget_month rows will be created by get_or_create_budget_month
         # if and when a transaction is categorised.
-        rows = db.execute(text("""
+        rows = db.execute(
+            text("""
                 SELECT
                     t.user_id,
                     t.category_id,
@@ -631,7 +614,8 @@ def reconcile_budget_activity() -> None:
                 FROM transactions t
                 WHERE t.category_id IS NOT NULL
                 GROUP BY t.user_id, t.category_id, DATE_TRUNC('month', t.date)
-                """)).fetchall()
+                """)
+        ).fetchall()
 
         corrected = 0
         for row in rows:
@@ -658,13 +642,11 @@ def reconcile_budget_activity() -> None:
                 corrected += 1
             elif bm.activity != int(correct_activity):
                 bm.activity = int(correct_activity)
-                bm.updated_at = datetime.now(timezone.utc)
+                bm.updated_at = datetime.now(UTC)
                 corrected += 1
 
         db.commit()
-        logger.info(
-            "reconcile_budget_activity: corrected %d budget_month rows", corrected
-        )
+        logger.info("reconcile_budget_activity: corrected %d budget_month rows", corrected)
     except Exception:
         db.rollback()
         logger.exception("reconcile_budget_activity failed")
@@ -703,12 +685,11 @@ def dispatch_bill_phase3(self, ref: str) -> None:
 
     Idempotent: skips silently if the payment is already in a terminal state.
     """
-    from app.core.config import settings
     from app.core.database import SessionLocal
     from app.models.pending_bill_payment import PendingBillPayment
     from app.models.transaction import Transaction
-    from app.services.interswitch_client import interswitch_client
     from app.services.budget_logic import get_or_create_budget_month
+    from app.services.interswitch_client import interswitch_client
 
     db = SessionLocal()
     try:
@@ -752,8 +733,7 @@ def dispatch_bill_phase3(self, ref: str) -> None:
             )
             if response_code != "00":
                 logger.warning(
-                    "dispatch_bill_phase3: checkout not yet confirmed "
-                    "ref=%s code=%s — retrying",
+                    "dispatch_bill_phase3: checkout not yet confirmed ref=%s code=%s — retrying",
                     ref,
                     response_code,
                 )
@@ -791,9 +771,7 @@ def dispatch_bill_phase3(self, ref: str) -> None:
                     )
                 )
             except Exception as exc:
-                logger.error(
-                    "dispatch_bill_phase3: initiate_payment failed ref=%s: %s", ref, exc
-                )
+                logger.error("dispatch_bill_phase3: initiate_payment failed ref=%s: %s", ref, exc)
                 if pending.attempt_count < 3:
                     raise self.retry(exc=exc, countdown=60 * pending.attempt_count)
                 pending.state = "FAILED"
@@ -807,10 +785,8 @@ def dispatch_bill_phase3(self, ref: str) -> None:
                 )
                 return
 
-        isw_code: str = str(
-            isw_result.get("ResponseCode") or isw_result.get("responseCode") or "99"
-        )
-        isw_grouping: str = str(isw_result.get("ResponseCodeGrouping", ""))
+        str(isw_result.get("ResponseCode") or isw_result.get("responseCode") or "99")
+        str(isw_result.get("ResponseCodeGrouping", ""))
 
         # TODO: check pending state and response code
 
@@ -858,7 +834,7 @@ def dispatch_bill_phase3(self, ref: str) -> None:
         db.commit()
 
         # ── Step 3: Create Transaction + update budget ────────────────────────
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         biller_label = pending.biller_name or "Biller"
         narration = f"{biller_label} via Interswitch"
 
@@ -879,9 +855,7 @@ def dispatch_bill_phase3(self, ref: str) -> None:
 
         if pending.category_id:
             month_str = now.strftime("%Y-%m")
-            bm = get_or_create_budget_month(
-                db, pending.user_id, pending.category_id, month_str
-            )
+            bm = get_or_create_budget_month(db, pending.user_id, pending.category_id, month_str)
             bm.activity += tx.amount
             db.flush()
 
@@ -890,14 +864,12 @@ def dispatch_bill_phase3(self, ref: str) -> None:
         db.commit()
 
         # ── Notify user (WS + push) ───────────────────────────────────────────
-        _notify_bill_payment(
-            pending.user_id, ref, "COMPLETED", biller_label, pending.amount
-        )
+        _notify_bill_payment(pending.user_id, ref, "COMPLETED", biller_label, pending.amount)
 
         # ── Nudge ─────────────────────────────────────────────────────────────
         try:
-            from app.models.user import User as UserModel
             from app.models.category import Category as CatModel
+            from app.models.user import User as UserModel
             from app.services.nudge_engine import evaluate_bill_payment_nudge
 
             fresh_user = db.get(UserModel, pending.user_id)
@@ -910,9 +882,7 @@ def dispatch_bill_phase3(self, ref: str) -> None:
                 evaluate_bill_payment_nudge(db, fresh_user, tx, biller_label, cat_name)
                 db.commit()
         except Exception:
-            logger.exception(
-                "dispatch_bill_phase3: nudge evaluation failed for ref=%s", ref
-            )
+            logger.exception("dispatch_bill_phase3: nudge evaluation failed for ref=%s", ref)
 
         logger.info("dispatch_bill_phase3: completed ref=%s tx_id=%s", ref, tx.id)
 

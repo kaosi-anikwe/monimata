@@ -27,7 +27,7 @@ DELETE /recurring-rules/:id    Hard-delete a rule
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -98,9 +98,7 @@ def get_rule(
 # ── POST /recurring-rules ─────────────────────────────────────────────────────
 
 
-@router.post(
-    "", response_model=RecurringRuleResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=RecurringRuleResponse, status_code=status.HTTP_201_CREATED)
 def create_rule(
     body: RecurringRuleCreate,
     current_user: User = Depends(get_current_user),
@@ -142,7 +140,7 @@ def update_rule(
         rule.ends_on = body.ends_on
     if body.next_due is not None:
         rule.next_due = body.next_due
-    rule.updated_at = datetime.now(timezone.utc)
+    rule.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(rule)
     return rule

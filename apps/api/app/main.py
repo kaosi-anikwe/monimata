@@ -22,19 +22,19 @@ from app.core.logging_config import configure_logging
 
 configure_logging(log_dir=settings.LOG_DIR, log_level=settings.LOG_LEVEL)
 
-from app.routers import (
-    auth,
+from app.routers import (  # noqa: E402
     accounts,
-    transactions,
+    auth,
+    bills,
     budget,
     categories,
+    content,
     nudges,
     recurring,
     reports,
     sync,
-    content,
+    transactions,
     webhooks,
-    bills,
     ws,
 )
 
@@ -57,9 +57,7 @@ app.include_router(accounts.router, prefix="/accounts", tags=["accounts"])
 app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
 app.include_router(budget.router, prefix="/budget", tags=["budget"])
 app.include_router(categories.router, prefix="/categories", tags=["categories"])
-app.include_router(
-    categories.groups_router, prefix="/category-groups", tags=["categories"]
-)
+app.include_router(categories.groups_router, prefix="/category-groups", tags=["categories"])
 app.include_router(nudges.router, prefix="/nudges", tags=["nudges"])
 app.include_router(reports.router, prefix="/reports", tags=["reports"])
 app.include_router(sync.router, prefix="/sync", tags=["sync"])

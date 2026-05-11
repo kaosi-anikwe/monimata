@@ -21,15 +21,13 @@ Auth router — register, login, refresh, logout, verify-bvn.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import cast
-from datetime import datetime, timezone
 
-import httpx
-from thefuzz import fuzz
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import bearer_scheme, get_current_user
@@ -59,7 +57,6 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.services.budget_logic import seed_default_categories
-from app.services.interswitch_client import interswitch_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -70,12 +67,8 @@ BVN_NAME_MATCH_THRESHOLD = 70  # fuzzy similarity percentage
 # ── POST /auth/register ───────────────────────────────────────────────────────
 
 
-@router.post(
-    "/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
-)
-async def register(
-    payload: RegisterRequest, db: Session = Depends(get_db)
-) -> TokenResponse:
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
     user = User(
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
@@ -89,9 +82,7 @@ async def register(
         db.refresh(user)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
     seed_default_categories(db, user)
     db.commit()
@@ -108,23 +99,17 @@ async def register(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    user: User | None = (
-        db.query(User).filter(User.email == payload.email.lower()).first()
-    )
+    user: User | None = db.query(User).filter(User.email == payload.email.lower()).first()
 
     # Constant-time check — always call verify_password even on miss to avoid timing attacks
     # Always call verify_password (even on a miss) to prevent timing-based
     # user enumeration. The dummy hash is a valid bcrypt hash that never matches.
     _DUMMY_HASH = "$2b$12$notarealpasswordhashXXuu8qkFBYKNsTVMjbDSEMqhvdEoKHHunq"
-    valid = verify_password(
-        payload.password, user.password_hash if user else _DUMMY_HASH
-    )
+    valid = verify_password(payload.password, user.password_hash if user else _DUMMY_HASH)
     if not user or not valid:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = datetime.now(UTC)
     db.commit()
 
     access_token = create_access_token(subject=user.id)
@@ -166,9 +151,7 @@ async def refresh_token(
 
     user = db.get(User, user_id)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     # Rotate: delete old, issue new
     delete_refresh_token(user_id)
@@ -193,6 +176,7 @@ async def logout(
     After this returns, the access token is unusable even within its 15-min window.
     """
     import time as _time
+
     from jose import JWTError
 
     delete_refresh_token(current_user.id)
@@ -261,9 +245,7 @@ async def verify_bvn(
     db: Session = Depends(get_db),
 ) -> BVNVerifyResponse:
     if current_user.identity_verified:
-        return BVNVerifyResponse(
-            identity_verified=True, message="Identity already verified"
-        )
+        return BVNVerifyResponse(identity_verified=True, message="Identity already verified")
 
     # try:
     #     bvn_data = await interswitch_client.lookup_bvn(payload.bvn)
@@ -291,6 +273,4 @@ async def verify_bvn(
     current_user.identity_verified = True
     db.commit()
 
-    return BVNVerifyResponse(
-        identity_verified=True, message="Identity verified successfully"
-    )
+    return BVNVerifyResponse(identity_verified=True, message="Identity verified successfully")

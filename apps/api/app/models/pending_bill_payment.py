@@ -29,11 +29,11 @@ State machine:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
@@ -79,9 +79,7 @@ class PendingBillPayment(Base):
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
     # ── State machine ─────────────────────────────────────────────────────────
-    state: Mapped[str] = mapped_column(
-        Text, nullable=False, default="PENDING_CHECKOUT", index=True
-    )
+    state: Mapped[str] = mapped_column(Text, nullable=False, default="PENDING_CHECKOUT", index=True)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # ── Linked transaction (set when state=COMPLETED) ─────────────────────────
@@ -93,11 +91,11 @@ class PendingBillPayment(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )

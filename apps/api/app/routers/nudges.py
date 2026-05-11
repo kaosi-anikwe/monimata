@@ -33,15 +33,14 @@ Endpoints:
 from __future__ import annotations
 
 import logging
-from typing import Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
-from app.models.nudge import Nudge
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.models.nudge import Nudge
 from app.models.user import User
 from app.schemas.nudges import (
     NudgeListResponse,
@@ -202,7 +201,7 @@ def open_nudge(
     nudge = _get_owned_nudge(db, nudge_id, current_user.id)
     nudge.is_opened = True
     if nudge.delivered_at is None:
-        nudge.delivered_at = datetime.now(timezone.utc)
+        nudge.delivered_at = datetime.now(UTC)
     db.commit()
     db.refresh(nudge)
     return NudgeResponse.model_validate(nudge)
@@ -225,7 +224,7 @@ def dismiss_nudge(
     nudge.is_dismissed = True
     nudge.is_opened = True
     if nudge.delivered_at is None:
-        nudge.delivered_at = datetime.now(timezone.utc)
+        nudge.delivered_at = datetime.now(UTC)
     db.commit()
     db.refresh(nudge)
     return NudgeResponse.model_validate(nudge)
@@ -261,7 +260,7 @@ def mark_all_read(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.query(Nudge).filter(
         Nudge.user_id == current_user.id,
         Nudge.is_opened == False,  # noqa: E712
@@ -324,13 +323,14 @@ def test_trigger(
     Inject a test nudge directly.  Supported trigger_types:
       threshold_80, threshold_100, large_single_tx, pay_received, bill_payment
     """
-    from app.services.nudge_engine import MESSAGES, TITLES, create_nudge
     import random
+
+    from app.services.nudge_engine import MESSAGES, TITLES, create_nudge
 
     SAMPLE_CONTEXTS: dict = {
         "threshold_80": {
             "category_name": "Food & Drinks",
-            "month": datetime.now(timezone.utc).strftime("%Y-%m"),
+            "month": datetime.now(UTC).strftime("%Y-%m"),
             "spent_kobo": 1_600_000,
             "assigned_kobo": 2_000_000,
             "remaining_kobo": 400_000,
@@ -340,7 +340,7 @@ def test_trigger(
         },
         "threshold_100": {
             "category_name": "Transport",
-            "month": datetime.now(timezone.utc).strftime("%Y-%m"),
+            "month": datetime.now(UTC).strftime("%Y-%m"),
             "spent_kobo": 2_500_000,
             "assigned_kobo": 2_000_000,
             "overage_kobo": 500_000,
@@ -407,7 +407,7 @@ def test_trigger(
 
 def _get_owned_nudge(db: Session, nudge_id: str, user_id: str) -> Nudge:
     """Fetch a nudge by ID, verifying it belongs to the calling user."""
-    nudge: Optional[Nudge] = (
+    nudge: Nudge | None = (
         db.query(Nudge).filter(Nudge.id == nudge_id, Nudge.user_id == user_id).first()
     )
     if nudge is None:

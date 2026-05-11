@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import logging
 import logging.config
-import os
 from pathlib import Path
 
 
@@ -52,9 +51,7 @@ def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
         "disable_existing_loggers": False,
         "formatters": {
             "detailed": {
-                "format": (
-                    "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s"
-                ),
+                "format": ("%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s"),
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
             "console": {

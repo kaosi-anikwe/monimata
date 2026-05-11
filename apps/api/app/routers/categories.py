@@ -25,18 +25,18 @@ Registered in main.py as:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
-from app.models.user import User
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.models.category import Category, CategoryGroup
 from app.models.target import CategoryTarget
 from app.models.transaction import Transaction
-from app.models.category import Category, CategoryGroup
+from app.models.user import User
 from app.schemas.categories import (
     CategoryCreate,
     CategoryGroupCreate,
@@ -86,9 +86,7 @@ def list_groups(
     )
 
 
-@groups_router.post(
-    "", response_model=CategoryGroupResponse, status_code=status.HTTP_201_CREATED
-)
+@groups_router.post("", response_model=CategoryGroupResponse, status_code=status.HTTP_201_CREATED)
 def create_group(
     body: CategoryGroupCreate,
     current_user: User = Depends(get_current_user),
@@ -97,9 +95,7 @@ def create_group(
     # Default sort_order: append after existing groups
     if body.sort_order is None:
         max_order = (
-            db.query(CategoryGroup)
-            .filter(CategoryGroup.user_id == str(current_user.id))
-            .count()
+            db.query(CategoryGroup).filter(CategoryGroup.user_id == str(current_user.id)).count()
         )
         sort_order = max_order
     else:
@@ -130,7 +126,7 @@ def update_group(
         group.sort_order = body.sort_order
     if body.is_hidden is not None:
         group.is_hidden = body.is_hidden
-    group.updated_at = datetime.now(timezone.utc)
+    group.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(group)
     return group
@@ -149,15 +145,13 @@ def delete_group(
     group = _get_group_or_404(db, str(group_id), str(current_user.id))
     has_categories = (
         db.query(Category)
-        .filter(
-            Category.group_id == str(group_id), Category.user_id == str(current_user.id)
-        )
+        .filter(Category.group_id == str(group_id), Category.user_id == str(current_user.id))
         .first()
     ) is not None
 
     if has_categories:
         group.is_hidden = True
-        group.updated_at = datetime.now(timezone.utc)
+        group.updated_at = datetime.now(UTC)
         db.commit()
         return
 
@@ -174,7 +168,7 @@ def sort_group(
 ) -> CategoryGroup:
     group = _get_group_or_404(db, str(group_id), str(current_user.id))
     group.sort_order = sort_order
-    group.updated_at = datetime.now(timezone.utc)
+    group.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(group)
     return group
@@ -186,15 +180,9 @@ def sort_group(
 
 
 def _get_category_or_404(db: Session, category_id: str, user_id: str) -> Category:
-    c = (
-        db.query(Category)
-        .filter(Category.id == category_id, Category.user_id == user_id)
-        .first()
-    )
+    c = db.query(Category).filter(Category.id == category_id, Category.user_id == user_id).first()
     if c is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     return c
 
 
@@ -263,7 +251,7 @@ def update_category(
         cat.sort_order = body.sort_order
     if body.is_hidden is not None:
         cat.is_hidden = body.is_hidden
-    cat.updated_at = datetime.now(timezone.utc)
+    cat.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(cat)
     return cat
@@ -290,7 +278,7 @@ def delete_category(
 
     if has_transactions:
         cat.is_hidden = True
-        cat.updated_at = datetime.now(timezone.utc)
+        cat.updated_at = datetime.now(UTC)
         db.commit()
         return
 
@@ -307,7 +295,7 @@ def sort_category(
 ) -> Category:
     cat = _get_category_or_404(db, str(category_id), str(current_user.id))
     cat.sort_order = sort_order
-    cat.updated_at = datetime.now(timezone.utc)
+    cat.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(cat)
     return cat
@@ -325,11 +313,7 @@ def get_target(
     db: Session = Depends(get_db),
 ) -> CategoryTarget | None:
     _get_category_or_404(db, str(category_id), str(current_user.id))
-    return (
-        db.query(CategoryTarget)
-        .filter(CategoryTarget.category_id == str(category_id))
-        .first()
-    )
+    return db.query(CategoryTarget).filter(CategoryTarget.category_id == str(category_id)).first()
 
 
 @router.put("/{category_id}/target", response_model=CategoryTargetResponse)
@@ -341,11 +325,7 @@ def upsert_target(
 ) -> CategoryTarget:
     _get_category_or_404(db, str(category_id), str(current_user.id))
 
-    target = (
-        db.query(CategoryTarget)
-        .filter(CategoryTarget.category_id == str(category_id))
-        .first()
-    )
+    target = db.query(CategoryTarget).filter(CategoryTarget.category_id == str(category_id)).first()
     if target is None:
         target = CategoryTarget(category_id=str(category_id))
         db.add(target)
@@ -370,11 +350,7 @@ def delete_target(
     db: Session = Depends(get_db),
 ) -> None:
     _get_category_or_404(db, str(category_id), str(current_user.id))
-    target = (
-        db.query(CategoryTarget)
-        .filter(CategoryTarget.category_id == str(category_id))
-        .first()
-    )
+    target = db.query(CategoryTarget).filter(CategoryTarget.category_id == str(category_id)).first()
     if target:
         db.delete(target)
         db.commit()

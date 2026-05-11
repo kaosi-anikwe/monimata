@@ -15,18 +15,18 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from datetime import datetime, timezone
 
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
 
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.category import Category
+    from app.models.user import User
 
 
 class BudgetMonth(Base):
@@ -38,9 +38,7 @@ class BudgetMonth(Base):
 
     __tablename__ = "budget_months"
     __table_args__ = (
-        UniqueConstraint(
-            "user_id", "category_id", "month", name="uq_budget_months_user_cat_month"
-        ),
+        UniqueConstraint("user_id", "category_id", "month", name="uq_budget_months_user_cat_month"),
     )
 
     id: Mapped[str] = mapped_column(
@@ -60,13 +58,13 @@ class BudgetMonth(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
     # relationships

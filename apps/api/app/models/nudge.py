@@ -17,11 +17,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy import Boolean, DateTime, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -60,8 +60,8 @@ class Nudge(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
     # relationships
-    user: Mapped["User"] = relationship(back_populates="nudges")
+    user: Mapped[User] = relationship(back_populates="nudges")

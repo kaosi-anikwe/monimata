@@ -87,16 +87,12 @@ class CustomerValidationResponse(BaseModel):
 
 
 class BillPayRequest(BaseModel):
-    payment_code: str = Field(
-        description="ISW PaymentCode for the selected biller service."
-    )
+    payment_code: str = Field(description="ISW PaymentCode for the selected biller service.")
     customer_id: str = Field(description="Customer's meter/smartcard/account number.")
     # Kobo.  Must match the fixed_amount from customer validation when the biller
     # uses a fixed amount, or be a positive user-entered value otherwise.
     amount: int = Field(gt=0, description="Amount in kobo.")
-    account_id: str = Field(
-        description="UUID of the user's linked bank account being debited."
-    )
+    account_id: str = Field(description="UUID of the user's linked bank account being debited.")
     customer_mobile: str | None = None
     customer_email: str | None = None
     # Human-readable biller name (e.g. "DSTV", "Ikeja Electric").

@@ -20,21 +20,20 @@ Budget router — assign, move money, TBB, full budget view, underfunded, auto-a
 
 from __future__ import annotations
 
+import logging
 import math
 import uuid
-import logging
 from datetime import date
-from typing import Optional
 
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
-from app.models.user import User
 from app.core.database import get_db
-from app.models.budget import BudgetMonth
 from app.core.deps import get_current_user
-from app.models.target import CategoryTarget
+from app.models.budget import BudgetMonth
 from app.models.category import Category, CategoryGroup
+from app.models.target import CategoryTarget
+from app.models.user import User
 from app.schemas.budget import (
     AssignRequest,
     AutoAssignResponse,
@@ -66,7 +65,7 @@ def _prev_month(month: str) -> str:
     return f"{y - 1}-12" if m == 1 else f"{y}-{m - 1:02d}"
 
 
-def _month_param(month: Optional[str] = Query(None, description="YYYY-MM")) -> str:
+def _month_param(month: str | None = Query(None, description="YYYY-MM")) -> str:
     return month or _CURRENT_MONTH
 
 
@@ -121,9 +120,7 @@ def get_budget(
             available = compute_available(db, user_id, str(cat.id), month)
 
             target = (
-                db.query(CategoryTarget)
-                .filter(CategoryTarget.category_id == str(cat.id))
-                .first()
+                db.query(CategoryTarget).filter(CategoryTarget.category_id == str(cat.id)).first()
             )
             req = required_this_month(target, available, today)
 
@@ -175,9 +172,7 @@ def set_assignment(
         .first()
     )
     if cat is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
 
     bm = get_or_create_budget_month(db, user_id, str(category_id), month)
     bm.assigned = body.assigned
@@ -186,11 +181,7 @@ def set_assignment(
     db.refresh(bm)
 
     available = compute_available(db, user_id, str(category_id), month)
-    target = (
-        db.query(CategoryTarget)
-        .filter(CategoryTarget.category_id == str(category_id))
-        .first()
-    )
+    target = db.query(CategoryTarget).filter(CategoryTarget.category_id == str(category_id)).first()
     req = required_this_month(target, available, date.today())
 
     return BudgetCategoryResponse(
@@ -240,20 +231,17 @@ def move_money(
                 detail=f"Category {cat_id} not found",
             )
 
-    from_bm = get_or_create_budget_month(
-        db, user_id, str(body.from_category_id), body.month
-    )
-    to_bm = get_or_create_budget_month(
-        db, user_id, str(body.to_category_id), body.month
-    )
+    from_bm = get_or_create_budget_month(db, user_id, str(body.from_category_id), body.month)
+    to_bm = get_or_create_budget_month(db, user_id, str(body.to_category_id), body.month)
 
-    from_available = compute_available(
-        db, user_id, str(body.from_category_id), body.month
-    )
+    from_available = compute_available(db, user_id, str(body.from_category_id), body.month)
     if from_available < body.amount:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Insufficient available funds: {from_available} kobo available, {body.amount} kobo requested",
+            detail=(
+                f"Insufficient available funds: {from_available} kobo available, "
+                f"{body.amount} kobo requested"
+            ),
         )
 
     from_bm.assigned -= body.amount
@@ -296,18 +284,12 @@ def list_underfunded(
     today = date.today()
 
     cats = (
-        db.query(Category)
-        .filter(Category.user_id == user_id, Category.is_hidden.is_(False))
-        .all()
+        db.query(Category).filter(Category.user_id == user_id, Category.is_hidden.is_(False)).all()
     )
 
     result: list[UnderfundedCategoryResponse] = []
     for cat in cats:
-        target = (
-            db.query(CategoryTarget)
-            .filter(CategoryTarget.category_id == str(cat.id))
-            .first()
-        )
+        target = db.query(CategoryTarget).filter(CategoryTarget.category_id == str(cat.id)).first()
         if target is None:
             continue
 
@@ -365,9 +347,7 @@ def auto_assign(
     today = date.today()
 
     cats = (
-        db.query(Category)
-        .filter(Category.user_id == user_id, Category.is_hidden.is_(False))
-        .all()
+        db.query(Category).filter(Category.user_id == user_id, Category.is_hidden.is_(False)).all()
     )
 
     assignments_made = 0
@@ -390,9 +370,7 @@ def auto_assign(
         candidates: list[tuple[Category, CategoryTarget, int]] = []
         for cat in cats:
             target = (
-                db.query(CategoryTarget)
-                .filter(CategoryTarget.category_id == str(cat.id))
-                .first()
+                db.query(CategoryTarget).filter(CategoryTarget.category_id == str(cat.id)).first()
             )
             if target is None:
                 continue

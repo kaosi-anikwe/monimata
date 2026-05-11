@@ -16,9 +16,8 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from uuid import UUID
-from typing import Optional
-from datetime import datetime, date
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -27,13 +26,13 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 class CategoryGroupCreate(BaseModel):
     name: str
-    sort_order: Optional[int] = None
+    sort_order: int | None = None
 
 
 class CategoryGroupUpdate(BaseModel):
-    name: Optional[str] = None
-    sort_order: Optional[int] = None
-    is_hidden: Optional[bool] = None
+    name: str | None = None
+    sort_order: int | None = None
+    is_hidden: bool | None = None
 
 
 class CategoryGroupResponse(BaseModel):
@@ -52,14 +51,14 @@ class CategoryGroupResponse(BaseModel):
 class CategoryCreate(BaseModel):
     group_id: UUID
     name: str
-    sort_order: Optional[int] = None
+    sort_order: int | None = None
 
 
 class CategoryUpdate(BaseModel):
-    name: Optional[str] = None
-    group_id: Optional[UUID] = None
-    sort_order: Optional[int] = None
-    is_hidden: Optional[bool] = None
+    name: str | None = None
+    group_id: UUID | None = None
+    sort_order: int | None = None
+    is_hidden: bool | None = None
 
 
 class CategoryResponse(BaseModel):
@@ -92,9 +91,9 @@ class CategoryTargetUpsert(BaseModel):
     frequency: str  # weekly | monthly | yearly | custom
     behavior: str = "set_aside"  # set_aside | refill | balance
     target_amount: int  # kobo, must be > 0
-    day_of_week: Optional[int] = None  # 0=Mon … 6=Sun; weekly only
-    day_of_month: Optional[int] = None  # 1-31; 0=last day; monthly only
-    target_date: Optional[date] = None  # yearly / custom due date
+    day_of_week: int | None = None  # 0=Mon … 6=Sun; weekly only
+    day_of_month: int | None = None  # 1-31; 0=last day; monthly only
+    target_date: date | None = None  # yearly / custom due date
     repeats: bool = False  # custom only
 
     @field_validator("frequency")
@@ -127,9 +126,9 @@ class CategoryTargetResponse(BaseModel):
     frequency: str
     behavior: str
     target_amount: int
-    day_of_week: Optional[int]
-    day_of_month: Optional[int]
-    target_date: Optional[date]
+    day_of_week: int | None
+    day_of_month: int | None
+    target_date: date | None
     repeats: bool
     updated_at: datetime
 

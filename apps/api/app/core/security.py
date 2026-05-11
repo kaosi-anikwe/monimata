@@ -24,16 +24,16 @@ Security utilities:
 
 from __future__ import annotations
 
-import os
-import uuid
 import base64
+import os
 import secrets
+import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
 import bcrypt
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from jose import JWTError, jwt
 
 from app.core.config import settings
 
@@ -73,10 +73,8 @@ def _jwt_algorithm() -> str:
     return "RS256" if settings.JWT_PRIVATE_KEY else "HS256"
 
 
-def create_access_token(
-    subject: str, extra_claims: dict[str, Any] | None = None
-) -> str:
-    now = datetime.now(timezone.utc)
+def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None) -> str:
+    now = datetime.now(UTC)
     expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload: dict[str, Any] = {
         "sub": subject,
@@ -127,9 +125,7 @@ def _aes_key() -> bytes:
     """Return the 32-byte AES key from config (stored as 64-char hex string)."""
     key_hex = settings.AES_ENCRYPTION_KEY
     if not key_hex or len(key_hex) < 64:
-        raise RuntimeError(
-            "AES_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)"
-        )
+        raise RuntimeError("AES_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)")
     return bytes.fromhex(key_hex[:64])
 
 

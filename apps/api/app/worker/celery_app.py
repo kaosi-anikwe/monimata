@@ -19,6 +19,7 @@ The broker and result backend both use Redis.
 """
 
 import sys
+from typing import Any, Protocol
 
 from celery import Celery
 
@@ -51,7 +52,6 @@ celery_app.conf.update(
 # Celery's @app.task decorator does not carry enough overload information for
 # Pyright to know that the decorated function becomes a Task with .delay().
 # Import CeleryTask and use cast(CeleryTask, my_task).delay(...) at call sites.
-from typing import Any, Protocol
 
 
 class CeleryTask(Protocol):

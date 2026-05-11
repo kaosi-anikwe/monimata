@@ -16,24 +16,22 @@
 
 from __future__ import annotations
 
-from uuid import UUID
 from datetime import date, datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-RecurringFrequencyLiteral = Literal[
-    "daily", "weekly", "biweekly", "monthly", "yearly", "custom"
-]
+RecurringFrequencyLiteral = Literal["daily", "weekly", "biweekly", "monthly", "yearly", "custom"]
 
 
 class RecurringRuleCreate(BaseModel):
     frequency: RecurringFrequencyLiteral
     interval: int = 1
-    day_of_week: Optional[int] = None  # 0=Mon … 6=Sun; weekly/biweekly
-    day_of_month: Optional[int] = None  # 1-31; 0=last day; monthly
+    day_of_week: int | None = None  # 0=Mon … 6=Sun; weekly/biweekly
+    day_of_month: int | None = None  # 1-31; 0=last day; monthly
     next_due: date
-    ends_on: Optional[date] = None
+    ends_on: date | None = None
     template: dict[str, Any]  # see RecurringRule model docstring
 
     @field_validator("interval")
@@ -47,9 +45,9 @@ class RecurringRuleCreate(BaseModel):
 class RecurringRuleUpdate(BaseModel):
     """All fields optional — only provided fields are updated."""
 
-    is_active: Optional[bool] = None
-    ends_on: Optional[date] = None
-    next_due: Optional[date] = None
+    is_active: bool | None = None
+    ends_on: date | None = None
+    next_due: date | None = None
 
 
 class RecurringRuleResponse(BaseModel):
@@ -57,10 +55,10 @@ class RecurringRuleResponse(BaseModel):
     user_id: UUID
     frequency: str
     interval: int
-    day_of_week: Optional[int]
-    day_of_month: Optional[int]
+    day_of_week: int | None
+    day_of_month: int | None
     next_due: date
-    ends_on: Optional[date]
+    ends_on: date | None
     is_active: bool
     template: dict[str, Any]
     created_at: datetime
