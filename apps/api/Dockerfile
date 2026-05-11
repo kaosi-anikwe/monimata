@@ -16,20 +16,23 @@
 
 FROM python:3.11-slim
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
 # Install only the OS packages required at runtime.
-# psycopg2-binary bundles libpq, so no libpq-dev needed.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        # alembic uses subprocess calls that may need bash
         bash \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install Python dependencies first so Docker can cache this layer.
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+# Copy dependency files first so Docker can cache the install layer.
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies into the system Python (no virtualenv inside Docker).
+# --frozen ensures the lockfile is respected exactly.
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application source.
 COPY app/       ./app/
