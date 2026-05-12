@@ -18,10 +18,10 @@
  * Profile tab — user card, gamification stats, settings links, and log-out.
  */
 
-import { useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -32,16 +32,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { logout } from '@/store/authSlice';
-import { ff, type_ } from '@/lib/typography';
 import { useToast } from '@/components/Toast';
-import { useAccounts } from '@/hooks/useAccounts';
-import { radius, shadow, spacing } from '@/lib/tokens';
-import { useTheme, useThemePreference } from '@/lib/theme';
-import { useBiometricLock } from '@/hooks/useBiometricLock';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { AmountDisplay, Avatar, Badge, Button, ListRow, SectionHeader } from '@/components/ui';
+import { useAccounts } from '@/hooks/useAccounts';
+import { useBiometricLock } from '@/hooks/useBiometricLock';
 import { useNudgeSettings, useNudgeUnreadCount, useUpdateNudgeSettings } from '@/hooks/useNudges';
+import { useTheme, useThemePreference } from '@/lib/theme';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
+import { logout } from '@/store/authSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 // ── Hardcoded gamification constants (Phase 14 will fetch from API) ──────────
 const FAKE_LEVEL = 7;
@@ -138,35 +138,6 @@ export default function ProfileScreen() {
         contentContainerStyle={ss.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* BVN warning banner */}
-        {!user?.identity_verified && (
-          <TouchableOpacity
-            style={[ss.bvnBanner, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorder }]}
-            onPress={() => router.push('/(auth)/verify-bvn')}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Complete BVN verification"
-          >
-            <Ionicons name="warning-outline" size={18} color={colors.warning} style={ss.bvnIcon} />
-            <View style={ss.bvnTxt}>
-              <Text style={[type_.body, { color: colors.warningText, ...ff(600) }]}>
-                Complete BVN verification
-              </Text>
-              <Text style={[type_.caption, { color: colors.warningText, marginTop: 2 }]}>
-                Required to link your bank accounts
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[ss.bvnBtn, { backgroundColor: colors.warning }]}
-              onPress={() => router.push('/(auth)/verify-bvn')}
-              accessibilityRole="button"
-              accessibilityLabel="Verify now"
-            >
-              <Text style={[type_.caption, { color: colors.white, ...ff(700) }]}>Verify now</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        )}
-
         {/* Stats grid */}
         <View style={ss.statsGrid}>
           <View style={[ss.statCell, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
@@ -198,24 +169,6 @@ export default function ProfileScreen() {
           style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
-          {user?.identity_verified ? (
-            <ListRow
-              iconBg={colors.surface}
-              leftIcon={<Ionicons name="shield-checkmark-outline" size={17} color={colors.brand} />}
-              title="Identity Verified ✓"
-              subtitle="BVN verified · bank sync enabled"
-              right={<Badge variant="success" size="sm">✓</Badge>}
-            />
-          ) : (
-            <ListRow
-              iconBg={colors.warningSubtle}
-              leftIcon={<Ionicons name="shield-outline" size={17} color={colors.warning} />}
-              title="Verify Identity"
-              subtitle="Tap to complete BVN verification"
-              onPress={() => router.push('/(auth)/verify-bvn')}
-              showChevron
-            />
-          )}
           <ListRow
             iconBg={colors.surface}
             leftIcon={<Ionicons name="business-outline" size={17} color={colors.brand} />}
@@ -439,26 +392,6 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     // scroll
     scroll: { flex: 1 },
     scrollContent: { paddingBottom: spacing.xxxl + spacing.xl },
-    // BVN banner
-    bvnBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.smd,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      margin: spacing.mdn,
-      marginTop: spacing.mdn,
-      padding: spacing.md,
-    },
-    bvnIcon: { flexShrink: 0, marginTop: 1 },
-    bvnTxt: { flex: 1 },
-    bvnBtn: {
-      borderRadius: radius.xs,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 6,
-      flexShrink: 0,
-      alignSelf: 'center',
-    },
     // stats grid
     statsGrid: {
       flexDirection: 'row',

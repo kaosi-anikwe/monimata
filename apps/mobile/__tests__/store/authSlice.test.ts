@@ -65,7 +65,6 @@ const mockUser: AuthUser = {
   email: 'emeka@example.com',
   first_name: 'Emeka',
   last_name: 'Okafor',
-  identity_verified: true,
   onboarded: true,
 };
 

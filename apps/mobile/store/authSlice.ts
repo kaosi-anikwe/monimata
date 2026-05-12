@@ -29,7 +29,6 @@ export interface AuthUser {
     email: string;
     first_name: string | null;
     last_name: string | null;
-    identity_verified: boolean;
     onboarded: boolean;
 }
 
@@ -194,21 +193,6 @@ export const markOnboardedThunk = createAsyncThunk(
     },
 );
 
-export const verifyBVN = createAsyncThunk(
-    'auth/verifyBVN',
-    async (bvn: string, { rejectWithValue }) => {
-        try {
-            const { data } = await api.post('/auth/verify-bvn', { bvn });
-            return data;
-        } catch (err: unknown) {
-            if (isAxiosError(err)) {
-                return rejectWithValue(err.response?.data?.detail ?? 'BVN verification failed');
-            }
-            return rejectWithValue('BVN verification failed');
-        }
-    },
-);
-
 // ── Slice ─────────────────────────────────────────────────────────────────────
 
 const authSlice = createSlice({
@@ -254,12 +238,6 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.isInitialised = true; // session check done — show auth screen
             })
-            .addCase(verifyBVN.pending, setLoading)
-            .addCase(verifyBVN.fulfilled, (state) => {
-                state.loading = false;
-                if (state.user) state.user.identity_verified = true;
-            })
-            .addCase(verifyBVN.rejected, setError)
             .addCase(markOnboardedThunk.pending, setLoading)
             .addCase(markOnboardedThunk.fulfilled, setUser)
             .addCase(markOnboardedThunk.rejected, setError);

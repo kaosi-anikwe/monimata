@@ -17,11 +17,10 @@
 /**
  * Login screen.
  */
-import { z } from 'zod';
-import { StatusBar } from 'expo-status-bar';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm } from 'react-hook-form';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { Controller, useForm } from 'react-hook-form';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -30,13 +29,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { z } from 'zod';
 
+import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { ff } from '@/lib/typography';
-import { Button, Input } from '@/components/ui';
-import { AuthHdr, BackBtn, s } from './_authShared';
 import { clearError, login } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { AuthHdr, BackBtn, s } from './_authShared';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -70,11 +70,7 @@ export default function LoginScreen() {
         return;
       }
       // Non-onboarded: stay in auth stack and lead user through the setup flow.
-      if (!user.identity_verified) {
-        router.replace('/(auth)/verify-bvn');
-      } else {
-        router.replace('/(auth)/onboarding');
-      }
+      router.replace('/(auth)/onboarding');
     } catch {
       // error is already written to Redux state by the rejected handler in authSlice
     }

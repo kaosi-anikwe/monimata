@@ -166,7 +166,7 @@ export interface ThemeColors {
   tealSubtle: string;
 
   // ── Semantic border variants ─────────────────────────────────────────────
-  /** Brand-green at 20% opacity — Mono badge borders, brand-tinted dividers. */
+  /** Brand-green at 20% opacity — badge borders, brand-tinted dividers. */
   borderBrand: string;
   /** Purple at 20% opacity — Manual account badge border. */
   purpleBorder: string;

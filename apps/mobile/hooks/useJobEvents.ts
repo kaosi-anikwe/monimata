@@ -55,14 +55,14 @@
  * Override with EXPO_PUBLIC_WS_URL if your WS server is on a different host.
  */
 
-import { useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
+import { useSelector } from 'react-redux';
 
-import type { RootState } from '@/store';
-import { getAccessToken } from '@/services/api';
 import { syncDatabase } from '@/database/sync';
+import { getAccessToken } from '@/services/api';
+import type { RootState } from '@/store';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 const WS_BASE =
@@ -142,7 +142,7 @@ export function useJobEvents(): void {
           try {
             const msg = JSON.parse(event.data) as ServerEvent;
             if (msg.type === 'invalidate' && Array.isArray(msg.keys)) {
-              // Keys that indicate new server-side data (Mono sync, categorisation,
+              // Keys that indicate new server-side data (email-parsed transactions, categorisation,
               // nudge evaluation). We must pull WatermelonDB before invalidating React
               // Query — otherwise the query re-runs against stale local SQLite data.
               const needsSync = msg.keys.some((k) =>

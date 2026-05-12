@@ -1,12 +1,11 @@
 import { Model } from '@nozbe/watermelondb'
-import { field, text, readonly, date } from '@nozbe/watermelondb/decorators'
+import { date, field, readonly, text } from '@nozbe/watermelondb/decorators'
 
 export default class Transaction extends Model {
   static table = 'transactions'
 
   @text('account_id') accountId!: string
   @text('user_id') userId!: string
-  @text('mono_id') monoId!: string | null
   @date('date') date!: Date
   @field('amount') amount!: number
   @text('narration') narration!: string

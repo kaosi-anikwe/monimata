@@ -17,12 +17,12 @@
 import { Q } from '@nozbe/watermelondb';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getDatabase } from '@/database';
-import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/Toast';
-import { useAppSelector } from '@/store/hooks';
-import { syncDatabase } from '@/database/sync';
+import { getDatabase } from '@/database';
 import TransactionModel from '@/database/models/Transaction';
+import { syncDatabase } from '@/database/sync';
+import { queryKeys } from '@/lib/queryKeys';
+import { useAppSelector } from '@/store/hooks';
 import type { Transaction, TransactionPage } from '@/types/transaction';
 
 export interface ManualTransactionBody {
@@ -141,7 +141,6 @@ export function useCreateTransaction() {
           tx.isManual = true;
           tx.isSplit = false;
           tx.source = 'manual';
-          tx.monoId = null;
           tx.balanceAfter = null;
           tx.recurrenceId = null;
         });

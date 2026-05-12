@@ -19,8 +19,8 @@ import { Tabs, useRouter, useSegments } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTheme } from '@/lib/theme';
 import { MainTabBar } from '@/components/ui/TabBar';
+import { useTheme } from '@/lib/theme';
 import { layout, shadow, spacing } from '@/lib/tokens';
 
 /**
@@ -68,7 +68,6 @@ export default function TabsLayout() {
         <Tabs.Screen name="index" options={{ title: 'Home' }} />
         <Tabs.Screen name="budget" options={{ title: 'Budget' }} />
         <Tabs.Screen name="transactions" options={{ title: 'Transactions' }} />
-        <Tabs.Screen name="bills" options={{ title: 'Pay Bills' }} />
         <Tabs.Screen name="nudges" options={{ title: 'Nudges' }} />
 
         {/* ── Hidden — accessible via router.push() ────────────────────── */}
