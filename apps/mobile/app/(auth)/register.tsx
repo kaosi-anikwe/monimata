@@ -23,8 +23,10 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -36,10 +38,19 @@ import { z } from 'zod';
 
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
-import { ff } from '@/lib/typography';
+import { spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
+import api from '@/services/api';
 import { AuthHdr, BackBtn, s } from './_authShared';
 
+const USERNAME_RE = /^[a-z0-9_-]+$/;
+
 const schema = z.object({
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be 30 characters or fewer')
+    .regex(USERNAME_RE, 'Only lowercase letters, digits, hyphens, and underscores'),
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().min(1, 'Last name is required'),
   email: z.string().email('Enter a valid email address'),
@@ -56,10 +67,37 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
+
 export default function RegisterScreen() {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.auth);
   const colors = useTheme();
+
+  // ── Username availability ─────────────────────────────────────────────
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function checkUsername(value: string) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!value || value.length < 3 || !USERNAME_RE.test(value) || value.length > 30) {
+      setUsernameStatus('invalid');
+      return;
+    }
+    setUsernameStatus('checking');
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const { data } = await api.get<{ available: boolean }>(
+          `/auth/check-username?username=${encodeURIComponent(value)}`,
+        );
+        setUsernameStatus(data.available ? 'available' : 'taken');
+      } catch {
+        setUsernameStatus('idle');
+      }
+    }, 500);
+  }
+
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
 
   const {
     control,
@@ -68,18 +106,20 @@ export default function RegisterScreen() {
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      first_name: '', last_name: '', email: '',
+      username: '', first_name: '', last_name: '', email: '',
       phone: '', password: '', confirm_password: '',
     },
   });
 
   async function onSubmit(data: FormValues) {
+    if (usernameStatus !== 'available') return;
     dispatch(clearError());
     try {
       await dispatch(
         register({
           email: data.email,
           password: data.password,
+          username: data.username,
           first_name: data.first_name,
           last_name: data.last_name,
           phone: data.phone || undefined,
@@ -113,6 +153,42 @@ export default function RegisterScreen() {
           ) : null}
 
           <View style={{ gap: 14 }}>
+            <Controller
+              control={control}
+              name="username"
+              render={({ field: { value, onChange, onBlur } }) => {
+                const hint =
+                  usernameStatus === 'checking' ? null
+                  : usernameStatus === 'available' ? 'Username is available'
+                  : usernameStatus === 'taken' ? 'Username is already taken'
+                  : undefined;
+                const hintColor =
+                  usernameStatus === 'available' ? colors.brand : colors.error;
+                return (
+                  <View>
+                    <Input
+                      label="Username"
+                      value={value}
+                      onChangeText={(v) => { onChange(v.toLowerCase()); checkUsername(v.toLowerCase()); }}
+                      onBlur={onBlur}
+                      placeholder="e.g. emeka_okafor"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      error={errors.username?.message}
+                    />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, minHeight: 16, gap: spacing.xs }}>
+                      {usernameStatus === 'checking' && (
+                        <ActivityIndicator size="small" color={colors.textMeta} />
+                      )}
+                      {hint && (
+                        <Text style={[type_.small, { color: hintColor }]}>{hint}</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              }}
+            />
+
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Controller
                 control={control}
@@ -215,7 +291,7 @@ export default function RegisterScreen() {
           <Button
             variant="green"
             onPress={handleSubmit(onSubmit)}
-            disabled={loading}
+            disabled={loading || usernameStatus !== 'available'}
             loading={loading}
             style={{ marginTop: 8 }}
             accessibilityLabel="Create account"

@@ -54,7 +54,7 @@ const initialState: AuthState = {
 export const register = createAsyncThunk(
     'auth/register',
     async (
-        payload: { email: string; password: string; first_name?: string; last_name?: string; phone?: string },
+        payload: { email: string; password: string; username: string; first_name?: string; last_name?: string; phone?: string },
         { rejectWithValue },
     ) => {
         // ── Step 1: attempt registration ──────────────────────────────────
