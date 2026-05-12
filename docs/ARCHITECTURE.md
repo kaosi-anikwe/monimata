@@ -1,6 +1,6 @@
 # MoniMata — Full System Architecture & Technical Blueprint
 
-> **Living document.** Update this as the system evolves. Every architectural decision here
+> **Living document.** Updates are made as the system evolves. Every architectural decision here
 > was made deliberately — the "why" is documented alongside the "what."
 
 ---
@@ -12,28 +12,26 @@
 3. [The Fundamental Architecture Decision](#3-the-fundamental-architecture-decision)
 4. [System Overview Diagram](#4-system-overview-diagram)
 5. [Database Schema — PostgreSQL](#5-database-schema--postgresql)
-6. [Mono Integration — Bank Sync](#6-mono-integration--bank-sync)
-7. [Interswitch Integration — Bill Payment & Identity](#7-interswitch-integration--bill-payment--identity)
-8. [Backend — FastAPI Endpoints](#8-backend--fastapi-endpoints)
-9. [Background Jobs — Celery](#9-background-jobs--celery)
-10. [Transaction Categorization Pipeline](#10-transaction-categorization-pipeline)
-11. [AI Nudge Engine](#11-ai-nudge-engine)
-12. [Budget Logic — The YNAB Model](#12-budget-logic--the-ynab-model)
-13. [Frontend Architecture — React Native](#13-frontend-architecture--react-native)
-14. [Offline-First Sync](#14-offline-first-sync)
-15. [Security Architecture](#15-security-architecture)
-16. [Infrastructure & Deployment](#16-infrastructure--deployment)
-17. [Monorepo Structure (Nx)](#17-monorepo-structure-nx)
-18. [Implementation Phases](#18-implementation-phases)
-19. [Key Decisions Reference](#19-key-decisions-reference)
+6. [Bank Alert Email Ingestion](#6-bank-alert-email-ingestion)
+7. [Backend — FastAPI Endpoints](#8-backend--fastapi-endpoints)
+8. [Background Jobs — Celery](#9-background-jobs--celery)
+9. [Transaction Categorization Pipeline](#10-transaction-categorization-pipeline)
+10. [AI Nudge Engine](#11-ai-nudge-engine)
+11. [Budget Logic — The YNAB Model](#12-budget-logic--the-ynab-model)
+12. [Frontend Architecture — React Native](#13-frontend-architecture--react-native)
+13. [Offline-First Sync](#14-offline-first-sync)
+14. [Security Architecture](#15-security-architecture)
+15. [Infrastructure & Deployment](#16-infrastructure--deployment)
+16. [Monorepo Structure (Nx)](#17-monorepo-structure-nx)
+17. [Key Decisions Reference](#18-key-decisions-reference)
 
 ---
 
 ## 1. Project Mission & Core Problem
 
 **MoniMata** (Pidgin: "Money Matters") is a zero-based budgeting app for Nigerians,
-modelled after YNAB, enhanced with automatic transaction syncing via Mono and
-AI-driven nudges delivered in Pidgin English.
+modelled after YNAB, enhanced with automatic transaction capture from forwarded bank
+alert emails and AI-driven nudges delivered in Pidgin English.
 
 **Tagline:** Every Kobo, Accounted For.
 
@@ -54,19 +52,18 @@ change their behaviour. Data without guidance doesn't break cycles.
 
 ## 2. Feature Scope
 
-| Feature                         | Description                                                                                                                                 | Priority       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| Unified Bank Sync               | Automated daily fetching of transactions from Nigerian banks via Mono                                                                       | P0             |
-| Zero-Based Budgeting            | "Give every Naira a job." All income assigned to categories before spending                                                                 | P0             |
-| Category Targets                | Per-category monthly/weekly/date-based assignment targets (YNAB model)                                                                      | P0             |
-| In-App Bill Payment             | Pay electricity, cable TV, airtime, data inside the app via Interswitch Quickteller. Budget updates in real time on success — no Mono delay | P0 (Hackathon) |
-| BVN Identity Verification       | Verify user identity via Interswitch Passport during onboarding. Required for CBN sandbox compliance                                        | P0 (Hackathon) |
-| Nudge Engine (AI)               | Personalized, Pidgin-infused spending alerts triggered by sync events                                                                       | P1             |
-| Transaction Auto-Categorization | Python rules + ML to auto-label bank narrations                                                                                             | P1             |
-| Offline-First UI                | Budget readable and usable without network                                                                                                  | P1             |
-| Financial Literacy Hub          | Bite-sized "Wisdom Nuggets" and articles on saving/investing                                                                                | P1             |
-| Auto-Assign                     | One-tap filling of underfunded categories from To Be Budgeted                                                                               | P2             |
-| Spending Reports                | Trends, net worth, income vs. expense breakdowns                                                                                            | P2             |
+| Feature                         | Description                                                                                             | Priority |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- | -------- |
+| Bank Alert Auto-Capture         | Transactions captured automatically from forwarded bank notification emails via Cloudflare email-worker | P0       |
+| Manual Transaction Entry        | User-entered cash and other transactions not covered by email alerts                                    | P0       |
+| Zero-Based Budgeting            | "Give every Naira a job." All income assigned to categories before spending                             | P0       |
+| Category Targets                | Per-category monthly/weekly/date-based assignment targets (YNAB model)                                  | P0       |
+| Nudge Engine (AI)               | Personalized, Pidgin-infused spending alerts triggered by incoming transactions                         | P1       |
+| Transaction Auto-Categorization | Python rules + ML to auto-label bank narrations                                                         | P1       |
+| Offline-First UI                | Budget readable and usable without network                                                              | P1       |
+| Financial Literacy Hub          | Bite-sized "Wisdom Nuggets" and articles on saving/investing                                            | P1       |
+| Auto-Assign                     | One-tap filling of underfunded categories from To Be Budgeted                                           | P2       |
+| Spending Reports                | Trends, net worth, income vs. expense breakdowns                                                        | P2       |
 
 ---
 
@@ -78,7 +75,7 @@ Financial records live in **PostgreSQL on the server**. The device holds a
 **read-optimized local cache** (WatermelonDB) of recent data. This is non-negotiable
 for the following reasons:
 
-- Mono webhooks fire at your server, not the user's phone
+- Bank alert emails are received by the server (via Cloudflare email-worker), not the user's phone
 - The nudge engine requires server-side analysis across transaction history
 - Users switch phones (phone theft and upgrades are very common in Nigeria)
 - NDPA data export and erasure rights require a server-side authoritative record
@@ -102,36 +99,37 @@ that also queues writes (manual transactions, category assignments) for server s
 
 ```
 [GTBank / Kuda / Zenith / OPay]
-          ↕  (Mono Connect — OAuth-style, no credentials stored)
-      [Mono API]                          [Interswitch API]
-          |                                       |
-          |  webhook: mono.events.account_updated |  (called on-demand: bill pay, BVN verify)
-          ↓                                       ↓
-  [FastAPI Backend] ──────────────────────────────┤
-          |                                       |
-          ├──→ Verify HMAC-SHA512 webhook sig     ├──→ Quickteller: POST /api/v2/quickteller/payments
-          ├──→ Enqueue Celery: fetch_transactions  ├──→ Passport:    GET  /api/v2/identity/bvn/{bvn}
-          |                                       |
-          ├──→ [PostgreSQL]         ← source of financial truth
-          ├──→ [Redis]              ← Celery broker + task queue + session cache
-          └──→ [Celery Workers]
-                  ├── fetch_transactions
-                  ├── categorize_transactions
-                  ├── evaluate_nudges
-                  ├── generate_nudge (template or LLM path)
-                  └── nightly_reconciliation (Celery Beat, 3am WAT)
-                          |
-                          ↓
-          [REST API + WebSocket server]
-                          ↕
-              [React Native App]
-                  ├── Budget Screen
-                  ├── Transactions Screen
-                  ├── Accounts Screen
-                  ├── Pay Bill Screen  ← Interswitch Quickteller UI
-                  └── [WatermelonDB]   ← local cache: last 90 days of data
-                          ↕
-              [Device Keychain]    ← encryption key for SQLCipher
+      |
+      | Bank sends alert email to user's inbox
+      ↓
+[Cloudflare Email Routing] → [email-worker (postal-mime)]
+      |
+      | POST /webhooks/bank-alerts  (X-MoniMata-Secret header)
+      ↓
+[FastAPI Backend]
+      |
+      ├── Verify shared secret (constant-time compare)
+      ├── Upsert transaction row (dedup on account + date + amount + narration)
+      ├── Update bank_accounts.balance
+      ├── Enqueue Celery tasks
+      |
+      ├── [PostgreSQL]    ← source of financial truth
+      ├── [Redis]         ← Celery broker + rate-limit counters + token store
+      └── [Celery Workers + Beat]
+              ├── categorize_transactions
+              ├── evaluate_nudges_for_transactions
+              ├── deliver_queued_nudges  (7:05 AM WAT daily)
+              ├── reconcile_budget_activity  (4:00 AM WAT daily)
+              └── weekly_review_nudges  (Friday 5:00 PM WAT)
+                      |
+                      ↓
+      [REST API + WebSocket /ws/events]
+                      ↕
+          [React Native (Expo) App]
+                      |
+                      └── [WatermelonDB + SQLCipher]  ← encrypted local cache
+                                  ↕
+                      [Device Secure Store]  ← SQLCipher encryption key
 ```
 
 ---
@@ -167,7 +165,7 @@ CREATE TABLE users (
     "enabled":           true
   }',
   onboarded            BOOLEAN NOT NULL DEFAULT false,
-  identity_verified    BOOLEAN NOT NULL DEFAULT false  -- set true after Interswitch BVN check
+  identity_verified    BOOLEAN NOT NULL DEFAULT false
 );
 ```
 
@@ -179,15 +177,15 @@ CREATE TABLE users (
 CREATE TABLE bank_accounts (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  mono_account_id   TEXT UNIQUE NOT NULL,   -- Mono's opaque account reference
   institution       TEXT NOT NULL,          -- "GTBank", "Kuda", "OPay"
   account_name      TEXT NOT NULL,
   account_number    TEXT,                   -- last 4 digits only, AES-256 encrypted
-  account_type      TEXT NOT NULL,          -- "SAVINGS" | "CURRENT"
+  alias             TEXT,                   -- user-set friendly name
+  account_type      TEXT NOT NULL DEFAULT 'SAVINGS',  -- "SAVINGS" | "CURRENT"
   currency          TEXT NOT NULL DEFAULT 'NGN',
-  balance           BIGINT NOT NULL DEFAULT 0,  -- kobo, updated on each sync
-  last_synced_at    TIMESTAMPTZ,
-  is_active         BOOLEAN NOT NULL DEFAULT true,
+  balance           BIGINT NOT NULL DEFAULT 0,       -- kobo, updated on each alert
+  starting_balance  BIGINT NOT NULL DEFAULT 0,       -- kobo, set at account creation
+  is_manual         BOOLEAN NOT NULL DEFAULT false,  -- true = no email alerts expected
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_bank_accounts_user_id ON bank_accounts(user_id);
@@ -202,27 +200,23 @@ CREATE TABLE transactions (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   account_id      UUID NOT NULL REFERENCES bank_accounts(id),
-  mono_id         TEXT UNIQUE,              -- Mono's transaction ID; NULL for manual entries
   date            DATE NOT NULL,
   amount          BIGINT NOT NULL,          -- kobo; negative = debit, positive = credit
   narration       TEXT NOT NULL,            -- raw bank description e.g. "TRANSFER TO CHOPNOW"
   type            TEXT NOT NULL,            -- "debit" | "credit"
-  balance_after   BIGINT,                   -- account balance after this transaction (from Mono)
+  balance_after   BIGINT,                   -- account balance after this transaction (from alert)
   category_id     UUID REFERENCES categories(id),  -- NULL until categorized
   memo            TEXT,                     -- user-written note
   is_split        BOOLEAN NOT NULL DEFAULT false,
-  is_manual       BOOLEAN NOT NULL DEFAULT false,
-  source          TEXT NOT NULL DEFAULT 'mono',
-  -- "mono"         → ingested from Mono bank sync
-  -- "interswitch"  → initiated via in-app Interswitch bill payment (recorded immediately)
-  -- "manual"       → user-entered cash transaction
+  source          transactionsource NOT NULL DEFAULT 'manual',
+  -- "bank_alert"  → ingested from a forwarded bank notification email
+  -- "manual"      → user-entered cash or off-app transaction
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_transactions_user_id_date ON transactions(user_id, date DESC);
 CREATE INDEX idx_transactions_account_id   ON transactions(account_id);
 CREATE INDEX idx_transactions_category_id  ON transactions(category_id);
-CREATE INDEX idx_transactions_mono_id      ON transactions(mono_id) WHERE mono_id IS NOT NULL;
 ```
 
 ---
@@ -446,499 +440,81 @@ CREATE INDEX idx_articles_tags ON articles USING GIN(tags);
 
 ---
 
-## 6. Mono Integration — Bank Sync
+## 6. Bank Alert Email Ingestion
 
-Mono is the bank data infrastructure. It handles connecting to Nigerian banks via their
-internet banking portals and fetching transactions on your behalf.
+Nigerian banks and fintechs send email alerts for every transaction. MoniMata captures
+these by having users configure email forwarding to a Cloudflare Worker that parses the
+alert and delivers structured transaction data to the backend.
+
 **MoniMata never handles or stores bank login credentials.**
 
-### Account Linking (One-Time)
+### How It Works
 
 ```
-1. App opens Mono Connect SDK (embedded webview)
-2. User selects their bank, enters internet banking credentials
-   → This flows directly through Mono's secure interface, not your servers
-3. Mono Connect SDK returns a one-time auth_code to your React Native app
-4. App sends: POST /accounts/connect  { "code": "<auth_code>" }
-5. Backend calls Mono: POST https://api.withmono.com/account/auth
-   Body: { "code": "<auth_code>" }
-   Headers: { "mono-sec-key": "<MONO_SECRET_KEY>" }
-6. Mono returns: { "id": "mono_account_id", ... }
-7. You store bank_account row with this mono_account_id
-8. Immediately trigger initial backfill: fetch all available transaction history
+Bank sends alert email to user's inbox
+              ↓
+  Cloudflare Email Routing
+              ↓
+  email-worker (Cloudflare Worker)
+    - Receives raw email via Email Routing
+    - Parses with postal-mime
+    - Extracts: amount, type (debit/credit), narration, date, balance_after
+              ↓
+  POST /webhooks/bank-alerts
+  Header: X-MoniMata-Secret: <shared_secret>
+  Body: { account_id, amount, type, narration, date, balance_after }
+              ↓
+  FastAPI backend
+    - Verify shared secret (constant-time compare)
+    - Upsert transaction row (dedup on account + date + amount + narration)
+    - Update bank_accounts.balance
+    - Enqueue categorize_transactions(new_transaction_ids)
+    - Send WebSocket event sync_complete to the user
 ```
 
-### Ongoing Sync — The 24-Hour Cycle
+### Webhook Authentication
 
-Mono re-syncs with the connected bank every ~24 hours. When sync completes, Mono fires
-a webhook to your registered endpoint.
-
-**Webhook event:** `mono.events.account_updated`
-
-```json
-{
-  "event": "mono.events.account_updated",
-  "data": {
-    "account": {
-      "id": "5f9d3e2b...",
-      "_id": "5f9d3e2b..."
-    }
-  }
-}
-```
-
-**CRITICAL: Always verify the Mono webhook signature before processing.**
+The email-worker authenticates using a shared secret sent in the `X-MoniMata-Secret`
+header. The backend verifies it with `hmac.compare_digest` (constant-time) to prevent
+timing attacks. Requests that fail this check are rejected with 401.
 
 ```python
-import hmac, hashlib
+import hmac
 
-def verify_mono_webhook(request_body: bytes, signature_header: str, secret: str) -> bool:
-    expected = hmac.new(
-        key=secret.encode(),
-        msg=request_body,
-        digestmod=hashlib.sha512
-    ).hexdigest()
-    return hmac.compare_digest(expected, signature_header)
-
-# In the endpoint:
-# if not verify_mono_webhook(raw_body, request.headers["mono-webhook-secret"], MONO_WEBHOOK_SECRET):
-#     raise HTTPException(status_code=401, detail="Invalid webhook signature")
+def verify_bank_alert_secret(header_value: str, expected: str) -> bool:
+    return hmac.compare_digest(header_value, expected)
 ```
 
-Reject any webhook request that fails this check. Without this, an attacker can forge
-fake transaction events.
+### Transaction Deduplication
 
-**After verification:**
+Because the same alert email can be delivered more than once (forwarding retries,
+Cloudflare routing failures), deduplication is enforced at insert time using
+`INSERT ... ON CONFLICT DO NOTHING` on a composite key of
+`(account_id, date, amount, narration)`. Re-delivered alerts are silently discarded.
 
-```
-Webhook received → verify HMAC → enqueue Celery task: fetch_transactions(mono_account_id)
-Celery worker → GET https://api.withmono.com/accounts/{id}/transactions?paginate=true
-             → upsert transactions using mono_id as deduplication key (INSERT ... ON CONFLICT DO NOTHING)
-             → update bank_accounts.balance and last_synced_at
-             → enqueue categorize_transactions(new_transaction_ids)
-```
+### Manual Accounts & Transactions
 
-### Manual Sync (User-Triggered)
-
-When the user opens the app or manually pulls to refresh, the app calls:
-`POST /accounts/{id}/sync`
-
-This calls Mono's reauthorize/sync endpoint to trigger an immediate fetch rather than
-waiting for the 24-hour window. Mono typically takes 30–120 seconds. Your server
-returns `202 Accepted` immediately and uses a WebSocket event to notify the client
-when new data is available.
-
-**App-open is the primary sync trigger.** This is by design — it makes the sync feel
-reactive to the user's intent rather than a mechanical background process.
-
-### Nightly Reconciliation (Safety Net)
-
-A Celery Beat job runs at 3:00 AM WAT daily. It checks all active bank accounts where
-`last_synced_at` is older than 26 hours and re-triggers a fetch. This catches any
-webhooks that were dropped due to server downtime.
-
-### Why 24-Hour Delay Is Not a Problem for Nudges
-
-The key insight: **you do not know a transaction happened until the next sync.**
-The nudge engine must be designed around sync events, not transaction timestamps.
-
-The nudge fires when the sync delivers new transactions — which could be the same
-evening (app-open sync) or the next morning (Mono's 24hr auto-sync). This is
-acceptable because:
-
-1. The best nudges are pattern-based, not single-transaction alerts. A nudge saying
-   "You've spent ₦45k on food the past 3 weeks and you're in that pattern again" is
-   more valuable than "you spent ₦8k just now." The 24-hour accumulation helps.
-
-2. App-open syncs can deliver nudges within minutes of transactions if the user opens
-   the app that day. For active users, latency is low.
-
-3. For scheduled nudges (weekly review, month-end summary), timing is deliberate and
-   independent of individual transactions.
-
-**Delivery gating:** If a nudge is generated at 3am by the nightly reconciliation,
-queue it and deliver at 7:05am (user's quiet hours gate). Users get the nudge at
-wake-up time, which feels purposeful, not mechanical.
-
----
-
-## 7. Interswitch Integration — Bill Payment & Identity
-
-Interswitch is the payment infrastructure layer. It provides three capabilities used
-in MoniMata:
-
-1. **Quickteller VAS (Browse & Validate)** — Browse over 7,000 billers (electricity,
-   cable TV, airtime, data), validate customer/meter/smartcard numbers, and dispatch
-   the final bill payment debit via `SendBillPaymentAdvice` from a Retailpay wallet.
-2. **Web Checkout (Collect User Payment)** — A hosted Interswitch checkout page where
-   the user pays using card, bank transfer, USSD, QR, or OPay. The collected funds
-   land in MoniMata's Retailpay wallet, which then funds the VAS bill dispatch.
-3. **Passport (Identity / BVN Verification)** — Verify a user's BVN during onboarding
-   for KYC and CBN sandbox compliance.
-
-### Why Interswitch Solves a Real Problem
-
-The biggest operational friction in MoniMata is Mono's 24-hour sync delay. For any
-transaction that happens outside the app, MoniMata only learns about it at the next
-sync. For bills paid **inside** the app via Interswitch, MoniMata orchestrates the
-payment itself — so it can record the transaction and update the budget within
-**seconds of the user completing checkout**, with no Mono sync delay. This is the only
-scenario in the product where budget reflection is near-real-time.
-
-### The 3-Phase Architecture
-
-Bill payment requires three Interswitch APIs working in sequence. Each does a
-fundamentally different job and cannot substitute for the others.
-
-**Phase 1 — VAS: Browse & Validate**
-Quickteller VAS populates the biller catalogue and validates the customer's
-meter/smartcard number. The critical output of this phase is the biller's
-**`paymentCode`** — the VAS identifier used later in Phase 3 to target the correct
-biller for the actual debit.
-
-**Phase 2 — Web Checkout: Collect User Payment**
-The user pays the bill amount (plus optional service fee) through Interswitch's
-hosted checkout page. The collected funds are settled into MoniMata's **Retailpay
-wallet** — not the user's bank account. MoniMata momentarily holds the funds.
-
-The Web Checkout `pay_item_id` is a single generic **"Bill Payment"** item
-registered once on the Quickteller Business Dashboard. It is **not** a per-biller
-code. The amount is passed dynamically at checkout time.
-
-**Phase 3 — VAS: Dispatch Bill**
-After verifying that the Web Checkout payment succeeded, the backend calls
-`SendBillPaymentAdvice` using:
-
-- The biller's `paymentCode` from Phase 1 (targets the correct biller)
-- The confirmed amount from Phase 2
-- The customer's meter/smartcard number
-
-Interswitch debits the Retailpay wallet and delivers value to the biller.
-
-**Failure handling obligation:** If Phase 3 fails (biller unavailable, wrong token,
-etc.) after Phase 2 has already collected the user's money, MoniMata is responsible
-for initiating a refund to the user. This is non-negotiable. A Celery task must
-monitor Phase 3 completion and trigger a refund if it does not succeed within a
-defined timeout (recommended: 60 seconds, maximum 3 retries).
-
-**Retailpay wallet:** Operating this flow requires a Quickteller Business account
-with Retailpay wallet access enabled by Interswitch. The wallet holds float that is
-replenished by the Web Checkout settlements. Zero float = `SendBillPaymentAdvice`
-calls will fail.
-
-### The Closed-Loop Bill Payment Flow
+Accounts that do not produce email alerts (cash, informal savings) are added as
+manual accounts. Transactions are logged directly by the user via the app.
 
 ```
-User has a "DSTV" category
-  → target_type: "monthly_set_aside", target_amount: ₦15,000
-  → assigned: ₦15,000, available: ₦15,000
-
-─── PHASE 1: Browse & Validate (VAS) ───────────────────────────────────────
-
-User taps "Pay Bill" on the DSTV category
-  → App calls GET /bills/categories → GET /bills/billers?category=<id>
-    (VAS: GetBillerCategories / GetBillersByCategory)
-  → User selects "DStv", enters SmartCard number
-  → App calls POST /bills/validate
-    (VAS: CustomerValidation)
-    → Returns: { customer_name: "JOHN DOE", amount_due: 1500000 }
-    → Crucially also returns: biller paymentCode (e.g. "0460600019")
-  → User reviews and confirms ₦15,000
-
-─── PHASE 2: Collect Payment (Web Checkout) ────────────────────────────────
-
-App calls: POST /bills/pay
-  → Backend generates idempotency key (ref), persists pending_payment record
-    including: ref, user_id, payment_code, customer_id, amount, category_id
-  → Backend opens Interswitch Web Checkout for the user:
-       Params: merchant_code, pay_item_id (generic "Bill Payment" item from dashboard),
-               amount=1500000, txn_ref=ref, cust_email, site_redirect_url
-  → Backend returns { payment_url, ref } to app
-
-App opens payment_url in WebView
-  → Interswitch checkout page: Card / Bank Transfer / USSD / QR / OPay
-  → User pays — funds settle into MoniMata's Retailpay wallet
-
-Two notification paths after checkout (backend must handle both):
-  a. Interswitch webhook → POST /webhooks/interswitch  (most reliable)
-  b. Interswitch redirects WebView → GET /bills/callback?txnref=<ref>&resp=<code>
-
-─── PHASE 3: Dispatch Bill (VAS SendBillPaymentAdvice) ────────────────────
-
-Backend receives webhook or callback → MUST verify server-side requery first:
-  GET https://webpay.interswitchng.com/collections/api/v1/gettransaction.json
-      ?merchantcode=<MC>&transactionreference=<ref>&amount=1500000
-  → Confirm ResponseCode == "00" and Amount matches before proceeding
-
-If verified OK:
-  Backend calls VAS SendBillPaymentAdvice:
-    POST https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions
-    {
-      "TerminalId": "<TERMINAL_ID>",
-      "paymentCode": "0460600019",    // biller paymentCode from Phase 1
-      "customerId": "<smartcard number>",
-      "customerMobile": "<user mobile>",
-      "customerEmail": "<user email>",
-      "amount": "1500000",            // kobo string
-      "requestReference": "<ref>"     // same idempotency key
-    }
-  → Interswitch debits Retailpay wallet and delivers value to DSTV
-
-If SendBillPaymentAdvice fails after Web Checkout succeeded:
-  → Enqueue Celery retry task (max 3 attempts, 60s apart)
-  → If all retries exhausted: initiate refund to user, mark payment as FAILED
-
-On confirmed Phase 3 success:
-  1. Backend creates a transactions row
-     (source = "interswitch", interswitch_ref = ref, category_id = DSTV category,
-      amount = -1500000 kobo)
-  2. budget_months.activity updated for that category + month
-  3. WebSocket event "budget_updated" pushed to client
-  4. Client WatermelonDB sync triggered
-
-User sees DSTV available drop from ₦15,000 → ₦0 within seconds of successful payment.
-No waiting for Mono's next 24-hour cycle.
+POST /accounts/manual       → create a manual account
+POST /transactions/manual   → log a cash or manual transaction
 ```
 
-### The Critical Deduplication Problem
+Manual transactions carry `source = 'manual'`.
+Bank-alert transactions carry `source = 'bank_alert'`.
 
-When Mono eventually syncs and sees the same DSTV debit on the bank statement, you
-must not create a duplicate transaction. Handle this by:
-
-1. When an Interswitch payment succeeds, store the Interswitch transaction reference
-   in a `interswitch_ref` column on the transaction row.
-2. When Mono brings in a transaction, before upserting, check if a transaction already
-   exists for that account, same date, same amount (±₦1), and `source = "interswitch"`.
-3. If match found: update the existing row's `mono_id` instead of creating a new row.
-4. Log the merge so it can be audited.
-
-```python
-def find_interswitch_duplicate(
-    account_id: str, date: date, amount: int
-) -> Transaction | None:
-    """Check if an Interswitch-originated transaction already covers this Mono entry."""
-    return db.query(Transaction).filter(
-        Transaction.account_id == account_id,
-        Transaction.source == "interswitch",
-        Transaction.date == date,
-        Transaction.amount.between(amount - 100, amount + 100),  # ±₦1 tolerance
-        Transaction.mono_id == None,  # not yet matched
-    ).first()
-```
-
-### Schema Addition for Interswitch Transactions
+### Transaction Source Enum
 
 ```sql
--- Add to transactions table
-ALTER TABLE transactions
-  ADD COLUMN interswitch_ref TEXT UNIQUE;  -- Interswitch payment reference; NULL for non-IS transactions
+CREATE TYPE transactionsource AS ENUM ('bank_alert', 'manual');
 ```
 
-### BVN Verification — Onboarding Flow
-
-```
-1. User completes registration (email + password)
-2. Before linking any bank account, app prompts for BVN
-3. App calls: POST /auth/verify-bvn  { "bvn": "12345678901" }
-4. Backend calls Interswitch Passport API:
-     GET https://passport.interswitchng.com/passport/oauth/token  (get access token)
-     GET https://api.interswitchng.com/identity/api/v1/customers/{bvn}
-5. Response includes first_name, last_name, date_of_birth
-6. Backend compares name against registration name (fuzzy match, >70% similarity)
-7. On match: sets users.identity_verified = true
-8. On mismatch: returns 422 with "Name on BVN does not match your registration"
-9. Users with identity_verified = false cannot link bank accounts
-```
-
-This ensures every MoniMata user is KYC-verified before they connect a bank —
-a requirement for operating under the CBN Regulatory Sandbox.
-
-### Interswitch API Reference
-
-**VAS — Browse, Validate & Dispatch (Quickteller)**
-
-| Operation                | Method | Endpoint                                                                                       |
-| ------------------------ | ------ | ---------------------------------------------------------------------------------------------- |
-| Get biller categories    | GET    | `https://qa.interswitchng.com/quicktellerservice/api/v5/services/`                             |
-| Get billers in category  | GET    | `https://qa.interswitchng.com/quicktellerservice/api/v5/services/{categoryId}`                 |
-| Get biller payment items | GET    | `https://qa.interswitchng.com/quicktellerservice/api/v5/services/options?serviceid={billerId}` |
-| Validate customer        | POST   | `https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions/validatecustomers`        |
-| Send bill payment advice | POST   | `https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions`                          |
-| Query VAS transaction    | GET    | `https://qa.interswitchng.com/quicktellerservice/api/v5/transactions/{requestRef}`             |
-
-Live base URL: `https://www.interswitchng.com/quicktellerservice/api/v5/`
-
-**Web Checkout — Collect User Payment**
-
-| Operation                | Method | Endpoint                                                                                                                           |
-| ------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Checkout page (redirect) | POST   | `https://newwebpay.qa.interswitchng.com/collections/w/pay` (form POST)                                                             |
-| Verify payment status    | GET    | `https://qa.interswitchng.com/collections/api/v1/gettransaction.json?merchantcode={mc}&transactionreference={ref}&amount={amount}` |
-
-Live base URL: `https://newwebpay.interswitchng.com/` and `https://webpay.interswitchng.com/`
-
-**Identity**
-
-| Operation   | Method | Endpoint                                                        |
-| ----------- | ------ | --------------------------------------------------------------- |
-| OAuth token | POST   | `https://passport.interswitchng.com/passport/oauth/token`       |
-| BVN lookup  | GET    | `https://api.interswitchng.com/identity/api/v1/customers/{bvn}` |
-
-**Auth:** VAS endpoints use a MAC-based `Authentication` header (not Bearer). Web
-Checkout uses your `merchant_code` + `pay_item_id` directly in the form POST.
-Identity (Passport) uses OAuth 2.0 client credentials — cache the access token in
-Redis (3600s expiry).
-
-```python
-class InterswitchClient:
-    TOKEN_CACHE_KEY = "interswitch:access_token"
-
-    async def get_token(self) -> str:
-        cached = redis.get(self.TOKEN_CACHE_KEY)
-        if cached:
-            return cached.decode()
-        response = await http.post(
-            "https://passport.interswitchng.com/passport/oauth/token",
-            data={
-                "grant_type": "client_credentials",
-                "client_id": settings.INTERSWITCH_CLIENT_ID,
-                "client_secret": settings.INTERSWITCH_CLIENT_SECRET,
-            }
-        )
-        token = response.json()["access_token"]
-        redis.setex(self.TOKEN_CACHE_KEY, 3500, token)  # 3500s — slightly before expiry
-        return token
-
-    def _vas_auth_header(self) -> str:
-        """VAS uses MAC auth, not Bearer. Computed per-request."""
-        timestamp = str(int(time.time()))
-        nonce = uuid4().hex
-        mac = hmac.new(
-            settings.INTERSWITCH_CLIENT_SECRET.encode(),
-            f"{timestamp}{nonce}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
-        return f'MAC id="{settings.INTERSWITCH_CLIENT_ID}",ts="{timestamp}",nonce="{nonce}",mac="{mac}"'
-
-    async def validate_customer(self, payment_code: str, customer_id: str) -> dict:
-        """Phase 1: Validate meter/smartcard number and get customer details."""
-        response = await http.post(
-            "https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions/validatecustomers",
-            headers={"Authentication": self._vas_auth_header(), "TerminalId": settings.INTERSWITCH_TERMINAL_ID},
-            json={"customers": [{"paymentCode": payment_code, "customerId": customer_id}]},
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def get_checkout_url(self, ref: str, amount: int, cust_email: str) -> str:
-        """Phase 2: Returns the Web Checkout URL to open in a WebView.
-        The pay_item_id is the generic 'Bill Payment' item pre-configured on
-        the Quickteller Business Dashboard. NOT a per-biller code."""
-        params = urlencode({
-            "merchant_code": settings.INTERSWITCH_MERCHANT_CODE,
-            "pay_item_id": settings.INTERSWITCH_BILL_PAY_ITEM_ID,
-            "txn_ref": ref,
-            "amount": amount,   # kobo
-            "currency": 566,
-            "cust_email": cust_email,
-            "site_redirect_url": f"{settings.API_BASE_URL}/bills/callback",
-        })
-        return f"https://newwebpay.qa.interswitchng.com/collections/w/pay?{params}"
-
-    async def verify_payment(self, ref: str, amount: int) -> dict:
-        """Server-side verification of Web Checkout — MUST be called before Phase 3."""
-        response = await http.get(
-            "https://qa.interswitchng.com/collections/api/v1/gettransaction.json",
-            params={"merchantcode": settings.INTERSWITCH_MERCHANT_CODE, "transactionreference": ref, "amount": amount},
-        )
-        response.raise_for_status()
-        return response.json()
-
-    async def send_bill_payment_advice(self, payment_code: str, customer_id: str,
-                                       amount: int, ref: str, customer_email: str) -> dict:
-        """Phase 3: Debit Retailpay wallet and deliver value to biller."""
-        response = await http.post(
-            "https://qa.interswitchng.com/quicktellerservice/api/v5/Transactions",
-            headers={"Authentication": self._vas_auth_header(), "TerminalId": settings.INTERSWITCH_TERMINAL_ID},
-            json={
-                "TerminalId": settings.INTERSWITCH_TERMINAL_ID,
-                "paymentCode": payment_code,   # biller code from Phase 1
-                "customerId": customer_id,
-                "customerEmail": customer_email,
-                "amount": str(amount),         # kobo, as string
-                "requestReference": ref,       # same idempotency key used in Phase 2
-            },
-        )
-        response.raise_for_status()
-        return response.json()
-```
-
-### Idempotency & State Machine for Bill Payments
-
-Bill payments span three phases and multiple async steps. Track each payment as a
-state machine with states: `PENDING_CHECKOUT → CHECKOUT_VERIFIED → BILL_DISPATCHED → COMPLETED | FAILED | REFUNDED`.
-
-Always generate the idempotency key and persist the record **before** opening the
-checkout. The same `ref` is used as `txn_ref` in Web Checkout and `requestReference`
-in `SendBillPaymentAdvice`, providing end-to-end traceability.
-
-```python
-async def initiate_bill_payment(user_id: str, payload: BillPayRequest) -> BillPayResult:
-    """Phase 2: Generate checkout URL. State → PENDING_CHECKOUT."""
-    ref = f"MM-{uuid4().hex[:16].upper()}"
-    # Persist BEFORE opening checkout — captures payment_code, customer_id, amount, category_id
-    create_pending_payment(user_id=user_id, ref=ref, payload=payload, state="PENDING_CHECKOUT")
-    checkout_url = interswitch_client.get_checkout_url(
-        ref=ref, amount=payload.amount, cust_email=payload.customer_email
-    )
-    return BillPayResult(checkout_url=checkout_url, ref=ref)
-
-
-async def on_checkout_complete(ref: str) -> None:
-    """Called by webhook + redirect callback. Verifies checkout then dispatches bill."""
-    pending = get_pending_payment(ref=ref)
-    if not pending or pending.state not in ("PENDING_CHECKOUT",):
-        return  # already processed or unknown
-
-    # Verify Web Checkout server-side BEFORE dispatching bill
-    verification = await interswitch_client.verify_payment(ref=ref, amount=pending.amount)
-    if verification.get("ResponseCode") != "00":
-        update_payment_state(pending.id, "FAILED")
-        return
-
-    update_payment_state(pending.id, "CHECKOUT_VERIFIED")
-    # Dispatch the actual bill payment from Retailpay wallet
-    await dispatch_bill(pending)
-
-
-async def dispatch_bill(pending: PendingPayment, attempt: int = 1) -> None:
-    """Phase 3: SendBillPaymentAdvice. State → BILL_DISPATCHED or retry/refund."""
-    try:
-        result = await interswitch_client.send_bill_payment_advice(
-            payment_code=pending.payment_code,
-            customer_id=pending.customer_id,
-            amount=pending.amount,
-            ref=pending.ref,
-            customer_email=pending.customer_email,
-        )
-        if result.get("responseCode") != "90000":  # VAS success code
-            raise ValueError(f"VAS error: {result.get('responseMessage')}")
-    except Exception as exc:
-        if attempt < 3:
-            # Enqueue retry with exponential backoff
-            dispatch_bill_task.apply_async((pending.id, attempt + 1), countdown=60 * attempt)
-            return
-        # All retries exhausted — must refund the user
-        update_payment_state(pending.id, "REFUNDED")
-        initiate_refund(pending)   # calls Interswitch refund endpoint
-        return
-
-    # Success — record transaction and update budget
-    update_payment_state(pending.id, "COMPLETED")
-    record_interswitch_transaction(pending)
-    update_budget_activity(pending.user_id, pending.category_id, pending.amount)
-    push_websocket_event(pending.user_id, "budget_updated")
-```
+| Value        | Origin                                            |
+| ------------ | ------------------------------------------------- |
+| `bank_alert` | Ingested from a forwarded bank notification email |
+| `manual`     | User-entered cash or off-app transaction          |
 
 ---
 
@@ -953,7 +529,6 @@ POST   /auth/refresh            → body: { refresh_token } → returns new acce
 POST   /auth/logout             → invalidates refresh token in Redis
 POST   /auth/request-otp        → phone-based OTP (for passwordless login option)
 POST   /auth/verify-otp
-POST   /auth/verify-bvn         → body: { bvn } → calls Interswitch Passport; sets identity_verified
 ```
 
 **Token strategy:**
@@ -967,11 +542,11 @@ POST   /auth/verify-bvn         → body: { bvn } → calls Interswitch Passport
 ### Bank Accounts
 
 ```
-POST   /accounts/connect                  → exchange Mono auth_code for account
-GET    /accounts                          → list all linked accounts + current balances
-DELETE /accounts/{id}                     → unlink account
-POST   /accounts/{id}/sync               → trigger manual sync (returns 202)
-GET    /accounts/{id}/sync-status        → { syncing: bool, last_synced_at: timestamp }
+POST   /accounts/manual                  → create a manual account
+GET    /accounts                          → list all accounts + current balances
+PATCH  /accounts/{id}/alias             → update account display name
+PATCH  /accounts/{id}/balance           → manually adjust account balance
+DELETE /accounts/{id}                     → delete account
 ```
 
 ---
@@ -986,7 +561,7 @@ PATCH  /transactions/{id}                 → update category_id, memo
 POST   /transactions/{id}/split           → body: [{ category_id, amount, memo }]
 DELETE /transactions/{id}/split           → remove split, revert to single category
 POST   /transactions/manual               → create cash/manual transaction
-DELETE /transactions/{id}                 → only allowed if is_manual = true
+DELETE /transactions/{id}                 → delete transaction
 ```
 
 ---
@@ -1107,58 +682,9 @@ Server-sent events:
 ### Webhooks (Internal — Not for App Clients)
 
 ```
-POST   /webhooks/mono                     → Mono account update events (HMAC-verified)
-POST   /webhooks/interswitch              → Interswitch TRANSACTION.COMPLETED webhook
-                                           Triggers server-side requery → SendBillPaymentAdvice
-```
-
----
-
-### Bill Payment
-
-```
-GET    /bills/categories                  → list biller categories (VAS GetBillerCategories)
-GET    /bills/billers?category=<id>       → list billers in category (VAS GetBillersByCategory)
-GET    /bills/billers/<id>/items          → list payment items for a biller (VAS GetBillerPaymentItem)
-                                           Returns: [{ paymentCode, name, amount? }]
-POST   /bills/validate                    → validate customer/meter/smartcard (VAS CustomerValidation)
-                                           body: { payment_code, customer_id }
-                                           returns: { customer_name, amount_due? }
-POST   /bills/pay                         → Phase 2: open Web Checkout
-                                           body: { payment_code, customer_id, customer_email, amount, category_id }
-                                           returns: { checkout_url, ref }
-                                           App opens checkout_url in WebView
-                                           Budget NOT updated here — only after Phase 3 succeeds
-GET    /bills/callback                    → redirect target after checkout completes/is cancelled
-                                           Triggers server-side verify → dispatch_bill (Phase 3)
-GET    /bills/pay/<ref>/status            → poll payment state machine status
-                                           returns: { state: PENDING_CHECKOUT|CHECKOUT_VERIFIED|
-                                                              BILL_DISPATCHED|COMPLETED|FAILED|REFUNDED }
-GET    /bills/history                     → user's in-app bill payment history
-```
-
-**Important:** `POST /bills/pay` requires `identity_verified = true` on the user.
-Users who have not completed BVN verification cannot initiate payments.
-
-**New DB table required: `pending_bill_payments`**
-
-```sql
-CREATE TABLE pending_bill_payments (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id           UUID NOT NULL REFERENCES users(id),
-  ref               TEXT NOT NULL UNIQUE,            -- idempotency key, used as txn_ref in all 3 phases
-  payment_code      TEXT NOT NULL,                   -- VAS biller paymentCode from Phase 1
-  customer_id       TEXT NOT NULL,                   -- meter / SmartCard number
-  customer_email    TEXT NOT NULL,
-  amount            BIGINT NOT NULL,                 -- kobo
-  category_id       UUID REFERENCES categories(id),
-  state             TEXT NOT NULL DEFAULT 'PENDING_CHECKOUT',
-                                            -- PENDING_CHECKOUT | CHECKOUT_VERIFIED |
-                                            -- BILL_DISPATCHED | COMPLETED | FAILED | REFUNDED
-  attempt_count     INT NOT NULL DEFAULT 0,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+POST   /webhooks/bank-alerts              → bank alert email receiver (forwarded by email-worker)
+                                           Verifies X-MoniMata-Secret → upsert transaction
+                                           → enqueue categorize_transactions
 ```
 
 ---
@@ -1179,27 +705,17 @@ Scheduler: **Celery Beat**
 
 ### Task Definitions
 
-**`fetch_transactions(mono_account_id: str)`**
-
-- Triggered by: Mono webhook, POST /accounts/{id}/sync, nightly reconciliation
-- Calls Mono `GET /accounts/{mono_account_id}/transactions?paginate=true`
-- Fetches all pages since `last_synced_at`
-- Upserts rows using `mono_id` as conflict key (`INSERT ... ON CONFLICT (mono_id) DO NOTHING`)
-- Updates `bank_accounts.balance` and `last_synced_at`
-- Enqueues `categorize_transactions(new_transaction_ids)`
-- Sends WebSocket event `sync_complete` to the user
-
 **`categorize_transactions(transaction_ids: List[str])`**
 
-- Triggered by: end of `fetch_transactions`
+- Triggered by: `POST /webhooks/bank-alerts` (after upsert), `POST /transactions/manual`
 - Runs categorization pipeline (see Section 10) for each transaction
 - Updates `transactions.category_id`
 - Updates `budget_months.activity` for affected category/month combinations
 - Enqueues `evaluate_nudges(user_id, transaction_id)` for each transaction
 
-**`evaluate_nudges(user_id: str, transaction_id: str)`**
+**`evaluate_nudges_for_transactions(user_id: str, transaction_ids: List[str])`**
 
-- Checks all nudge trigger rules for this transaction
+- Checks all nudge trigger rules for each transaction
 - Checks fatigue limits (max 3/day, max 1/day per category)
 - If rule fires and fatigue allows: enqueues `generate_nudge(...)`
 
@@ -1217,6 +733,11 @@ Scheduler: **Celery Beat**
 - Finds all nudges where `delivered_at IS NULL` and `created_at < today 07:00`
 - Delivers them via FCM
 
+**`reconcile_budget_activity()`** — Celery Beat: every day at 4:00 AM WAT
+
+- Recomputes `budget_months.activity` from transactions for all active users
+- Guards against drift caused by recategorizations or sync races
+
 **`weekly_review_nudges()`** — Celery Beat: every Friday, 5:00 PM WAT
 
 - Fetches all active users
@@ -1227,11 +748,6 @@ Scheduler: **Celery Beat**
 **`month_end_summary()`** — Celery Beat: last day of month, 8:00 PM WAT
 
 - Same staggered delivery approach as weekly review
-
-**`nightly_reconciliation()`** — Celery Beat: every day at 3:00 AM WAT
-
-- Finds all accounts where `last_synced_at < now() - interval '26 hours'`
-- Enqueues `fetch_transactions` for each stale account
 
 ---
 
@@ -1517,21 +1033,14 @@ App Root
 ├─ Auth Stack
 │   ├─ Welcome / Onboarding
 │   ├─ Register
-│   ├─ BVN Verification   ← Interswitch Passport; required before bank linking
-│   ├─ Login
-│   └─ Link Bank Account (Mono Connect webview)
+│   └─ Login
 │
 └─ Main Tabs (after auth)
     ├─ Budget Tab          → category groups → categories → assign amounts
     ├─ Transactions Tab    → timeline, search, filter by date/category/account
-    ├─ Accounts Tab        → linked banks, balances, last sync time, add account
+    ├─ Accounts Tab        → manual accounts, balances, add account
     ├─ Reports Tab         → spending by category, trends, net worth
     └─ Profile Tab         → nudge settings, data export, linked accounts, logout
-
-Bill Payment (bottom sheet, not a tab)
-  Opens from any category → biller category list → biller → customer ID → confirm → pay
-  Powered by Interswitch Quickteller
-  On payment success: category available updates in real time (no sync delay)
 ```
 
 ### Budget Screen Behaviour
@@ -1541,7 +1050,7 @@ Bill Payment (bottom sheet, not a tab)
 - Tapping a category opens an assignment field and shows its target/required amount
 - Red indicator on underfunded categories (available < required_this_month)
 - "Auto-Assign" button fills all underfunded from TBB in one tap (calls `/budget/auto-assign`)
-- Pull-to-refresh triggers a manual Mono sync
+- Pull-to-refresh triggers a manual sync (re-fetches from server)
 
 ---
 
@@ -1581,7 +1090,7 @@ POST /sync/push
 {
   "changes": {
     "transactions": {
-      "created": [{ "_id": "local-uuid", "is_manual": true, ... }],
+      "created": [{ "_id": "local-uuid", "source": "manual", ... }],
       "updated": [{ "id": "server-uuid", "memo": "Updated memo", ... }],
       "deleted": []
     },
@@ -1612,7 +1121,7 @@ its own writes reflected back.
 
 1. **App foreground** — on every `AppState` change from background to active
 2. **Pull-to-refresh** — user manually triggers
-3. **WebSocket `sync_complete` event** — server notifies when Mono fetch is done
+3. **WebSocket `sync_complete` event** — server notifies when bank alert processing finishes
 4. **Periodic background fetch** — every 15 minutes when app has background fetch
    permission (iOS Background Fetch / Android WorkManager)
 
@@ -1623,12 +1132,9 @@ its own writes reflected back.
 | Concern                    | Implementation                                                                                                                         |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Authentication             | JWT (RS256, 15-min access token) + rotating opaque refresh token (7 days, stored in Redis)                                             |
-| API authorization          | All endpoints require valid JWT, except `/auth/*` and `/webhooks/mono`                                                                 |
+| API authorization          | All endpoints require valid JWT, except `/auth/*` and `/webhooks/bank-alerts`                                                          |
 | Row-level security         | Every query includes `WHERE user_id = current_user_id` — never trust client-supplied user_id                                           |
-| Mono webhook auth          | HMAC-SHA512 signature verification on every incoming webhook (reject 401 if invalid)                                                   |
-| Interswitch auth           | OAuth 2.0 client credentials; access token cached in Redis; `client_secret` stored in secrets manager, never in code                   |
-| Interswitch bill pay gate  | `POST /bills/pay` checks `identity_verified = true` before calling Interswitch; prevents unverified users from initiating payments     |
-| Interswitch idempotency    | Payment reference generated and persisted before the Interswitch API call; prevents duplicate charges on retry                         |
+| Bank-alert webhook auth    | `X-MoniMata-Secret` verified with `hmac.compare_digest` (constant-time) on every incoming request                                      |
 | Secrets management         | All API keys and DB credentials in environment variables. Never in code or git. Use Railway/Render secret vault or AWS Secrets Manager |
 | PII at rest                | Account numbers column: AES-256-GCM encrypted before DB insert. Keys in secrets manager                                                |
 | Transport security         | HTTPS everywhere, HSTS header. Certificate pinning in React Native production builds                                                   |
@@ -1637,7 +1143,7 @@ its own writes reflected back.
 | NDPA compliance            | Data export as signed time-limited URL. Deletion is a hard cascading delete with 30-day soft-delete window                             |
 | Dependency security        | Dependabot / Renovate for automated CVE alerts on all packages                                                                         |
 | LLM data hygiene           | Never send raw narrations, account numbers, bank names, or any PII to external LLM APIs — aggregated stats and category names only     |
-| Open source considerations | Core engine is AGPL. Mono API keys, LLM keys, and Nudge model weights are in environment variables and are never open-sourced          |
+| Open source considerations | Core engine is AGPL. LLM keys and nudge model weights are in environment variables and are never open-sourced                          |
 
 ---
 
@@ -1664,18 +1170,11 @@ Target: **zero to first 5,000 users** with ~$50–80/month infrastructure cost.
 # Core
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
-SECRET_KEY=<random 64-byte hex>   # for JWT signing
 JWT_PRIVATE_KEY=<RS256 private key>
 JWT_PUBLIC_KEY=<RS256 public key>
 
-# Mono
-MONO_SECRET_KEY=<from Mono dashboard>
-MONO_WEBHOOK_SECRET=<from Mono dashboard — for HMAC verification>
-
-# Interswitch
-INTERSWITCH_CLIENT_ID=<from Interswitch developer portal>
-INTERSWITCH_CLIENT_SECRET=<from Interswitch developer portal>
-INTERSWITCH_ENV=sandbox   # "sandbox" | "production"
+# Bank Alert Webhook
+BANK_ALERT_WEBHOOK_SECRET=<shared secret matched against X-MoniMata-Secret header>
 
 # AI
 OPENAI_API_KEY=<for GPT-4o-mini nudges>  # or ANTHROPIC_API_KEY for Claude Haiku
@@ -1711,10 +1210,10 @@ monimata/
 │   │   │   ├── models/             # SQLAlchemy ORM models
 │   │   │   ├── schemas/            # Pydantic request/response schemas
 │   │   │   ├── services/           # Business logic (not in routers)
+│   │   │   │   ├── bank_alert_parser.py
 │   │   │   │   ├── categorization.py
 │   │   │   │   ├── nudge_engine.py
-│   │   │   │   ├── budget_logic.py
-│   │   │   │   └── mono_client.py
+│   │   │   │   └── budget_logic.py
 │   │   │   ├── worker/             # Celery tasks
 │   │   │   │   ├── tasks.py
 │   │   │   │   └── beat_schedule.py
@@ -1735,7 +1234,6 @@ monimata/
 │       │   │   ├── Reports/
 │       │   │   └── Profile/
 │       │   ├── components/         # Shared UI components
-│       │   │   └── BillPayment/    # Interswitch Quickteller bottom sheet + flow
 │       │   ├── database/           # WatermelonDB models + schema
 │       │   │   ├── models/
 │       │   │   │   ├── Transaction.ts
@@ -1746,7 +1244,6 @@ monimata/
 │       │   ├── services/
 │       │   │   ├── api.ts          # Axios client + interceptors
 │       │   │   ├── nudges.ts       # On-device nudge evaluation
-│       │   │   ├── bills.ts        # Interswitch bill payment service
 │       │   │   └── websocket.ts
 │       │   ├── store/              # Redux Toolkit slices (UI state only)
 │       │   └── utils/
@@ -1764,133 +1261,21 @@ monimata/
 └── ARCHITECTURE.md                 # ← this file
 ```
 
----
-
-## 18. Implementation Phases
-
-Build in strict priority order. Do not start Phase N+1 until Phase N is shippable.
-
-### Hackathon Build Plan (4 Days)
-
-This is the compressed path for the Enyata × Interswitch Hackathon. The goal is a
-working demo that tells a complete product story, not a fully production-hardened app.
-
-**Day 1 — Foundation + Auth**
-
-- [ ] Nx monorepo scaffold (FastAPI app + React Native app)
-- [ ] PostgreSQL schema (core tables: users, bank_accounts, transactions, categories,
-      category_groups, budget_months) + Alembic migrations
-- [ ] Auth endpoints: register, login, refresh
-- [ ] `POST /auth/verify-bvn` → Interswitch Passport BVN check + `identity_verified` flag
-- [ ] Mono account linking (`POST /accounts/connect`) + initial transaction backfill
-- [ ] React Native: Register screen → BVN verification screen → Link Bank Account screen
-
-**Day 2 — Core Budget Loop**
-
-- [ ] Mono webhook receiver (HMAC-verified) + `fetch_transactions` Celery task
-- [ ] Basic auto-categorization (keyword rules, merchant dictionary)
-- [ ] Category groups + categories CRUD
-- [ ] Budget CRUD: assign, move money, TBB calculation
-- [ ] `GET /budget?month=` full response
-- [ ] WatermelonDB models + delta sync (`/sync/pull`, `/sync/push`)
-- [ ] React Native: Budget screen (assign amounts, TBB indicator) + Transactions screen
-
-**Day 3 — Interswitch Bill Payment**
-
-- [ ] `GET /bills/categories` + `GET /bills/billers?category=`
-- [ ] `POST /bills/validate` (customer number validation)
-- [ ] `POST /bills/pay` → Interswitch Quickteller → record transaction immediately
-      (source="interswitch") → update `budget_months.activity` → push `budget_updated`
-      WebSocket event
-- [ ] Interswitch deduplication logic (prevent double-entry when Mono later syncs same tx)
-- [ ] React Native: BillPayment bottom sheet (biller list → customer ID → confirm → pay)
-- [ ] WebSocket client connection for real-time budget updates
-
-**Day 4 — Polish + Demo Story**
-
-- [ ] 2–3 template-based nudges for the demo (`pay_received`, `threshold_80`,
-      `pay_bill_success`)
-- [ ] React Native: Accounts screen with sync status indicator
-- [ ] Error states and loading indicators throughout
-- [ ] Seed data script for a convincing demo state
-- [ ] Fix sync edge cases; test full flow end-to-end
-- [ ] Prepare demo script (see Section 7 for the pitch narrative)
-
----
-
-### Phase 0 — Foundation (Backend skeleton)
-
-- [ ] Nx monorepo scaffold
-- [ ] FastAPI app with health check endpoint
-- [ ] PostgreSQL schema (all tables) + Alembic migrations
-- [ ] Celery + Redis setup with a test task
-- [ ] Auth endpoints (register, login, refresh, logout)
-- [ ] JWT middleware on all protected routes
-- [ ] Environment config with pydantic-settings
-- [ ] CI pipeline (GitHub Actions: lint, type-check, tests)
-
-### Phase 1 — Core Loop (makes the app useful)
-
-- [ ] Mono account linking endpoint + initial backfill
-- [ ] Mono webhook receiver (HMAC-verified)
-- [ ] `fetch_transactions` Celery task
-- [ ] Transaction upsert with mono_id deduplication
-- [ ] Basic auto-categorization (merchant dictionary + keyword rules)
-- [ ] Category groups and categories CRUD
-- [ ] Budget CRUD (assign, move money, TBB calculation)
-- [ ] `/budget?month=` full budget response
-- [ ] Delta sync endpoints (`/sync/pull`, `/sync/push`)
-- [ ] React Native: WatermelonDB models + sync engine
-- [ ] React Native: Budget screen (functional, no targets yet)
-- [ ] React Native: Transactions screen with manual entry
-- [ ] React Native: Accounts screen with sync status
-- [ ] Interswitch BVN verification on onboarding
-- [ ] Interswitch bill payment endpoints + Pay Bill bottom sheet
-- [ ] Interswitch deduplication (prevent Mono re-importing paid bills)
-
-### Phase 2 — Intelligence (makes the app sticky)
-
-- [ ] Category targets schema + CRUD endpoints
-- [ ] `required_this_month` calculation per target type
-- [ ] `/budget/underfunded` and `/budget/auto-assign` endpoints
-- [ ] Budget screen: target indicators + underfunded highlights
-- [ ] Template-based nudge engine (no LLM — ship this fast)
-- [ ] On-device nudge evaluation (local notifications after sync)
-- [ ] FCM push notifications for server-side nudges
-- [ ] Nudge fatigue logic (max 3/day, quiet hours, payday grace)
-- [ ] Transaction re-categorization UI (builds merchant dictionary)
-- [ ] WebSocket server + client connection
-
-### Phase 3 — Differentiators
-
-- [ ] LLM-powered weekly review nudges (GPT-4o-mini / Claude Haiku)
-- [ ] Anomaly detection nudges (`anomaly_week`)
-- [ ] Spending reports (category breakdown, trends, income vs expense)
-- [ ] Knowledge Hub: article/nugget CRUD (admin) + reading UI
-- [ ] NDPA: data export + account deletion endpoints
-- [ ] Onboarding flow (first-time budget setup wizard)
-- [ ] Month rollover logic (carry-forward, target reset)
-- [ ] ML transaction categorization (fine-tuned sklearn classifier)
-
----
-
-## 19. Key Decisions Reference
+## 18. Key Decisions Reference
 
 A quick lookup for "why did we do it this way?"
 
 | Decision                | Choice                                                | Rationale                                                                                   |
 | ----------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Data storage primary    | PostgreSQL (server)                                   | Mono webhooks hit server; AI analysis is server-side; multi-device; NDPA compliance         |
+| Data storage primary    | PostgreSQL (server)                                   | Bank alerts arrive at the server; AI analysis is server-side; multi-device; NDPA compliance |
 | Device storage          | WatermelonDB cache                                    | Offline reads, fast UI, delta sync protocol built-in                                        |
+| Transaction ingestion   | Cloudflare email-worker → `/webhooks/bank-alerts`     | No third-party bank API dependency; works with any bank that sends email alerts             |
 | Money representation    | Integer kobo                                          | No floating point rounding bugs                                                             |
 | Goals / sinking funds   | Category target (`category_targets` table)            | Mirrors YNAB: target is a property of the category, not a separate entity                   |
 | `available` field       | Never stored, always computed                         | Ensures budget self-heals when transactions are re-categorized                              |
-| Mono webhook security   | HMAC-SHA512 verification                              | Without this, anyone can POST fake transactions to your webhook                             |
-| Interswitch role        | KYC (Passport) + in-app bill payment (Quickteller)    | Only two Interswitch integrations — both add genuine product value, not checkbox compliance |
-| Interswitch real-time   | Bill payments recorded immediately on success         | Closes the Mono 24hr sync gap for transactions the user initiates from within the app       |
-| Interswitch dedup       | Match on account + date + amount before Mono upsert   | Prevents double-counting when Mono later syncs the same bill debit from the bank            |
-| Interswitch idempotency | Reference generated + persisted before API call       | User is never charged twice if network drops mid-payment                                    |
-| Nudge timing            | Event-driven on sync completion, gated by quiet hours | More relevant than fixed cron; avoids 3am delivery                                          |
+| Bank-alert webhook auth | Shared secret + `hmac.compare_digest`                 | Constant-time comparison prevents timing attacks; no external PKI required                  |
+| Transaction source      | `transactionsource` PostgreSQL enum                   | Enforces at DB level: only `bank_alert` or `manual`; no legacy sources possible             |
+| Nudge timing            | Event-driven on alert ingestion, gated by quiet hours | More relevant than fixed cron; avoids 3am delivery                                          |
 | Nudge message source    | Template (80%) + LLM (20%)                            | Templates are instant and free; LLM reserved for complex summaries                          |
 | LLM data input          | Aggregated kobo + category names only                 | PII never leaves your servers; compliant with NDPA                                          |
 | On-device AI            | No LLM; JS rule evaluation + templates                | Mid-range Nigerian Android (3–4GB RAM) cannot run a viable LLM locally                      |

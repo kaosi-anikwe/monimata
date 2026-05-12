@@ -20,7 +20,7 @@ Verify the new columns exist:
 SELECT column_name, data_type
 FROM information_schema.columns
 WHERE table_name IN ('nudges', 'users')
-  AND column_name IN ('title', 'context', 'fcm_token');
+  AND column_name IN ('title', 'context', 'expo_push_token');
 ```
 
 ### 1.2 Use the test-trigger endpoint
@@ -35,7 +35,7 @@ curl -X POST http://localhost:8000/nudges/test-trigger \
   -H "Content-Type: application/json" \
   -d '{"trigger_type": "threshold_80"}'
 
-# All five types: threshold_80 | threshold_100 | large_single_tx | pay_received | bill_payment
+# All supported types: threshold_80 | threshold_100 | large_single_tx | pay_received
 ```
 
 The endpoint returns the created `Nudge` object (with `context` populated) so you can
@@ -77,11 +77,11 @@ Visit `http://localhost:5555`.
 
 Key tasks to monitor:
 
-| Task                      | Trigger                                                                   |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `categorize_transactions` | After a transaction is created / synced                                   |
-| `deliver_queued_nudges`   | Beat schedule, every 5 minutes; delivers nudges queued during quiet hours |
-| `fetch_transactions`      | Manual sync or Mono webhook                                               |
+| Task                               | Trigger                                                                            |
+| ---------------------------------- | ---------------------------------------------------------------------------------- |
+| `categorize_transactions`          | After a transaction is created or received from bank alert                         |
+| `evaluate_nudges_for_transactions` | After categorization completes                                                     |
+| `deliver_queued_nudges`            | Beat schedule, every day at 7:05 AM WAT; delivers nudges queued during quiet hours |
 
 To force `deliver_queued_nudges` immediately:
 
@@ -104,7 +104,7 @@ Open Expo Go. On the first launch:
 
 1. The OS will ask for notification permission — grant it.
 2. The app calls `GET /nudges/register-device` with the `ExponentPushToken[...]` token.
-3. Verify the token is stored: `SELECT fcm_token FROM users WHERE id = '<user id>';`
+3. Verify the token is stored: `SELECT expo_push_token FROM users WHERE id = '<user id>';`
 
 ### 3.2 Send a test push
 
@@ -150,7 +150,6 @@ app to confirm the "Why you got this" section renders correctly for every type:
 | `threshold_100`   | "Your Y budget ... is fully used. You overspent by ₦Z..." | Adjust budget, Review transactions |
 | `large_single_tx` | "A single transaction of ₦X ... consumed Y% of..."        | Review transactions, Adjust budget |
 | `pay_received`    | "₦X credit was received..."                               | Assign to your budget              |
-| `bill_payment`    | "Your Biller payment of ₦X was processed..."              | View bill history                  |
 
 ---
 
@@ -204,31 +203,48 @@ verify only 3 nudges are created.
 
 ---
 
-## 6. Mono sync — triggering automatic nudges
+## 6. Bank alert — triggering automatic nudges
 
-Mono's sandbox accounts **do not auto-fire webhooks** on a 24-hour cycle. Use these
-workarounds:
+The fastest way to trigger a real nudge end-to-end without a live bank email is to
+post directly to the webhook endpoint, simulating what the email-worker sends:
 
-| Method                     | How                                                                                                           |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Manual sync**            | `POST /accounts/{account_id}/sync` — queues `fetch_transactions` which may create nudges after categorization |
-| **Mono webhook simulator** | Mono dashboard → Webhooks → Send Test Event → `account_updated`                                               |
-| **Manual transaction API** | `POST /transactions/manual` — fastest path; bypasses Mono entirely                                            |
+```bash
+# Simulate a bank alert arriving (replace values as needed)
+curl -X POST http://localhost:8000/webhooks/bank-alerts \
+  -H "X-MoniMata-Secret: <BANK_ALERT_WEBHOOK_SECRET>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "<ACCOUNT_ID>",
+    "amount": -4500000,
+    "type": "debit",
+    "narration": "POS PURCHASE CHOPNOW 07032026",
+    "date": "2026-05-12",
+    "balance_after": 15500000
+  }'
+```
+
+Alternatives:
+
+| Method                     | How                                                                       |
+| -------------------------- | ------------------------------------------------------------------------- |
+| **Webhook POST (above)**   | Direct curl to `/webhooks/bank-alerts` — fastest, no email setup needed   |
+| **Manual transaction API** | `POST /transactions/manual` — bypasses the webhook, creates tx directly   |
+| **Real email forwarding**  | Configure Cloudflare Email Routing to forward a bank alert to your worker |
 
 ---
 
 ## 7. Acceptance checklist before release
 
 - [ ] `expo-notifications` permission prompt appears on first launch
-- [ ] `fcm_token` stored in DB after permission granted
+- [ ] `expo_push_token` stored in DB after permission granted
 - [ ] Foreground nudge: `Alert` dialog shows title + body with "View" navigating to Nudges tab
 - [ ] Background nudge: OS banner navigates to Nudges tab on tap
 - [ ] Nudge card renders unread dot; dot disappears after opening
 - [ ] "Mark all read" clears all unread dots and removes badge
-- [ ] Nudge detail sheet shows correct "Why you got this" for all 5 trigger types
-- [ ] All 5 action buttons deep-link to the correct tab
+- [ ] Nudge detail sheet shows correct "Why you got this" for all 4 trigger types
+- [ ] All 4 action buttons deep-link to the correct tab
 - [ ] Dismiss removes the nudge from the active list (opacity reduction) and closes the sheet
 - [ ] Tab bar badge shows unread count; badge disappears when all nudges opened
 - [ ] Quiet-hours: nudges queue correctly and deliver after the quiet window ends
 - [ ] Fatigue: > 3 real nudge attempts in one day → no additional push sent
-- [ ] `alembic upgrade head` applies migration 0006 without errors on a clean DB
+- [ ] `alembic upgrade head` applies cleanly on a fresh DB (current head: `0011`)

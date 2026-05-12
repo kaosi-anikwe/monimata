@@ -48,7 +48,7 @@ sudo apt update && sudo apt upgrade -y
 
 ```bash
 sudo apt install -y \
-  python3.11 python3.11-venv python3.11-dev \
+  python3.11 python3.11-dev \
   postgresql postgresql-contrib \
   redis-server \
   nginx \
@@ -60,7 +60,16 @@ sudo apt install -y \
   ufw
 ```
 
-### 2.3 Create a dedicated system user
+### 2.3 Install uv
+
+[uv](https://docs.astral.sh/uv/) manages the Python virtual environment and dependencies.
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+sudo mv ~/.cargo/bin/uv /usr/local/bin/uv   # make uv available to all users
+```
+
+### 2.4 Create a dedicated system user
 
 Never run the application as root.
 
@@ -68,7 +77,7 @@ Never run the application as root.
 sudo useradd --system --create-home --shell /bin/bash monimata
 ```
 
-### 2.4 Firewall
+### 2.5 Firewall
 
 ```bash
 sudo ufw allow OpenSSH
@@ -89,24 +98,15 @@ sudo chown monimata:monimata /srv/monimata
 sudo -u monimata git clone <your-repo-url> /srv/monimata/app
 ```
 
-### 3.2 Create the Python virtual environment
+### 3.2 Create the Python virtual environment and install dependencies
 
 ```bash
-sudo -u monimata python3.11 -m venv /srv/monimata/venv
+cd /srv/monimata/app/apps/api
+sudo -u monimata uv sync
 ```
 
-### 3.3 Install Python dependencies
-
-```bash
-sudo -u monimata /srv/monimata/venv/bin/pip install --upgrade pip
-sudo -u monimata /srv/monimata/venv/bin/pip install -r /srv/monimata/app/apps/api/requirements.txt
-```
-
-### 3.4 Convenience: add venv to the monimata user's PATH
-
-```bash
-sudo -u monimata bash -c 'echo "export PATH=/srv/monimata/venv/bin:\$PATH" >> ~/.bashrc'
-```
+This reads `pyproject.toml`, creates a `.venv` at `/srv/monimata/app/apps/api/.venv`, and
+installs all pinned dependencies from `uv.lock`. No separate venv creation step is needed.
 
 ---
 
@@ -138,13 +138,8 @@ JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 # AES key for PII encryption
 AES_ENCRYPTION_KEY=<64-char hex string>
 
-# Mono + Interswitch production credentials
-MONO_SECRET_KEY=...
-MONO_WEBHOOK_SECRET=...
-INTERSWITCH_CLIENT_ID=...
-INTERSWITCH_CLIENT_SECRET=...
-INTERSWITCH_ENV=production
-INTERSWITCH_QUICKTELLER_URL=https://api.interswitchng.com/quickteller/api/v5
+# Bank alert webhook shared secret
+BANK_ALERT_WEBHOOK_SECRET=<random 32-char hex string>
 
 # Logging
 LOG_LEVEL=INFO
@@ -174,10 +169,16 @@ awk 'NF {ORS="\\n"; print}' /srv/monimata/private.pem
 ### 4.3 Generate the AES encryption key
 
 ```bash
-/srv/monimata/venv/bin/python -c "import secrets; print(secrets.token_hex(32))"
+/srv/monimata/app/apps/api/.venv/bin/python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-### 4.4 Lock down the .env file
+### 4.4 Generate the webhook secret
+
+```bash
+/srv/monimata/app/apps/api/.venv/bin/python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### 4.5 Lock down the .env file
 
 ```bash
 sudo chmod 600 /srv/monimata/app/apps/api/.env
@@ -202,7 +203,7 @@ SQL
 
 ```bash
 cd /srv/monimata/app/apps/api
-sudo -u monimata /srv/monimata/venv/bin/alembic upgrade head
+sudo -u monimata uv run alembic upgrade head
 ```
 
 ### 5.3 Verify
@@ -236,7 +237,7 @@ sudo -u monimata tee /srv/monimata/dev-start.sh <<'EOF'
 # Kill all: tmux kill-session -t monimata
 
 SESSION="monimata"
-VENV="/srv/monimata/venv/bin"
+VENV="/srv/monimata/app/apps/api/.venv/bin"
 APP_DIR="/srv/monimata/app/apps/api"
 
 # Kill any existing session
@@ -265,7 +266,7 @@ tmux send-keys -t "$SESSION:beat" \
 
 # Window 3 — interactive shell (for ad-hoc commands, migrations, etc.)
 tmux send-keys -t "$SESSION:shell" \
-  "cd $APP_DIR && source /srv/monimata/venv/bin/activate" \
+  "cd $APP_DIR && source .venv/bin/activate" \
   Enter
 
 echo ""
@@ -317,7 +318,7 @@ Or from outside tmux:
 tmux send-keys -t monimata:uvicorn C-c Enter
 sleep 1
 tmux send-keys -t monimata:uvicorn \
-  "cd /srv/monimata/app/apps/api && /srv/monimata/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug" \
+  "cd /srv/monimata/app/apps/api && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug" \
   Enter
 ```
 
@@ -326,7 +327,7 @@ tmux send-keys -t monimata:uvicorn \
 ```bash
 # In the shell window (window 3) or any SSH session:
 cd /srv/monimata/app/apps/api
-source /srv/monimata/venv/bin/activate
+source .venv/bin/activate
 alembic upgrade head
 ```
 
@@ -335,10 +336,10 @@ alembic upgrade head
 ```bash
 # In the shell window:
 cd /srv/monimata/app/apps/api
-source /srv/monimata/venv/bin/activate
+source .venv/bin/activate
 python - <<'PY'
-from app.worker.tasks import nightly_reconciliation
-result = nightly_reconciliation.delay()
+from app.worker.tasks import reconcile_budget_activity
+result = reconcile_budget_activity.delay()
 print("Task ID:", result.id)
 PY
 ```
@@ -390,7 +391,7 @@ Group=monimata
 WorkingDirectory=/srv/monimata/app/apps/api
 EnvironmentFile=/etc/monimata.env
 
-ExecStart=/srv/monimata/venv/bin/uvicorn app.main:app \
+ExecStart=/srv/monimata/app/apps/api/.venv/bin/uvicorn app.main:app \
     --host 127.0.0.1 \
     --port 8000 \
     --workers 4 \
@@ -432,7 +433,7 @@ Group=monimata
 WorkingDirectory=/srv/monimata/app/apps/api
 EnvironmentFile=/etc/monimata.env
 
-ExecStart=/srv/monimata/venv/bin/celery \
+ExecStart=/srv/monimata/app/apps/api/.venv/bin/celery \
     -A app.worker.celery_app worker \
     --loglevel=info \
     --concurrency=4 \
@@ -440,7 +441,7 @@ ExecStart=/srv/monimata/venv/bin/celery \
     --logfile=/srv/monimata/logs/celery-worker.log \
     --detach
 
-ExecStop=/srv/monimata/venv/bin/celery \
+ExecStop=/srv/monimata/app/apps/api/.venv/bin/celery \
     -A app.worker.celery_app control shutdown
 
 PIDFile=/run/monimata/celery-worker.pid
@@ -481,7 +482,7 @@ Group=monimata
 WorkingDirectory=/srv/monimata/app/apps/api
 EnvironmentFile=/etc/monimata.env
 
-ExecStart=/srv/monimata/venv/bin/celery \
+ExecStart=/srv/monimata/app/apps/api/.venv/bin/celery \
     -A app.worker.celery_app beat \
     --loglevel=info \
     --scheduler celery.beat.PersistentScheduler \
@@ -603,7 +604,7 @@ server {
         proxy_set_header   Upgrade           $http_upgrade;
         proxy_set_header   Connection        "upgrade";
 
-        # Timeouts — increase for Mono syncs which can be slow
+        # Timeouts
         proxy_connect_timeout 10s;
         proxy_send_timeout    60s;
         proxy_read_timeout    60s;
@@ -708,12 +709,12 @@ A safe update sequence that minimises downtime:
 cd /srv/monimata/app
 sudo -u monimata git pull origin main
 
-# 2. Install any new Python dependencies
-sudo -u monimata /srv/monimata/venv/bin/pip install -r apps/api/requirements.txt
+# 2. Install/sync Python dependencies
+cd apps/api
+sudo -u monimata uv sync
 
 # 3. Run database migrations
-cd apps/api
-sudo -u monimata /srv/monimata/venv/bin/alembic upgrade head
+sudo -u monimata uv run alembic upgrade head
 
 # 4. Restart all application processes
 sudo systemctl restart monimata-api monimata-worker monimata-beat
