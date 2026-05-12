@@ -92,7 +92,6 @@ async def add_manual_account(
         account_name=payload.alias,
         alias=payload.alias,
         account_number=payload.account_number,
-        bank_code=payload.bank_code,
         account_type=payload.account_type.upper(),
         currency=payload.currency,
         balance=payload.balance,

@@ -128,6 +128,7 @@ def _serialize_budget_month(bm: BudgetMonth) -> dict[str, Any]:
         "month": bm.month,
         "assigned": bm.assigned,
         "activity": bm.activity,
+        "created_at": _ts_ms(bm.created_at) if bm.created_at else None,
         "updated_at": _ts_ms(bm.updated_at) if bm.updated_at else None,
     }
 
@@ -383,7 +384,10 @@ def pull(
                 "updated": [
                     _serialize_category_group(g)
                     for g in groups
-                    if g.created_at and _ts_ms(g.created_at) <= last_pulled_at
+                    if g.updated_at
+                    and _ts_ms(g.updated_at) > last_pulled_at
+                    and g.created_at
+                    and _ts_ms(g.created_at) <= last_pulled_at
                 ],
                 "deleted": [],
             },
@@ -396,7 +400,10 @@ def pull(
                 "updated": [
                     _serialize_category(c)
                     for c in cats
-                    if c.created_at and _ts_ms(c.created_at) <= last_pulled_at
+                    if c.updated_at
+                    and _ts_ms(c.updated_at) > last_pulled_at
+                    and c.created_at
+                    and _ts_ms(c.created_at) <= last_pulled_at
                 ],
                 "deleted": [],
             },
@@ -409,7 +416,10 @@ def pull(
                 "updated": [
                     _serialize_budget_month(b)
                     for b in bms
-                    if b.created_at and _ts_ms(b.created_at) <= last_pulled_at
+                    if b.updated_at
+                    and _ts_ms(b.updated_at) > last_pulled_at
+                    and b.created_at
+                    and _ts_ms(b.created_at) <= last_pulled_at
                 ],
                 "deleted": [],
             },
@@ -418,7 +428,10 @@ def pull(
                     _serialize_target(t) for t in targets if _ts_ms(t.created_at) > last_pulled_at
                 ],
                 "updated": [
-                    _serialize_target(t) for t in targets if _ts_ms(t.created_at) <= last_pulled_at
+                    _serialize_target(t)
+                    for t in targets
+                    if _ts_ms(t.updated_at) > last_pulled_at
+                    and _ts_ms(t.created_at) <= last_pulled_at
                 ],
                 "deleted": [],
             },
@@ -431,7 +444,8 @@ def pull(
                 "updated": [
                     _serialize_recurring_rule(r)
                     for r in rules
-                    if _ts_ms(r.created_at) <= last_pulled_at
+                    if _ts_ms(r.updated_at) > last_pulled_at
+                    and _ts_ms(r.created_at) <= last_pulled_at
                 ],
                 "deleted": [],
             },
@@ -445,6 +459,9 @@ def pull(
 
 @router.post("/push", status_code=status.HTTP_200_OK)
 def push(
+    last_pulled_at: int = Query(
+        0, description="Unix millisecond timestamp of last successful pull"
+    ),
     body: dict[str, Any] = Body(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -460,6 +477,14 @@ def push(
             detail="Too many sync requests. Please slow down.",
         )
     user_id = str(current_user.id)
+    # `last_pulled_at` is the server_timestamp from the preceding pull.
+    # Using it as created_at for newly pushed records ensures created_at <= last_pulled_at
+    # on the next pull, so those records never re-appear in the `created` bucket.
+    push_created_at = (
+        datetime.fromtimestamp(last_pulled_at / 1000, tz=UTC)
+        if last_pulled_at > 0
+        else datetime.now(UTC)
+    )
     changes = body.get("changes", {})
 
     # ── Security pre-validation ───────────────────────────────────────────────
@@ -518,6 +543,7 @@ def push(
                     name=record["name"],
                     sort_order=int(record.get("sort_order", 0)),
                     is_hidden=bool(record.get("is_hidden", False)),
+                    created_at=push_created_at,
                 )
             )
         has_category_changes = True
@@ -553,6 +579,7 @@ def push(
                     name=record["name"],
                     sort_order=int(record.get("sort_order", 0)),
                     is_hidden=bool(record.get("is_hidden", False)),
+                    created_at=push_created_at,
                 )
             )
         has_category_changes = True
@@ -601,6 +628,7 @@ def push(
                         month=record["month"],
                         assigned=int(record.get("assigned", 0)),
                         activity=0,  # activity is server-owned; never trust client
+                        created_at=push_created_at,
                     )
                 )
         has_budget_changes = True
@@ -677,6 +705,7 @@ def push(
                     day_of_month=record.get("day_of_month"),
                     target_date=target_date_val,
                     repeats=bool(record.get("repeats", False)),
+                    created_at=push_created_at,
                 )
             )
         has_category_changes = True
@@ -747,6 +776,7 @@ def push(
                     ends_on=ends_on_val,
                     is_active=bool(record.get("is_active", True)),
                     template=record.get("template", {}),
+                    created_at=push_created_at,
                 )
             )
 
@@ -781,6 +811,7 @@ def push(
             is_split=bool(record.get("is_split", False)),
             source=TransactionSource(record.get("source", "manual")),
             recurrence_id=record.get("recurrence_id"),
+            created_at=push_created_at,
         )
         db.add(new_tx)
 
