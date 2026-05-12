@@ -302,14 +302,14 @@ def patch_transaction(
             # Account changed: undo old amount from old account, apply new amount to new account
             old_acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
             new_acct = db.query(BankAccount).filter(BankAccount.id == new_account_id_str).first()
-            if old_acct and not old_acct.is_mono_linked:
+            if old_acct:
                 old_acct.balance -= old_amount
-            if new_acct and not new_acct.is_mono_linked:
+            if new_acct:
                 new_acct.balance += new_signed
         else:
             # Same account: apply the signed delta
             acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
-            if acct and not acct.is_mono_linked:
+            if acct:
                 acct.balance += new_signed - old_amount
 
     tx.category_id = new_category_id
@@ -531,11 +531,8 @@ def create_manual_transaction(
         bm = get_or_create_budget_month(db, str(current_user.id), str(body.category_id), month_str)
         bm.activity += signed_amount
 
-    # Keep the stored balance in sync for manual (non-Mono) accounts.
-    # Mono-linked accounts derive their balance from SUM(transactions.amount)
-    # at read time, so they don't need this.
-    if not account.is_mono_linked:
-        account.balance += signed_amount
+    # Keep the stored balance in sync.
+    account.balance += signed_amount
 
     db.commit()
     db.refresh(tx)
@@ -576,9 +573,9 @@ def delete_transaction(
         bm = get_or_create_budget_month(db, str(current_user.id), str(tx.category_id), month_str)
         bm.activity -= tx.amount
 
-    # Reverse the balance adjustment on manual (non-Mono) accounts.
+    # Reverse the balance adjustment.
     acct = db.query(BankAccount).filter(BankAccount.id == str(tx.account_id)).first()
-    if acct and not acct.is_mono_linked:
+    if acct:
         acct.balance -= tx.amount
 
     db.delete(tx)

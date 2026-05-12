@@ -38,9 +38,6 @@ class BankAccount(Base):
     user_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    # Nullable — manual accounts have no Mono ID.
-    # Uniqueness is enforced by a partial index (see migration 0008).
-    mono_account_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     institution: Mapped[str] = mapped_column(Text, nullable=False)
     account_name: Mapped[str] = mapped_column(Text, nullable=False)
     # User-defined display name — always editable, overrides account_name in the UI
@@ -54,19 +51,13 @@ class BankAccount(Base):
     # Balance before our earliest imported transaction (kobo).
     # displayed_balance = starting_balance + SUM(transactions.amount)
     starting_balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
-    # Timestamp of the last manual balance update (manual accounts only)
+    # Timestamp of the last manual balance update
     balance_as_of: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Append-only JSONB audit log: [{amount, note, changed_at}, …]
     balance_adjustments: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    # Timestamp of the last bank alert processed for this account
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # True when a live Mono account_id is attached
-    is_mono_linked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    linked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    unlinked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # Preserved from last unlink; used for re-link recognition
-    previous_mono_account_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    requires_reauth: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # NULL = live; non-NULL = soft-deleted
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

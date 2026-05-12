@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Auth router — register, login, refresh, logout, verify-bvn.
+Auth router — register, login, refresh, logout.
 """
 
 from __future__ import annotations
@@ -47,8 +47,6 @@ from app.core.security import (
 from app.models.user import User
 from app.schemas.auth import (
     AccessTokenResponse,
-    BVNVerifyRequest,
-    BVNVerifyResponse,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
@@ -60,8 +58,6 @@ from app.services.budget_logic import seed_default_categories
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-BVN_NAME_MATCH_THRESHOLD = 70  # fuzzy similarity percentage
 
 
 # ── POST /auth/register ───────────────────────────────────────────────────────
@@ -233,44 +229,3 @@ async def update_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
-
-
-# ── POST /auth/verify-bvn ─────────────────────────────────────────────────────
-
-
-@router.post("/verify-bvn", response_model=BVNVerifyResponse)
-async def verify_bvn(
-    payload: BVNVerifyRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> BVNVerifyResponse:
-    if current_user.identity_verified:
-        return BVNVerifyResponse(identity_verified=True, message="Identity already verified")
-
-    # try:
-    #     bvn_data = await interswitch_client.lookup_bvn(payload.bvn)
-    # except httpx.HTTPStatusError as exc:
-    #     logger.warning("Interswitch BVN lookup failed: %s", exc.response.text)
-    #     raise HTTPException(
-    #         status_code=status.HTTP_502_BAD_GATEWAY,
-    #         detail="BVN verification service unavailable. Please try again.",
-    #     )
-
-    # # Extract name from Interswitch response
-    # bvn_first = (bvn_data.get("firstName") or "").strip()
-    # bvn_last = (bvn_data.get("lastName") or "").strip()
-    # bvn_full = f"{bvn_first} {bvn_last}".strip().lower()
-
-    # user_full = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip().lower()
-
-    # similarity = fuzz.token_sort_ratio(user_full, bvn_full)
-    # if similarity < BVN_NAME_MATCH_THRESHOLD:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    #         detail="Name on BVN does not match your registration. Please check your details.",
-    #     )
-
-    current_user.identity_verified = True
-    db.commit()
-
-    return BVNVerifyResponse(identity_verified=True, message="Identity verified successfully")

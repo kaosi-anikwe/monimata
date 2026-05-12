@@ -810,7 +810,7 @@ def push(
             )
             .first()
         )
-        if _create_acct and not _create_acct.is_mono_linked:
+        if _create_acct:
             _create_acct.balance += new_tx.amount
 
         new_tx_ids.append(record["id"])
@@ -857,14 +857,14 @@ def push(
                     .filter(BankAccount.id == _old_account_id, BankAccount.user_id == user_id)
                     .first()
                 )
-                if _old_upd_acct and not _old_upd_acct.is_mono_linked:
+                if _old_upd_acct:
                     _old_upd_acct.balance -= _old_amount
                 _new_upd_acct = (
                     db.query(BankAccount)
                     .filter(BankAccount.id == _new_account_id, BankAccount.user_id == user_id)
                     .first()
                 )
-                if _new_upd_acct and not _new_upd_acct.is_mono_linked:
+                if _new_upd_acct:
                     _new_upd_acct.balance += _new_amount
             elif _new_amount != _old_amount:
                 _upd_acct = (
@@ -872,7 +872,7 @@ def push(
                     .filter(BankAccount.id == _old_account_id, BankAccount.user_id == user_id)
                     .first()
                 )
-                if _upd_acct and not _upd_acct.is_mono_linked:
+                if _upd_acct:
                     _upd_acct.balance += _new_amount - _old_amount
 
         # Rebalance budget_months.activity when the category changes.
@@ -928,7 +928,7 @@ def push(
             .filter(BankAccount.id == tx.account_id, BankAccount.user_id == user_id)
             .first()
         )
-        if _del_acct and not _del_acct.is_mono_linked:
+        if _del_acct:
             _del_acct.balance -= tx.amount
 
         db.delete(tx)

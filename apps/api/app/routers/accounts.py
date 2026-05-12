@@ -17,23 +17,15 @@
 """
 Bank accounts router.
 
-Account lifecycle
-─────────────────
-  MANUAL (no Mono) ──link──▶ LINKED (has Mono)
-       │                           │
-       └──delete──▶ SOFT-DELETED ◀─┘
-                    (deleted_at set)
+Accounts are created manually by the user.  Transactions are added
+automatically via forwarded bank alert emails or by manual entry in the app.
 
 Endpoints
 ─────────
-  POST   /accounts/manual          Create a manual account (no BVN required)
-  POST   /accounts/connect         Link a NEW Mono account (BVN required)
+  POST   /accounts/manual          Create a manual account
   GET    /accounts                 List live (non-deleted) accounts
-  POST   /accounts/{id}/link       Link an existing manual account to Mono
-  POST   /accounts/{id}/unlink     Disconnect Mono, keep account + history
-  PATCH  /accounts/{id}/balance    Update manual balance (manual accounts only)
-  POST   /accounts/{id}/sync       Trigger Mono sync (Mono-linked accounts only)
-  GET    /accounts/{id}/sync-status
+  PATCH  /accounts/{id}/alias      Update the display alias
+  PATCH  /accounts/{id}/balance    Update manual balance
   DELETE /accounts/{id}            Soft-delete
 """
 
@@ -41,29 +33,23 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, get_verified_user
+from app.core.deps import get_current_user
 from app.models.bank_account import BankAccount
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.accounts import (
     AddManualAccountRequest,
     BankAccountResponse,
-    ConnectAccountRequest,
-    SyncStatusResponse,
     UpdateAliasRequest,
     UpdateManualBalanceRequest,
 )
-from app.services.mono_client import mono_client
-from app.worker.celery_app import CeleryTask
-from app.worker.tasks import fetch_transactions
 from app.ws_manager import notify_user
 
 logger = logging.getLogger(__name__)
@@ -104,7 +90,7 @@ async def add_manual_account(
     bank_account = BankAccount(
         user_id=current_user.id,
         institution=payload.institution,
-        account_name=payload.alias,  # placeholder until Mono overwrites it
+        account_name=payload.alias,
         alias=payload.alias,
         account_number=payload.account_number,
         bank_code=payload.bank_code,
@@ -113,7 +99,6 @@ async def add_manual_account(
         balance=payload.balance,
         starting_balance=payload.balance,
         balance_as_of=datetime.now(UTC),
-        is_mono_linked=False,
     )
     db.add(bank_account)
     db.commit()
@@ -134,8 +119,6 @@ async def add_manual_account(
             source="manual",
         )
         db.add(opening_tx)
-        # The transaction now accounts for the full opening balance; zero the
-        # anchor so it isn't double-counted if the account is later Mono-linked.
         bank_account.starting_balance = 0
         db.commit()
 
@@ -146,124 +129,10 @@ async def add_manual_account(
     return bank_account
 
 
-# ── POST /accounts/connect ────────────────────────────────────────────────────
-
-
-@router.post("/connect", response_model=BankAccountResponse, status_code=status.HTTP_201_CREATED)
-async def connect_account(
-    payload: ConnectAccountRequest,
-    current_user: User = Depends(get_verified_user),  # requires identity_verified
-    db: Session = Depends(get_db),
-) -> BankAccount:
-    """Exchange a Mono auth_code for a linked bank account.
-
-    If an account with the resolved account number already exists as a manual
-    account for this user, it is promoted to a linked account (data merged).
-    """
-    try:
-        auth_data = await mono_client.exchange_auth_code(payload.code)
-    except httpx.HTTPStatusError as exc:
-        logger.warning("Mono auth_code exchange failed: %s", exc.response.text)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not connect bank account. Please try again.",
-        )
-
-    mono_account_id: str = auth_data.get("data", {}).get("id", "")
-    if not mono_account_id:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Mono did not return an account ID",
-        )
-
-    try:
-        account_data = await mono_client.get_account(mono_account_id)
-    except httpx.HTTPStatusError:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not fetch account details from Mono",
-        )
-
-    acct_info: dict = account_data.get("data", {}).get("account", account_data)
-
-    # Check if this Mono account is already linked (cross-user conflict)
-    existing_mono = (
-        db.query(BankAccount).filter(BankAccount.mono_account_id == mono_account_id).first()
-    )
-    if existing_mono:
-        if existing_mono.user_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="This bank account is already linked to another user",
-            )
-        # Re-activate if the account exists but was unlinked
-        existing_mono.is_mono_linked = True
-        existing_mono.is_active = True
-        existing_mono.linked_at = existing_mono.linked_at or datetime.now(UTC)
-        existing_mono.unlinked_at = None
-        db.commit()
-        db.refresh(existing_mono)
-        cast(CeleryTask, fetch_transactions).delay(mono_account_id)
-        return existing_mono
-
-    mono_account_number: str = acct_info.get("account_number", "")
-
-    # Check for a manual account to merge into
-    manual_match: BankAccount | None = None
-    if mono_account_number:
-        manual_match = (
-            db.query(BankAccount)
-            .filter(
-                BankAccount.user_id == current_user.id,
-                BankAccount.account_number == mono_account_number,
-                ~BankAccount.is_mono_linked,
-                BankAccount.deleted_at.is_(None),
-            )
-            .first()
-        )
-
-    now = datetime.now(UTC)
-
-    if manual_match:
-        # Promote the existing manual account with Mono data.
-        # account_name is overwritten by Mono; alias stays as the user set it.
-        manual_match.mono_account_id = mono_account_id
-        manual_match.institution = acct_info.get("institution", {}).get(
-            "name", manual_match.institution
-        )
-        manual_match.account_name = acct_info.get("name", manual_match.account_name)
-        manual_match.account_type = acct_info.get("type", manual_match.account_type).upper()
-        manual_match.currency = acct_info.get("currency", manual_match.currency)
-        manual_match.balance = int(acct_info.get("balance", manual_match.balance))
-        manual_match.is_mono_linked = True
-        manual_match.is_active = True
-        manual_match.linked_at = now
-        manual_match.unlinked_at = None
-        db.commit()
-        db.refresh(manual_match)
-        cast(CeleryTask, fetch_transactions).delay(mono_account_id)
-        return manual_match
-
-    bank_account = BankAccount(
-        user_id=current_user.id,
-        mono_account_id=mono_account_id,
-        institution=acct_info.get("institution", {}).get("name", "Unknown Bank"),
-        account_name=acct_info.get("name", ""),
-        account_number=mono_account_number or None,
-        account_type=acct_info.get("type", "SAVINGS").upper(),
-        currency=acct_info.get("currency", "NGN"),
-        balance=int(acct_info.get("balance", 0)),
-        is_mono_linked=True,
-        linked_at=now,
-    )
-    db.add(bank_account)
-    db.commit()
-    db.refresh(bank_account)
-    cast(CeleryTask, fetch_transactions).delay(mono_account_id)
-    return bank_account
-
-
 # ── GET /accounts ─────────────────────────────────────────────────────────────
+
+
+
 
 
 @router.get("", response_model=list[BankAccountResponse])
@@ -282,18 +151,15 @@ def list_accounts(
 
     result: list[BankAccountResponse] = []
     for acct in accounts:
-        if acct.is_mono_linked:
-            # For Mono-linked accounts, compute balance from transactions
-            computed_balance: int = acct.starting_balance + (
-                db.query(func.sum(Transaction.amount))
-                .filter(Transaction.account_id == acct.id)
-                .scalar()
-                or 0
-            )
-        else:
-            # Manual accounts: balance field is the source of truth
-            computed_balance = acct.balance
-
+        # Balance = starting_balance + sum of all transactions for the account.
+        # The starting_balance anchor is set to 0 when an opening transaction is
+        # created, so this formula works for both new and existing accounts.
+        computed_balance: int = acct.starting_balance + (
+            db.query(func.sum(Transaction.amount))
+            .filter(Transaction.account_id == acct.id)
+            .scalar()
+            or 0
+        )
         resp = BankAccountResponse.model_validate(acct)
         resp.balance = int(computed_balance)
         result.append(resp)
@@ -301,120 +167,10 @@ def list_accounts(
     return result
 
 
-# ── POST /accounts/{id}/link ──────────────────────────────────────────────────
-
-
-@router.post("/{account_id}/link", response_model=BankAccountResponse)
-async def link_account(
-    account_id: str,
-    payload: ConnectAccountRequest,
-    current_user: User = Depends(get_verified_user),
-    db: Session = Depends(get_db),
-) -> BankAccount:
-    """Link an existing manual account to Mono using a fresh auth_code."""
-    account = _get_live_account_or_404(db, account_id, current_user.id)
-
-    if account.is_mono_linked:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This account is already linked to Mono.",
-        )
-
-    try:
-        auth_data = await mono_client.exchange_auth_code(payload.code)
-    except httpx.HTTPStatusError as exc:
-        logger.warning("Mono auth_code exchange failed: %s", exc.response.text)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not connect bank account. Please try again.",
-        )
-
-    mono_account_id: str = auth_data.get("data", {}).get("id", "")
-    if not mono_account_id:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Mono did not return an account ID",
-        )
-
-    # Conflict: another account already owns this Mono ID
-    conflict = (
-        db.query(BankAccount)
-        .filter(
-            BankAccount.mono_account_id == mono_account_id,
-            BankAccount.id != account_id,
-        )
-        .first()
-    )
-    if conflict:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This bank account is already linked to another entry.",
-        )
-
-    try:
-        account_data = await mono_client.get_account(mono_account_id)
-    except httpx.HTTPStatusError:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not fetch account details from Mono",
-        )
-
-    acct_info: dict = account_data.get("data", {}).get("account", account_data)
-    now = datetime.now(UTC)
-
-    account.mono_account_id = mono_account_id
-    account.institution = acct_info.get("institution", {}).get("name", account.institution)
-    # Mono overwrites account_name; alias is preserved as the user-facing display name
-    account.account_name = acct_info.get("name", account.account_name)
-    account.account_type = acct_info.get("type", account.account_type).upper()
-    account.balance = int(acct_info.get("balance", account.balance))
-    account.is_mono_linked = True
-    account.is_active = True
-    account.linked_at = now
-    account.unlinked_at = None
-
-    db.commit()
-    db.refresh(account)
-    cast(CeleryTask, fetch_transactions).delay(mono_account_id)
-    return account
-
-
-# ── POST /accounts/{id}/unlink ────────────────────────────────────────────────
-
-
-@router.post("/{account_id}/unlink", response_model=BankAccountResponse)
-async def unlink_account(
-    account_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> BankAccount:
-    """Disconnect Mono from the account. Account and transaction history are kept."""
-    account = _get_live_account_or_404(db, account_id, current_user.id)
-
-    if not account.is_mono_linked or not account.mono_account_id:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Account is not linked to Mono.",
-        )
-
-    try:
-        await mono_client.unlink_account(account.mono_account_id)
-    except httpx.HTTPStatusError as exc:
-        # Log but proceed — local state must still be updated even if Mono call fails
-        logger.warning("Mono unlink call failed for account=%s: %s", account_id, exc.response.text)
-
-    now = datetime.now(UTC)
-    account.previous_mono_account_id = account.mono_account_id
-    account.mono_account_id = None
-    account.is_mono_linked = False
-    account.unlinked_at = now
-
-    db.commit()
-    db.refresh(account)
-    return account
-
-
 # ── PATCH /accounts/{id}/alias ───────────────────────────────────────────────
+
+
+
 
 
 @router.patch("/{account_id}/alias", response_model=BankAccountResponse)
@@ -444,12 +200,6 @@ def update_manual_balance(
 ) -> BankAccount:
     """Update the balance of a manual account and append an audit entry."""
     account = _get_live_account_or_404(db, account_id, current_user.id)
-
-    if account.is_mono_linked:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Balance cannot be edited on Mono-linked accounts.",
-        )
 
     now = datetime.now(UTC)
     audit_entry: dict[str, Any] = {
@@ -483,45 +233,6 @@ def delete_account(
     account = _get_live_account_or_404(db, account_id, current_user.id)
     account.deleted_at = datetime.now(UTC)
     db.commit()
-
-
-# ── POST /accounts/{id}/sync ──────────────────────────────────────────────────
-
-
-@router.post("/{account_id}/sync", status_code=status.HTTP_202_ACCEPTED)
-async def trigger_sync(
-    account_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> dict:
-    account = _get_live_account_or_404(db, account_id, current_user.id)
-
-    if not account.is_mono_linked or not account.mono_account_id:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Sync is only available for Mono-linked accounts.",
-        )
-
-    try:
-        await mono_client.trigger_sync(account.mono_account_id)
-    except httpx.HTTPStatusError:
-        pass  # Mono may return 4xx for accounts that don't support manual sync
-
-    cast(CeleryTask, fetch_transactions).delay(account.mono_account_id)
-    return {"status": "syncing"}
-
-
-# ── GET /accounts/{id}/sync-status ────────────────────────────────────────────
-
-
-@router.get("/{account_id}/sync-status", response_model=SyncStatusResponse)
-def sync_status(
-    account_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> SyncStatusResponse:
-    account = _get_live_account_or_404(db, account_id, current_user.id)
-    return SyncStatusResponse(syncing=False, last_synced_at=account.last_synced_at)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
