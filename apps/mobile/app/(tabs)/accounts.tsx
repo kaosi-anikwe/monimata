@@ -79,7 +79,6 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
   const { error } = useToast();
   const [alias, setAlias] = useState('');
   const [institution, setInstitution] = useState('');
-  const [bankCode, setBankCode] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountType, setAccountType] = useState<'SAVINGS' | 'CURRENT'>('SAVINGS');
   const [balance, setBalance] = useState('');
@@ -87,7 +86,6 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
   function reset() {
     setAlias('');
     setInstitution('');
-    setBankCode('');
     setAccountNumber('');
     setAccountType('SAVINGS');
     setBalance('');
@@ -99,14 +97,13 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
   }
 
   function handleSubmit() {
-    if (!alias.trim() || !institution.trim() || !bankCode.trim() || accountNumber.length !== 10) {
+    if (!alias.trim() || !institution.trim() || accountNumber.length !== 10) {
       error('Missing details', 'Please fill in all required fields. Account number must be 10 digits.');
       return;
     }
     const payload: AddManualAccountPayload = {
       alias: alias.trim(),
       institution: institution.trim(),
-      bank_code: bankCode.trim(),
       account_number: accountNumber.trim(),
       account_type: accountType,
       balance: balance ? Math.round(parseFloat(balance) * 100) : 0,
@@ -131,15 +128,6 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
           onChangeText={setInstitution}
           placeholder="e.g. First Bank"
           accessibilityLabel="Bank name"
-        />
-        <Input
-          label="CBN Bank Code *"
-          value={bankCode}
-          onChangeText={setBankCode}
-          placeholder="e.g. 011"
-          keyboardType="number-pad"
-          maxLength={6}
-          accessibilityLabel="CBN bank code"
         />
         <Input
           label="Account Number *"
