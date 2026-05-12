@@ -425,6 +425,3 @@ def evaluate_transaction_nudges(db, tx: Transaction) -> None:
             },
             category_id=tx.category_id,
         )
-
-
-

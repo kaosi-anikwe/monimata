@@ -77,10 +77,7 @@ def upgrade() -> None:
 
     # ── 3. transactions.source: VARCHAR → PostgreSQL ENUM ────────────────────
     # Refresh column info after the drops above.
-    col_types = {
-        c["name"]: str(c["type"])
-        for c in inspector.get_columns("transactions")
-    }
+    col_types = {c["name"]: str(c["type"]) for c in inspector.get_columns("transactions")}
     if "VARCHAR" in col_types.get("source", "VARCHAR").upper():
         _source_enum_create = PG_ENUM("bank_alert", "manual", name="transactionsource")
         _source_enum_create.create(op.get_bind(), checkfirst=True)
@@ -99,15 +96,18 @@ def upgrade() -> None:
             "USING source::transactionsource"
         )
         op.execute(
-            "ALTER TABLE transactions "
-            "ALTER COLUMN source SET DEFAULT 'manual'::transactionsource"
+            "ALTER TABLE transactions ALTER COLUMN source SET DEFAULT 'manual'::transactionsource"
         )
 
     # ── 4. bank_accounts: drop Mono lifecycle columns (may already be gone) ───
     ba_cols = {c["name"] for c in inspector.get_columns("bank_accounts")}
     mono_ba_cols = {
-        "mono_account_id", "is_mono_linked", "linked_at",
-        "unlinked_at", "previous_mono_account_id", "requires_reauth",
+        "mono_account_id",
+        "is_mono_linked",
+        "linked_at",
+        "unlinked_at",
+        "previous_mono_account_id",
+        "requires_reauth",
     }
     cols_to_drop = mono_ba_cols & ba_cols
     if cols_to_drop:
@@ -119,25 +119,29 @@ def upgrade() -> None:
 def downgrade() -> None:
     # ── 4. Restore bank_accounts Mono columns ─────────────────────────────────
     with op.batch_alter_table("bank_accounts") as batch_op:
-        batch_op.add_column(sa.Column("requires_reauth", sa.Boolean(), nullable=False, server_default="false"))
+        batch_op.add_column(
+            sa.Column("requires_reauth", sa.Boolean(), nullable=False, server_default="false")
+        )
         batch_op.add_column(sa.Column("previous_mono_account_id", sa.Text(), nullable=True))
         batch_op.add_column(sa.Column("unlinked_at", sa.DateTime(timezone=True), nullable=True))
         batch_op.add_column(sa.Column("linked_at", sa.DateTime(timezone=True), nullable=True))
-        batch_op.add_column(sa.Column("is_mono_linked", sa.Boolean(), nullable=False, server_default="false"))
+        batch_op.add_column(
+            sa.Column("is_mono_linked", sa.Boolean(), nullable=False, server_default="false")
+        )
         batch_op.add_column(sa.Column("mono_account_id", sa.Text(), nullable=True))
 
     # ── 3. transactions.source: ENUM → VARCHAR ────────────────────────────────
     op.execute(
-        "ALTER TABLE transactions "
-        "ALTER COLUMN source TYPE VARCHAR(20) "
-        "USING source::VARCHAR"
+        "ALTER TABLE transactions ALTER COLUMN source TYPE VARCHAR(20) USING source::VARCHAR"
     )
     op.execute("ALTER TABLE transactions ALTER COLUMN source SET DEFAULT 'mono'")
     _source_enum.drop(op.get_bind(), checkfirst=True)
 
     # ── 2. Restore transactions columns ───────────────────────────────────────
     with op.batch_alter_table("transactions") as batch_op:
-        batch_op.add_column(sa.Column("is_manual", sa.Boolean(), nullable=False, server_default="false"))
+        batch_op.add_column(
+            sa.Column("is_manual", sa.Boolean(), nullable=False, server_default="false")
+        )
         batch_op.add_column(sa.Column("interswitch_ref", sa.Text(), nullable=True))
         batch_op.add_column(sa.Column("mono_id", sa.Text(), nullable=True))
 

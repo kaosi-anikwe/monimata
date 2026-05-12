@@ -130,9 +130,6 @@ async def add_manual_account(
 # ── GET /accounts ─────────────────────────────────────────────────────────────
 
 
-
-
-
 @router.get("", response_model=list[BankAccountResponse])
 def list_accounts(
     current_user: User = Depends(get_current_user),
@@ -166,9 +163,6 @@ def list_accounts(
 
 
 # ── PATCH /accounts/{id}/alias ───────────────────────────────────────────────
-
-
-
 
 
 @router.patch("/{account_id}/alias", response_model=BankAccountResponse)
