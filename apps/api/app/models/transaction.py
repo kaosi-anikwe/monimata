@@ -18,12 +18,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.database import Base
 from app.models.bank_account import BankAccount
 from app.models.category import Category
 from app.models.user import User
@@ -31,7 +34,10 @@ from app.models.user import User
 if TYPE_CHECKING:
     from app.models.recurring_rule import RecurringRule
 
-from app.core.database import Base
+
+class TransactionSource(StrEnum):
+    bank_alert = "bank_alert"
+    manual = "manual"
 
 
 class Transaction(Base):
@@ -46,7 +52,6 @@ class Transaction(Base):
     account_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), ForeignKey("bank_accounts.id"), nullable=False
     )
-    mono_id: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     amount: Mapped[int] = mapped_column(
         BigInteger, nullable=False
@@ -59,11 +64,16 @@ class Transaction(Base):
     )
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_split: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    source: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="mono"
-    )  # "mono" | "interswitch" | "manual"
-    interswitch_ref: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
+    # All transactions are editable regardless of source.
+    source: Mapped[TransactionSource] = mapped_column(
+        SAEnum(
+            TransactionSource,
+            values_callable=lambda e: [i.value for i in e],
+            name="transactionsource",
+        ),
+        nullable=False,
+        default=TransactionSource.manual,
+    )
     recurrence_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("recurring_rules.id", ondelete="SET NULL"),
