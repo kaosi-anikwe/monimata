@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import re
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, field_validator
@@ -24,6 +25,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
+    username: str
     first_name: str | None = None
     last_name: str | None = None
     phone: str | None = None
@@ -33,6 +35,17 @@ class RegisterRequest(BaseModel):
     def password_strength(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
+        return v
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        v = v.lower().strip()
+        if not re.match(r"^[a-z0-9_-]{3,30}$", v):
+            raise ValueError(
+                "Username must be 3–30 characters and contain only lowercase letters, "
+                "digits, hyphens, and underscores"
+            )
         return v
 
 
@@ -51,6 +64,22 @@ class UpdateProfileRequest(BaseModel):
     phone: str | None = None
     email: EmailStr | None = None
     onboarded: bool | None = None
+    username: str | None = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        import re
+
+        v = v.lower().strip()
+        if not re.match(r"^[a-z0-9_-]{3,30}$", v):
+            raise ValueError(
+                "Username must be 3–30 characters and contain only lowercase letters, "
+                "digits, hyphens, and underscores"
+            )
+        return v
 
 
 # ── Response schemas ──────────────────────────────────────────────────────────
@@ -71,6 +100,7 @@ class AccessTokenResponse(BaseModel):
 class UserResponse(BaseModel):
     id: str
     email: str
+    username: str | None
     first_name: str | None
     last_name: str | None
     phone: str | None

@@ -21,7 +21,6 @@ from pydantic import BaseModel, Field
 
 class AddManualAccountRequest(BaseModel):
     institution: str
-    bank_code: str  # CBN institution code, e.g. "058"
     account_number: str = Field(min_length=10, max_length=10, pattern=r"^\d{10}$")
     alias: str  # user-defined display name
     account_type: str = "SAVINGS"  # "SAVINGS" | "CURRENT"
@@ -45,7 +44,6 @@ class BankAccountResponse(BaseModel):
     account_name: str
     alias: str | None = None
     account_number: str | None = None
-    bank_code: str | None = None
     account_type: str
     currency: str
     balance: int  # kobo

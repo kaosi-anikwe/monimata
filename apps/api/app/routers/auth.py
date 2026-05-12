@@ -67,6 +67,7 @@ router = APIRouter()
 async def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
     user = User(
         email=payload.email.lower(),
+        username=payload.username,
         password_hash=hash_password(payload.password),
         first_name=payload.first_name,
         last_name=payload.last_name,
@@ -215,6 +216,14 @@ async def update_profile(
         current_user.phone = payload.phone
     if payload.onboarded is not None:
         current_user.onboarded = payload.onboarded
+    if payload.username is not None:
+        existing = db.query(User).filter(User.username == payload.username).first()
+        if existing and existing.id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already taken",
+            )
+        current_user.username = payload.username
     if payload.email is not None:
         new_email = payload.email.lower()
         if new_email != current_user.email:
@@ -229,3 +238,23 @@ async def update_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+# ── GET /auth/check-username ──────────────────────────────────────────────────
+
+
+@router.get("/check-username")
+async def check_username(username: str, db: Session = Depends(get_db)) -> dict[str, bool]:
+    """
+    Real-time uniqueness check for use during signup.
+    Returns {"available": true} when the username is valid and not yet taken.
+    No authentication required — called as the user types.
+    Rate-limited by the API gateway / Nginx upstream.
+    """
+    import re
+
+    username = username.lower().strip()
+    if not re.match(r"^[a-z0-9_-]{3,30}$", username):
+        return {"available": False}
+    taken = db.query(User.id).filter(User.username == username).first() is not None
+    return {"available": not taken}
