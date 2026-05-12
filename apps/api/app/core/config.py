@@ -31,10 +31,11 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8081"]
 
     # ── JWT ───────────────────────────────────────────────────────────────────
-    # RS256 keys — generate with: openssl genrsa -out private.pem 2048
-    #              openssl rsa -in private.pem -pubout -out public.pem
-    JWT_PRIVATE_KEY: str = ""
-    JWT_PUBLIC_KEY: str = ""
+    # RS256 keys stored as base64-encoded PEM.
+    # Generate with the snippet in docs/DEPLOYMENT.md §4.3.
+    # Leave both empty to fall back to HS256 (development only).
+    JWT_PRIVATE_KEY: str = ""  # base64-encoded PKCS8 private key
+    JWT_PUBLIC_KEY: str = ""  # base64-encoded public key
     JWT_ALGORITHM: str = "RS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
