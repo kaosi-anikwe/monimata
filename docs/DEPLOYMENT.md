@@ -149,22 +149,20 @@ LOG_DIR=/srv/monimata/logs/api
 ### 4.2 Generate RS256 JWT keys
 
 ```bash
-# Run on the server as the monimata user
-openssl genrsa -out /srv/monimata/private.pem 2048
-openssl rsa -in /srv/monimata/private.pem -pubout -out /srv/monimata/public.pem
-chmod 600 /srv/monimata/private.pem
+sudo -u monimata /srv/monimata/app/apps/api/.venv/bin/python3 -c "
+import base64
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
-# View the keys to copy into .env (escape newlines as \n)
-cat /srv/monimata/private.pem
-cat /srv/monimata/public.pem
+key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+priv = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+pub  = key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+print('JWT_PRIVATE_KEY=' + base64.b64encode(priv).decode())
+print('JWT_PUBLIC_KEY='  + base64.b64encode(pub).decode())
+"
 ```
 
-When pasting PEM keys into `.env`, replace literal newlines with `\n`:
-
-```bash
-# Helper: print key with \n on one line
-awk 'NF {ORS="\\n"; print}' /srv/monimata/private.pem
-```
+Paste the two printed lines directly into `.env`. The values are base64-encoded PEM — no multiline escaping needed.
 
 ### 4.3 Generate the AES encryption key
 

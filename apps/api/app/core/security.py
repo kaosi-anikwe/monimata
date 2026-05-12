@@ -56,16 +56,20 @@ def verify_password(plain: str, hashed: str) -> bool:
 # ── JWT ───────────────────────────────────────────────────────────────────────
 
 
-def _jwt_encode_key() -> str | dict:
-    """Return the signing key. RS256 preferred; falls back to HS256 secret."""
+def _decode_pem(b64_value: str) -> str:
+    """Decode a base64-encoded PEM string into the raw PEM text."""
+    return base64.b64decode(b64_value).decode()
+
+
+def _jwt_encode_key() -> str:
     if settings.JWT_PRIVATE_KEY:
-        return settings.JWT_PRIVATE_KEY.replace("\\n", "\n")
+        return _decode_pem(settings.JWT_PRIVATE_KEY)
     return settings.SECRET_KEY
 
 
-def _jwt_decode_key() -> str | dict:
-    if settings.JWT_PUBLIC_KEY:
-        return settings.JWT_PUBLIC_KEY.replace("\\n", "\n")
+def _jwt_decode_key() -> str:
+    if settings.JWT_PRIVATE_KEY:
+        return _decode_pem(settings.JWT_PUBLIC_KEY)
     return settings.SECRET_KEY
 
 

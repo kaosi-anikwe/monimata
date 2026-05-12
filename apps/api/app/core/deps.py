@@ -23,6 +23,7 @@ from __future__ import annotations
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
+from jose.exceptions import JWKError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -40,7 +41,7 @@ def get_current_user(
     try:
         payload = decode_access_token(token)
         user_id: str = payload["sub"]
-    except (JWTError, KeyError):
+    except (JWTError, JWKError, KeyError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
