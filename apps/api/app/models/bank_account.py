@@ -44,7 +44,6 @@ class BankAccount(Base):
     alias: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Full 10-digit NUBAN, stored AES-256-GCM encrypted
     account_number: Mapped[str | None] = mapped_column(Text, nullable=True)
-    bank_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     account_type: Mapped[str] = mapped_column(String(20), nullable=False)  # "SAVINGS" | "CURRENT"
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="NGN")
     balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)  # kobo

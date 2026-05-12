@@ -50,6 +50,11 @@ class User(Base):
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    # Unique handle — becomes the local part of the alert email <username>@moni-mata.ng.
+    # Lowercase letters, digits, hyphens and underscores only; 3–30 chars.
+    username: Mapped[str] = mapped_column(
+        Text, unique=True, nullable=True
+    )  # NULL until user sets it during onboarding
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     first_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_name: Mapped[str | None] = mapped_column(Text, nullable=True)
