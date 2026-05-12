@@ -116,12 +116,13 @@ MoniMata is a **cloud-primary, device-cached** system. Financial records are aut
 
 ### Monorepo
 
-| Tool         | Purpose                            |
-| ------------ | ---------------------------------- |
-| Nx 18        | Task orchestration, caching        |
-| TypeScript 5 | Shared types (`libs/shared-types`) |
-| uv           | Python package manager (backend)   |
-| pre-commit   | Git hook runner (ruff lint/format) |
+| Tool                 | Purpose                                           |
+| -------------------- | ------------------------------------------------- |
+| Nx 18                | Task orchestration, caching                       |
+| TypeScript 5         | Shared types (`libs/shared-types`)                |
+| openapi-typescript 6 | Generates TS types from FastAPI's `/openapi.json` |
+| uv                   | Python package manager (backend)                  |
+| pre-commit           | Git hook runner (ruff lint/format)                |
 
 ---
 
@@ -200,6 +201,21 @@ celery -A app.worker.celery_app beat -l info
 ```
 
 The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+
+### Shared Types
+
+`libs/shared-types` is the single source of truth for TypeScript types shared across the mobile app and any TS tooling. Hand-written domain types live in `src/index.ts`. Auto-generated API types (mirroring FastAPI's Pydantic schemas) live in `src/api.ts` — never edit that file manually.
+
+To regenerate after a backend schema change (requires the API server running on `localhost:8000`):
+
+```bash
+# From the monorepo root
+npm run generate:types
+
+# Then commit the updated libs/shared-types/src/api.ts
+git add libs/shared-types/src/api.ts
+git commit -m "chore: regenerate shared types"
+```
 
 ### Mobile
 

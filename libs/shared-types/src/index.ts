@@ -15,7 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 /**
  * Shared TypeScript interfaces used by both the mobile app and any TS tooling.
+ *
+ * Hand-written types live in this file.
+ * Auto-generated API types (from FastAPI's OpenAPI spec) live in ./api.ts —
+ * run `npm run generate:types` from the monorepo root to regenerate them.
  */
+
+export * from './api';
 
 export interface User {
   id: string;

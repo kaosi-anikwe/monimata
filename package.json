@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "api": "nx serve api",
-    "mobile": "nx start mobile"
+    "mobile": "nx start mobile",
+    "generate:types": "npm run generate -w @monimata/shared-types"
   },
   "devDependencies": {
     "@nx/js": "^18.0.0",
