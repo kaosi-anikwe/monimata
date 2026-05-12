@@ -22,6 +22,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.models.transaction import TransactionSource
+
 
 class TransactionSplitResponse(BaseModel):
     id: UUID
@@ -35,7 +37,6 @@ class TransactionSplitResponse(BaseModel):
 class TransactionResponse(BaseModel):
     id: UUID
     account_id: UUID
-    mono_id: str | None
     date: datetime
     amount: int  # kobo — negative = debit, positive = credit
     narration: str
@@ -44,8 +45,7 @@ class TransactionResponse(BaseModel):
     category_id: UUID | None
     memo: str | None
     is_split: bool
-    is_manual: bool
-    source: str
+    source: TransactionSource
     recurrence_id: UUID | None
     splits: list[TransactionSplitResponse]
     created_at: datetime
@@ -65,16 +65,11 @@ class TransactionListResponse(BaseModel):
 
 class TransactionPatchRequest(BaseModel):
     """
-    Patch a transaction.
-
-    category_id and memo apply to all transactions.
-    type / amount / narration / date / account_id only apply to manual
-    transactions (silently ignored for Mono/Interswitch imports).
+    Patch a transaction.  All fields are editable regardless of source.
     """
 
     category_id: UUID | None = None
     memo: str | None = None
-    # ── Manual transactions only ──────────────────────────────────────────────
     type: Literal["debit", "credit"] | None = None
     amount: int | None = None  # kobo, positive — sign derived from type
     narration: str | None = None

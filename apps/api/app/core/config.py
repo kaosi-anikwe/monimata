@@ -42,57 +42,6 @@ class Settings(BaseSettings):
     # Fallback HS256 secret for development (used only when RS256 keys are absent)
     SECRET_KEY: str = "change-me-in-production"
 
-    # ── Mono ──────────────────────────────────────────────────────────────────
-    MONO_SECRET_KEY: str = ""
-    MONO_WEBHOOK_SECRET: str = ""
-    MONO_BASE_URL: str = "https://api.withmono.com/v2"
-
-    # ── Interswitch ───────────────────────────────────────────────────────────
-    INTERSWITCH_CLIENT_ID: str = ""
-    INTERSWITCH_CLIENT_SECRET: str = ""
-    INTERSWITCH_ENV: str = "sandbox"  # "sandbox" | "production"
-
-    # Our own Quickteller Business credentials — used exclusively for the
-    # Web Checkout Collections re-query (verify_web_payment).  All other
-    # Interswitch calls use the test credentials above (provided by ISW devs).
-    INTERSWITCH_OWN_CLIENT_ID: str = ""
-    INTERSWITCH_OWN_CLIENT_SECRET: str = ""
-
-    INTERSWITCH_BASE_URL: str = (
-        "https://api-marketplace-routing.k8.isw.la/marketplace-routing/api/v1"
-    )
-
-    # INTERSWITCH_PASSPORT_URL: str = "https://passport-v2.k8.isw.la"
-    INTERSWITCH_PASSPORT_URL: str = "https://apps.qa.interswitchng.com"
-    INTERSWITCH_OWN_PASSPORT_URL: str = "https://qa.interswitchng.com"
-
-    # Quickteller bill-payment API (sandbox vs production base URLs differ).
-    # Sandbox:    https://qa.interswitchng.com/quicktellerservice/api/v5
-    # Production: https://api.interswitchng.com/quickteller/api/v5
-    INTERSWITCH_QUICKTELLER_URL: str = "https://qa.interswitchng.com/quicktellerservice/api/v5"
-    # TerminalId assigned by Interswitch during onboarding; default is the
-    # public sandbox terminal used in Interswitch's own documentation examples.
-    INTERSWITCH_TERMINAL_ID: str = "3pbl0001"
-
-    # ── Interswitch Web Checkout (Phase 2) ────────────────────────────────────
-    # Sandbox:    https://newwebpay.qa.interswitchng.com/collections/w/pay
-    # Production: https://newwebpay.interswitchng.com/collections/w/pay
-    INTERSWITCH_WEB_CHECKOUT_URL: str = "https://newwebpay.qa.interswitchng.com/collections/w/pay"
-    # Collections re-query endpoint used to verify a completed Web Checkout.
-    # Sandbox:    https://qa.interswitchng.com/collections/api/v1
-    # Production: https://api.interswitchng.com/collections/api/v1
-    INTERSWITCH_COLLECTIONS_URL: str = "https://qa.interswitchng.com/collections/api/v1"
-    # Merchant code issued during Quickteller Business onboarding.
-    INTERSWITCH_MERCHANT_CODE: str = ""
-    # The single generic "Bill Payment" pay item registered on the
-    # Quickteller Business Dashboard (not per-biller).
-    INTERSWITCH_PAY_ITEM_ID: str = ""
-
-    # ── Interswitch webhook security ──────────────────────────────────────────
-    # Secret used to verify the HMAC-SHA512 signature on ISW webhook events.
-    # Set this to the value configured in the Interswitch Developer Console.
-    INTERSWITCH_WEBHOOK_SECRET: str = ""
-
     # ── AI / LLM ──────────────────────────────────────────────────────────────
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""

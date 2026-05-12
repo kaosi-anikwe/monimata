@@ -19,10 +19,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class ConnectAccountRequest(BaseModel):
-    code: str  # one-time auth_code from Mono Connect SDK
-
-
 class AddManualAccountRequest(BaseModel):
     institution: str
     bank_code: str  # CBN institution code, e.g. "058"
@@ -55,17 +51,8 @@ class BankAccountResponse(BaseModel):
     balance: int  # kobo
     balance_as_of: datetime | None = None
     last_synced_at: datetime | None = None
-    is_mono_linked: bool
-    linked_at: datetime | None = None
-    unlinked_at: datetime | None = None
     is_active: bool
-    requires_reauth: bool
     deleted_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-class SyncStatusResponse(BaseModel):
-    syncing: bool
-    last_synced_at: datetime | None
