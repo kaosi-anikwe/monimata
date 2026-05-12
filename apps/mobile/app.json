@@ -2,13 +2,13 @@
   "expo": {
     "name": "MoniMata",
     "slug": "monimata-mobile",
-    "version": "1.0.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "scheme": "monimata-mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ng.com.monimata",
+      "bundleIdentifier": "ng.monimata",
       "icon": {
         "light": "./assets/icons/ios-light.png",
         "dark": "./assets/icons/ios-dark.png",
@@ -29,7 +29,7 @@
         "android.permission.USE_FINGERPRINT"
       ],
       "softwareKeyboardLayoutMode": "pan",
-      "package": "ng.com.monimata",
+      "package": "ng.monimata",
       "googleServicesFile": "google-services.json"
     },
     "web": {
