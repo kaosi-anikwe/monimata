@@ -57,7 +57,7 @@ from app.models.budget import BudgetMonth
 from app.models.category import Category, CategoryGroup
 from app.models.recurring_rule import RecurringRule
 from app.models.target import CategoryTarget
-from app.models.transaction import Transaction
+from app.models.transaction import Transaction, TransactionSource
 from app.models.user import User
 from app.services.budget_logic import get_or_create_budget_month
 from app.ws_manager import notify_user
@@ -80,7 +80,6 @@ def _serialize_transaction(tx: Transaction) -> dict[str, Any]:
         "id": str(tx.id),
         "account_id": str(tx.account_id),
         "user_id": str(tx.user_id),
-        "mono_id": tx.mono_id,
         "date": _ts_ms(tx.date) if tx.date else None,
         "amount": tx.amount,
         "narration": tx.narration,
@@ -89,8 +88,7 @@ def _serialize_transaction(tx: Transaction) -> dict[str, Any]:
         "category_id": str(tx.category_id) if tx.category_id else None,
         "memo": tx.memo,
         "is_split": tx.is_split,
-        "is_manual": tx.is_manual,
-        "source": tx.source,
+        "source": tx.source.value if isinstance(tx.source, TransactionSource) else tx.source,
         "recurrence_id": str(tx.recurrence_id) if tx.recurrence_id else None,
         "created_at": _ts_ms(tx.created_at),
         "updated_at": _ts_ms(tx.updated_at),
@@ -232,8 +230,7 @@ def _generate_recurring_transactions(db: Session, user_id: str, today: date) -> 
                 type=tmpl.get("type", "debit"),
                 category_id=tmpl.get("category_id"),
                 memo=tmpl.get("memo"),
-                is_manual=True,
-                source="manual",
+                source=TransactionSource.manual,
                 recurrence_id=str(rule.id),
             )
             db.add(tx)
@@ -766,11 +763,6 @@ def push(
     tx_changes = changes.get("transactions", {})
 
     for record in tx_changes.get("created", []):
-        # Only manual transactions may be created from the client.
-        if not record.get("is_manual"):
-            logger.warning("Rejected push-create of non-manual transaction id=%s", record.get("id"))
-            continue
-
         tx_existing = db.query(Transaction).filter(Transaction.id == record["id"]).first()
         if tx_existing:
             continue  # idempotent duplicate push
@@ -786,9 +778,8 @@ def push(
             type=record.get("type", "debit"),
             category_id=record.get("category_id"),
             memo=record.get("memo"),
-            is_manual=True,
             is_split=bool(record.get("is_split", False)),
-            source="manual",
+            source=TransactionSource(record.get("source", "manual")),
             recurrence_id=record.get("recurrence_id"),
         )
         db.add(new_tx)
@@ -799,9 +790,7 @@ def push(
             bm.activity += new_tx.amount
             has_budget_changes = True
 
-        # Keep account.balance in sync for manual (non-Mono) accounts.
-        # Mono-linked accounts derive their balance from SUM(transactions) at
-        # read time, so they must not have balance mutated here.
+        # Keep account.balance in sync.
         _create_acct = (
             db.query(BankAccount)
             .filter(
@@ -810,7 +799,7 @@ def push(
             )
             .first()
         )
-        if _create_acct and not _create_acct.is_mono_linked:
+        if _create_acct:
             _create_acct.balance += new_tx.amount
 
         new_tx_ids.append(record["id"])
@@ -831,49 +820,47 @@ def push(
             )
             continue
 
-        # Manual transactions: all mutable fields are editable.
-        # Mono/Interswitch transactions: only category_id and memo.
-        if tx.is_manual:
-            _old_amount = tx.amount
-            _old_account_id = str(tx.account_id)
+        # All fields are editable — the user may correct bank-alert transactions.
+        _old_amount = tx.amount
+        _old_account_id = str(tx.account_id)
 
-            if "type" in record:
-                tx.type = record["type"]
-            if "date" in record:
-                tx.date = datetime.fromtimestamp(record["date"] / 1000, tz=UTC)
-            if "account_id" in record:
-                tx.account_id = record["account_id"]
-            if "narration" in record:
-                tx.narration = record["narration"]
-            if "amount" in record:
-                tx.amount = int(record["amount"])
+        if "type" in record:
+            tx.type = record["type"]
+        if "date" in record:
+            tx.date = datetime.fromtimestamp(record["date"] / 1000, tz=UTC)
+        if "account_id" in record:
+            tx.account_id = record["account_id"]
+        if "narration" in record:
+            tx.narration = record["narration"]
+        if "amount" in record:
+            tx.amount = int(record["amount"])
 
-            # Adjust account balance(s) for manual (non-Mono) accounts.
-            _new_amount = tx.amount
-            _new_account_id = str(tx.account_id)
-            if _old_account_id != _new_account_id:
-                _old_upd_acct = (
-                    db.query(BankAccount)
-                    .filter(BankAccount.id == _old_account_id, BankAccount.user_id == user_id)
-                    .first()
-                )
-                if _old_upd_acct and not _old_upd_acct.is_mono_linked:
-                    _old_upd_acct.balance -= _old_amount
-                _new_upd_acct = (
-                    db.query(BankAccount)
-                    .filter(BankAccount.id == _new_account_id, BankAccount.user_id == user_id)
-                    .first()
-                )
-                if _new_upd_acct and not _new_upd_acct.is_mono_linked:
-                    _new_upd_acct.balance += _new_amount
-            elif _new_amount != _old_amount:
-                _upd_acct = (
-                    db.query(BankAccount)
-                    .filter(BankAccount.id == _old_account_id, BankAccount.user_id == user_id)
-                    .first()
-                )
-                if _upd_acct and not _upd_acct.is_mono_linked:
-                    _upd_acct.balance += _new_amount - _old_amount
+        # Adjust account balance(s).
+        _new_amount = tx.amount
+        _new_account_id = str(tx.account_id)
+        if _old_account_id != _new_account_id:
+            _old_upd_acct = (
+                db.query(BankAccount)
+                .filter(BankAccount.id == _old_account_id, BankAccount.user_id == user_id)
+                .first()
+            )
+            if _old_upd_acct:
+                _old_upd_acct.balance -= _old_amount
+            _new_upd_acct = (
+                db.query(BankAccount)
+                .filter(BankAccount.id == _new_account_id, BankAccount.user_id == user_id)
+                .first()
+            )
+            if _new_upd_acct:
+                _new_upd_acct.balance += _new_amount
+        elif _new_amount != _old_amount:
+            _upd_acct = (
+                db.query(BankAccount)
+                .filter(BankAccount.id == _old_account_id, BankAccount.user_id == user_id)
+                .first()
+            )
+            if _upd_acct:
+                _upd_acct.balance += _new_amount - _old_amount
 
         # Rebalance budget_months.activity when the category changes.
         old_category_id = str(tx.category_id) if tx.category_id else None
@@ -907,14 +894,6 @@ def push(
         if tx is None:
             continue  # already gone — idempotent
 
-        if not tx.is_manual:
-            logger.warning(
-                "Rejected delete of non-manual transaction id=%s user=%s",
-                record_id,
-                user_id,
-            )
-            continue
-
         # Reverse budget activity before deleting the transaction row.
         if tx.category_id:
             tx_month = tx.date.strftime("%Y-%m")
@@ -922,13 +901,13 @@ def push(
             bm.activity -= tx.amount
             has_budget_changes = True
 
-        # Reverse account balance for manual (non-Mono) accounts.
+        # Reverse account balance.
         _del_acct = (
             db.query(BankAccount)
             .filter(BankAccount.id == tx.account_id, BankAccount.user_id == user_id)
             .first()
         )
-        if _del_acct and not _del_acct.is_mono_linked:
+        if _del_acct:
             _del_acct.balance -= tx.amount
 
         db.delete(tx)

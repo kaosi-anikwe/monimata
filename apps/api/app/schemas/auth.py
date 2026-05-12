@@ -53,18 +53,6 @@ class UpdateProfileRequest(BaseModel):
     onboarded: bool | None = None
 
 
-class BVNVerifyRequest(BaseModel):
-    bvn: str
-
-    @field_validator("bvn")
-    @classmethod
-    def bvn_format(cls, v: str) -> str:
-        v = v.strip()
-        if not v.isdigit() or len(v) != 11:
-            raise ValueError("BVN must be exactly 11 digits")
-        return v
-
-
 # ── Response schemas ──────────────────────────────────────────────────────────
 
 
@@ -91,8 +79,3 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-class BVNVerifyResponse(BaseModel):
-    identity_verified: bool
-    message: str
