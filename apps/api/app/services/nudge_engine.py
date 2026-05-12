@@ -22,7 +22,6 @@ Trigger types (MVP):
   threshold_100   — spending has reached or exceeded 100% of assigned
   large_single_tx — a single debit transaction consumed ≥ 40% of a category's budget
   pay_received    — credit transaction ≥ PAY_RECEIVED_THRESHOLD kobo detected
-  bill_payment    — successful Interswitch bill payment (positive confirmation)
 
 Deduplication:
   Only one nudge per (user, trigger_type, category_id, WAT calendar day) is created.
@@ -428,43 +427,4 @@ def evaluate_transaction_nudges(db, tx: Transaction) -> None:
         )
 
 
-def evaluate_bill_payment_nudge(
-    db,
-    user: User,
-    tx: Transaction,
-    biller_name: str,
-    category_name: str | None = None,
-) -> None:
-    """
-    Create a bill_payment confirmation nudge after a successful Interswitch payment.
 
-    Called from bills.py `_schedule_bill_nudge` background task.
-    The caller is responsible for committing and closing the session.
-    """
-    if not can_send_nudge(db, user, "bill_payment"):
-        return
-
-    amount_str = _kobo_to_naira_str(abs(tx.amount))
-    title = TITLES["bill_payment"].format(biller_name=biller_name)
-    message = random.choice(MESSAGES["bill_payment"]).format(
-        biller_name=biller_name,
-        amount_naira=amount_str,
-    )
-    ctx: dict = {
-        "biller_name": biller_name,
-        "amount_kobo": tx.amount,
-        "amount_naira": amount_str,
-        "reference": tx.interswitch_ref,
-    }
-    if category_name:
-        ctx["category_name"] = category_name
-
-    create_nudge(
-        db,
-        user,
-        "bill_payment",
-        title,
-        message,
-        context=ctx,
-        category_id=tx.category_id,
-    )

@@ -18,7 +18,7 @@
 Redis client helper.
 Provides a single shared Redis connection used for:
   - Refresh token storage
-  - Interswitch access token cache
+  - Rate-limit counters
   - Celery broker (via Celery's own connection)
 """
 

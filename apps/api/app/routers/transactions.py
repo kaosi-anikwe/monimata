@@ -32,7 +32,7 @@ from app.core.deps import get_current_user
 from app.models.bank_account import BankAccount
 from app.models.category import Category
 from app.models.narration_map import NarrationCategoryMap
-from app.models.transaction import Transaction, TransactionSplit
+from app.models.transaction import Transaction, TransactionSource, TransactionSplit
 from app.models.user import User
 from app.schemas.transactions import (
     ManualTransactionRequest,
@@ -200,11 +200,7 @@ def patch_transaction(
     db: Session = Depends(get_db),
 ) -> Transaction:
     """
-    Patch a transaction.
-
-    category_id / memo apply to all transactions.
-    type / amount / narration / date / account_id only apply to manual
-    transactions; they are silently ignored for Mono imports.
+    Patch a transaction. All fields are editable by the owner.
 
     Budget activity is recalculated atomically — one undo of the old state,
     one application of the new state — to avoid double-counting when amount,
@@ -217,19 +213,9 @@ def patch_transaction(
     old_account_id_str = str(tx.account_id)
 
     # ── Resolve intended final values ──────────────────────────────────────────
-    # Financial fields (amount/type/date/narration/account) are editable only on
-    # *uncleared* manual transactions.  Once Mono confirms a manual entry by
-    # matching it (mono_id is set), the bank record becomes immutable — only the
-    # user's annotations (category, memo) remain editable.
-    is_editable = tx.is_manual and tx.mono_id is None
-    if is_editable:
-        new_type = body.type if body.type is not None else tx.type
-        new_abs = abs(body.amount) if body.amount is not None else abs(tx.amount)
-        new_date: datetime = body.date if body.date is not None else tx.date
-    else:
-        new_type = tx.type
-        new_abs = abs(tx.amount)
-        new_date = tx.date
+    new_type = body.type if body.type is not None else tx.type
+    new_abs = abs(body.amount) if body.amount is not None else abs(tx.amount)
+    new_date: datetime = body.date if body.date is not None else tx.date
 
     new_signed = -new_abs if new_type == "debit" else new_abs
 
@@ -273,44 +259,42 @@ def patch_transaction(
             new_bm.activity += new_signed
 
     # ── Apply field changes ─────────────────────────────────────────────────
-    if is_editable:
-        tx.type = new_type
-        tx.amount = new_signed
-        tx.date = new_date
-        if body.narration is not None:
-            tx.narration = body.narration
-        if body.account_id is not None:
-            account = (
-                db.query(BankAccount)
-                .filter(
-                    BankAccount.id == str(body.account_id),
-                    BankAccount.user_id == str(current_user.id),
-                )
-                .first()
+    tx.type = new_type
+    tx.amount = new_signed
+    tx.date = new_date
+    if body.narration is not None:
+        tx.narration = body.narration
+    if body.account_id is not None:
+        account = (
+            db.query(BankAccount)
+            .filter(
+                BankAccount.id == str(body.account_id),
+                BankAccount.user_id == str(current_user.id),
             )
-            if account is None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Account not found",
-                )
-            tx.account_id = str(body.account_id)
+            .first()
+        )
+        if account is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Account not found",
+            )
+        tx.account_id = str(body.account_id)
 
-    # ── Update manual account balances to reflect financial field changes ──────
-    if is_editable:
-        new_account_id_str = str(tx.account_id)  # may have been updated above
-        if old_account_id_str != new_account_id_str:
-            # Account changed: undo old amount from old account, apply new amount to new account
-            old_acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
-            new_acct = db.query(BankAccount).filter(BankAccount.id == new_account_id_str).first()
-            if old_acct:
-                old_acct.balance -= old_amount
-            if new_acct:
-                new_acct.balance += new_signed
-        else:
-            # Same account: apply the signed delta
-            acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
-            if acct:
-                acct.balance += new_signed - old_amount
+    # ── Update account balances to reflect financial field changes ────────────
+    new_account_id_str = str(tx.account_id)  # may have been updated above
+    if old_account_id_str != new_account_id_str:
+        # Account changed: undo old amount from old account, apply new amount to new account
+        old_acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
+        new_acct = db.query(BankAccount).filter(BankAccount.id == new_account_id_str).first()
+        if old_acct:
+            old_acct.balance -= old_amount
+        if new_acct:
+            new_acct.balance += new_signed
+    else:
+        # Same account: apply the signed delta
+        acct = db.query(BankAccount).filter(BankAccount.id == old_account_id_str).first()
+        if acct:
+            acct.balance += new_signed - old_amount
 
     tx.category_id = new_category_id
     if body.memo is not None:
@@ -360,11 +344,6 @@ def split_transaction(
     """
     tx = _get_tx_or_404(db, str(tx_id), str(current_user.id))
 
-    if tx.is_manual is False and tx.source == "interswitch":
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Interswitch bill payment transactions cannot be split",
-        )
 
     total_abs = abs(tx.amount)
     split_sum = sum(s.amount for s in body.splits)
@@ -478,7 +457,7 @@ def create_manual_transaction(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Transaction:
-    """Create a cash/manual transaction (not from Mono)."""
+    """Create a transaction entered manually by the user."""
     # Verify account belongs to user
     account = (
         db.query(BankAccount)
@@ -520,8 +499,7 @@ def create_manual_transaction(
         type=body.type,
         category_id=str(body.category_id) if body.category_id else None,
         memo=body.memo,
-        is_manual=True,
-        source="manual",
+        source=TransactionSource.manual,
     )
     db.add(tx)
     db.flush()
@@ -559,13 +537,8 @@ def delete_transaction(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
-    """Delete a manual transaction only."""
+    """Delete a transaction."""
     tx = _get_tx_or_404(db, str(tx_id), str(current_user.id))
-    if not tx.is_manual:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Only manually created transactions can be deleted",
-        )
 
     # Undo budget activity
     if tx.category_id:

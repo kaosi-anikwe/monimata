@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.bank_account import BankAccount
-from app.models.transaction import Transaction
+from app.models.transaction import Transaction, TransactionSource
 from app.models.user import User
 from app.schemas.accounts import (
     AddManualAccountRequest,
@@ -65,11 +65,10 @@ async def add_manual_account(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BankAccount:
-    """Create a manual (non-Mono) bank account.
+    """Create a manual bank account.
 
     The alias field is the user-facing display name and is always editable.
-    account_name is reserved for the name returned by Mono when/if the account
-    is later linked.
+    account_name mirrors alias on creation and can be updated independently.
     """
     # Check if the user already has a live account with the same account number
     existing = (
@@ -115,8 +114,7 @@ async def add_manual_account(
             amount=bank_account.balance,
             narration="Starting balance",
             type="credit",
-            is_manual=True,
-            source="manual",
+            source=TransactionSource.manual,
         )
         db.add(opening_tx)
         bank_account.starting_balance = 0
