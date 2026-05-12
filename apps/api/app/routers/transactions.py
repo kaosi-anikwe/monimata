@@ -344,7 +344,6 @@ def split_transaction(
     """
     tx = _get_tx_or_404(db, str(tx_id), str(current_user.id))
 
-
     total_abs = abs(tx.amount)
     split_sum = sum(s.amount for s in body.splits)
     if split_sum != total_abs:
