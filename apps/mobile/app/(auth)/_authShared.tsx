@@ -24,19 +24,19 @@
  *   BackBtn     — frosted-glass back button (.x-btn.dk) for dark headers (preferred)
  *   BackArrow   — raw white arrow icon (kept for compat; use BackBtn instead)
  *   EyeIcon     — password visibility toggle icon
- *   TrustCard   — shield badge used on BVN + link-bank screens
+ *   TrustCard   — shield badge with shield icon + text
  *   s           — shared StyleSheet matching .auth-hdr / .inp / .btn-green / .x-btn.dk
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, type ReactNode } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRef, type ReactNode } from 'react';
 import type { StyleProp, TextInputProps, TextStyle, ViewStyle } from 'react-native';
 import { Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { ff } from '@/lib/typography';
-import { glass, radius, spacing } from '@/lib/tokens';
 import { useTheme, type ThemeColors } from '@/lib/theme';
+import { glass, radius, spacing } from '@/lib/tokens';
+import { ff } from '@/lib/typography';
 
 // ─── AuthInput ────────────────────────────────────────────────────────────────
 // Matches .inp: height 48, radius --rm (16), border 1.5px, focus → brand green glow.
@@ -159,7 +159,7 @@ export function AuthHdr({ children }: { children: ReactNode }) {
 }
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
-// Referenced across login, register, verify-bvn, and link-bank.
+// Referenced across login, register, and onboarding screens.
 
 export const s = StyleSheet.create({
   screen: { flex: 1 },
@@ -229,7 +229,7 @@ export const s = StyleSheet.create({
 });
 
 // ─── TrustCard ────────────────────────────────────────────────────────────────
-// Used on BVN + link-bank screens — green badge with shield icon + text.
+// Green badge with shield icon + text — reusable security/info card.
 
 export function TrustCard({ text, colors }: { text: string; colors: ThemeColors }) {
   return (

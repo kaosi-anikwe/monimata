@@ -15,15 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Accounts tab — manage bank accounts (manual and Mono-linked).
+ * Accounts tab — manage bank accounts (manual entry).
  */
-import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle, Path } from 'react-native-svg';
 import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -34,19 +32,19 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useToast } from '@/components/Toast';
-import { Input } from '@/components/ui/Input';
+import { useTour, type TourStep } from '@/components/tour';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { Divider } from '@/components/ui/Divider';
+import { Input } from '@/components/ui/Input';
 import { ListRow } from '@/components/ui/ListRow';
-import { BottomSheet } from '@/components/ui/BottomSheet';
 import {
   useAccounts,
   useAddManualAccount,
   useDeleteAccount,
-  useTriggerSync,
-  useUnlinkMono,
   useUpdateAlias,
   useUpdateBalance,
   type AddManualAccountPayload,
@@ -56,31 +54,12 @@ import { radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
 import { formatNaira } from '@/utils/money';
-import { TourTarget, useTour, type TourStep } from '@/components/tour';
 
 // ── Tour definition ─────────────────────────────────────────────────────
 
-const ACCOUNTS_TOUR: TourStep[] = [
-  {
-    targetId: 'accounts-link-bank',
-    title: 'Link your bank',
-    body: 'Connect GTBank, Kuda, Access, or any other Nigerian bank via Mono. Your transactions will sync automatically every day.',
-    tooltipSide: 'below',
-  },
-];
+const ACCOUNTS_TOUR: TourStep[] = [];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatLastSynced(dateStr: string | null): string {
-  if (!dateStr) return 'Never synced';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
-}
 
 function formatBalanceDate(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -364,7 +343,6 @@ interface MoreActionsSheetProps {
   onClose: () => void;
   onRename: () => void;
   onUpdateBalance: () => void;
-  onUnlink: () => void;
   onDelete: () => void;
 }
 
@@ -373,12 +351,10 @@ function MoreActionsSheet({
   onClose,
   onRename,
   onUpdateBalance,
-  onUnlink,
   onDelete,
 }: MoreActionsSheetProps) {
   const colors = useTheme();
   if (!account) return null;
-  const isLinked = account.is_mono_linked;
 
   function action(fn: () => void) {
     onClose();
@@ -404,57 +380,19 @@ function MoreActionsSheet({
           showChevron
         />
 
-        {/* Update Balance (manual only) */}
-        {!isLinked && (
-          <ListRow
-            leftIcon={
-              <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
-                <Path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-            }
-            iconBg={colors.warningSubtle}
-            title="Update Balance"
-            subtitle="Manually set the current balance"
-            onPress={() => action(onUpdateBalance)}
-            showChevron
-          />
-        )}
-
-        {/* Link to Mono (manual only) */}
-        {!isLinked && (
-          <ListRow
-            leftIcon={
-              <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
-                <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-            }
-            iconBg={colors.infoSubtle}
-            title="Link to Mono"
-            subtitle="Enable automatic sync"
-            onPress={() => {
-              onClose();
-              router.push({ pathname: '/(auth)/link-bank', params: { accountId: account.id } });
-            }}
-            showChevron
-          />
-        )}
-
-        {/* Disconnect Mono (linked only) */}
-        {isLinked && (
-          <ListRow
-            leftIcon={
-              <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
-                <Path d="M18.84 12.25l1.72-1.71a4.91 4.91 0 00-6.94-6.94l-1.72 1.71M5.17 8l-2.14 2.14a4.91 4.91 0 006.94 6.94l2.14-2.13M2 2l20 20" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-            }
-            iconBg={colors.warningSubtle}
-            title="Disconnect Mono"
-            subtitle="Stop automatic sync"
-            onPress={() => action(onUnlink)}
-            showChevron
-          />
-        )}
+        {/* Update Balance */}
+        <ListRow
+          leftIcon={
+            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+              <Path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          }
+          iconBg={colors.warningSubtle}
+          title="Update Balance"
+          subtitle="Manually set the current balance"
+          onPress={() => action(onUpdateBalance)}
+          showChevron
+        />
 
         <Divider verticalMargin={spacing.xs} />
 
@@ -481,34 +419,17 @@ function MoreActionsSheet({
 
 interface AccountCardProps {
   account: BankAccount;
-  isSyncing: boolean;
-  onSync: () => void;
   onMoreActions: () => void;
 }
 
-function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardProps) {
+function AccountCard({ account, onMoreActions }: AccountCardProps) {
   const colors = useTheme();
-  const isLinked = account.is_mono_linked;
-  const needsReauth = isLinked && account.requires_reauth;
-
-  // Sync status
-  type SyncState = 'ok' | 'warn' | 'manual';
-  const syncState: SyncState = !isLinked ? 'manual' : needsReauth ? 'warn' : 'ok';
-  const syncDotColor =
-    syncState === 'ok' ? colors.brandBright :
-      syncState === 'warn' ? colors.warning :
-        'transparent';
-
-  const syncStatusText =
-    syncState === 'manual' ? 'Manual account' :
-      syncState === 'warn' ? 'Sync paused · Re-auth needed' :
-        `Synced · ${formatLastSynced(account.last_synced_at)}`;
 
   return (
     <View
       style={[
         ss.card,
-        { backgroundColor: colors.cardBg, borderColor: needsReauth ? colors.warning : colors.border },
+        { backgroundColor: colors.cardBg, borderColor: colors.border },
         shadow.sm,
       ]}
     >
@@ -519,9 +440,9 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
           <View style={ss.bankInfo}>
             <View style={[ss.bankIc, { backgroundColor: colors.surface }]}>
               <Ionicons
-                name={isLinked ? 'business' : 'wallet-outline'}
+                name="wallet-outline"
                 size={20}
-                color={isLinked ? colors.brand : colors.textMeta}
+                color={colors.textMeta}
               />
             </View>
             <View>
@@ -534,19 +455,10 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
           <View
             style={[
               ss.badge,
-              isLinked
-                ? { backgroundColor: colors.surface, borderColor: colors.borderBrand }
-                : { backgroundColor: colors.purpleSubtle, borderColor: colors.purpleBorder },
+              { backgroundColor: colors.purpleSubtle, borderColor: colors.purpleBorder },
             ]}
           >
-            <Text
-              style={[
-                ss.badgeText,
-                { color: isLinked ? colors.brand : colors.purple },
-              ]}
-            >
-              {isLinked ? 'Mono' : 'Manual'}
-            </Text>
+            <Text style={[ss.badgeText, { color: colors.purple }]}>Manual</Text>
           </View>
         </View>
 
@@ -554,28 +466,15 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
         <Text style={[ss.balanceAmt, { color: colors.textPrimary }]}>
           {formatNaira(account.balance)}
         </Text>
-        {!isLinked && account.balance_as_of && (
+        {account.balance_as_of && (
           <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2, marginBottom: spacing.sm }]}>
             {formatBalanceDate(account.balance_as_of)}
           </Text>
         )}
 
-        {/* Sync status */}
+        {/* Status */}
         <View style={ss.syncStatusRow}>
-          {syncState !== 'manual' && (
-            <View style={[ss.syncDot, { backgroundColor: syncDotColor }]} />
-          )}
-          <Text
-            style={[
-              type_.caption,
-              {
-                color: syncState === 'warn' ? colors.warning : colors.textMeta,
-                fontWeight: syncState === 'warn' ? '600' : '400',
-              },
-            ]}
-          >
-            {syncStatusText}
-          </Text>
+          <Text style={[type_.caption, { color: colors.textMeta }]}>Manual account</Text>
         </View>
       </View>
 
@@ -584,75 +483,32 @@ function AccountCard({ account, isSyncing, onSync, onMoreActions }: AccountCardP
         style={[
           ss.cardFooter,
           {
-            backgroundColor: needsReauth ? colors.warningSubtle : colors.surface,
-            borderTopColor: needsReauth ? colors.warningBorder : colors.border,
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
           },
         ]}
       >
-        {needsReauth ? (
-          <>
-            <Text style={[type_.caption, { color: colors.warningText, flex: 1 }]}>
-              Session expired — needs reconnection
-            </Text>
-            <TouchableOpacity
-              style={[ss.footerBtn, { backgroundColor: colors.warning, borderColor: colors.warning }]}
-              onPress={() => router.push({ pathname: '/(auth)/link-bank', params: { accountId: account.id } })}
-              accessibilityRole="button"
-              accessibilityLabel="Reconnect Mono"
-            >
-              <Text style={[ss.footerBtnTxt, { color: colors.white }]}>Reconnect</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            {/* Last sync info */}
-            <View style={ss.footerSyncInfo}>
-              <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-                <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>
-                {isLinked ? `Last sync: ${formatLastSynced(account.last_synced_at)}` : 'Manual account'}
-              </Text>
-            </View>
-
-            <View style={ss.footerBtns}>
-              {isLinked && (
-                <TouchableOpacity
-                  style={[ss.footerBtn, { backgroundColor: colors.cardBg, borderColor: colors.border }, isSyncing && ss.footerBtnDisabled]}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSync(); }}
-                  disabled={isSyncing}
-                  accessibilityRole="button"
-                  accessibilityLabel="Sync account"
-                >
-                  {isSyncing ? (
-                    <ActivityIndicator size={12} color={colors.brand} />
-                  ) : (
-                    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-                      <Path d="M23 4v6h-6" stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                      <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10" stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    </Svg>
-                  )}
-                  <Text style={[ss.footerBtnTxt, { color: colors.textSecondary }]}>
-                    {isSyncing ? 'Syncing…' : 'Sync'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[ss.footerBtnMore, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-                onPress={onMoreActions}
-                accessibilityRole="button"
-                accessibilityLabel="More options"
-              >
-                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                  <Circle cx={12} cy={5} r={1.5} fill={colors.textMeta} />
-                  <Circle cx={12} cy={12} r={1.5} fill={colors.textMeta} />
-                  <Circle cx={12} cy={19} r={1.5} fill={colors.textMeta} />
-                </Svg>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+        <View style={ss.footerSyncInfo}>
+          <Text style={[type_.caption, { color: colors.textMeta }]}>
+            {account.balance_as_of
+              ? `Updated: ${formatBalanceDate(account.balance_as_of)}`
+              : 'Add transactions manually or via email alerts'}
+          </Text>
+        </View>
+        <View style={ss.footerBtns}>
+          <TouchableOpacity
+            style={[ss.footerBtnMore, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+            onPress={onMoreActions}
+            accessibilityRole="button"
+            accessibilityLabel="More options"
+          >
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Circle cx={12} cy={5} r={1.5} fill={colors.textMeta} />
+              <Circle cx={12} cy={12} r={1.5} fill={colors.textMeta} />
+              <Circle cx={12} cy={19} r={1.5} fill={colors.textMeta} />
+            </Svg>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -665,19 +521,15 @@ export default function AccountsScreen() {
   const insets = useSafeAreaInsets();
   const { confirm } = useToast();
   const { data: accounts = [], isLoading, error, refetch } = useAccounts();
-  const syncMutation = useTriggerSync();
-  const unlinkMutation = useUnlinkMono();
   const deleteMutation = useDeleteAccount();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [balanceAccount, setBalanceAccount] = useState<BankAccount | null>(null);
   const [renameAccount, setRenameAccount] = useState<BankAccount | null>(null);
   const [moreAccount, setMoreAccount] = useState<BankAccount | null>(null);
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
-  const hasReauthAccount = accounts.some((a) => a.is_mono_linked && a.requires_reauth);
 
   const startTourIfUnseen = useTour();
   useFocusEffect(
@@ -689,21 +541,6 @@ export default function AccountsScreen() {
     await refetch();
     setRefreshing(false);
   }, [refetch]);
-
-  function handleSync(account: BankAccount) {
-    setSyncingId(account.id);
-    syncMutation.mutate(account.id, { onSettled: () => setSyncingId(null) });
-  }
-
-  function handleUnlink(account: BankAccount) {
-    confirm({
-      title: 'Disconnect Mono',
-      message: `Remove the Mono connection from ${account.institution}? Your account and transaction history will be kept, but auto-sync will stop.`,
-      confirmText: 'Disconnect',
-      confirmStyle: 'destructive',
-      onConfirm: () => unlinkMutation.mutate(account.id),
-    });
-  }
 
   function handleDelete(account: BankAccount) {
     confirm({
@@ -757,30 +594,16 @@ export default function AccountsScreen() {
         <Text style={[ss.headerTitle, { color: colors.textPrimary }]}>Accounts</Text>
         <View style={ss.headerActions}>
           <TouchableOpacity
-            style={[ss.headerBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAddSheet(true); }}
             accessibilityRole="button"
             accessibilityLabel="Add manual account"
           >
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <Path d="M12 5v14M5 12h14" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
+              <Path d="M12 5v14M5 12h14" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" />
             </Svg>
-            <Text style={[ss.headerBtnTxt, { color: colors.brand }]}>Manual</Text>
+            <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Add Account</Text>
           </TouchableOpacity>
-          <TourTarget id="accounts-link-bank">
-            <TouchableOpacity
-              style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(auth)/link-bank'); }}
-              accessibilityRole="button"
-              accessibilityLabel="Link bank via Mono"
-            >
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                <Path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke={colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke={colors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-              <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Link Bank</Text>
-            </TouchableOpacity>
-          </TourTarget>
         </View>
       </View>
 
@@ -802,19 +625,11 @@ export default function AccountsScreen() {
             </View>
             <Text style={[ss.emptyTitle, { color: colors.textPrimary }]}>No accounts yet</Text>
             <Text style={[type_.body, { color: colors.textMeta, textAlign: 'center', marginBottom: spacing.xxl }]}>
-              Add a bank account manually, or link one via Mono to sync transactions automatically.
+              Add your first bank account to start tracking your money.
             </Text>
-            <Button variant="green" onPress={() => setShowAddSheet(true)} accessibilityLabel="Add  account manually">
-              Add Manually
+            <Button variant="green" onPress={() => setShowAddSheet(true)} accessibilityLabel="Add account manually">
+              Add Account
             </Button>
-            <TouchableOpacity
-              style={[ss.emptyGhostBtn, { borderColor: colors.border }]}
-              onPress={() => router.push('/(auth)/link-bank')}
-              accessibilityRole="button"
-              accessibilityLabel="Link via Mono"
-            >
-              <Text style={[type_.label, { color: colors.brand }]}>Link via Mono</Text>
-            </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -833,56 +648,30 @@ export default function AccountsScreen() {
               </View>
             </View>
 
-            {/* ── Global re-auth warning banner ── */}
-            {hasReauthAccount && (
-              <TouchableOpacity
-                style={[ss.globalReauthBanner, { backgroundColor: colors.warningSubtle, borderColor: colors.warningBorder }]}
-                onPress={() => router.push('/(auth)/link-bank')}
-                accessibilityRole="button"
-                accessibilityLabel="Fix Mono reconnection"
-              >
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                  <Path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M12 9v4M12 17h.01" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" />
-                </Svg>
-                <View style={{ flex: 1 }}>
-                  <Text style={[type_.label, { color: colors.warningText }]}>
-                    Sync paused on one or more accounts
-                  </Text>
-                  <Text style={[type_.caption, { color: colors.warningText, marginTop: 2 }]}>
-                    Reconnect to resume automatic sync
-                  </Text>
-                </View>
-                <Text style={[type_.label, { color: colors.warning }]}>Fix →</Text>
-              </TouchableOpacity>
-            )}
-
             {/* ── Account cards ── */}
             {accounts.map((account) => (
               <AccountCard
                 key={account.id}
                 account={account}
-                isSyncing={syncingId === account.id}
-                onSync={() => handleSync(account)}
                 onMoreActions={() => setMoreAccount(account)}
               />
             ))}
 
-            {/* ── Link more prompt card ── */}
+            {/* ── Add more prompt card ── */}
             <View style={[ss.linkMoreCard, { backgroundColor: colors.darkGreen }]}>
               {/* Radial glow overlay */}
               <View style={[ss.linkMoreGlow, { backgroundColor: colors.limeGlow }]} />
               <Text style={[ss.linkMoreTitle, { color: colors.textInverse }]}>Got another account?</Text>
               <Text style={[ss.linkMoreSub, { color: colors.textInverseSecondary }]}>
-                Link your OPay, Zenith, or Access account for a complete picture of your money.
+                Add your OPay, Zenith, or Access account for a complete picture of your money.
               </Text>
               <TouchableOpacity
                 style={[ss.linkMoreBtn, { backgroundColor: colors.lime }]}
-                onPress={() => router.push('/(auth)/link-bank')}
+                onPress={() => setShowAddSheet(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Link another bank"
+                accessibilityLabel="Add another account"
               >
-                <Text style={[ss.linkMoreBtnTxt, { color: colors.darkGreen }]}>Link Another Bank</Text>
+                <Text style={[ss.linkMoreBtnTxt, { color: colors.darkGreen }]}>Add Another Account</Text>
               </TouchableOpacity>
             </View>
 
@@ -906,7 +695,6 @@ export default function AccountsScreen() {
         onClose={() => setMoreAccount(null)}
         onRename={() => { setMoreAccount(null); setRenameAccount(moreAccount); }}
         onUpdateBalance={() => { setMoreAccount(null); setBalanceAccount(moreAccount); }}
-        onUnlink={() => moreAccount && handleUnlink(moreAccount)}
         onDelete={() => moreAccount && handleDelete(moreAccount)}
       />
     </View>

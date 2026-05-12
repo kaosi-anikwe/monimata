@@ -31,7 +31,6 @@ export const schema = appSchema({
       columns: [
         { name: 'account_id', type: 'string', isIndexed: true },
         { name: 'user_id', type: 'string' },
-        { name: 'mono_id', type: 'string', isOptional: true },
         { name: 'date', type: 'number' },
         { name: 'amount', type: 'number' },
         { name: 'narration', type: 'string' },

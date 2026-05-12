@@ -97,7 +97,6 @@ const migrations = schemaMigrations({
             "id" TEXT PRIMARY KEY NOT NULL,
             "account_id" TEXT NOT NULL DEFAULT '',
             "user_id" TEXT NOT NULL DEFAULT '',
-            "mono_id" TEXT,
             "date" REAL NOT NULL DEFAULT 0,
             "amount" REAL NOT NULL DEFAULT 0,
             "narration" TEXT NOT NULL DEFAULT '',

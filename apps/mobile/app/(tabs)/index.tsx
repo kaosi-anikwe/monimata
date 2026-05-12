@@ -20,12 +20,13 @@
  * FAB note: the lime "+" FAB lives in (tabs)/_layout.tsx (bottom-right), not here.
  */
 
-import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { StatusBar } from 'expo-status-bar';
 import { ProgressBar } from '@/components/ui';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -37,19 +38,18 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
 
-import { useTheme } from '@/lib/theme';
-import { useBudget } from '@/hooks/useBudget';
-import { useAppSelector } from '@/store/hooks';
+import { TourTarget, useTour, useTourContext, type TourStep } from '@/components/tour';
 import { syncDatabase } from '@/database/sync';
 import { useAccounts } from '@/hooks/useAccounts';
-import { ff, formatMoney } from '@/lib/typography';
-import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
+import { useBudget } from '@/hooks/useBudget';
 import { useDismissNudge, useNudgeUnreadCount, useNudges } from '@/hooks/useNudges';
-import { TourTarget, useTour, useTourContext, type TourStep } from '@/components/tour';
 import { releasePrompt } from '@/lib/notifPromptBridge';
+import { useTheme } from '@/lib/theme';
+import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
+import { ff, formatMoney } from '@/lib/typography';
 import { onWelcomeDone } from '@/lib/welcomeBridge';
+import { useAppSelector } from '@/store/hooks';
 
 // ── Tour definition ──────────────────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ const HOME_TOUR: TourStep[] = [
   {
     targetId: 'home-all-accounts',
     title: 'View your accounts',
-    body: 'Tap here to see all your bank accounts, link a new one via Mono, or add a manual account. Accounts lives in the More tab.',
+    body: 'Tap here to see all your bank accounts or add a manual account. Accounts lives in the More tab.',
     tooltipSide: 'below',
     fallbackFullscreen: true,
   },
