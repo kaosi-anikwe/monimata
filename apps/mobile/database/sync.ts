@@ -35,7 +35,7 @@ export async function syncDatabase(): Promise<void> {
     },
 
     pushChanges: async ({ changes, lastPulledAt }) => {
-      const response = await fetch(`${API_BASE}/sync/push`, {
+      const response = await fetch(`${API_BASE}/sync/push?last_pulled_at=${lastPulledAt}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -47,5 +47,10 @@ export async function syncDatabase(): Promise<void> {
     },
 
     migrationsEnabledAtVersion: 1,
+    // Suppress the "server wants to create record that already exists" diagnostic.
+    // This happens when a locally-created record is pushed successfully but then
+    // also appears in the next pull's `created` list (because last_pulled_at
+    // predates the record). Treating it as an update is the correct behaviour.
+    sendCreatedAsUpdated: true,
   })
 }

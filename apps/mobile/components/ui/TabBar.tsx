@@ -20,7 +20,7 @@
  * Custom bottom tab bar for the main app shell.
  *
  * Visual layout — 5 equal slots:
- *   [ Home ] [ Budget ] [ Activity ] [ Pay Bills ] [ Nudges ]
+ *   [ Home ] [ Budget ] [ Transactions ] [ Nudges ]
  *
  * Matches mockup CSS `.bnav` / `.ni` / `.ni.on`:
  * - Height: layout.tabBarHeight (76 pt) + safe-area bottom inset.
@@ -70,7 +70,6 @@ const TABS: TabConfig[] = [
   { routeName: 'index', label: 'Home', icon: 'home-outline', iconActive: 'home-outline' },
   { routeName: 'budget', label: 'Budget', icon: 'card-outline', iconActive: 'card-outline' },
   { routeName: 'transactions', label: 'Transactions', icon: 'document-text-outline', iconActive: 'document-text-outline' },
-  { routeName: 'bills', label: 'Pay Bills', icon: 'flash-outline', iconActive: 'flash-outline' },
   { routeName: 'nudges', label: 'Nudges', icon: 'notifications-outline', iconActive: 'notifications-outline' },
 ] as const;
 
@@ -209,12 +208,6 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
         />
         <TabItem
           config={TABS[3]}
-          isActive={activeRouteName === 'bills'}
-          onPress={() => handleTabPress('bills')}
-          colors={colors}
-        />
-        <TabItem
-          config={TABS[4]}
           isActive={activeRouteName === 'nudges'}
           onPress={() => handleTabPress('nudges')}
           badge={nudgeUnread}
