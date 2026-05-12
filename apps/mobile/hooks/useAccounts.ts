@@ -23,7 +23,6 @@ import type { BankAccount } from '@/types/account';
 
 export interface AddManualAccountPayload {
   institution: string;
-  bank_code: string;
   account_number: string;
   alias: string;
   account_type?: string;
