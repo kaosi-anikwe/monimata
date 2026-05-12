@@ -43,7 +43,6 @@ if settings.SENTRY_DSN:
 from app.routers import (  # noqa: E402
     accounts,
     auth,
-    bills,
     budget,
     categories,
     content,
@@ -94,7 +93,6 @@ app.include_router(reports.router, prefix="/reports", tags=["reports"])
 app.include_router(sync.router, prefix="/sync", tags=["sync"])
 app.include_router(content.router, prefix="/content", tags=["content"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
-app.include_router(bills.router, prefix="/bills", tags=["bills"])
 app.include_router(recurring.router, prefix="/recurring-rules", tags=["recurring"])
 app.include_router(ws.router, tags=["websocket"])
 

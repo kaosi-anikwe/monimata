@@ -22,11 +22,6 @@ from celery.schedules import crontab
 from app.worker.celery_app import celery_app
 
 celery_app.conf.beat_schedule = {
-    # Every day at 3:00 AM WAT — re-sync stale accounts
-    "nightly-reconciliation": {
-        "task": "app.worker.tasks.nightly_reconciliation",
-        "schedule": crontab(hour=3, minute=0),
-    },
     # Every day at 4:00 AM WAT — recompute budget activity from transactions
     "reconcile-budget-activity": {
         "task": "app.worker.tasks.reconcile_budget_activity",
