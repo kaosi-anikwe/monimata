@@ -2,7 +2,7 @@
 
 > **Every Kobo, Accounted For.**
 
-MoniMata (Pidgin: _Money Matters_) is a zero-based budgeting app built specifically for Nigerians. It automatically syncs transactions from Nigerian banks via [Mono Connect](https://mono.co), lets you give every Naira a job before you spend it, and delivers AI-powered spending nudges in Pidgin English — like a knowledgeable friend advising you, not a cold alert.
+MoniMata (Pidgin: _Money Matters_) is a zero-based budgeting app built specifically for Nigerians. It automatically captures transactions from bank alert emails, lets you give every Naira a job before you spend it, and delivers AI-powered spending nudges in Pidgin English — like a knowledgeable friend advising you, not a cold alert.
 
 ---
 
@@ -18,15 +18,14 @@ MoniMata (Pidgin: _Money Matters_) is a zero-based budgeting app built specifica
 
 ## Features
 
-- **Automatic Bank Sync** — Daily transaction fetching from 200+ Nigerian banks and fintechs via Mono Connect
+- **Automatic Transaction Capture** — Bank alert emails are forwarded by a Cloudflare Worker and parsed into transactions automatically
+- **Manual Transaction Entry** — Log cash purchases and any transaction not covered by email alerts
 - **Zero-Based Budgeting** — Every Naira assigned to a category before it is spent (YNAB model: TBB, Assigned, Activity, Available)
 - **Category Targets** — Monthly, weekly, or date-based savings goals per category
-- **In-App Bill Payment** — Electricity, cable TV, airtime, data bundles via Interswitch Quickteller — budget updates in real time
-- **BVN Identity Verification** — Powered by Interswitch Passport; required before bill payments or bank linking
-- **AI Nudge Engine** — Personalised, Pidgin-infused spending alerts triggered by sync events
+- **AI Nudge Engine** — Personalised, Pidgin-infused spending alerts triggered by incoming transactions
 - **Transaction Auto-Categorisation** — Rule-based + fuzzy-matching pipeline to label bank narrations automatically
 - **Offline-First UI** — Budget remains readable and usable without a network connection (WatermelonDB, 90-day local cache)
-- **Recurring Rules** — Automatic detection and scheduling of repeated transactions
+- **Recurring Rules** — Automatic scheduling of repeated transactions
 - **Split Transactions** — Allocate a single purchase across multiple categories
 - **Financial Reports** — Spending by category, income vs. expenses, net worth trends
 - **Knowledge Hub** — Bite-sized financial literacy articles and "Wisdom Nuggets"
@@ -41,39 +40,35 @@ MoniMata is a **cloud-primary, device-cached** system. Financial records are aut
 
 ```
 [GTBank / Kuda / Zenith / OPay]
-      ↕  Mono Connect (OAuth-based, no credentials stored)
-  [Mono API]                       [Interswitch API]
-      |                                    |
-      | webhook: account_updated           | on-demand: bill pay / BVN
-      ↓                                    ↓
-[FastAPI Backend] ───────────────────────────┤
-      |                                    |
-      ├── Verify HMAC-SHA512 webhook sig   ├── Quickteller: bill payments
-      ├── Enqueue Celery tasks             ├── Passport:    BVN verification
-      |                                    |
+      |
+      | Bank sends alert email to user's inbox
+      ↓
+[Cloudflare Email Routing] → [email-parser (postal-mime)]
+      |
+      | POST /webhooks/bank-alerts  (X-MoniMata-Secret)
+      ↓
+[FastAPI Backend]
+      |
+      ├── Verify shared secret (constant-time compare)
+      ├── Parse alert → Transaction row (upsert)
+      ├── Enqueue Celery tasks
+      |
       ├── [PostgreSQL]    ← source of financial truth
-      ├── [Redis]         ← Celery broker + result backend
+      ├── [Redis]         ← Celery broker + token store + rate limits
       └── [Celery Workers + Beat]
-              ├── fetch_transactions
               ├── categorize_transactions
-              ├── evaluate_nudges / generate_nudge
-              └── nightly_reconciliation (3 AM WAT)
+              ├── evaluate_nudges
+              ├── deliver_queued_nudges  (7:05 AM WAT)
+              └── reconcile_budget_activity  (4:00 AM WAT)
                       |
                       ↓
       [REST API + WebSocket /ws/events]
                       ↕
           [React Native (Expo) App]
-
-[Bank alert email]
-      ↓
-[Cloudflare Email Routing] → [email-worker (postal-mime)]
-      ↓
-POST /webhooks/bank-alerts  (X-MoniMata-Secret)
-              ├── Budget, Transactions, Accounts, Bills
-              ├── Nudges, Reports, Hub, Profile
-              └── [WatermelonDB + SQLCipher]  ← encrypted local cache
-                      ↕
-          [Device Secure Store]  ← SQLCipher encryption key
+                      |
+                      └── [WatermelonDB + SQLCipher]  ← encrypted local cache
+                                  ↕
+                      [Device Secure Store]  ← SQLCipher encryption key
 ```
 
 ---
@@ -110,7 +105,7 @@ POST /webhooks/bank-alerts  (X-MoniMata-Secret)
 | Animations      | React Native Reanimated 4               |
 | Lists           | Shopify FlashList                       |
 
-### Email Worker (`apps/email-worker`)
+### Email Worker (`apps/email-parser`)
 
 | Layer           | Technology                    |
 | --------------- | ----------------------------- |
@@ -142,17 +137,17 @@ monimata/
 │   │   │   ├── models/         # SQLAlchemy ORM models
 │   │   │   ├── routers/        # One file per endpoint group
 │   │   │   ├── schemas/        # Pydantic request/response schemas
-│   │   │   ├── services/       # Mono client, Interswitch client, categorisation
+│   │   │   ├── services/       # Bank alert parser, categorisation, nudge engine, push
 │   │   │   └── worker/         # Celery app, tasks, beat schedule
 │   │   └── alembic/            # Database migrations
-│   ├── email-worker/           # Cloudflare Email Worker
+│   ├── email-parser/           # Cloudflare Email Worker
 │   │   ├── src/index.ts        # Worker entrypoint (postal-mime + Sentry)
 │   │   ├── scripts/deploy.mjs  # Cross-platform deploy + source map upload
 │   │   └── wrangler.toml       # Cloudflare Workers configuration
 │   └── mobile/                 # React Native (Expo) app
 │       ├── app/                # Expo Router screens
-│       │   ├── (auth)/         # Welcome, Register, Login, Verify BVN, Link Bank
-│       │   └── (tabs)/         # Budget, Transactions, Accounts, Bills, Nudges, Profile, Hub, Rewards
+│       │   ├── (auth)/         # Welcome, Register, Login
+│       │   └── (tabs)/         # Budget, Transactions, Accounts, Nudges, Profile, Hub
 │       ├── components/         # Shared UI components
 │       ├── database/           # WatermelonDB setup, schema, encryption, sync
 │       ├── hooks/              # Feature-specific React hooks
@@ -192,7 +187,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\Activate.ps1
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env — set DATABASE_URL, REDIS_URL, JWT keys, Mono and Interswitch credentials
+# Edit .env — set DATABASE_URL, REDIS_URL, JWT keys, and BANK_ALERT_WEBHOOK_SECRET
 
 # 3. Run database migrations
 alembic upgrade head
@@ -241,11 +236,9 @@ npm start
 | `JWT_PRIVATE_KEY`           | RS256 private key (PEM)                                       |
 | `JWT_PUBLIC_KEY`            | RS256 public key (PEM)                                        |
 | `AES_ENCRYPTION_KEY`        | 64-char hex string for AES-256 PII encryption                 |
-| `MONO_SECRET_KEY`           | Mono API secret key                                           |
-| `MONO_WEBHOOK_SECRET`       | Mono webhook HMAC-SHA512 signing secret                       |
-| `INTERSWITCH_CLIENT_ID`     | Interswitch client ID                                         |
-| `INTERSWITCH_CLIENT_SECRET` | Interswitch client secret                                     |
-| `INTERSWITCH_ENV`           | `sandbox` or `production`                                     |
+| `BANK_ALERT_WEBHOOK_SECRET` | Shared secret matched against `X-MoniMata-Secret` header      |
+| `OPENAI_API_KEY`            | OpenAI key for nudge generation (optional)                    |
+| `SENTRY_DSN`                | Sentry DSN for error reporting (leave blank to disable)       |
 | `LOG_LEVEL`                 | `DEBUG` / `INFO` / `WARNING` (default: `INFO`)                |
 
 Generate the RS256 key pair:
@@ -268,7 +261,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 | `EXPO_PUBLIC_API_URL`    | Backend base URL — **required**, no fallback |
 | `EXPO_PUBLIC_SENTRY_DSN` | Sentry DSN for crash reporting               |
 
-### Email Worker (`apps/email-worker/.dev.vars` for local dev; Cloudflare secrets in production)
+### Email Worker (`apps/email-parser/.dev.vars` for local dev; Cloudflare secrets in production)
 
 | Variable         | Description                                                      |
 | ---------------- | ---------------------------------------------------------------- |
@@ -283,7 +276,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 | ----------------------- | ----------------------------------------------------- |
 | `GET /health`           | Health check                                          |
 | `/auth`                 | Register, login, token refresh                        |
-| `/accounts`             | Bank account management                               |
+| `/accounts`             | Bank account management (manual accounts)             |
 | `/transactions`         | Transaction CRUD and manual entry                     |
 | `/budget`               | Budget month management                               |
 | `/categories`           | Category CRUD                                         |
@@ -294,10 +287,8 @@ python -c "import secrets; print(secrets.token_hex(32))"
 | `/ws/events`            | WebSocket real-time events                            |
 | `/nudges`               | AI-generated spending nudges                          |
 | `/reports`              | Spending, income vs. expense, net worth               |
-| `/bills`                | Interswitch Quickteller bill payment                  |
 | `/content`              | Knowledge Hub articles                                |
-| `/webhooks/mono`        | Mono webhook receiver (HMAC-SHA512 verified)          |
-| `/webhooks/bank-alerts` | Bank alert email receiver (forwarded by email-worker) |
+| `/webhooks/bank-alerts` | Bank alert email receiver (forwarded by email-parser) |
 
 ---
 
@@ -305,7 +296,6 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 | Schedule                 | Task                                                                      |
 | ------------------------ | ------------------------------------------------------------------------- |
-| Daily 3:00 AM WAT        | Re-sync stale bank accounts (`nightly_reconciliation`)                    |
 | Daily 4:00 AM WAT        | Recompute budget activity from transactions (`reconcile_budget_activity`) |
 | Daily 7:05 AM WAT        | Deliver queued nudge notifications (`deliver_queued_nudges`)              |
 | Every Friday 5:00 PM WAT | Weekly review nudges (`weekly_review_nudges`)                             |
@@ -353,8 +343,7 @@ uv add --group dev <pkg>  # dev-only dependency
 
 - All primary keys are UUIDs — no sequential IDs exposed in URLs
 - Account numbers stored as AES-256-GCM ciphertext; only the last 4 digits shown
-- Mono webhooks verified with HMAC-SHA512 before any processing
-- BVN verification (`identity_verified = true`) required before bill payments or linking bank accounts
+- Bank-alert webhook authenticated via constant-time shared secret comparison
 - Device-side database encrypted with SQLCipher; key stored in the OS secure keychain
 - RS256 JWT with 15-minute access tokens and 7-day rotating refresh tokens
 - CORS origins configured explicitly — no wildcard in production
@@ -380,15 +369,6 @@ For building a release APK without EAS or the Play Store, see [docs/LOCAL_APK_BU
 | [docs/LOCAL_APK_BUILD.md](docs/LOCAL_APK_BUILD.md)     | Building and signing a local release APK                           |
 | [docs/AUDIT_ACTION_PLAN.md](docs/AUDIT_ACTION_PLAN.md) | Security and quality audit findings and fixes applied              |
 | [docs/UI_MIGRATION_PLAN.md](docs/UI_MIGRATION_PLAN.md) | Screen-by-screen UI migration plan and design token reference      |
-
----
-
-## Team
-
-| Member           | Role                 | Contributions                                                                                                                                     |
-| ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Kaosi Anikwe** | Full-Stack Developer | Entire codebase — FastAPI backend, WatermelonDB sync engine, React Native app, Celery workers, Mono & Interswitch integrations, CI/CD, deployment |
-| **Patricia Oko** | UI/UX Designer       | App design, screen flows, visual identity, and authored this README                                                                               |
 
 ---
 
