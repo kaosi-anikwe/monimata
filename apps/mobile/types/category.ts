@@ -14,13 +14,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-export interface CategoryItem {
-  id: string;
-  name: string;
-}
+import type { Category } from '@monimata/shared-types';
 
+/** Lightweight pick — only id + name are needed by pickers and dropdowns. */
+export type CategoryItem = Pick<Category, 'id' | 'name'>;
+
+/**
+ * CategoryGroup with lightweight CategoryItem children.
+ * The mobile app builds these from WatermelonDB models — only id + name are
+ * projected from the local DB. For full API responses use CategoryGroupWithCategories.
+ */
 export interface CategoryGroup {
   id: string;
   name: string;
+  sort_order: number;
+  is_hidden: boolean;
   categories: CategoryItem[];
 }

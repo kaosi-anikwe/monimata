@@ -14,42 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-/** Determines which UI tab created this target */
+/** Client-side narrowing for CategoryTarget.frequency (API types it as plain string). */
 export type TargetFrequency = 'weekly' | 'monthly' | 'yearly' | 'custom';
 
-/**
- * What to do each period:
- * - set_aside → assign the amount again (bills, subscriptions)
- * - refill    → top up until available == amount (groceries, fun money)
- * - balance   → ensure available never drops below amount (emergency fund)
- */
+/** Client-side narrowing for CategoryTarget.behavior (API types it as plain string). */
 export type TargetBehavior = 'set_aside' | 'refill' | 'balance';
-
-export interface CategoryTarget {
-  id: string;
-  category_id: string;
-  frequency: TargetFrequency;
-  behavior: TargetBehavior;
-  /** kobo — must be positive */
-  target_amount: number;
-  /** 0=Mon … 6=Sun; weekly only */
-  day_of_week: number | null;
-  /** 1–31; 0 = last day of month; monthly only */
-  day_of_month: number | null;
-  /** ISO date "YYYY-MM-DD"; yearly / custom due date */
-  target_date: string | null;
-  /** custom frequency only */
-  repeats: boolean;
-  updated_at: string;
-}
-
-/** Payload for PUT /categories/:id/target */
-export interface CategoryTargetUpsert {
-  frequency: TargetFrequency;
-  behavior: TargetBehavior;
-  target_amount: number;
-  day_of_week?: number | null;
-  day_of_month?: number | null;
-  target_date?: string | null;
-  repeats?: boolean;
-}

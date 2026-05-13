@@ -46,7 +46,7 @@ import {
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, formatMoney } from '@/lib/typography';
-import type { BudgetResponse } from '@/types/budget';
+import type { BudgetResponse } from '@monimata/shared-types';
 import {
   useApplyAutoAssign,
   useAutoAssignPreviews,

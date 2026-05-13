@@ -56,7 +56,7 @@ import { glass, layout, radius, spacing } from '@/lib/tokens';
 import { ff, formatMoney, type_ } from '@/lib/typography';
 import { nextMonth, prevMonth } from '@/store/budgetSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import type { BudgetCategory, BudgetGroup } from '@/types/budget';
+import type { BudgetCategory, BudgetGroup } from '@monimata/shared-types';
 
 // ── Tour definition ───────────────────────────────────────────────────────────
 

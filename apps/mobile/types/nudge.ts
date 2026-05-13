@@ -14,14 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-export type NudgeTriggerType =
-  | 'threshold_80'
-  | 'threshold_100'
-  | 'large_single_tx'
-  | 'pay_received'
-  | 'bill_payment';
-
 // ── Context shapes (per trigger_type) ─────────────────────────────────────
+// These are not in the OpenAPI spec (context is typed as {[key:string]:unknown})
+// so they remain local.
 
 export interface Threshold80Context {
   category_name: string;
@@ -76,40 +71,3 @@ export type NudgeContext =
   | PayReceivedContext
   | BillPaymentContext
   | Record<string, unknown>; // fallback for unknown types
-
-// ── Main Nudge type ────────────────────────────────────────────────────────
-
-export interface Nudge {
-  id: string;
-  trigger_type: NudgeTriggerType | string;
-  title: string | null;
-  message: string;
-  context: NudgeContext | null;
-  category_id: string | null;
-  is_opened: boolean;
-  is_dismissed: boolean;
-  delivered_at: string | null;
-  created_at: string;
-}
-
-export interface NudgeListResponse {
-  nudges: Nudge[];
-  total: number;
-  unread_count: number;
-}
-
-export interface NudgeSettings {
-  enabled: boolean;
-  quiet_hours_start: string; // HH:MM
-  quiet_hours_end: string;   // HH:MM
-  fatigue_limit: number;
-  language: 'pidgin' | 'formal';
-}
-
-export interface NudgeSettingsUpdate {
-  enabled?: boolean;
-  quiet_hours_start?: string;
-  quiet_hours_end?: string;
-  fatigue_limit?: number;
-  language?: 'pidgin' | 'formal';
-}

@@ -23,7 +23,7 @@ import type {
   NudgeListResponse,
   NudgeSettings,
   NudgeSettingsUpdate,
-} from '../types/nudge';
+} from '@monimata/shared-types';
 
 // ── List ──────────────────────────────────────────────────────────────────
 

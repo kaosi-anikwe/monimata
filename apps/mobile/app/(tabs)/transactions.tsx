@@ -55,9 +55,9 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useTheme } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { BankAccount } from '@/types/account';
 import type { CategoryGroup } from '@/types/category';
-import type { Transaction } from '@/types/transaction';
+import type { BankAccount, Transaction } from '@monimata/shared-types';
+
 import { formatNaira } from '@/utils/money';
 
 // ── Tour definition ──────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLas
         ss.txRow,
         { borderBottomColor: colors.separator },
         !isLast && ss.txRowBorder,
-        tx.is_manual && { borderLeftColor: colors.info, borderLeftWidth: 3 },
+        tx.source === 'manual' && { borderLeftColor: colors.info, borderLeftWidth: 3 },
       ]}
       onPress={onPress}
       activeOpacity={0.7}
@@ -256,7 +256,7 @@ function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLas
           {sign}{formatNaira(Math.abs(tx.amount))}
         </Text>
         {/* <Text style={[type_.caption, { color: colors.textMeta }]}>{isDebit ? 'Debit' : 'Credit'}</Text> */}
-        {tx.is_manual && (
+        {tx.source === 'manual' && (
           <View style={[ss.manualBadge, { backgroundColor: colors.infoSubtle }]}>
             <Text style={[ss.manualBadgeText, { color: colors.info }]}>MANUAL</Text>
           </View>
