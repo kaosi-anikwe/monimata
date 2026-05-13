@@ -21,6 +21,8 @@ Revises: 0013
 Create Date: 2026-05-13
 """
 
+from sqlalchemy import text
+
 from alembic import op
 
 revision: str = "0014"
@@ -30,9 +32,39 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # PostgreSQL requires ALTER TYPE … ADD VALUE outside a transaction.
-    op.execute("ALTER TYPE transactionsource ADD VALUE IF NOT EXISTS 'statement'")
-    op.execute("ALTER TYPE transactionsource ADD VALUE IF NOT EXISTS 'receipt'")
+    conn = op.get_bind()
+
+    # Check whether the enum type exists at all.
+    type_exists = conn.execute(
+        text("SELECT 1 FROM pg_type WHERE typname = 'transactionsource'")
+    ).scalar()
+
+    if not type_exists:
+        # Fresh database that skipped migration 0011 — create the full enum.
+        # ALTER TYPE … ADD VALUE cannot run inside a transaction so we use
+        # CREATE TYPE here (which can).
+        conn.execute(
+            text(
+                "CREATE TYPE transactionsource AS ENUM "
+                "('bank_alert', 'manual', 'statement', 'receipt')"
+            )
+        )
+    else:
+        # Enum exists — add the two new values if not already present.
+        # ALTER TYPE … ADD VALUE must run outside a transaction block; Alembic
+        # executes DDL outside its implicit transaction when using PostgreSQL.
+        for value in ("statement", "receipt"):
+            exists = conn.execute(
+                text(
+                    "SELECT 1 FROM pg_enum "
+                    "WHERE enumtypid = 'transactionsource'::regtype "
+                    "AND enumlabel = :val"
+                ),
+                {"val": value},
+            ).scalar()
+            if not exists:
+                # AUTOCOMMIT needed for ALTER TYPE ADD VALUE outside transaction.
+                conn.execute(text(f"ALTER TYPE transactionsource ADD VALUE '{value}'"))
 
 
 def downgrade() -> None:
