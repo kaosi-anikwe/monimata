@@ -25,11 +25,11 @@
  * Touch targets: all tappable rows/cards ≥ 44 pt.
  */
 
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -39,11 +39,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ff } from '@/lib/typography';
-import { useTheme } from '@/lib/theme';
 import { useToast } from '@/components/Toast';
 import { Chip } from '@/components/ui/Chip';
+import { useTheme } from '@/lib/theme';
 import { hitSlop, layout, radius, shadow, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -342,7 +342,7 @@ function ArticleCard({
 
       {/* Content */}
       <View style={ss.artContent}>
-        <Text style={[ss.artTag, { color: colors.brand, ...ff(700) }]}>{article.tag}</Text>
+        <Text style={[ss.artTag, { color: colors.brand }]}>{article.tag}</Text>
         <Text style={[ss.artTitle, { color: colors.textPrimary, ...ff(700) }]} numberOfLines={2}>
           {article.title}
         </Text>
@@ -394,7 +394,7 @@ function CourseCardMini({
 
       {/* Info */}
       <View style={ss.courseMiniInfo}>
-        <Text style={[ss.courseTag, { color: colors.brand, ...ff(700) }]}>{course.tag}</Text>
+        <Text style={[ss.courseTag, { color: colors.brand }]}>{course.tag}</Text>
         <Text style={[ss.courseTitle, { color: colors.textPrimary, ...ff(700) }]} numberOfLines={2}>
           {course.title}
         </Text>
@@ -579,7 +579,7 @@ export default function HubScreen() {
           >
             <Ionicons name="arrow-back" size={layout.iconMd} color={colors.white} />
           </TouchableOpacity>
-          <Text style={[ss.titleTxt, { color: colors.white, ...ff(700) }]}>Knowledge Hub</Text>
+          <Text style={[ss.titleTxt, { color: colors.white }]}>Knowledge Hub</Text>
           {/* Spacer to balance the back button */}
           <View style={ss.titleSpacer} />
         </View>
@@ -761,7 +761,7 @@ export default function HubScreen() {
               accessibilityRole="button"
               accessibilityLabel="Start today's quiz"
             >
-              <Text style={[ss.startBtnTxt, { color: colors.white, ...ff(700) }]}>
+              <Text style={[ss.startBtnTxt, { color: colors.white }]}>
                 Start Today&apos;s Quiz
               </Text>
             </TouchableOpacity>
@@ -815,10 +815,10 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    titleTxt: { fontSize: 17 },
+    titleTxt: { ...type_.h2 },
     titleSpacer: { width: 36 },
     heroHeading: { fontSize: 21, letterSpacing: -0.3 },
-    heroSub: { fontSize: 13, marginTop: 3 },
+    heroSub: { ...type_.bodyReg, marginTop: 3 },
 
     // ── Hub tab pills ─────────────────────────────────────────────────────────
     hubTabs: {
@@ -915,7 +915,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     },
     artEmoji: { fontSize: 30 },
     artContent: { flex: 1, minWidth: 0 },
-    artTag: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
+    artTag: { ...type_.labelSm },
     artTitle: { fontSize: 13, lineHeight: 18, marginTop: 3 },
     artMeta: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 5 },
     artMetaTxt: { fontSize: 11 },
@@ -960,7 +960,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       justifyContent: 'center',
     },
     courseMiniInfo: { padding: 10 },
-    courseTag: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
+    courseTag: { ...type_.labelSm },
     courseTitle: { fontSize: 13, lineHeight: 18, marginTop: 3 },
     courseMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
     courseLessons: { fontSize: 10 },
@@ -1017,7 +1017,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     },
     dailyEmoji: { fontSize: 40, marginBottom: 12 },
     dailyTitle: { fontSize: 16 },
-    dailySub: { fontSize: 13, marginTop: 6, lineHeight: 20 },
+    dailySub: { ...type_.bodyReg, marginTop: 6 },
     startBtn: {
       marginTop: spacing.lg,
       height: 46,
@@ -1026,7 +1026,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    startBtnTxt: { fontSize: 14 },
+    startBtnTxt: { ...type_.btnSm },
 
     // ── Quiz list ─────────────────────────────────────────────────────────────
     quizList: {

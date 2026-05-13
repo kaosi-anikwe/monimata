@@ -24,12 +24,12 @@
  * - Drag-to-reorder: long-press the ≡ handle on a group or category row to
  *   drag it to a new position. Groups collapse while a group is being dragged.
  */
-import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -71,9 +71,9 @@ import {
   useUnhideGroup,
 } from '@/hooks/useBudget';
 import { useTheme } from '@/lib/theme';
-import { useAppSelector } from '@/store/hooks';
-import { ff, formatMoney } from '@/lib/typography';
 import { glass, radius, shadow, spacing } from '@/lib/tokens';
+import { ff, formatMoney, type_ } from '@/lib/typography';
+import { useAppSelector } from '@/store/hooks';
 import type { BudgetCategory, BudgetGroup } from '@/types/budget';
 
 
@@ -1063,7 +1063,7 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
   },
-  hdrTitle: { ...ff(700), fontSize: 17, letterSpacing: -0.3 },
+  hdrTitle: { ...type_.h2 },
   backBtn: {
     width: 36,
     height: 36,
@@ -1164,7 +1164,7 @@ const ss = StyleSheet.create({
     ...shadow.md,
   },
   catNameBtn: { flex: 1 },
-  catName: { ...ff(600), fontSize: 14 },
+  catName: { ...type_.body },
   catTargetChip: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
@@ -1188,7 +1188,7 @@ const ss = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: 'dashed',
   },
-  addGroupText: { ...ff(600), fontSize: 14 },
+  addGroupText: { ...type_.body },
 
   // ── Action sheet rows (.ash-row) ─────────────────────────────────────────
   ashRow: {
@@ -1207,7 +1207,7 @@ const ss = StyleSheet.create({
     justifyContent: 'center',
   },
   ashText: { flex: 1 },
-  ashNm: { ...ff(600), fontSize: 14 },
+  ashNm: { ...type_.body },
 
   // ── Rename inline ────────────────────────────────────────────────────────
   renameRow: {
@@ -1274,8 +1274,8 @@ const ss = StyleSheet.create({
 
   // ── Error state ──────────────────────────────────────────────────────────
   errorContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 6 },
-  errorText: { fontSize: 16, ...ff(600), textAlign: 'center' },
-  errorSub: { fontSize: 13, textAlign: 'center' },
+  errorText: { ...type_.h3, textAlign: 'center' },
+  errorSub: { ...type_.bodyReg, textAlign: 'center' },
 
   // ── Hidden toggle + unhide sheet ─────────────────────────────────────────
   hiddenToggle: {
@@ -1296,5 +1296,5 @@ const ss = StyleSheet.create({
   unhideSub: { ...ff(400), fontSize: 14, textAlign: 'center', lineHeight: 20 },
   unhideFooter: { flexDirection: 'row', gap: 10, marginTop: 8 },
   unhideBtn: { flex: 1, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  unhideBtnTxt: { ...ff(700), fontSize: 14 },
+  unhideBtnTxt: { ...type_.btnSm },
 });

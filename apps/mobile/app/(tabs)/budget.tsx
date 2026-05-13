@@ -25,12 +25,12 @@
  *  - Budget data comes from the API via React Query
  *  - FAB (Add Transaction) is rendered by the tab _layout.tsx
  */
-import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -45,18 +45,18 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTheme } from '@/lib/theme';
-import { ProgressBar } from '@/components/ui';
-import { syncDatabase } from '@/database/sync';
-import { ff, formatMoney } from '@/lib/typography';
-import { nextMonth, prevMonth } from '@/store/budgetSlice';
-import { glass, layout, radius, spacing } from '@/lib/tokens';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { AutoAssignSheet } from '@/components/AutoAssignSheet';
 import { BudgetWalkthrough } from '@/components/BudgetWalkthrough';
 import { TourTarget, useTour, type TourStep } from '@/components/tour';
-import type { BudgetCategory, BudgetGroup } from '@/types/budget';
+import { ProgressBar } from '@/components/ui';
+import { syncDatabase } from '@/database/sync';
 import { useAssignCategory, useBudget, useMoveMoney, useUnhideCategory, useUnhideGroup } from '@/hooks/useBudget';
+import { useTheme } from '@/lib/theme';
+import { glass, layout, radius, spacing } from '@/lib/tokens';
+import { ff, formatMoney, type_ } from '@/lib/typography';
+import { nextMonth, prevMonth } from '@/store/budgetSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import type { BudgetCategory, BudgetGroup } from '@/types/budget';
 
 // ── Tour definition ───────────────────────────────────────────────────────────
 
@@ -248,7 +248,7 @@ const ms = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
-  tbbVal: { ...ff(800), fontSize: 24, letterSpacing: -0.5, marginTop: 1 },
+  tbbVal: { ...type_.displayMd, marginTop: 1 },
   tbbSub: { ...ff(400), fontSize: 11, color: glass.textFaint, marginTop: 1 },
   aaBtn: {
     flexDirection: 'row',
@@ -373,7 +373,7 @@ const cr = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   left: { flex: 1, minWidth: 0 },
-  name: { ...ff(600), fontSize: 14 },
+  name: { ...type_.body },
   right: { alignItems: 'flex-end', minWidth: 86 },
   avail: { ...ff(700), fontSize: 15 },
   assignedTxt: { ...ff(400), fontSize: 11, marginTop: 1 },
@@ -418,7 +418,7 @@ const np = StyleSheet.create({
   grid: { marginHorizontal: 20, marginTop: spacing.mdn, borderRadius: radius.md, overflow: 'hidden', gap: 1 },
   row: { flexDirection: 'row', gap: 1 },
   key: { flex: 1, height: 50, alignItems: 'center', justifyContent: 'center' },
-  keyTxt: { ...ff(600), fontSize: 19 },
+  keyTxt: { ...type_.numpad },
 });
 
 // ── Assign / Move sheet ────────────────────────────────────────────────────────
@@ -770,8 +770,8 @@ const sh = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 14,
   },
-  topTitle: { ...ff(700), fontSize: 17, letterSpacing: -0.3 },
-  topSub: { ...ff(400), fontSize: 13, marginTop: 3 },
+  topTitle: { ...type_.h2 },
+  topSub: { ...type_.bodyReg, marginTop: 3 },
   xBtn: {
     width: 32,
     height: 32,
@@ -831,7 +831,7 @@ const sh = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footTxt: { ...ff(700), fontSize: 14 },
+  footTxt: { ...type_.btnSm },
   // Move mode extras
   toLabel: {
     ...ff(700),
@@ -853,7 +853,7 @@ const sh = StyleSheet.create({
     marginVertical: 2,
   },
   destName: { flex: 1, ...ff(500), fontSize: 14 },
-  destAvail: { ...ff(400), fontSize: 13 },
+  destAvail: { ...type_.bodyReg },
 });
 
 // ── Group header (.bgt-grp-h) ─────────────────────────────────────────────────
@@ -924,7 +924,7 @@ const gh = StyleSheet.create({
     paddingRight: 14,
     paddingVertical: 11,
   },
-  name: { ...ff(700), fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, flex: 1 },
+  name: { ...type_.label, flex: 1 },
   right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   total: { ...ff(700), fontSize: 13 },
 });
@@ -1014,7 +1014,7 @@ const uh = StyleSheet.create({
     gap: 8,
   },
   icon: { marginBottom: 4 },
-  title: { ...ff(700), fontSize: 17 },
+  title: { ...type_.h2 },
   sub: { ...ff(400), fontSize: 14, textAlign: 'center', lineHeight: 20 },
 });
 
@@ -1236,7 +1236,7 @@ const s = StyleSheet.create({
     gap: 6,
   },
   errorText: { ...ff(600), fontSize: 16, textAlign: 'center' },
-  errorSub: { ...ff(400), fontSize: 13, textAlign: 'center' },
+  errorSub: { ...type_.bodyReg, textAlign: 'center' },
   grpCard: {
     marginHorizontal: 16,
     marginTop: 10,

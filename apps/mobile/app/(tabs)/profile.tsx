@@ -21,7 +21,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -33,10 +32,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/Toast';
-import { AmountDisplay, Avatar, Badge, Button, ListRow, SectionHeader } from '@/components/ui';
-import { useAccounts } from '@/hooks/useAccounts';
+import { Avatar, Badge, Button, ListRow, SectionHeader } from '@/components/ui';
 import { useBiometricLock } from '@/hooks/useBiometricLock';
-import { useNudgeSettings, useNudgeUnreadCount, useUpdateNudgeSettings } from '@/hooks/useNudges';
+import { useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
 import { useTheme, useThemePreference } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
@@ -44,11 +42,7 @@ import { logout } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 // ── Hardcoded gamification constants (Phase 14 will fetch from API) ──────────
-const FAKE_LEVEL = 7;
-const FAKE_XP = 2840;
 const FAKE_STREAK = 14;
-const FAKE_BADGES = 8;
-const FAKE_XP_TO_NEXT = 1360;
 
 // ── ProfileRow — reusable menu row ────────────────────────────────────────────
 // ── Main screen ───────────────────────────────────────────────────────────────
@@ -60,8 +54,6 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((s) => s.auth);
-  const nudgeUnread = useNudgeUnreadCount();
-  const { data: accounts } = useAccounts();
   const { confirm, info } = useToast();
   const { isEnrolled, isEnabled: biometricEnabled, toggleEnabled: toggleBiometric } = useBiometricLock();
 
@@ -74,10 +66,6 @@ export default function ProfileScreen() {
     updateNudgeSettings.mutate({ language: lang });
   }
 
-  const netWorth = useMemo(
-    () => (accounts ?? []).filter((a) => a.is_active).reduce((s, a) => s + a.balance, 0),
-    [accounts],
-  );
 
   function handleLogout() {
     confirm({
@@ -115,7 +103,7 @@ export default function ProfileScreen() {
             size="lg"
           />
           <View>
-            <Text style={[ss.profName, { color: colors.white, ...ff(800) }]}>
+            <Text style={[ss.profName, { color: colors.white }]}>
               {user ? `${user.first_name} ${user.last_name}` : 'Hey there'}
             </Text>
             {user?.email ? (
@@ -126,9 +114,7 @@ export default function ProfileScreen() {
 
         {/* Gamification badge pills */}
         <View style={ss.badges}>
-          <Badge variant="lime">Level {FAKE_LEVEL} ⚔️</Badge>
           <Badge variant="lime">{FAKE_STREAK}-day streak 🔥</Badge>
-          <Badge variant="lime">{FAKE_BADGES} badges 🏅</Badge>
         </View>
       </View>
 
@@ -138,29 +124,6 @@ export default function ProfileScreen() {
         contentContainerStyle={ss.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Stats grid */}
-        <View style={ss.statsGrid}>
-          <View style={[ss.statCell, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
-            <AmountDisplay
-              kobo={netWorth}
-              size="md"
-              compact
-              style={{ fontSize: 22, letterSpacing: -0.5 }}
-            />
-            <Text style={[ss.statLbl, { color: colors.textMeta, ...ff(600) }]}>Net Worth</Text>
-          </View>
-          <View style={[ss.statCell, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
-            <Text style={[ss.statNum, { color: colors.textPrimary, ...ff(800) }]}>
-              {FAKE_XP.toLocaleString()}
-            </Text>
-            <Text style={[ss.statLbl, { color: colors.textMeta, ...ff(600) }]}>Total XP</Text>
-          </View>
-          <View style={[ss.statCell, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
-            <Text style={[ss.statNum, { color: colors.textPrimary, ...ff(800) }]}>{FAKE_STREAK}</Text>
-            <Text style={[ss.statLbl, { color: colors.textMeta, ...ff(600) }]}>Day Streak</Text>
-          </View>
-        </View>
-
         {/* ── Account & Security section ───────────────────────────────── */}
         <SectionHeader
           title="Account & Security"
@@ -214,46 +177,6 @@ export default function ProfileScreen() {
               separator={false}
             />
           )}
-        </View>
-
-        {/* ── Activity section ──────────────────────────────────────────── */}
-        <SectionHeader
-          title="Activity"
-          variant="group"
-          paddingHorizontal={spacing.lg}
-          style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
-        />
-        <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
-          <ListRow
-            iconBg={colors.warningSubtle}
-            leftIcon={<Ionicons name="star-outline" size={17} color={colors.warning} />}
-            title="Rewards & XP"
-            subtitle={`Level ${FAKE_LEVEL} · ${FAKE_XP.toLocaleString()} XP · ${FAKE_XP_TO_NEXT.toLocaleString()} to Level ${FAKE_LEVEL + 1}`}
-            onPress={() => router.push('/(tabs)/rewards')}
-            showChevron
-          />
-          <ListRow
-            iconBg={colors.warningSubtle}
-            leftIcon={<Ionicons name="stats-chart-outline" size={17} color={colors.warning} />}
-            title="Leaderboard"
-            subtitle="See how you rank this week"
-            onPress={() => comingSoon('Leaderboard')}
-            showChevron
-          />
-          <ListRow
-            iconBg={colors.errorSubtle}
-            leftIcon={<Ionicons name="notifications-outline" size={17} color={colors.error} />}
-            title="Nudges"
-            subtitle="AI-powered spending alerts"
-            onPress={() => router.push('/(tabs)/nudges')}
-            right={
-              nudgeUnread > 0
-                ? <Badge variant="error" size="sm">{nudgeUnread > 99 ? '99+' : nudgeUnread} new</Badge>
-                : undefined
-            }
-            showChevron={nudgeUnread === 0}
-            separator={false}
-          />
         </View>
 
         {/* ── Learn & Reports section ──────────────────────────────────── */}
@@ -323,7 +246,7 @@ export default function ProfileScreen() {
                       type_.caption,
                       nudgeLang === 'pidgin'
                         ? { color: colors.white, ...ff(700) }
-                        : { color: colors.textMeta, ...ff(600) },
+                        : { color: colors.textMeta },
                     ]}
                   >
                     Pidgin
@@ -341,7 +264,7 @@ export default function ProfileScreen() {
                       type_.caption,
                       nudgeLang === 'formal'
                         ? { color: colors.white, ...ff(700) }
-                        : { color: colors.textMeta, ...ff(600) },
+                        : { color: colors.textMeta },
                     ]}
                   >
                     Formal
@@ -386,8 +309,8 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       gap: spacing.md,
       marginBottom: spacing.md,
     },
-    profName: { fontSize: 19, letterSpacing: -0.3 },
-    profEmail: { fontSize: 13, marginTop: 1 },
+    profName: { ...ff(800), fontSize: 19, letterSpacing: -0.3 },
+    profEmail: { ...type_.bodyReg, marginTop: 1 },
     badges: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
     // scroll
     scroll: { flex: 1 },

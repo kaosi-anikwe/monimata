@@ -24,10 +24,10 @@
  * Tapping a challenge navigates to /challenge/[id].
  */
 
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -37,11 +37,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ff } from '@/lib/typography';
-import { useTheme } from '@/lib/theme';
 import { useToast } from '@/components/Toast';
 import { Badge, Button, ProgressBar } from '@/components/ui';
+import { useTheme } from '@/lib/theme';
 import { hitSlop, layout, radius, shadow, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
 
 // ── Fake seed data ────────────────────────────────────────────────────────────
 // Phase 16 replaces with useGamification() / useStreak() / useBadges() / useChallenges().
@@ -198,17 +198,17 @@ function BadgeCell({
       {/* "New!" pip */}
       {badge.isNew && (
         <View style={[ss.bdgNewPip, { backgroundColor: colors.error, borderColor: colors.white }]}>
-          <Text style={[ss.bdgNewTxt, { color: colors.white, ...ff(800) }]}>N</Text>
+          <Text style={[ss.bdgNewTxt, { color: colors.white }]}>N</Text>
         </View>
       )}
       <Text style={ss.bdgIcon}>{badge.emoji}</Text>
-      <Text style={[ss.bdgName, { color: colors.textPrimary, ...ff(700) }]} numberOfLines={2}>
+      <Text style={[ss.bdgName, { color: colors.textPrimary }]} numberOfLines={2}>
         {badge.name}
       </Text>
       <Text
         style={[
           ss.bdgStatus,
-          { color: badge.earned ? colors.brand : colors.textMeta, ...ff(600) },
+          { color: badge.earned ? colors.brand : colors.textMeta },
         ]}
       >
         {badge.earned ? 'Earned!' : (badge.lockHint ?? 'Locked')}
@@ -248,7 +248,7 @@ function ChallengeCard({
 
       {/* Info */}
       <View style={ss.chalInfo}>
-        <Text style={[ss.chalTtl, { color: colors.textPrimary, ...ff(700) }]}>
+        <Text style={[ss.chalTtl, { color: colors.textPrimary }]}>
           {challenge.title}
         </Text>
         <Text style={[ss.chalDesc, { color: colors.textMeta }]}>
@@ -282,7 +282,7 @@ function ChallengeCard({
           accessibilityLabel={`Join ${challenge.title}`}
           hitSlop={hitSlop(36)}
         >
-          <Text style={[ss.joinBtnTxt, { color: colors.white, ...ff(700) }]}>Join</Text>
+          <Text style={[ss.joinBtnTxt, { color: colors.white }]}>Join</Text>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -312,7 +312,7 @@ function XpBar({
   return (
     <View style={ss.xpWrap}>
       <View style={ss.xpRow}>
-        <Text style={[ss.xpLev, { color: colors.lime, ...ff(700) }]}>
+        <Text style={[ss.xpLev, { color: colors.lime }]}>
           Level {level} · {levelTitle}
         </Text>
         <Text style={[ss.xpPts, { color: colors.textInverseFaint }]}>
@@ -365,7 +365,7 @@ export default function RewardsScreen() {
 
         <View style={ss.headerTop}>
           <View>
-            <Text style={[ss.levelTitle, { color: colors.white, ...ff(800) }]}>
+            <Text style={[ss.levelTitle, { color: colors.white }]}>
               Money Warrior ⚔️
             </Text>
             <Text style={[ss.levelSub, { color: colors.textInverseFaint }]}>
@@ -406,7 +406,7 @@ export default function RewardsScreen() {
           {/* Left: fire + big number */}
           <View style={ss.streakLeft}>
             <Text style={ss.streakFire}>🔥</Text>
-            <Text style={[ss.streakNum, { color: colors.textPrimary, ...ff(800) }]}>
+            <Text style={[ss.streakNum, { color: colors.textPrimary }]}>
               {FAKE_STREAK}
             </Text>
             <Text style={[ss.streakDays, { color: colors.textMeta }]}>days</Text>
@@ -414,8 +414,8 @@ export default function RewardsScreen() {
 
           {/* Right: label + dots */}
           <View style={ss.streakRight}>
-            <Text style={[ss.streakLbl, { color: colors.warning, ...ff(700) }]}>STREAK</Text>
-            <Text style={[ss.streakVal, { color: colors.textPrimary, ...ff(700) }]}>
+            <Text style={[ss.streakLbl, { color: colors.warning }]}>STREAK</Text>
+            <Text style={[ss.streakVal, { color: colors.textPrimary }]}>
               Daily Budget Check-in
             </Text>
             <Text style={[ss.streakSub, { color: colors.textMeta }]}>
@@ -442,9 +442,9 @@ export default function RewardsScreen() {
                 return (
                   <View key={i} style={ss.wkDot}>
                     <View style={[ss.wkDotCircle, { backgroundColor: dotBg }]}>
-                      <Text style={[ss.wkDotSym, { color: dotColor, ...ff(700) }]}>{sym}</Text>
+                      <Text style={[ss.wkDotSym, { color: dotColor }]}>{sym}</Text>
                     </View>
-                    <Text style={[ss.wkDotLbl, { color: colors.textMeta, ...ff(600) }]}>{lbl}</Text>
+                    <Text style={[ss.wkDotLbl, { color: colors.textMeta }]}>{lbl}</Text>
                   </View>
                 );
               })}
@@ -454,8 +454,8 @@ export default function RewardsScreen() {
 
         {/* ── Badges section ────────────────────────────────────────────── */}
         <View style={ss.secRow}>
-          <Text style={[ss.secTtl, { color: colors.textPrimary, ...ff(800) }]}>Badges</Text>
-          <Text style={[ss.secLnk, { color: colors.brand, ...ff(600) }]}>
+          <Text style={[ss.secTtl, { color: colors.textPrimary }]}>Badges</Text>
+          <Text style={[ss.secLnk, { color: colors.brand }]}>
             {BADGES.filter((b) => b.earned).length}/{BADGES.length}
           </Text>
         </View>
@@ -467,7 +467,7 @@ export default function RewardsScreen() {
 
         {/* ── Active challenges section ──────────────────────────────────── */}
         <View style={ss.secRow}>
-          <Text style={[ss.secTtl, { color: colors.textPrimary, ...ff(800) }]}>
+          <Text style={[ss.secTtl, { color: colors.textPrimary }]}>
             Active Challenges
           </Text>
           <TouchableOpacity
@@ -475,7 +475,7 @@ export default function RewardsScreen() {
             accessibilityRole="button"
             accessibilityLabel="View all challenges"
           >
-            <Text style={[ss.secLnk, { color: colors.brand, ...ff(600) }]}>View all</Text>
+            <Text style={[ss.secLnk, { color: colors.brand }]}>View all</Text>
           </TouchableOpacity>
         </View>
 
@@ -528,8 +528,8 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       justifyContent: 'space-between',
       marginBottom: spacing.mdn,
     },
-    levelTitle: { fontSize: 22, letterSpacing: -0.3 },
-    levelSub: { fontSize: 13, marginTop: 3 },
+    levelTitle: { ...ff(800), fontSize: 22, letterSpacing: -0.3 },
+    levelSub: { ...type_.bodyReg, marginTop: 3 },
 
     // ── XP bar ───────────────────────────────────────────────────────────────
     xpWrap: { marginTop: 2 },
@@ -539,14 +539,14 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       justifyContent: 'space-between',
       marginBottom: 6,
     },
-    xpLev: { fontSize: 13 },
-    xpPts: { fontSize: 12 },
+    xpLev: { ...ff(700), fontSize: 13 },
+    xpPts: { ...ff(400), fontSize: 12 },
     xpMetaRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginTop: 4,
     },
-    xpMetaTxt: { fontSize: 10 },
+    xpMetaTxt: { ...ff(400), fontSize: 10 },
     textInverseFaint: { opacity: 0.4 },
 
     // ── Streak banner ─────────────────────────────────────────────────────────
@@ -563,12 +563,12 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     },
     streakLeft: { alignItems: 'center', flexShrink: 0 },
     streakFire: { fontSize: 38, lineHeight: 42 },
-    streakNum: { fontSize: 42, letterSpacing: -2, lineHeight: 42 },
-    streakDays: { fontSize: 13, marginTop: 2 },
+    streakNum: { ...ff(800), fontSize: 42, letterSpacing: -2, lineHeight: 42 },
+    streakDays: { ...ff(400), fontSize: 13, marginTop: 2 },
     streakRight: { flex: 1 },
-    streakLbl: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
-    streakVal: { fontSize: 14, marginTop: 2 },
-    streakSub: { fontSize: 12, marginTop: 1, lineHeight: 17 },
+    streakLbl: { ...type_.labelSm },
+    streakVal: { ...ff(700), fontSize: 14, marginTop: 2 },
+    streakSub: { ...ff(400), fontSize: 12, marginTop: 1, lineHeight: 17 },
     wkDots: { flexDirection: 'row', gap: 4, marginTop: spacing.smd },
     wkDot: { alignItems: 'center', gap: 3 },
     wkDotCircle: {
@@ -578,8 +578,8 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    wkDotSym: { fontSize: 13 },
-    wkDotLbl: { fontSize: 9 },
+    wkDotSym: { ...ff(700), fontSize: 13 },
+    wkDotLbl: { ...ff(600), fontSize: 9 },
 
     // ── Section row ──────────────────────────────────────────────────────────
     secRow: {
@@ -590,8 +590,8 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       marginTop: spacing.md,
       marginBottom: spacing.smd,
     },
-    secTtl: { fontSize: 16, letterSpacing: -0.3 },
-    secLnk: { fontSize: 13 },
+    secTtl: { ...type_.h3 },
+    secLnk: { ...ff(600), fontSize: 13 },
 
     // ── Badges grid ───────────────────────────────────────────────────────────
     badgesGrid: {
@@ -620,10 +620,10 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    bdgNewTxt: { fontSize: 7 },
+    bdgNewTxt: { ...ff(800), fontSize: 7 },
     bdgIcon: { fontSize: 28, marginBottom: 6 },
-    bdgName: { fontSize: 11, lineHeight: 15, textAlign: 'center' },
-    bdgStatus: { fontSize: 10, marginTop: 2, textAlign: 'center' },
+    bdgName: { ...ff(700), fontSize: 11, lineHeight: 15, textAlign: 'center' },
+    bdgStatus: { ...ff(600), fontSize: 10, marginTop: 2, textAlign: 'center' },
 
     // ── Challenge cards ───────────────────────────────────────────────────────
     chalList: { paddingHorizontal: spacing.lg, gap: spacing.smd },
@@ -646,15 +646,15 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     },
     chalEmoji: { fontSize: 22 },
     chalInfo: { flex: 1, minWidth: 0 },
-    chalTtl: { fontSize: 13 },
-    chalDesc: { fontSize: 12, marginTop: 2, lineHeight: 17 },
+    chalTtl: { ...ff(700), fontSize: 13 },
+    chalDesc: { ...ff(400), fontSize: 12, marginTop: 2, lineHeight: 17 },
     chalFoot: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       marginTop: 8,
     },
-    chalProgTxt: { fontSize: 11 },
+    chalProgTxt: { ...ff(400), fontSize: 11 },
 
     // Joined badge → replaced by <Badge variant="success">
 
@@ -666,6 +666,6 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       paddingHorizontal: 12,
       paddingVertical: 6,
     },
-    joinBtnTxt: { fontSize: 12 },
+    joinBtnTxt: { ...ff(700), fontSize: 12 },
   });
 }

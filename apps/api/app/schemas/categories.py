@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -87,30 +88,27 @@ class CategoryGroupWithCategories(BaseModel):
 # ── Category Targets ──────────────────────────────────────────────────────────
 
 
+class TargetFrequency(StrEnum):
+    weekly = "weekly"
+    monthly = "monthly"
+    yearly = "yearly"
+    custom = "custom"
+
+
+class TargetBehavior(StrEnum):
+    set_aside = "set_aside"
+    refill = "refill"
+    balance = "balance"
+
+
 class CategoryTargetUpsert(BaseModel):
-    frequency: str  # weekly | monthly | yearly | custom
-    behavior: str = "set_aside"  # set_aside | refill | balance
+    frequency: TargetFrequency
+    behavior: TargetBehavior = TargetBehavior.set_aside
     target_amount: int  # kobo, must be > 0
     day_of_week: int | None = None  # 0=Mon … 6=Sun; weekly only
     day_of_month: int | None = None  # 1-31; 0=last day; monthly only
     target_date: date | None = None  # yearly / custom due date
     repeats: bool = False  # custom only
-
-    @field_validator("frequency")
-    @classmethod
-    def valid_frequency(cls, v: str) -> str:
-        allowed = {"weekly", "monthly", "yearly", "custom"}
-        if v not in allowed:
-            raise ValueError(f"frequency must be one of {allowed}")
-        return v
-
-    @field_validator("behavior")
-    @classmethod
-    def valid_behavior(cls, v: str) -> str:
-        allowed = {"set_aside", "refill", "balance"}
-        if v not in allowed:
-            raise ValueError(f"behavior must be one of {allowed}")
-        return v
 
     @field_validator("target_amount")
     @classmethod
@@ -123,8 +121,8 @@ class CategoryTargetUpsert(BaseModel):
 class CategoryTargetResponse(BaseModel):
     id: UUID
     category_id: UUID
-    frequency: str
-    behavior: str
+    frequency: TargetFrequency
+    behavior: TargetBehavior
     target_amount: int
     day_of_week: int | None
     day_of_month: int | None
