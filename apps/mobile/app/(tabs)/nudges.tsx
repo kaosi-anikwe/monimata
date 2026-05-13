@@ -52,11 +52,10 @@ import {
   useNudges,
   useOpenNudge,
 } from '../../hooks/useNudges';
+import type { Nudge, NudgeTriggerType } from '@monimata/shared-types';
 import type {
   BillPaymentContext,
   LargeSingleTxContext,
-  Nudge,
-  NudgeTriggerType,
   PayReceivedContext,
   Threshold100Context,
   Threshold80Context,

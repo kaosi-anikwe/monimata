@@ -14,42 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-export type RecurringFrequency =
-  | 'daily'
-  | 'weekly'
-  | 'biweekly'
-  | 'monthly'
-  | 'yearly'
-  | 'custom';
-
-/** Template stored on RecurringRule — used to create each transaction instance */
-export interface RecurringTemplate {
-  account_id: string;
-  /** kobo; negative=debit, positive=credit */
-  amount: number;
-  narration: string;
-  type: 'debit' | 'credit';
-  category_id: string | null;
-  memo: string | null;
-}
-
-export interface RecurringRule {
-  id: string;
-  user_id: string;
-  frequency: RecurringFrequency;
-  /** Every N units of frequency — 1 for most common cases */
-  interval: number;
-  /** 0=Mon … 6=Sun; weekly / biweekly */
-  day_of_week: number | null;
-  /** 1–31; 0 = last day; monthly */
-  day_of_month: number | null;
-  /** ISO date "YYYY-MM-DD" — next transaction to generate */
-  next_due: string;
-  /** ISO date "YYYY-MM-DD" — optional hard stop */
-  ends_on: string | null;
-  is_active: boolean;
-  template: RecurringTemplate;
-}
+import type { RecurringFrequency } from '@monimata/shared-types';
 
 /** Display labels shown in the "How often?" picker */
 export const RECURRENCE_OPTIONS: { label: string; value: RecurringFrequency; interval: number }[] =

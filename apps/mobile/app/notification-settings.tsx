@@ -41,7 +41,7 @@ import { useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { NudgeSettings } from '@/types/nudge';
+import type { NudgeSettings } from '@monimata/shared-types';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 

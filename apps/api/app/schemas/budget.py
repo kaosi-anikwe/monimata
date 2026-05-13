@@ -58,6 +58,7 @@ class BudgetResponse(BaseModel):
     month: str  # "YYYY-MM"
     tbb: int  # kobo — To Be Budgeted
     groups: list[BudgetGroupResponse]
+    total_debit: int = 0  # calculated on mobile
 
 
 class AssignRequest(BaseModel):

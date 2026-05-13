@@ -19,7 +19,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/Toast';
 import { queryKeys } from '@/lib/queryKeys';
 import api from '@/services/api';
-import type { BankAccount } from '@/types/account';
+import type { BankAccount } from '@monimata/shared-types';
 
 export interface AddManualAccountPayload {
   institution: string;

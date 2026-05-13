@@ -52,7 +52,7 @@ import {
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { BankAccount } from '@/types/account';
+import type { BankAccount } from '@monimata/shared-types';
 import { formatNaira } from '@/utils/money';
 
 // ── Tour definition ─────────────────────────────────────────────────────

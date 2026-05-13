@@ -17,12 +17,12 @@
 import { Q } from '@nozbe/watermelondb';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getDatabase } from '@/database';
-import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/Toast';
-import { syncDatabase } from '@/database/sync';
+import { getDatabase } from '@/database';
 import CategoryTargetModel from '@/database/models/CategoryTarget';
-import type { CategoryTarget, CategoryTargetUpsert } from '@/types/target';
+import { syncDatabase } from '@/database/sync';
+import { queryKeys } from '@/lib/queryKeys';
+import type { CategoryTarget, CategoryTargetUpsert } from '@monimata/shared-types';
 
 function targetModelToDto(m: CategoryTargetModel): CategoryTarget {
   return {
@@ -67,7 +67,7 @@ export function useUpsertTarget(month: string) {
         if (existing.length > 0) {
           await existing[0].update(t => {
             t.frequency = body.frequency;
-            t.behavior = body.behavior;
+            t.behavior = body.behavior ?? 'set_aside';
             t.targetAmount = body.target_amount;
             t.dayOfWeek = body.day_of_week ?? null;
             t.dayOfMonth = body.day_of_month ?? null;
@@ -79,7 +79,7 @@ export function useUpsertTarget(month: string) {
           await db.get<CategoryTargetModel>('category_targets').create(t => {
             t.categoryId = categoryId;
             t.frequency = body.frequency;
-            t.behavior = body.behavior;
+            t.behavior = body.behavior ?? 'set_aside';
             t.targetAmount = body.target_amount;
             t.dayOfWeek = body.day_of_week ?? null;
             t.dayOfMonth = body.day_of_month ?? null;

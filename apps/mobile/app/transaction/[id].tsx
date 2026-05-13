@@ -59,11 +59,10 @@ import {
 import { GRADIENTS, useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { BankAccount } from '@/types/account';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
-import type { Transaction } from '@/types/transaction';
 import { computeNextDue, nairaStringToKobo } from '@/utils/money';
+import type { BankAccount, Transaction } from '@monimata/shared-types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -508,7 +507,7 @@ function ManualEditForm({
   const createRecurring = useCreateRecurringRule();
   const deactivateRecurring = useDeactivateRecurringRule();
 
-  const [txType, setTxType] = useState<'debit' | 'credit'>(tx.type);
+  const [txType, setTxType] = useState<'debit' | 'credit'>(tx.type as 'debit' | 'credit');
   const [amountStr, setAmountStr] = useState(koboToNairaStr(tx.amount));
   const [narration, setNarration] = useState(tx.narration);
   const [txDatetime, setTxDatetime] = useState(() => new Date(tx.date));
@@ -881,9 +880,9 @@ export default function TransactionDetailsScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      <StatusBar style={tx.is_manual ? 'dark' : 'light'} />
+      <StatusBar style={tx.source === 'manual' ? 'dark' : 'light'} />
       {/* ── Header: white for manual, dark gradient hero for bank ── */}
-      {tx.is_manual ? (
+      {tx.source === 'manual' ? (
         <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
           <TouchableOpacity
             style={[ss.backBtn, { backgroundColor: colors.surface }]}
@@ -925,7 +924,7 @@ export default function TransactionDetailsScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {tx.is_manual ? (
+        {tx.source === 'manual' ? (
           <ManualEditForm
             tx={tx}
             accounts={accounts}

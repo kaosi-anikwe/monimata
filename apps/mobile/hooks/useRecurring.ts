@@ -22,7 +22,7 @@ import { useToast } from '@/components/Toast';
 import { syncDatabase } from '@/database/sync';
 import { useAppSelector } from '@/store/hooks';
 import RecurringRuleModel from '@/database/models/RecurringRule';
-import type { RecurringFrequency, RecurringRule, RecurringTemplate } from '@/types/recurring';
+import type { RecurringFrequency, RecurringRule, RecurringTemplate } from '@monimata/shared-types';
 
 export interface RecurringRuleBody {
   frequency: RecurringFrequency;
@@ -32,15 +32,7 @@ export interface RecurringRuleBody {
   /** ISO date "YYYY-MM-DD" — date of the NEXT occurrence to generate */
   next_due: string;
   ends_on?: string | null;
-  template: {
-    account_id: string;
-    /** kobo; negative = debit, positive = credit */
-    amount: number;
-    narration: string;
-    type: 'debit' | 'credit';
-    category_id: string | null;
-    memo: string | null;
-  };
+  template: RecurringTemplate;
 }
 
 function ruleModelToDto(m: RecurringRuleModel): RecurringRule {
@@ -55,6 +47,8 @@ function ruleModelToDto(m: RecurringRuleModel): RecurringRule {
     ends_on: m.endsOn,
     is_active: m.isActive,
     template: JSON.parse(m.template) as RecurringTemplate,
+    created_at: m.createdAt.toISOString(),
+    updated_at: m.updatedAt.toISOString(),
   };
 }
 

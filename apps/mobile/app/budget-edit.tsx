@@ -74,7 +74,7 @@ import { useTheme } from '@/lib/theme';
 import { glass, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, formatMoney, type_ } from '@/lib/typography';
 import { useAppSelector } from '@/store/hooks';
-import type { BudgetCategory, BudgetGroup } from '@/types/budget';
+import type { BudgetCategory, BudgetGroup } from '@monimata/shared-types';
 
 
 // ─── Target summary label ─────────────────────────────────────────────────────

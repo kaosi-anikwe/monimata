@@ -23,7 +23,7 @@ import TransactionModel from '@/database/models/Transaction';
 import { syncDatabase } from '@/database/sync';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAppSelector } from '@/store/hooks';
-import type { Transaction, TransactionPage } from '@/types/transaction';
+import type { Transaction, TransactionListResponse as TransactionPage } from '@monimata/shared-types';
 
 export interface ManualTransactionBody {
   account_id: string;
@@ -45,13 +45,15 @@ function txModelToDto(m: TransactionModel): Transaction {
     narration: m.narration,
     amount: m.amount,
     type: m.type as 'debit' | 'credit',
+    balance_after: m.balanceAfter ?? null,
     category_id: m.categoryId,
     memo: m.memo,
     is_split: m.isSplit,
-    is_manual: m.isManual,
-    source: m.source,
+    source: m.source as 'bank_alert' | 'manual',
     recurrence_id: m.recurrenceId,
     splits: [],
+    created_at: m.createdAt.toISOString(),
+    updated_at: m.updatedAt.toISOString(),
   };
 }
 

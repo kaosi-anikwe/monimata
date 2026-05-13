@@ -189,8 +189,11 @@ export default function HomeScreen() {
     [budget],
   );
 
-  // Expenses = ALL debit transactions this month (categorised + uncategorised)
-  const totalExpenses = budget?.total_debit ?? 0;
+  // Expenses = sum of all debit activity across categories this month
+  const totalExpenses = useMemo(
+    () => allCats.reduce((s, c) => s + Math.max(0, -c.activity), 0),
+    [allCats],
+  );
 
   // Income = TBB + totalAssigned (fundamental ZBB identity)
   const totalIncome = useMemo(() => {

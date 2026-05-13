@@ -16,108 +16,78 @@
 /**
  * Shared TypeScript interfaces used by both the mobile app and any TS tooling.
  *
- * Hand-written types live in this file.
  * Auto-generated API types (from FastAPI's OpenAPI spec) live in ./api.ts —
  * run `npm run generate:types` from the monorepo root to regenerate them.
+ *
+ * This file re-exports the generated types under friendly names so consumers
+ * can write:
+ *   import type { User, Transaction } from '@monimata/shared-types';
+ * instead of the verbose bracket-notation form.
  */
 
-export * from './api';
+export type { components, operations, paths } from './api';
 
-export interface User {
-  id: string;
-  email: string;
-  first_name: string | null;
-  last_name: string | null;
-  phone: string | null;
-  identity_verified: boolean;
-  onboarded: boolean;
-  created_at: string;
-}
+import type { components } from './api';
 
-export interface BankAccount {
-  id: string;
-  institution: string;
-  account_name: string;
-  account_type: 'SAVINGS' | 'CURRENT';
-  currency: string;
-  balance: number; // kobo
-  last_synced_at: string | null;
-  is_active: boolean;
-}
+// ── Auth ──────────────────────────────────────────────────────────────────────
+export type User = components['schemas']['UserResponse'];
+export type RegisterPayload = components['schemas']['RegisterRequest'];
+export type LoginPayload = components['schemas']['LoginRequest'];
+export type UpdateProfilePayload = components['schemas']['UpdateProfileRequest'];
+export type TokenResponse = components['schemas']['TokenResponse'];
+export type AccessTokenResponse = components['schemas']['AccessTokenResponse'];
+export type RefreshPayload = components['schemas']['RefreshRequest'];
 
-export interface Transaction {
-  id: string;
-  account_id: string;
-  date: string; // ISO date "YYYY-MM-DD"
-  amount: number; // kobo; negative = debit
-  narration: string;
-  type: 'debit' | 'credit';
-  category_id: string | null;
-  memo: string | null;
-  is_split: boolean;
-  is_manual: boolean;
-  source: 'mono' | 'interswitch' | 'manual';
-}
+// ── Accounts ─────────────────────────────────────────────────────────────────
+export type BankAccount = components['schemas']['BankAccountResponse'];
+export type AddManualAccountPayload = components['schemas']['AddManualAccountRequest'];
+export type UpdateAliasPayload = components['schemas']['UpdateAliasRequest'];
+export type UpdateManualBalancePayload = components['schemas']['UpdateManualBalanceRequest'];
 
-export interface CategoryGroup {
-  id: string;
-  name: string;
-  sort_order: number;
-  is_hidden: boolean;
-  categories: Category[];
-}
+// ── Transactions ─────────────────────────────────────────────────────────────
+export type Transaction = components['schemas']['TransactionResponse'];
+export type TransactionSplit = components['schemas']['TransactionSplitResponse'];
+export type TransactionSplitItem = components['schemas']['TransactionSplitItem'];
+export type TransactionSplitPayload = components['schemas']['TransactionSplitRequest'];
+export type ManualTransactionPayload = components['schemas']['ManualTransactionRequest'];
+export type TransactionPatchPayload = components['schemas']['TransactionPatchRequest'];
+export type TransactionListResponse = components['schemas']['TransactionListResponse'];
+export type TransactionSource = components['schemas']['TransactionSource'];
 
-export interface Category {
-  id: string;
-  group_id: string;
-  name: string;
-  sort_order: number;
-  is_hidden: boolean;
-  target?: CategoryTarget;
-}
+// ── Budget ────────────────────────────────────────────────────────────────────
+export type BudgetResponse = components['schemas']['BudgetResponse'];
+export type BudgetGroup = components['schemas']['BudgetGroupResponse'];
+export type BudgetCategory = components['schemas']['BudgetCategoryResponse'];
+export type TBBResponse = components['schemas']['TBBResponse'];
+export type AssignBudgetPayload = components['schemas']['AssignRequest'];
+export type MoveMoneyPayload = components['schemas']['MoveMoneyRequest'];
+export type AutoAssignStrategy = components['schemas']['AutoAssignStrategy'];
+export type AutoAssignResponse = components['schemas']['AutoAssignResponse'];
+export type UnderfundedCategory = components['schemas']['UnderfundedCategoryResponse'];
 
-export interface CategoryTarget {
-  id: string;
-  category_id: string;
-  target_type:
-    | 'monthly_set_aside'
-    | 'monthly_fill_up_to'
-    | 'monthly_balance'
-    | 'weekly_set_aside'
-    | 'by_date';
-  target_amount: number; // kobo
-  target_date?: string | null;
-  repeats: boolean;
-  repeat_cadence?: 'monthly' | 'quarterly' | 'annually' | null;
-}
+// ── Categories ────────────────────────────────────────────────────────────────
+export type Category = components['schemas']['CategoryResponse'];
+export type CategoryGroup = components['schemas']['CategoryGroupResponse'];
+export type CategoryGroupWithCategories = components['schemas']['CategoryGroupWithCategories'];
+export type CategoryCreatePayload = components['schemas']['CategoryCreate'];
+export type CategoryUpdatePayload = components['schemas']['CategoryUpdate'];
+export type CategoryGroupCreatePayload = components['schemas']['CategoryGroupCreate'];
+export type CategoryGroupUpdatePayload = components['schemas']['CategoryGroupUpdate'];
+export type CategoryTarget = components['schemas']['CategoryTargetResponse'];
+export type CategoryTargetUpsert = components['schemas']['CategoryTargetUpsert'];
 
-export interface BudgetMonth {
-  id: string;
-  category_id: string;
-  month: string; // "YYYY-MM"
-  assigned: number; // kobo
-  activity: number; // kobo (negative = total debits)
-  available: number; // kobo — computed by server: assigned + activity (since activity is negative)
-  required_this_month?: number; // from target calculation
-}
+// ── Nudges ────────────────────────────────────────────────────────────────────
+export type Nudge = components['schemas']['NudgeResponse'];
+export type NudgeListResponse = components['schemas']['NudgeListResponse'];
+export type NudgeSettings = components['schemas']['NudgeSettingsResponse'];
+export type NudgeSettingsUpdate = components['schemas']['NudgeSettingsUpdate'];
+export type NudgeTriggerType = components['schemas']['NudgeTriggerType'];
+export type RegisterDevicePayload = components['schemas']['RegisterDeviceRequest'];
+export type TestTriggerPayload = components['schemas']['TestTriggerRequest'];
 
-export interface BudgetResponse {
-  month: string;
-  tbb: number; // kobo — To Be Budgeted
-  groups: Array<
-    CategoryGroup & {
-      categories: Array<Category & { budget: BudgetMonth }>;
-    }
-  >;
-}
-
-export interface Nudge {
-  id: string;
-  trigger_type: string;
-  message: string;
-  category_id: string | null;
-  is_opened: boolean;
-  is_dismissed: boolean;
-  delivered_at: string | null;
-  created_at: string;
-}
+// ── Recurring rules ───────────────────────────────────────────────────────────
+export type RecurringRule = components['schemas']['RecurringRuleResponse'];
+export type RecurringRuleCreate = components['schemas']['RecurringRuleCreate'];
+export type RecurringRuleUpdate = components['schemas']['RecurringRuleUpdate'];
+export type RecurringFrequency = components['schemas']['RecurringRuleCreate']['frequency'];
+export type RecurringTemplate = components['schemas']['RecurringTemplate'];

@@ -47,7 +47,7 @@ import { useCreateTransaction } from '@/hooks/useTransactions';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { BankAccount } from '@/types/account';
+import type { BankAccount } from '@monimata/shared-types';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
 import { computeNextDue, nairaStringToKobo } from '@/utils/money';
