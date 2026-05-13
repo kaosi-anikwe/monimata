@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -41,19 +41,42 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.security import encrypt_pii
 from app.models.bank_account import BankAccount
 from app.models.transaction import Transaction, TransactionSource
 from app.models.user import User
 from app.schemas.accounts import (
     AddManualAccountRequest,
     BankAccountResponse,
+    SupportedBankResponse,
     UpdateAliasRequest,
     UpdateManualBalanceRequest,
 )
+from app.services.ingestion.registry import list_supported_banks
 from app.ws_manager import notify_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ── GET /accounts/supported-banks ───────────────────────────────────────────
+
+
+@router.get("/supported-banks", response_model=list[SupportedBankResponse])
+def supported_banks() -> list[SupportedBankResponse]:
+    """Return every bank that MoniMata can ingest data from.
+
+    Open endpoint — no authentication required.  Used to drive the bank
+    picker in the "add account" flow.
+    """
+    return [
+        SupportedBankResponse(
+            slug=bank.slug,
+            name=bank.display_name,
+            channels=cast(list[Literal["email", "statement", "receipt"]], sorted(bank.channels)),
+        )
+        for bank in list_supported_banks()
+    ]
 
 
 # ── POST /accounts/manual ─────────────────────────────────────────────────────
@@ -70,28 +93,39 @@ async def add_manual_account(
     The alias field is the user-facing display name and is always editable.
     account_name mirrors alias on creation and can be updated independently.
     """
-    # Check if the user already has a live account with the same account number
-    existing = (
+    # Check if the user already has a live account with the same account number.
+    # account_number is stored encrypted; decrypt each candidate and compare.
+    from app.core.security import decrypt_pii
+
+    for candidate in (
         db.query(BankAccount)
         .filter(
             BankAccount.user_id == current_user.id,
-            BankAccount.account_number == payload.account_number,
+            BankAccount.account_number.isnot(None),
             BankAccount.deleted_at.is_(None),
         )
-        .first()
-    )
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="You already have an account with that account number.",
-        )
+        .all()
+    ):
+        try:
+            if (
+                candidate.account_number
+                and decrypt_pii(candidate.account_number) == payload.account_number
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="You already have an account with that account number.",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # malformed blob — skip
 
     bank_account = BankAccount(
         user_id=current_user.id,
         institution=payload.institution,
         account_name=payload.alias,
         alias=payload.alias,
-        account_number=payload.account_number,
+        account_number=encrypt_pii(payload.account_number),
         account_type=payload.account_type.upper(),
         currency=payload.currency,
         balance=payload.balance,
