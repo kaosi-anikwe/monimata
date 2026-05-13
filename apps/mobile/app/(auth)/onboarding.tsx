@@ -40,7 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme, type ThemeColors } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { ff, type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -402,8 +402,7 @@ function makeStyles(colors: ThemeColors) {
       marginBottom: 6,
     },
     headerSub: {
-      ...ff(400),
-      fontSize: 13,
+      ...type_.bodyReg,
       color: colors.textInverseSecondary,
     },
     // ── Options ──
@@ -432,8 +431,7 @@ function makeStyles(colors: ThemeColors) {
       flex: 1,
     },
     optName: {
-      ...ff(700),
-      fontSize: 14,
+      ...type_.btnSm,
     },
     optSub: {
       ...ff(400),
@@ -460,8 +458,7 @@ function makeStyles(colors: ThemeColors) {
       marginTop: spacing.xs,
     },
     previewTxt: {
-      ...ff(400),
-      fontSize: 13,
+      ...type_.bodyReg,
       flex: 1,
     },
     reassure: {
@@ -488,8 +485,7 @@ function makeStyles(colors: ThemeColors) {
       marginBottom: spacing.sm,
     },
     skipTxt: {
-      ...ff(400),
-      fontSize: 13,
+      ...type_.bodyReg,
       textDecorationLine: 'underline',
     },
   });

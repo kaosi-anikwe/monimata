@@ -6,10 +6,9 @@
  *
  * Route: /split-transaction?id=<txId>
 */
-import { useMemo, useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import Svg, { Path, Polyline } from 'react-native-svg';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -19,17 +18,18 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Polyline } from 'react-native-svg';
 
-import { useTheme } from '@/lib/theme';
-import { type_ } from '@/lib/typography';
-import { formatNaira } from '@/utils/money';
 import { useToast } from '@/components/Toast';
-import { radius, spacing } from '@/lib/tokens';
-import { Button } from '@/components/ui/Button';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Button } from '@/components/ui/Button';
 import { useCategoryGroups } from '@/hooks/useCategories';
-import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { useTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
+import { useTheme } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
+import type { CategoryGroup, CategoryItem } from '@/types/category';
+import { formatNaira } from '@/utils/money';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -473,21 +473,21 @@ const ss = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.sm,
   },
-  heroLbl: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 },
-  heroAmt: { fontSize: 20, fontWeight: '800', fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.5 },
+  heroLbl: { ...ff(600), fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 },
+  heroAmt: { ...ff(800), fontSize: 20, letterSpacing: -0.5 },
   visualBar: { height: 10, borderRadius: 5, overflow: 'hidden', flexDirection: 'row', marginVertical: spacing.sm },
-  heroHint: { fontSize: 12, fontWeight: '600' },
+  heroHint: { ...ff(600), fontSize: 12 },
 
   // Equal-split chips
   eqChips: { paddingVertical: spacing.smd, gap: spacing.sm },
   eqChip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5 },
-  eqChipTxt: { fontSize: 12, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+  eqChipTxt: { ...ff(700), fontSize: 12 },
 
   // Split row
   splitRow: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', padding: spacing.mdn },
   splitRowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   splitNumBadge: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  splitNumTxt: { fontSize: 11, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+  splitNumTxt: { ...ff(700), fontSize: 11 },
   splitCatPill: {
     flex: 1,
     flexDirection: 'row',
@@ -498,7 +498,7 @@ const ss = StyleSheet.create({
     paddingVertical: 5,
     gap: 4,
   },
-  splitCatTxt: { fontSize: 13, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold', flex: 1 },
+  splitCatTxt: { ...ff(600), fontSize: 13, flex: 1 },
   splitDel: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   splitAmtRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   splitAmtWrap: {
@@ -511,9 +511,9 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.md,
     gap: 4,
   },
-  splitAmtSymbol: { fontSize: 15, fontWeight: '700' },
-  splitAmtInp: { flex: 1, fontSize: 15, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold', padding: 0 },
-  splitPct: { fontSize: 12, fontWeight: '600' },
+  splitAmtSymbol: { ...ff(700), fontSize: 15 },
+  splitAmtInp: { flex: 1, ...ff(700), fontSize: 15, padding: 0 },
+  splitPct: { ...ff(600), fontSize: 12 },
   splitFillBtn: {
     height: 38,
     borderRadius: 9,
@@ -521,9 +521,9 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.md,
     justifyContent: 'center',
   },
-  splitFillTxt: { fontSize: 12, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+  splitFillTxt: { ...ff(700), fontSize: 12 },
   splitMemoRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm },
-  splitMemoInput: { fontSize: 13, padding: 0, fontFamily: 'PlusJakartaSans_400Regular' },
+  splitMemoInput: { ...ff(400), fontSize: 13, padding: 0 },
 
   // Add button
   addBtn: {
@@ -549,8 +549,8 @@ const ss = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  remLbl: { fontSize: 12, fontWeight: '600' },
-  remVal: { fontSize: 18, fontWeight: '800', fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.5 },
+  remLbl: { ...ff(600), fontSize: 12 },
+  remVal: { ...ff(800), fontSize: 18, letterSpacing: -0.5 },
 
   // Category picker
   pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: 7 },

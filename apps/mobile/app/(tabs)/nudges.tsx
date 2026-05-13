@@ -26,9 +26,9 @@
  * which also shows an unread count badge (managed in _layout.tsx).
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -42,10 +42,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Badge, BottomSheet, Button, EmptyState, ListRow, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
-import { ff, type_ } from '@/lib/typography';
 import { radius, shadow, spacing } from '@/lib/tokens';
-import { BottomSheet, Badge, Button, EmptyState, ListRow, ScreenHeader } from '@/components/ui';
+import { ff, type_ } from '@/lib/typography';
 import {
   useDismissNudge,
   useMarkAllNudgesRead,
@@ -285,7 +285,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
           <Ionicons name={meta.icon} size={28} color={colors[meta.iconColor]} />
         </View>
         <View style={ss.sheetHeaderText}>
-          <Text style={[type_.caption, { color: colors.textMeta, fontWeight: '600', marginBottom: 3 }]}>
+          <Text style={[type_.caption, { color: colors.textMeta, marginBottom: 3 }]}>
             {meta.label}
           </Text>
           <Text style={[type_.h3, { color: colors.textPrimary, lineHeight: 24 }]} numberOfLines={2}>
@@ -544,7 +544,7 @@ const ss = StyleSheet.create({
     paddingVertical: 6,
     flexShrink: 0,
   },
-  markAllText: { fontSize: 12, fontWeight: '600' },
+  markAllText: { ...ff(600), fontSize: 12 },
   // body states
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: {
@@ -590,8 +590,8 @@ const ss = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 3,
   },
-  cardTitle: { fontSize: 13, fontWeight: '700', flex: 1, marginRight: 8 },
-  cardMessage: { fontSize: 12, lineHeight: 17 },
+  cardTitle: { ...ff(700), fontSize: 13, flex: 1, marginRight: 8 },
+  cardMessage: { ...ff(400), fontSize: 12, lineHeight: 17 },
   // detail sheet content (rendered inside BottomSheet's scroll area)
   sheetHeaderRow: { flexDirection: 'row', gap: 14, marginBottom: 16 },
   sheetIconBubble: {
@@ -605,5 +605,5 @@ const ss = StyleSheet.create({
   sheetHeaderText: { flex: 1, justifyContent: 'center' },
   sheetSection: { marginBottom: 20 },
   whyCard: { flexDirection: 'row', gap: 10, padding: 12 },
-  whyText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  whyText: { flex: 1, ...type_.body },
 });

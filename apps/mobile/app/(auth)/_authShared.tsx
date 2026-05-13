@@ -36,7 +36,7 @@ import { Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'r
 
 import { useTheme, type ThemeColors } from '@/lib/theme';
 import { glass, radius, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { ff, type_ } from '@/lib/typography';
 
 // ─── AuthInput ────────────────────────────────────────────────────────────────
 // Matches .inp: height 48, radius --rm (16), border 1.5px, focus → brand green glow.
@@ -187,7 +187,7 @@ export const s = StyleSheet.create({
   },
   // Legacy alias — kept so existing callers compile without changes
   backBtn: { marginBottom: 14 },
-  authTitle: { ...ff(800), fontSize: 22, letterSpacing: -0.4, marginBottom: 4 },
+  authTitle: { ...type_.h1, marginBottom: 4 },
   authSub: { ...ff(400), fontSize: 14, lineHeight: 21 },
 
   // Scrollable body below header
@@ -215,7 +215,7 @@ export const s = StyleSheet.create({
 
   // Bottom nav link (e.g. "Already have an account?")
   navLink: { marginTop: 14, alignItems: 'center' },
-  navLinkText: { ...ff(400), fontSize: 13 },
+  navLinkText: { ...type_.bodyReg },
 
   // Terms of service note — below submit button on register screen
   tosWrap: { marginTop: 12, paddingHorizontal: 4, alignItems: 'center' },

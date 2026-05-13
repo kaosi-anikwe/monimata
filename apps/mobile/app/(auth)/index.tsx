@@ -17,17 +17,17 @@
 /**
  * Welcome screen — entry point for unauthenticated users.
  */
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ActivityIndicator, Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { ff } from '@/lib/typography';
-import { radius, spacing } from '@/lib/tokens';
 import { useTheme, type ThemeColors } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
 
 // ─── Carousel data ────────────────────────────────────────────────────────────
 
@@ -218,8 +218,7 @@ function makeStyles(colors: ThemeColors) {
       marginBottom: 6,
     },
     tagline: {
-      ...ff(400),
-      fontSize: 13,
+      ...type_.bodyReg,
       color: colors.textInverseFaint,
       letterSpacing: 0.5,
       marginBottom: 36,
@@ -267,9 +266,7 @@ function makeStyles(colors: ThemeColors) {
       justifyContent: 'center',
     },
     btnLimeTxt: {
-      ...ff(700),
-      fontSize: 16,
-      letterSpacing: -0.2,
+      ...type_.btnLg,
     },
     btnGhost: {
       height: 50,
@@ -281,8 +278,7 @@ function makeStyles(colors: ThemeColors) {
       backgroundColor: 'transparent',
     },
     btnGhostTxt: {
-      ...ff(600),
-      fontSize: 14,
+      ...type_.body,
     },
   });
 }

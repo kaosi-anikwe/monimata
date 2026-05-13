@@ -47,7 +47,7 @@ import { useDismissNudge, useNudgeUnreadCount, useNudges } from '@/hooks/useNudg
 import { releasePrompt } from '@/lib/notifPromptBridge';
 import { useTheme } from '@/lib/theme';
 import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
-import { ff, formatMoney } from '@/lib/typography';
+import { ff, formatMoney, type_ } from '@/lib/typography';
 import { onWelcomeDone } from '@/lib/welcomeBridge';
 import { useAppSelector } from '@/store/hooks';
 
@@ -576,7 +576,7 @@ const s = StyleSheet.create({
   },
   avatarText: { ...ff(800), fontSize: 16 },
   greetTxt: { ...ff(400), fontSize: 12, color: glass.textDim },
-  nameTxt: { ...ff(700), fontSize: 15 },
+  nameTxt: { ...type_.userName },
   notifBtn: {
     width: 38,
     height: 38,
@@ -628,9 +628,7 @@ const s = StyleSheet.create({
   },
   balChipTxt: { ...ff(700), fontSize: 11 },
   balAmt: {
-    ...ff(800),
-    fontSize: 36,
-    letterSpacing: -1.5,
+    ...type_.display,
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
@@ -661,7 +659,7 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 11,
   },
-  secTitle: { ...ff(800), fontSize: 16, letterSpacing: -0.3 },
+  secTitle: { ...type_.h3 },
   secLink: { ...ff(600), fontSize: 13 },
 
   // Stats grid
@@ -721,7 +719,7 @@ const s = StyleSheet.create({
   },
   streakNum: { ...ff(800), fontSize: 30, letterSpacing: -1, lineHeight: 34 },
   streakNumSm: { ...ff(500), fontSize: 13 },
-  streakDesc: { ...ff(400), fontSize: 13, marginTop: 3 },
+  streakDesc: { ...type_.bodyReg, marginTop: 3 },
   streakBadge: {
     backgroundColor: glass.badge,
     borderWidth: 1,
@@ -782,7 +780,7 @@ const s = StyleSheet.create({
   },
   goalJarTxt: { fontSize: 24 },
   goalInfo: { flex: 1, minWidth: 0 },
-  goalName: { ...ff(700), fontSize: 14 },
+  goalName: { ...type_.btnSm },
   goalAmt: { ...ff(400), fontSize: 12 },
   goalAdd: {
     width: 30,
@@ -801,5 +799,5 @@ const s = StyleSheet.create({
     padding: spacing.xl,
   },
   errorText: { ...ff(600), fontSize: 16, textAlign: 'center' },
-  errorSub: { ...ff(400), fontSize: 13, textAlign: 'center' },
+  errorSub: { ...type_.bodyReg, textAlign: 'center' },
 });
