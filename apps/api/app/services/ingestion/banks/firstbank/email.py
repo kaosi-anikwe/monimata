@@ -1,0 +1,76 @@
+# MoniMata - zero-based budgeting for Nigerians
+# Copyright (C) 2026  MoniMata Contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+"""First Bank of Nigeria email alert parser.
+
+Alert format (plain-text body):
+    Credit: A/C:XXXXXXXXXX|Amt: NGN 1,234.56|Desc:SALARY|Bal:NGN 5,000.00
+    Debit:  A/C:XXXXXXXXXX|Amt: NGN 1,234.56|Desc:POS|Bal:NGN 5,000.00
+
+Sender domain: firstbanknigeria.com
+"""
+
+from __future__ import annotations
+
+import re
+
+from app.services.ingestion._utils import to_kobo
+from app.services.ingestion.base import EmailBankParser, ParsedTransaction
+from app.services.ingestion.registry import BankInfo, register_email_parser
+
+_CREDIT_RE = re.compile(
+    r"Credit:\s*A/C:(?P<acct>\d+)\|Amt:\s*NGN\s*(?P<amount>[\d,]+(?:\.\d{1,2})?)"
+    r"(?:\|Desc:(?P<narration>[^|]+))?"
+    r"(?:\|Bal:NGN\s*(?P<balance>[\d,]+(?:\.\d{1,2})?))?",
+    re.IGNORECASE,
+)
+_DEBIT_RE = re.compile(
+    r"Debit:\s*A/C:(?P<acct>\d+)\|Amt:\s*NGN\s*(?P<amount>[\d,]+(?:\.\d{1,2})?)"
+    r"(?:\|Desc:(?P<narration>[^|]+))?"
+    r"(?:\|Bal:NGN\s*(?P<balance>[\d,]+(?:\.\d{1,2})?))?",
+    re.IGNORECASE,
+)
+
+
+class _FirstBankEmailParser(EmailBankParser):
+    sender_domains: frozenset[str] = frozenset({"firstbanknigeria.com"})
+
+    def parse(self, body: str) -> ParsedTransaction | None:
+        for pattern, txn_type in ((_CREDIT_RE, "credit"), (_DEBIT_RE, "debit")):
+            m = pattern.search(body)
+            if not m:
+                continue
+            g = m.groupdict()
+            amount_kobo = to_kobo(g["amount"])
+            if amount_kobo is None:
+                continue
+            acct = g.get("acct")
+            narration = (g.get("narration") or "").strip() or None
+            return ParsedTransaction(
+                transaction_type=txn_type,
+                amount_kobo=amount_kobo,
+                account_last4=acct[-4:] if acct else None,
+                balance_kobo=to_kobo(g.get("balance")),
+                narration=narration,
+                sender_email=None,
+            )
+        return None
+
+
+register_email_parser(
+    BankInfo(slug="firstbank", display_name="First Bank"),
+    _FirstBankEmailParser(),
+)

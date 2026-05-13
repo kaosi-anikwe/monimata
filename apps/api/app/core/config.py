@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     # Shared secret that the Cloudflare email-worker sends in X-MoniMata-Secret.
     BANK_ALERT_WEBHOOK_SECRET: str = ""
 
+    # ── Outbound SMTP ─────────────────────────────────────────────────────────
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""  # e.g. "MoniMata <no-reply@moni-mata.ng>"
+    SMTP_USE_TLS: bool = True  # STARTTLS on port 587; set False for SSL-only (port 465)
+
     # ── Logging ───────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"  # DEBUG | INFO | WARNING | ERROR
     LOG_DIR: str = "logs"  # relative to the working directory (apps/api)

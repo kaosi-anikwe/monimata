@@ -79,6 +79,10 @@ class Transaction(Base):
         ForeignKey("recurring_rules.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Bank-issued reference / transaction number stored for idempotent dedup.
+    # A partial unique index on (account_id, external_ref) WHERE external_ref
+    # IS NOT NULL prevents duplicate ingestion of the same bank alert.
+    external_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
