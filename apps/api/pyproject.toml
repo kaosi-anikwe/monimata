@@ -46,6 +46,7 @@ dependencies = [
     "mypy-extensions==1.1.0",
     "packaging==26.0",
     "pathspec==1.0.4",
+    "pdfplumber>=0.11.9",
     "platformdirs==4.9.4",
     "prompt-toolkit==3.0.52",
     "psycopg2-binary==2.9.11",
@@ -96,6 +97,8 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.9.0",
     "pre-commit>=3.7.0",
+    "ipykernel>=6.29.0",
+    "pandas>=3.0.3",
 ]
 
 [tool.ruff]

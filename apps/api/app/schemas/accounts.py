@@ -15,8 +15,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AddManualAccountRequest(BaseModel):
@@ -38,6 +39,12 @@ class UpdateAliasRequest(BaseModel):
     alias: str
 
 
+class SupportedBankResponse(BaseModel):
+    slug: str
+    name: str
+    channels: list[Literal["email", "statement", "receipt"]]
+
+
 class BankAccountResponse(BaseModel):
     id: str
     institution: str
@@ -54,3 +61,19 @@ class BankAccountResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("account_number", mode="before")
+    @classmethod
+    def _decrypt_account_number(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        # If it's already a 10-digit string (plaintext, pre-migration) return as-is.
+        if v.isdigit() and len(v) == 10:
+            return v
+        # Otherwise treat as an AES-GCM encrypted blob.
+        try:
+            from app.core.security import decrypt_pii
+
+            return decrypt_pii(v)
+        except Exception:
+            return v  # last-resort: return raw rather than crash

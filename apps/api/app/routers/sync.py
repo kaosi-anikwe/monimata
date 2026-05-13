@@ -852,18 +852,24 @@ def push(
             continue
 
         # All fields are editable — the user may correct bank-alert transactions.
+        # Exception: statement-sourced transactions are immutable for financial
+        # fields (amount, type, date, account, narration) because statement data
+        # is more accurate than email parsing or manual entry.  Category, memo,
+        # and is_split remain user-editable on all sources.
+        is_statement = tx.source == TransactionSource.statement
+
         _old_amount = tx.amount
         _old_account_id = str(tx.account_id)
 
-        if "type" in record:
+        if "type" in record and not is_statement:
             tx.type = record["type"]
-        if "date" in record:
+        if "date" in record and not is_statement:
             tx.date = datetime.fromtimestamp(record["date"] / 1000, tz=UTC)
-        if "account_id" in record:
+        if "account_id" in record and not is_statement:
             tx.account_id = record["account_id"]
-        if "narration" in record:
+        if "narration" in record and not is_statement:
             tx.narration = record["narration"]
-        if "amount" in record:
+        if "amount" in record and not is_statement:
             tx.amount = int(record["amount"])
 
         # Adjust account balance(s).

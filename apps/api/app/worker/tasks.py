@@ -30,12 +30,14 @@ from the request path or needs a scheduled trigger.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import cast
 
 import app.worker.beat_schedule as _beat_schedule  # noqa: F401 — registers beat schedule
 from app.core.database import SessionLocal
 from app.models.budget import BudgetMonth
-from app.worker.celery_app import celery_app
+from app.models.transaction import Transaction
+from app.worker.celery_app import CeleryTask, celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -271,3 +273,251 @@ def _update_budget_activity(db, tx) -> None:
         db.add(bm)
 
     bm.activity += tx.amount
+
+
+# ── process_bank_statement ────────────────────────────────────────────────────
+
+
+@celery_app.task(name="app.worker.tasks.process_bank_statement", bind=True)
+def process_bank_statement(
+    self,
+    pdf_b64: str,
+    filename: str,
+    bank_slug: str,
+    account_id: str,
+    user_id: str,
+) -> None:
+    """Parse a bank statement PDF and upsert its transactions.
+
+    Offloaded from the webhook after account ownership is verified.  Sends
+    push notifications when complete (success or empty statement).
+    """
+    import base64 as _base64
+
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.bank_account import BankAccount
+    from app.models.transaction import Transaction, TransactionSource
+    from app.models.user import User
+    from app.services.ingestion import UnsupportedBankError
+    from app.services.ingestion.channels.statement import UnsupportedChannelError, parse_statement
+    from app.services.nudge_engine import send_statement_processed_push
+    from app.ws_manager import notify_user
+
+    bank_display = bank_slug.replace("_", " ").title()
+
+    db = SessionLocal()
+    try:
+        pdf_bytes = _base64.b64decode(pdf_b64)
+
+        try:
+            parsed_txns = parse_statement(pdf_bytes, filename, bank_slug)
+        except (UnsupportedBankError, UnsupportedChannelError, ValueError) as exc:
+            logger.warning(
+                "process_bank_statement: parse failed bank=%s account=%s: %s",
+                bank_slug,
+                account_id,
+                exc,
+            )
+            return
+
+        account: BankAccount | None = db.get(BankAccount, account_id)
+        user: User | None = db.get(User, user_id)
+        if account is None or user is None:
+            logger.warning(
+                "process_bank_statement: account or user not found account=%s user=%s",
+                account_id,
+                user_id,
+            )
+            return
+
+        if not parsed_txns:
+            logger.info(
+                "process_bank_statement: no transactions bank=%s account=%s",
+                bank_slug,
+                account_id,
+            )
+            send_statement_processed_push(user=user, bank_name=bank_display, imported=0, updated=0)
+            return
+
+        # Build ref → transaction lookup for O(1) dedup.
+        existing_by_ref: dict[str, Transaction] = {
+            tx.external_ref: tx
+            for tx in db.query(Transaction)
+            .filter(
+                Transaction.account_id == account_id,
+                Transaction.external_ref.isnot(None),
+            )
+            .all()
+            if tx.external_ref is not None
+        }
+
+        inserted_txs: list[Transaction] = []
+        updated_ids: list[str] = []
+
+        for txn in parsed_txns:
+            signed_amount = -txn.amount_kobo if txn.transaction_type == "debit" else txn.amount_kobo
+            narration = txn.narration or f"{bank_display} {txn.transaction_type.capitalize()}"
+            tx_date = txn.transaction_date or datetime.now(UTC)
+
+            # Case 1: ref already in DB → update in place (preserve category/memo/is_split)
+            if txn.transaction_ref and txn.transaction_ref in existing_by_ref:
+                existing = existing_by_ref[txn.transaction_ref]
+                existing.date = tx_date
+                existing.amount = signed_amount
+                existing.narration = narration
+                existing.type = txn.transaction_type
+                existing.balance_after = txn.balance_kobo
+                existing.source = TransactionSource.statement
+                updated_ids.append(str(existing.id))
+                continue
+
+            # Case 2: matching unlinked manual entry → upgrade to statement
+            manual_match = _find_manual_match(
+                db, account_id, txn.transaction_type, signed_amount, tx_date
+            )
+            if manual_match is not None:
+                manual_match.date = tx_date
+                manual_match.narration = narration
+                manual_match.balance_after = txn.balance_kobo
+                manual_match.source = TransactionSource.statement
+                manual_match.external_ref = txn.transaction_ref
+                updated_ids.append(str(manual_match.id))
+                if txn.transaction_ref:
+                    existing_by_ref[txn.transaction_ref] = manual_match
+                continue
+
+            # Case 3: new transaction
+            tx = Transaction(
+                user_id=user_id,
+                account_id=account_id,
+                date=tx_date,
+                amount=signed_amount,
+                narration=narration,
+                type=txn.transaction_type,
+                balance_after=txn.balance_kobo,
+                source=TransactionSource.statement,
+                external_ref=txn.transaction_ref,
+            )
+            db.add(tx)
+            if txn.transaction_ref:
+                existing_by_ref[txn.transaction_ref] = tx
+            inserted_txs.append(tx)
+
+        account.last_synced_at = datetime.now(UTC)
+
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            logger.warning(
+                "process_bank_statement: integrity error bank=%s account=%s",
+                bank_slug,
+                account_id,
+            )
+            return
+
+        # IDs are available after commit.
+        inserted_ids = [str(tx.id) for tx in inserted_txs]
+
+        logger.info(
+            "process_bank_statement: bank=%s account=%s inserted=%d updated=%d",
+            bank_slug,
+            account_id,
+            len(inserted_ids),
+            len(updated_ids),
+        )
+
+        # ── Anchor starting_balance to the bank's closing balance ─────────
+        # Find the most recent transaction that carries a balance_after value;
+        # that is the bank's authoritative closing balance for this account.
+        # Recompute starting_balance so that:
+        #   starting_balance + SUM(all transactions) == bank closing balance
+        # This keeps computed_balance in perfect sync with the bank regardless
+        # of how many historical transactions we hold.
+        anchor_tx = (
+            db.query(Transaction)
+            .filter(
+                Transaction.account_id == account_id,
+                Transaction.balance_after.isnot(None),
+            )
+            .order_by(Transaction.date.desc())
+            .first()
+        )
+        if anchor_tx is not None and anchor_tx.balance_after is not None:
+            from sqlalchemy import func as _func
+
+            total_sum: int = (
+                db.query(_func.sum(Transaction.amount))
+                .filter(Transaction.account_id == account_id)
+                .scalar()
+                or 0
+            )
+            new_starting = anchor_tx.balance_after - total_sum
+            if account.starting_balance != new_starting:
+                logger.info(
+                    "process_bank_statement: anchoring starting_balance old=%d new=%d account=%s",
+                    account.starting_balance,
+                    new_starting,
+                    account_id,
+                )
+                account.starting_balance = new_starting
+                db.commit()
+
+        if inserted_ids:
+            try:
+                cast(CeleryTask, categorize_transactions).delay(inserted_ids)
+            except Exception:
+                logger.exception(
+                    "process_bank_statement: failed to enqueue categorize_transactions"
+                )
+
+        notify_user(user_id, ["transactions", "budget", "accounts"])
+        send_statement_processed_push(
+            user=user,
+            bank_name=bank_display,
+            imported=len(inserted_ids),
+            updated=len(updated_ids),
+        )
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "process_bank_statement: unexpected error bank=%s account=%s",
+            bank_slug,
+            account_id,
+        )
+        raise
+    finally:
+        db.close()
+
+
+def _find_manual_match(
+    db,
+    account_id: str,
+    txn_type: str,
+    signed_amount: int,
+    tx_date: datetime,
+) -> Transaction | None:
+    """Return the single unlinked manual transaction that matches a statement entry.
+
+    Returns ``None`` when zero or more than one candidate is found so that
+    ambiguous cases always produce a new insert rather than a wrong upgrade.
+    """
+    from app.models.transaction import Transaction, TransactionSource
+
+    window_start = tx_date - timedelta(hours=6)
+    window_end = tx_date + timedelta(hours=6)
+    candidates = (
+        db.query(Transaction)
+        .filter(
+            Transaction.account_id == account_id,
+            Transaction.source == TransactionSource.manual,
+            Transaction.external_ref.is_(None),
+            Transaction.type == txn_type,
+            Transaction.amount == signed_amount,
+            Transaction.date.between(window_start, window_end),
+        )
+        .all()
+    )
+    return candidates[0] if len(candidates) == 1 else None
