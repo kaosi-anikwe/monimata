@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from enum import StrEnum
 from uuid import UUID
 
@@ -41,6 +42,8 @@ class BudgetCategoryResponse(BaseModel):
     required_this_month: int | None  # kobo — None when no target set
     target_amount: int | None  # kobo — None when no target set
     target_frequency: str | None  # "weekly" | "monthly" | "yearly" | "custom" | None
+    target_behavior: str | None  # "set_aside" | "refill" | "balance" | None
+    target_date: date | None  # "YYYY-MM-DD" deadline for yearly/custom targets; None otherwise
 
 
 class BudgetGroupResponse(BaseModel):
