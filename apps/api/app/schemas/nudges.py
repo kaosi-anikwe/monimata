@@ -19,14 +19,23 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
+class NudgeTriggerType(StrEnum):
+    threshold_80 = "threshold_80"
+    threshold_100 = "threshold_100"
+    large_single_tx = "large_single_tx"
+    pay_received = "pay_received"
+    bill_payment = "bill_payment"
+
+
 class NudgeResponse(BaseModel):
     id: str
-    trigger_type: str
+    trigger_type: NudgeTriggerType
     title: str | None
     message: str
     context: dict[str, Any] | None = None
@@ -78,10 +87,5 @@ class RegisterDeviceRequest(BaseModel):
 
 
 class TestTriggerRequest(BaseModel):
-    trigger_type: str = Field(
-        ...,
-        description=(
-            "One of: threshold_80, threshold_100, large_single_tx, pay_received, bill_payment"
-        ),
-    )
+    trigger_type: NudgeTriggerType
     category_id: str | None = None

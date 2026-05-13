@@ -17,12 +17,21 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 RecurringFrequencyLiteral = Literal["daily", "weekly", "biweekly", "monthly", "yearly", "custom"]
+
+
+class RecurringTemplate(BaseModel):
+    account_id: str
+    amount: int  # kobo; negative = debit, positive = credit
+    narration: str
+    type: Literal["debit", "credit"]
+    category_id: str | None = None
+    memo: str | None = None
 
 
 class RecurringRuleCreate(BaseModel):
@@ -32,7 +41,7 @@ class RecurringRuleCreate(BaseModel):
     day_of_month: int | None = None  # 1-31; 0=last day; monthly
     next_due: date
     ends_on: date | None = None
-    template: dict[str, Any]  # see RecurringRule model docstring
+    template: RecurringTemplate
 
     @field_validator("interval")
     @classmethod
@@ -53,14 +62,14 @@ class RecurringRuleUpdate(BaseModel):
 class RecurringRuleResponse(BaseModel):
     id: UUID
     user_id: UUID
-    frequency: str
+    frequency: RecurringFrequencyLiteral
     interval: int
     day_of_week: int | None
     day_of_month: int | None
     next_due: date
     ends_on: date | None
     is_active: bool
-    template: dict[str, Any]
+    template: RecurringTemplate
     created_at: datetime
     updated_at: datetime
 
