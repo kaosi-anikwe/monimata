@@ -21,9 +21,14 @@ Core types for the bank data ingestion system.
 parser, regardless of whether the source was an email alert, an uploaded
 statement, a forwarded receipt, or any future channel.
 
-``EmailBankParser`` is the Protocol every bank-specific email parser must
-satisfy.  Adding a new bank for the email channel means implementing this
-Protocol and registering it via ``registry.register_email_parser()``.
+``EmailBankParser``     — Protocol for email alert parsers.
+``StatementBankParser`` — Protocol for bank statement parsers (PDF/CSV upload
+                          or forwarded statement).  Returns a list because a
+                          statement contains multiple transactions.
+``ReceiptBankParser``   — Protocol for transaction receipt parsers (image/PDF
+                          shared to the app).  OCR is performed upstream by
+                          the channel dispatcher; the parser receives plain
+                          text.  Returns a single transaction.
 """
 
 from __future__ import annotations
@@ -54,19 +59,53 @@ class EmailBankParser(Protocol):
     """
     Protocol that every bank-specific email parser must satisfy.
 
-    Implementing this Protocol is intentionally minimal: a single class
-    with a ``sender_domains`` class attribute and a ``parse()`` method.
+    ``sender_domains`` — set of email domains that identify this bank's
+        alert emails.  Routing is done exclusively by sender domain.
 
-    ``sender_domains`` is the set of email domains that identify emails
-    from this bank, e.g. ``frozenset({"gtbank.com"})``.  Routing is done
-    exclusively by sender domain — no generic fallback exists.
-
-    ``parse()`` receives the plain-text email body and returns a
-    ``ParsedTransaction`` on success, or ``None`` if the body is from the
-    right bank but in an unrecognised format (parser should log a warning
-    in that case so we can add the new template).
+    ``parse(body)`` — receives the plain-text email body; returns a
+        ``ParsedTransaction`` on success, or ``None`` if the template is
+        unrecognised (log a warning so the new template can be added).
     """
 
     sender_domains: frozenset[str]
 
     def parse(self, body: str) -> ParsedTransaction | None: ...
+
+
+class StatementBankParser(Protocol):
+    """
+    Protocol that every bank-specific statement parser must satisfy.
+
+    ``identify(content, email_body)`` — given raw file bytes and the
+        optional forwarding email body, returns ``(account_number, bank_slug)``
+        if the file is recognised as belonging to this bank, or ``None``
+        otherwise.  Used to auto-detect the bank when a statement is
+        forwarded by email.  ``email_body`` may be an empty string if the
+        attachment was uploaded directly.
+
+    ``parse(content, filename)`` — receives the raw file bytes and the
+        original filename (used to distinguish PDF from CSV).  Returns a
+        list of ``ParsedTransaction`` objects extracted from the statement,
+        ordered oldest-first.  Returns an empty list if the file is
+        structurally valid but contains no transactions.  Raises
+        ``ValueError`` if the file format is unrecognised or corrupt.
+    """
+
+    def identify(self, content: bytes, email_body: str) -> tuple[str, str] | None: ...
+    def parse(self, content: bytes, filename: str) -> list[ParsedTransaction]: ...
+
+
+class ReceiptBankParser(Protocol):
+    """
+    Protocol that every bank-specific receipt parser must satisfy.
+
+    OCR (Tesseract / Vision API) is performed upstream by the channel
+    dispatcher before this parser is called.  The parser only sees plain
+    text.
+
+    ``parse(text)`` — receives OCR-extracted plain text from a receipt
+        image or PDF.  Returns a single ``ParsedTransaction`` on success,
+        or ``None`` if the text does not match any known receipt template.
+    """
+
+    def parse(self, text: str) -> ParsedTransaction | None: ...

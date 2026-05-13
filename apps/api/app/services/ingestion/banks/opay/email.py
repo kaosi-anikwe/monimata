@@ -59,11 +59,38 @@ _CREDIT_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-# MULTILINE so $ anchors to end of each line; \*? strips optional bold markers.
-_NAME_RE = re.compile(r"^Name:\s*\*?([^*\n]+?)\*?\s*$", re.MULTILINE)
-_BANK_RE = re.compile(r"^Bank:\s*\*?([^*\n]+?)\*?\s*$", re.MULTILINE)
-_REF_RE = re.compile(r"^Transaction No\.:\s*\*?([0-9A-Za-z]+)\*?\s*$", re.MULTILINE)
-_DATE_RE = re.compile(r"^Transaction Date:\s*\*?([^*\n]+?)\*?\s*$", re.MULTILINE)
+
+def _get_field(label: str, body: str) -> str | None:
+    """Extract the value for *label* from an OPay email body.
+
+    Handles two layouts produced by different forwarding methods:
+
+    Inline (plain-text forwarded):
+        Name: *ACCOUNT NAME*
+        Name: ACCOUNT NAME
+
+    Next-line (HTML-extracted, auto-forwarded):
+        Name:
+            ACCOUNT NAME
+    """
+    escaped = re.escape(label)
+    # Layout 1 — value on the same line, optional asterisk bold markers.
+    m = re.search(
+        rf"^[ \t]*{escaped}:\s*\*?([^*\n]+?)\*?\s*$",
+        body,
+        re.IGNORECASE | re.MULTILINE,
+    )
+    if m:
+        return m.group(1).strip() or None
+    # Layout 2 — label line ends with optional whitespace, value on next line.
+    m = re.search(
+        rf"^[ \t]*{escaped}:[ \t]*\n[ \t]+([^\n]+?)\s*$",
+        body,
+        re.IGNORECASE | re.MULTILINE,
+    )
+    if m:
+        return m.group(1).strip() or None
+    return None
 
 
 def _parse_date(text: str) -> datetime | None:
@@ -90,10 +117,10 @@ class _OPayEmailParser(EmailBankParser):
             if amount_kobo is None:
                 return None
 
-            name_m = _NAME_RE.search(body)
-            bank_m = _BANK_RE.search(body)
-            recipient_name = name_m.group(1).strip() if name_m else None
-            recipient_bank = bank_m.group(1).strip() if bank_m else None
+            name_m = _get_field("Name", body)
+            bank_m = _get_field("Bank", body)
+            recipient_name = name_m
+            recipient_bank = bank_m
 
             if recipient_name:
                 narration = recipient_name
@@ -102,8 +129,8 @@ class _OPayEmailParser(EmailBankParser):
             else:
                 narration = "OPay Transfer"
 
-            ref_m = _REF_RE.search(body)
-            date_m = _DATE_RE.search(body)
+            transaction_ref = _get_field("Transaction No.", body)
+            date_raw = _get_field("Transaction Date", body)
             return ParsedTransaction(
                 transaction_type="debit",
                 amount_kobo=amount_kobo,
@@ -111,8 +138,8 @@ class _OPayEmailParser(EmailBankParser):
                 balance_kobo=to_kobo(m.group("balance")),
                 narration=narration,
                 sender_email=None,
-                transaction_ref=ref_m.group(1).strip() if ref_m else None,
-                transaction_date=_parse_date(date_m.group(1)) if date_m else None,
+                transaction_ref=transaction_ref,
+                transaction_date=_parse_date(date_raw) if date_raw else None,
             )
 
         # ── Credit: incoming transfer ────────────────────────────────────────
@@ -122,8 +149,8 @@ class _OPayEmailParser(EmailBankParser):
             if amount_kobo is None:
                 return None
 
-            ref_m = _REF_RE.search(body)
-            date_m = _DATE_RE.search(body)
+            transaction_ref = _get_field("Transaction No.", body)
+            date_raw = _get_field("Transaction Date", body)
             return ParsedTransaction(
                 transaction_type="credit",
                 amount_kobo=amount_kobo,
@@ -131,8 +158,8 @@ class _OPayEmailParser(EmailBankParser):
                 balance_kobo=to_kobo(m.group("balance")),
                 narration="OPay Credit",
                 sender_email=None,
-                transaction_ref=ref_m.group(1).strip() if ref_m else None,
-                transaction_date=_parse_date(date_m.group(1)) if date_m else None,
+                transaction_ref=transaction_ref,
+                transaction_date=_parse_date(date_raw) if date_raw else None,
             )
 
         return None

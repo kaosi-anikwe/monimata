@@ -47,7 +47,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.services.ingestion.base import EmailBankParser
+    from app.services.ingestion.base import EmailBankParser, ReceiptBankParser, StatementBankParser
 
 
 @dataclass(frozen=True)
@@ -81,6 +81,12 @@ _EMAIL_DOMAIN_MAP: dict[str, str] = {}
 # bank slug → EmailBankParser instance
 _EMAIL_PARSERS: dict[str, EmailBankParser] = {}
 
+# bank slug → StatementBankParser instance
+_STATEMENT_PARSERS: dict[str, StatementBankParser] = {}
+
+# bank slug → ReceiptBankParser instance
+_RECEIPT_PARSERS: dict[str, ReceiptBankParser] = {}
+
 
 # ── Registration ─────────────────────────────────────────────────────────────
 
@@ -101,6 +107,36 @@ def register_email_parser(bank: BankInfo, parser: EmailBankParser) -> None:
     _EMAIL_PARSERS[bank.slug] = parser
     for domain in parser.sender_domains:
         _EMAIL_DOMAIN_MAP[domain.lower()] = bank.slug
+
+
+def register_statement_parser(bank: BankInfo, parser: StatementBankParser) -> None:
+    """Register *bank* and its statement *parser*.
+
+    The bank entry in ``_BANKS`` is created if absent, or merged if already
+    registered by another channel (e.g. email).  This allows a bank to add
+    statement support independently of email support.
+    """
+    existing = _BANKS.get(bank.slug)
+    merged = dataclasses.replace(
+        existing if existing is not None else bank,
+        channels=(existing.channels if existing else bank.channels) | frozenset({"statement"}),
+    )
+    _BANKS[bank.slug] = merged
+    _STATEMENT_PARSERS[bank.slug] = parser
+
+
+def register_receipt_parser(bank: BankInfo, parser: ReceiptBankParser) -> None:
+    """Register *bank* and its receipt *parser*.
+
+    Same merge semantics as ``register_statement_parser``.
+    """
+    existing = _BANKS.get(bank.slug)
+    merged = dataclasses.replace(
+        existing if existing is not None else bank,
+        channels=(existing.channels if existing else bank.channels) | frozenset({"receipt"}),
+    )
+    _BANKS[bank.slug] = merged
+    _RECEIPT_PARSERS[bank.slug] = parser
 
 
 # ── Public query API ─────────────────────────────────────────────────────────
@@ -141,4 +177,14 @@ def iter_email_parsers() -> Iterator[tuple[BankInfo, EmailBankParser]]:
     Used by the CAF content-probe strategy in ``channels.email``.
     """
     for slug, parser in _EMAIL_PARSERS.items():
+        yield _BANKS[slug], parser
+
+
+def iter_statement_parsers() -> Iterator[tuple[BankInfo, StatementBankParser]]:
+    """Yield ``(BankInfo, parser)`` for every registered statement parser.
+
+    Used by ``channels.statement.identify_statement()`` to auto-detect the
+    bank and account number from a forwarded statement attachment.
+    """
+    for slug, parser in _STATEMENT_PARSERS.items():
         yield _BANKS[slug], parser
