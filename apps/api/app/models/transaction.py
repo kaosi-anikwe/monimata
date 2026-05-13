@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
 class TransactionSource(StrEnum):
     bank_alert = "bank_alert"
+    statement = "statement"
+    receipt = "receipt"
     manual = "manual"
 
 

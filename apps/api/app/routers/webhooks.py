@@ -7,10 +7,12 @@ CRITICAL: Always verify the shared secret before processing any payload.
 
 from __future__ import annotations
 
+import base64
 import logging
 import re
 import secrets
 from datetime import UTC, datetime
+from typing import cast
 
 import sentry_sdk
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -25,6 +27,7 @@ from app.models.user import User
 from app.services.email_service import send_email
 from app.services.ingestion import UnsupportedBankError, parse_email_alert
 from app.services.ingestion.channels.email import probe_email_content
+from app.services.ingestion.channels.statement import identify_statement
 from app.services.ingestion.registry import get_bank_by_email_domain
 from app.ws_manager import notify_user
 
@@ -142,20 +145,34 @@ async def bank_alert_webhook(
     sender: str = (data.get("from") or "").strip()
     recipient: str = (data.get("to") or "").strip()
     body: str = data.get("body") or ""
+    html: str = data.get("html") or ""
 
-    with open("verify", "w") as f:
-        f.write(body)
+    attachments: list[dict] = data.get("attachments") or []
+    pdf_attachments = [a for a in attachments if a.get("mimeType") == "application/pdf"]
 
     # ── Gmail forwarding-verification intercept ───────────────────────────────
     # When a user adds <username>@moni-mata.ng as a Gmail forwarding address,
     # Google sends a confirmation email to that address.  Our mailbox has no
     # inbox, so we detect the email, extract the verification link, and forward
     # it to the requester so they can complete the setup.
+    #
+    # Hard early-exit on the known sender so we don't fall through to the bank
+    # parser even if the link regex doesn't match (e.g. format change).
+    if "forwarding-noreply@google.com" in sender.lower():
+        logger.info(
+            "bank_alert_webhook: Gmail forwarding email from %s — checking for verification link",
+            sender,
+        )
+        # Verification link may live in HTML only; check both parts.
+        link_match = _GMAIL_VERIFICATION_RE.search(body) or _GMAIL_VERIFICATION_RE.search(html)
+    else:
+        # For all other senders, only check the plain-text body.
+        link_match = _GMAIL_VERIFICATION_RE.search(body)
 
-    link_match = _GMAIL_VERIFICATION_RE.search(body)
     if link_match:
         verification_url = link_match.group(1)
-        requester_match = _GMAIL_REQUESTER_RE.search(body)
+        # Requester address may appear in body or html.
+        requester_match = _GMAIL_REQUESTER_RE.search(body) or _GMAIL_REQUESTER_RE.search(html)
         requester = requester_match.group(1) if requester_match else sender
 
         logger.info(
@@ -184,6 +201,15 @@ async def bank_alert_webhook(
 
         return {"status": "ok", "reason": "gmail_verification_forwarded"}
 
+    # If the sender is a known Google infrastructure address but we couldn't
+    # find a verification link, it's an unrecognised Google system email —
+    # skip silently rather than letting it fall through to the bank parser.
+    if "forwarding-noreply@google.com" in sender.lower():
+        logger.info(
+            "bank_alert_webhook: unrecognised Google system email from=%s — skipped", sender
+        )
+        return {"status": "skipped", "reason": "google_system_email"}
+
     # When the email has been forwarded from a personal inbox (e.g. Gmail),
     # the direct sender is the user's address, not the bank's.  Extract the
     # original bank sender from the forwarded-message header in the body.
@@ -192,6 +218,102 @@ async def bank_alert_webhook(
         logger.info(
             "bank_alert_webhook: resolved forwarded sender %s → %s", sender, effective_sender
         )
+
+    # ── PDF bank statement attachments ───────────────────────────────────────
+    # Processed before the email-alert path.  If any attachment is recognised
+    # as a bank statement, ownership is verified then the heavy lifting is
+    # offloaded to the process_bank_statement Celery task so the webhook
+    # returns immediately.
+    if pdf_attachments:
+        for att in pdf_attachments:
+            try:
+                pdf_bytes = base64.b64decode(att["content"])
+            except Exception:
+                logger.warning("bank_alert_webhook: could not decode PDF attachment")
+                continue
+
+            result = identify_statement(pdf_bytes, body)
+            if result is None:
+                continue  # not a recognised statement; try next attachment
+
+            account_number, bank_slug = result
+
+            # Resolve recipient → User
+            username = recipient.split("@")[0].lower() if "@" in recipient else ""
+            if not username:
+                logger.warning("bank_alert_webhook: unparseable recipient=%s", recipient)
+                return {"status": "skipped", "reason": "invalid_recipient"}
+
+            user = db.query(User).filter(User.username == username).first()
+            if user is None:
+                logger.warning("bank_alert_webhook: no user for username=%s", username)
+                return {"status": "skipped", "reason": "user_not_found"}
+
+            # Verify ownership: find the bank account whose decrypted number matches
+            # the statement.  Prevents importing another person's statement.
+            from app.core.security import decrypt_pii
+
+            account = None
+            for candidate in (
+                db.query(BankAccount)
+                .filter(
+                    BankAccount.user_id == str(user.id),
+                    BankAccount.institution.ilike(f"%{bank_slug}%"),
+                    BankAccount.deleted_at.is_(None),
+                )
+                .all()
+            ):
+                if candidate.account_number is None:
+                    continue
+                try:
+                    if decrypt_pii(candidate.account_number) == account_number:
+                        account = candidate
+                        break
+                except Exception:
+                    logger.warning(
+                        "bank_alert_webhook: could not decrypt account_number for account=%s",
+                        candidate.id,
+                    )
+
+            if account is None:
+                logger.warning(
+                    "bank_alert_webhook: no %s account matching number=%s for user=%s",
+                    bank_slug,
+                    account_number[-4:],
+                    user.id,
+                )
+                return {"status": "skipped", "reason": "account_not_found"}
+
+            # Notify user that the statement arrived, then dispatch processing.
+            try:
+                from app.services.nudge_engine import send_statement_received_push
+
+                send_statement_received_push(
+                    user=user, bank_name=bank_slug.replace("_", " ").title()
+                )
+            except Exception:
+                logger.exception("bank_alert_webhook: send_statement_received_push failed")
+
+            filename = att.get("filename") or f"{bank_slug}_statement.pdf"
+            pdf_b64 = base64.b64encode(pdf_bytes).decode()
+            try:
+                from app.worker.celery_app import CeleryTask
+                from app.worker.tasks import process_bank_statement
+
+                cast(CeleryTask, process_bank_statement).delay(
+                    pdf_b64, filename, bank_slug, str(account.id), str(user.id)
+                )
+            except Exception:
+                logger.exception("bank_alert_webhook: failed to enqueue process_bank_statement")
+                return {"status": "error", "reason": "task_enqueue_failed"}
+
+            logger.info(
+                "bank_alert_webhook: statement queued bank=%s account=%s user=%s",
+                bank_slug,
+                account.id,
+                user.id,
+            )
+            return {"status": "accepted"}
 
     # ── 1. Parse the email body ───────────────────────────────────────────────
 

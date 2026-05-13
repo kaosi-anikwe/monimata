@@ -72,6 +72,8 @@ TITLES: dict[str, str] = {
     "pay_received": "Money don enter! 🎉",
     "bill_payment": "{biller_name} payment done ✅",
     "transaction_received": "{type_emoji} Transaction Alert",
+    "statement_received": "📄 Statement received",
+    "statement_processed": "✅ Statement imported",
 }
 
 MESSAGES: dict[str, list[str]] = {
@@ -111,6 +113,15 @@ MESSAGES: dict[str, list[str]] = {
         "{type_verb} ₦{amount_naira} — {narration}. Balance: ₦{balance_naira}.",
         "₦{amount_naira} {type_verb_past} your account. {narration}. Bal: ₦{balance_naira}.",
     ],
+    "statement_received": [
+        "Your {bank_name} statement don land. We dey process am now.",
+        "{bank_name} statement received — importing your transactions in the background.",
+    ],
+    "statement_processed": [
+        "{imported} new transactions imported from your {bank_name} statement."
+        "{updated} existing updated.",
+        "Done! {imported} new, {updated} updated from your {bank_name} statement.",
+    ],
 }
 
 
@@ -118,13 +129,9 @@ MESSAGES: dict[str, list[str]] = {
 
 
 def _kobo_to_naira_str(kobo: int) -> str:
-    """Format a kobo amount as a human-readable Naira string."""
+    """Format a kobo amount as a human-readable Naira string. e.g. 100000 → 1,000.00"""
     naira = abs(kobo) / 100
-    if naira >= 1_000_000:
-        return f"{naira / 1_000_000:.1f}m"
-    if naira >= 1_000:
-        return f"{naira / 1_000:.0f}k"
-    return f"{naira:.0f}"
+    return f"{naira:,.2f}"
 
 
 def _is_quiet_hours(nudge_settings: dict) -> bool:
@@ -331,6 +338,36 @@ def send_transaction_received_push(
         user.id,
         abs(amount_kobo),
         transaction_type,
+    )
+
+
+def send_statement_received_push(user: User, bank_name: str) -> None:
+    """Fire-and-forget push: statement received, processing in background."""
+    from app.services.push_service import send_push_notification
+
+    if not user.expo_push_token:
+        return
+    send_push_notification(
+        token=user.expo_push_token,
+        title=TITLES["statement_received"],
+        body=random.choice(MESSAGES["statement_received"]).format(bank_name=bank_name),
+        data={"trigger_type": "statement_received"},
+    )
+
+
+def send_statement_processed_push(user: User, bank_name: str, imported: int, updated: int) -> None:
+    """Fire-and-forget push: statement fully imported."""
+    from app.services.push_service import send_push_notification
+
+    if not user.expo_push_token:
+        return
+    send_push_notification(
+        token=user.expo_push_token,
+        title=TITLES["statement_processed"],
+        body=random.choice(MESSAGES["statement_processed"]).format(
+            bank_name=bank_name, imported=imported, updated=updated
+        ),
+        data={"trigger_type": "statement_processed", "imported": imported, "updated": updated},
     )
 
 
