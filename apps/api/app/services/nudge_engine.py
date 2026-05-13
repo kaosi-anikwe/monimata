@@ -71,6 +71,7 @@ TITLES: dict[str, str] = {
     "large_single_tx": "Big spend on {category_name}",
     "pay_received": "Money don enter! 🎉",
     "bill_payment": "{biller_name} payment done ✅",
+    "transaction_received": "{type_emoji} Transaction Alert",
 }
 
 MESSAGES: dict[str, list[str]] = {
@@ -105,6 +106,10 @@ MESSAGES: dict[str, list[str]] = {
         "Your {biller_name} payment of ₦{amount_naira} don go through. "
         "Your budget don update automatically.",
         "₦{amount_naira} for {biller_name} — payment successful and budget adjusted. Well done!",
+    ],
+    "transaction_received": [
+        "{type_verb} ₦{amount_naira} — {narration}. Balance: ₦{balance_naira}.",
+        "₦{amount_naira} {type_verb_past} your account. {narration}. Bal: ₦{balance_naira}.",
     ],
 }
 
@@ -269,6 +274,64 @@ def create_nudge(
 
 
 # ── Trigger evaluators ────────────────────────────────────────────────────────
+
+
+def send_transaction_received_push(
+    user: User,
+    amount_kobo: int,
+    transaction_type: str,
+    narration: str,
+    balance_kobo: int | None,
+) -> None:
+    """
+    Send an immediate push notification when a bank alert transaction arrives.
+
+    This is a lightweight fire-and-forget push — it does NOT create a Nudge
+    row and does NOT respect fatigue limits, because it is a factual
+    confirmation (not a behavioural nudge).  Quiet hours are still respected:
+    the push is suppressed if the user is in their quiet window.
+
+    Called synchronously from the bank-alert webhook handler, before the
+    Celery categorization task runs.
+    """
+    from app.services.push_service import send_push_notification
+
+    if not user.expo_push_token:
+        return
+
+    ns = user.nudge_settings or {}
+    if _is_quiet_hours(ns):
+        return
+
+    amount_str = _kobo_to_naira_str(abs(amount_kobo))
+    balance_str = _kobo_to_naira_str(balance_kobo) if balance_kobo is not None else "—"
+    is_credit = transaction_type == "credit"
+
+    type_emoji = "💚" if is_credit else "🔴"
+    type_verb = "Credit" if is_credit else "Debit"
+    type_verb_past = "credited to" if is_credit else "debited from"
+
+    title = TITLES["transaction_received"].format(type_emoji=type_emoji)
+    message = random.choice(MESSAGES["transaction_received"]).format(
+        type_verb=type_verb,
+        type_verb_past=type_verb_past,
+        amount_naira=amount_str,
+        narration=narration,
+        balance_naira=balance_str,
+    )
+
+    send_push_notification(
+        token=user.expo_push_token,
+        title=title,
+        body=message,
+        data={"trigger_type": "transaction_received", "amount_kobo": abs(amount_kobo)},
+    )
+    logger.debug(
+        "send_transaction_received_push: sent to user=%s amount=%d type=%s",
+        user.id,
+        abs(amount_kobo),
+        transaction_type,
+    )
 
 
 def evaluate_transaction_nudges(db, tx: Transaction) -> None:
