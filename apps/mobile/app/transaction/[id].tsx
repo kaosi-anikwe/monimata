@@ -58,7 +58,7 @@ import {
 } from '@/hooks/useTransactions';
 import { GRADIENTS, useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
-import { type_ } from '@/lib/typography';
+import { ff, type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
@@ -139,7 +139,7 @@ function Frow({ label, isLast = false, children }: { label: string; isLast?: boo
   const colors = useTheme();
   return (
     <View style={[ss.frow, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}>
-      <Text style={[type_.small, { color: colors.textMeta, fontWeight: '500', width: 90 }]}>{label}</Text>
+      <Text style={[type_.small, { color: colors.textMeta, width: 90 }]}>{label}</Text>
       <View style={ss.frowValue}>{children}</View>
     </View>
   );
@@ -154,8 +154,8 @@ function DetailRow({ label, value, isLast = false }: { label: string; value: str
       ss.detailRow,
       !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
     ]}>
-      <Text style={[type_.small, { color: colors.textMeta, fontWeight: '500' }]}>{label}</Text>
-      <Text style={[type_.small, { color: colors.textPrimary, fontWeight: '600', flex: 1, textAlign: 'right' }]} numberOfLines={2}>
+      <Text style={[type_.small, { color: colors.textMeta }]}>{label}</Text>
+      <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.textPrimary, flex: 1, textAlign: 'right' }]} numberOfLines={2}>
         {value}
       </Text>
     </View>
@@ -376,11 +376,10 @@ function BankViewForm({
             onPress={() => setShowCategoryPicker(true)}
             accessibilityRole="button" accessibilityLabel="Select category"
           >
-            <Text style={[type_.small, {
-              color: selectedCategory ? colors.brand : colors.textTertiary,
-              fontWeight: selectedCategory ? '600' : '400',
-              flex: 1,
-            }]}>
+            <Text style={[
+              { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
+              { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
+            ]}>
               {selectedCategory ? selectedCategory.name : 'Uncategorised'}
             </Text>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -609,7 +608,7 @@ function ManualEditForm({
             onPress={() => { setDtPickerMode('date'); setShowDatePicker(true); }}
             accessibilityRole="button" accessibilityLabel="Select date and time"
           >
-            <Text style={[type_.small, { color: colors.textPrimary, fontWeight: '600', flex: 1 }]}>
+            <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
               {formatTxDatetime(txDatetime.toISOString())}
             </Text>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -624,11 +623,10 @@ function ManualEditForm({
             accessibilityRole="button" accessibilityLabel="Select account"
           >
             <Text
-              style={[type_.small, {
-                color: selectedAccount ? colors.textPrimary : colors.textTertiary,
-                fontWeight: selectedAccount ? '600' : '400',
-                flex: 1,
-              }]}
+              style={[
+                { ...ff(selectedAccount ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { color: selectedAccount ? colors.textPrimary : colors.textTertiary, flex: 1 },
+              ]}
               numberOfLines={1}
             >
               {selectedAccount
@@ -646,11 +644,10 @@ function ManualEditForm({
             onPress={() => setShowCategoryPicker(true)}
             accessibilityRole="button" accessibilityLabel="Select category"
           >
-            <Text style={[type_.small, {
-              color: selectedCategory ? colors.brand : colors.textTertiary,
-              fontWeight: selectedCategory ? '600' : '400',
-              flex: 1,
-            }]}>
+            <Text style={[
+              { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
+              { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
+            ]}>
               {selectedCategory ? selectedCategory.name : 'Optional'}
             </Text>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -689,7 +686,7 @@ function ManualEditForm({
               }}
               accessibilityRole="button" accessibilityLabel="Stop recurring"
             >
-              <Text style={[type_.caption, { color: colors.error, fontWeight: '700' }]}>Stop</Text>
+              <Text style={[{ ...ff(700), fontSize: 11, lineHeight: 14 }, { color: colors.error }]}>Stop</Text>
             </TouchableOpacity>
           </Frow>
         ) : (
@@ -699,11 +696,10 @@ function ManualEditForm({
               onPress={() => setShowRecurrencePicker(true)}
               accessibilityRole="button" accessibilityLabel="Select recurrence"
             >
-              <Text style={[type_.small, {
-                color: recurrence ? colors.textPrimary : colors.textTertiary,
-                fontWeight: recurrence ? '600' : '400',
-                flex: 1,
-              }]}>
+              <Text style={[
+                { ...ff(recurrence ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { color: recurrence ? colors.textPrimary : colors.textTertiary, flex: 1 },
+              ]}>
                 {recurrence ? recurrence.label : 'Never'}
               </Text>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -1013,8 +1009,8 @@ const ss = StyleSheet.create({
   },
   ashIc: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   ashText: { flex: 1 },
-  ashName: { fontSize: 14, fontWeight: '600', fontFamily: 'PlusJakartaSans-SemiBold' },
-  ashDesc: { fontSize: 12, marginTop: 1 },
+  ashName: { ...type_.body },
+  ashDesc: { ...ff(400), fontSize: 12, marginTop: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
@@ -1034,13 +1030,7 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
   },
-  heroNavTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    fontFamily: 'PlusJakartaSans_700Bold',
-    color: 'rgba(255,255,255,0.9)',
-    letterSpacing: -0.3,
-  },
+  heroNavTitle: { ...type_.h2 },
   frostBtn: {
     width: 36,
     height: 36,
@@ -1051,20 +1041,8 @@ const ss = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroAmtLg: {
-    fontSize: 38,
-    fontWeight: '800',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: -1.5,
-    marginBottom: spacing.sm,
-  },
-  heroNarr: {
-    fontSize: 15,
-    fontWeight: '500',
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: 'rgba(255,255,255,0.55)',
-    marginBottom: spacing.md,
-  },
+  heroAmtLg: { ...ff(800), fontSize: 38, letterSpacing: -1.5, marginBottom: spacing.sm },
+  heroNarr: { ...ff(500), fontSize: 15, marginBottom: spacing.md },
   heroChips: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -1075,7 +1053,7 @@ const ss = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radius.full,
   },
-  heroChipTxt: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  heroChipTxt: { ...ff(800), fontSize: 11, letterSpacing: 1 },
   heroChipGlass: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1084,15 +1062,10 @@ const ss = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
   },
-  heroChipGlassTxt: {
-    fontSize: 11,
-    fontWeight: '600',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    color: 'rgba(255,255,255,0.75)',
-  },
+  heroChipGlassTxt: { ...type_.caption },
   // kept for typeBadge usage in any remaining manual form badges
   typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
-  typeBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  typeBadgeText: { ...ff(800), fontSize: 11, letterSpacing: 1 },
   // Detail card (bank view)
   detailCard: {
     borderRadius: radius.md,
@@ -1118,13 +1091,13 @@ const ss = StyleSheet.create({
     minHeight: 48,
   },
   frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  frowInput: { flex: 1, fontSize: 13, fontWeight: '600', fontFamily: 'PlusJakartaSans-SemiBold', padding: 0 },
+  frowInput: { flex: 1, ...ff(600), fontSize: 13, padding: 0 },
   frowValue: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   // Type toggle
   typeToggle: { flexDirection: 'row', borderRadius: radius.sm + 1, padding: 3, overflow: 'hidden' },
   typePill: { position: 'absolute', top: 3, bottom: 3, borderRadius: spacing.smd },
   typeBtn: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  typeBtnText: { fontSize: 14, fontWeight: '700', fontFamily: 'PlusJakartaSans-Bold' },
+  typeBtnText: { ...type_.btnSm },
   // Amount display (manual edit)
   amtCard: {
     borderRadius: radius.lg,
@@ -1134,8 +1107,8 @@ const ss = StyleSheet.create({
     alignItems: 'center',
   },
   amtRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  amtSym: { fontSize: 20, fontWeight: '800', fontFamily: 'PlusJakartaSans-ExtraBold', lineHeight: 52, marginRight: 2 },
-  amtNum: { fontSize: 48, fontWeight: '800', fontFamily: 'PlusJakartaSans-ExtraBold', letterSpacing: -2 },
+  amtSym: { ...ff(800), fontSize: 20, lineHeight: 52, marginRight: 2 },
+  amtNum: { ...ff(800), fontSize: 48, letterSpacing: -2 },
   // Recurring badge
   recurBadge: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.xs, flex: 1 },
   stopBtn: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.xs, borderWidth: 1.5 },
@@ -1150,7 +1123,7 @@ const ss = StyleSheet.create({
   numpad: { borderRadius: radius.md, overflow: 'hidden', gap: 1 },
   numRow: { flexDirection: 'row', gap: 1 },
   numKey: { flex: 1, height: 50, alignItems: 'center', justifyContent: 'center' },
-  numKeyText: { fontSize: 19, fontWeight: '600', fontFamily: 'PlusJakartaSans-SemiBold' },
+  numKeyText: { ...type_.numpad },
   // Pickers
   pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: 7 },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },

@@ -26,6 +26,16 @@ export interface Env {
 
 const API_URL = 'https://test.moni-mata.ng/webhooks/bank-alerts';
 
+function arrayBufferToBase64(buffer: string | ArrayBuffer | Uint8Array): string {
+    if (typeof buffer === 'string') return btoa(buffer);
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
 export default withSentry(
     (env: Env) => ({
         dsn: env.SENTRY_DSN,
@@ -45,6 +55,13 @@ export default withSentry(
                 subject: email.subject ?? null,
                 body: email.text ?? null,
                 html: email.html ?? null,
+                attachments: email.attachments.map(att => ({
+                    filename: att.filename ?? null,
+                    mimeType: att.mimeType,
+                    disposition: att.disposition ?? null,
+                    contentId: att.contentId ?? null,
+                    content: arrayBufferToBase64(att.content),
+                })),
             };
 
             const response = await fetch(API_URL, {

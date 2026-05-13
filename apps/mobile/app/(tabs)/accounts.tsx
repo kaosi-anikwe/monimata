@@ -51,7 +51,7 @@ import {
 } from '@/hooks/useAccounts';
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
-import { type_ } from '@/lib/typography';
+import { ff, type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
 import { formatNaira } from '@/utils/money';
 
@@ -704,9 +704,7 @@ const ss = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 20,
-    letterSpacing: -0.3,
+    ...type_.h1,
   },
   headerActions: { flexDirection: 'row', gap: spacing.sm },
   headerBtn: {
@@ -718,7 +716,7 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 7,
   },
-  headerBtnTxt: { fontSize: 13, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
+  headerBtnTxt: { ...type_.body },
 
   // Scroll
   scroll: { paddingTop: spacing.smd },
@@ -731,18 +729,12 @@ const ss = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   totalLbl: {
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: 'PlusJakartaSans_700Bold',
-    textTransform: 'uppercase',
+    ...type_.label,
     letterSpacing: 1.3,
     marginBottom: spacing.xs,
   },
   totalAmt: {
-    fontSize: 30,
-    fontWeight: '800',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: -1,
+    ...type_.display,
   },
   syncNote: {
     flexDirection: 'row',
@@ -750,7 +742,7 @@ const ss = StyleSheet.create({
     gap: spacing.xs,
     paddingTop: spacing.sm,
   },
-  syncNoteTxt: { fontSize: 11 },
+  syncNoteTxt: { ...type_.caption },
 
   // Global re-auth banner  — matches .reauth-banner
   globalReauthBanner: {
@@ -798,13 +790,10 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
-  badgeText: { fontSize: 10, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+  badgeText: { ...ff(700), fontSize: 10 },
 
   balanceAmt: {
-    fontSize: 26,
-    fontWeight: '800',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    letterSpacing: -1,
+    ...type_.displayMd,
     marginBottom: spacing.sm,
   },
   syncStatusRow: {
@@ -835,7 +824,7 @@ const ss = StyleSheet.create({
     paddingVertical: 5,
   },
   footerBtnDisabled: { opacity: 0.6 },
-  footerBtnTxt: { fontSize: 11, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+  footerBtnTxt: { ...ff(700), fontSize: 11 },
   footerBtnMore: {
     width: 28,
     height: 28,
@@ -863,13 +852,11 @@ const ss = StyleSheet.create({
     borderRadius: 45,
   },
   linkMoreTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    ...type_.userName,
     marginBottom: spacing.xs,
   },
   linkMoreSub: {
-    fontSize: 12,
+    ...type_.small,
     marginBottom: spacing.md,
     lineHeight: 18,
   },
@@ -879,7 +866,7 @@ const ss = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: spacing.lg,
   },
-  linkMoreBtnTxt: { fontSize: 13, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+  linkMoreBtnTxt: { ...type_.btnSm },
 
   // Empty state
   emptyWrap: {
@@ -898,9 +885,7 @@ const ss = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   emptyTitle: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 18,
-    fontWeight: '700',
+    ...type_.h2,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
@@ -935,6 +920,6 @@ const ss = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xl,
   },
-  errorText: { fontSize: 16, fontWeight: '600', textAlign: 'center' },
-  errorSub: { fontSize: 13, textAlign: 'center' },
+  errorText: { ...type_.h3, textAlign: 'center' },
+  errorSub: { ...type_.bodyReg, textAlign: 'center' },
 });

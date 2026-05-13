@@ -21,14 +21,14 @@
  * Pull-to-refresh triggers a WatermelonDB sync.
  * Search bar + filter chips (All / Uncategorised / Debits / Credits / per-account).
  */
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { FlashList } from '@shopify/flash-list';
+import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-import { FlashList } from '@shopify/flash-list';
-import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -40,25 +40,25 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 
-import { useTheme } from '@/lib/theme';
-import { type_ } from '@/lib/typography';
-import { formatNaira } from '@/utils/money';
+import { TourTarget, useTour, type TourStep } from '@/components/tour';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Chip } from '@/components/ui/Chip';
-import { queryKeys } from '@/lib/queryKeys';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { syncDatabase } from '@/database/sync';
 import { useAccounts } from '@/hooks/useAccounts';
+import { useCategoryGroups } from '@/hooks/useCategories';
+import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
+import { queryKeys } from '@/lib/queryKeys';
+import { useTheme } from '@/lib/theme';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
 import type { BankAccount } from '@/types/account';
 import type { CategoryGroup } from '@/types/category';
 import type { Transaction } from '@/types/transaction';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { BottomSheet } from '@/components/ui/BottomSheet';
-import { useCategoryGroups } from '@/hooks/useCategories';
-import { layout, radius, shadow, spacing } from '@/lib/tokens';
-import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
-import { TourTarget, useTour, type TourStep } from '@/components/tour';
+import { formatNaira } from '@/utils/money';
 
 // ── Tour definition ──────────────────────────────────────────────────────
 
@@ -211,7 +211,7 @@ function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLas
 
       {/* Info column */}
       <View style={ss.txInfo}>
-        <Text style={[type_.small, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
+        <Text style={[type_.small, { color: colors.textPrimary }]} numberOfLines={1}>
           {tx.narration}
         </Text>
         <View style={ss.txMeta}>
@@ -291,7 +291,7 @@ function DayGroupCard({ group, categoryMap, accountMap, onTxPress, onCategoryPre
         <Text style={[type_.labelSm, { color: colors.textMeta, letterSpacing: 0.8 }]}>
           {formatDayLabel(group.day)}
         </Text>
-        <Text style={[type_.small, { color: netColor, fontWeight: '700' }]}>
+        <Text style={[type_.small, { color: netColor }]}>
           {netLabel}
         </Text>
       </View>
@@ -598,7 +598,7 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  hdrTitle: { fontSize: 18, fontWeight: '700', fontFamily: 'PlusJakartaSans-Bold', letterSpacing: -0.3 },
+  hdrTitle: { ...type_.h2 },
   hdrIconBtn: {
     width: 36,
     height: 36,
@@ -619,9 +619,9 @@ const ss = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    ...ff(400),
     fontSize: 14,
     padding: 0,
-    fontFamily: 'PlusJakartaSans-Regular',
   },
 
   // Filter chips row
@@ -684,11 +684,11 @@ const ss = StyleSheet.create({
     borderRadius: 5,
   },
   txCatChipText: {
+    ...ff(700),
     fontSize: 10,
-    fontWeight: '700',
   },
   txAmt: { alignItems: 'flex-end', flexShrink: 0 },
-  txAmtNum: { fontSize: 14, fontWeight: '700' },
+  txAmtNum: { ...ff(700), fontSize: 14 },
 
   // Manual badge
   manualBadge: {
@@ -697,7 +697,7 @@ const ss = StyleSheet.create({
     borderRadius: 4,
     marginTop: 2,
   },
-  manualBadgeText: { fontSize: 9, fontWeight: '700' },
+  manualBadgeText: { ...ff(700), fontSize: 9 },
 
   // Category picker sheet rows
   pickerGroupHeader: {
@@ -720,7 +720,7 @@ const ss = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xl,
   },
-  errorText: { fontSize: 16, fontWeight: '600', textAlign: 'center' },
-  errorSub: { fontSize: 13, textAlign: 'center' },
+  errorText: { ...type_.h3, textAlign: 'center' },
+  errorSub: { ...type_.bodyReg, textAlign: 'center' },
 });
 
