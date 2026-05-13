@@ -47,10 +47,5 @@ export async function syncDatabase(): Promise<void> {
     },
 
     migrationsEnabledAtVersion: 1,
-    // Suppress the "server wants to create record that already exists" diagnostic.
-    // This happens when a locally-created record is pushed successfully but then
-    // also appears in the next pull's `created` list (because last_pulled_at
-    // predates the record). Treating it as an update is the correct behaviour.
-    sendCreatedAsUpdated: true,
   })
 }

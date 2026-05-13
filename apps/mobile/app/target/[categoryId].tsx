@@ -23,11 +23,11 @@
  *
  * Route: /target/[categoryId]
  */
-import { useEffect, useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -42,14 +42,14 @@ import {
 import Animated, { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ff } from '@/lib/typography';
-import { useTheme } from '@/lib/theme';
 import { useBudget } from '@/hooks/useBudget';
-import { radius, spacing } from '@/lib/tokens';
-import { useAppSelector } from '@/store/hooks';
-import { nairaStringToKobo } from '@/utils/money';
 import { useTarget, useUpsertTarget } from '@/hooks/useTargets';
+import { useTheme } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
+import { useAppSelector } from '@/store/hooks';
 import type { TargetBehavior, TargetFrequency } from '@/types/target';
+import { nairaStringToKobo } from '@/utils/money';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -641,7 +641,7 @@ const ts = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  hdrTitle: { ...ff(700), fontSize: 17, letterSpacing: -0.3, flex: 1, textAlign: 'center' },
+  hdrTitle: { ...type_.h2, flex: 1, textAlign: 'center' },
   backBtn: {
     width: 36,
     height: 36,
@@ -796,5 +796,5 @@ const ts = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  saveBtnText: { ...ff(700), fontSize: 16 },
+  saveBtnText: { ...type_.btnLg },
 });

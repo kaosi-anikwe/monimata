@@ -20,8 +20,8 @@
  * Persisted to API: enabled, quiet_hours_start, quiet_hours_end, fatigue_limit, language.
  */
 
-import { useState } from 'react';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -35,13 +35,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTheme } from '@/lib/theme';
-import { ff, type_ } from '@/lib/typography';
 import { useToast } from '@/components/Toast';
-import { radius, spacing } from '@/lib/tokens';
-import type { NudgeSettings } from '@/types/nudge';
-import { Button, SectionHeader, ScreenHeader } from '@/components/ui';
+import { Button, ScreenHeader, SectionHeader } from '@/components/ui';
 import { useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
+import { useTheme } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
+import type { NudgeSettings } from '@/types/nudge';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ export default function NotificationSettingsScreen() {
           {/* Enable AI Nudges */}
           <View style={[ss.settingRow, { borderBottomColor: colors.border }]}>
             <View style={ss.settingLeft}>
-              <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>
                 Enable AI Nudges
               </Text>
               <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2 }]}>
@@ -132,7 +132,7 @@ export default function NotificationSettingsScreen() {
           {/* Quiet Hours: From */}
           <View style={[ss.settingRow, { borderBottomColor: colors.border }]}>
             <View style={ss.settingLeft}>
-              <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>
                 Quiet Hours: From
               </Text>
               <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2 }]}>
@@ -162,7 +162,7 @@ export default function NotificationSettingsScreen() {
           {/* Quiet Hours: To */}
           <View style={[ss.settingRow, { borderBottomColor: colors.border }]}>
             <View style={ss.settingLeft}>
-              <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>
                 Quiet Hours: To
               </Text>
             </View>
@@ -189,7 +189,7 @@ export default function NotificationSettingsScreen() {
           {/* Daily nudge limit */}
           <View style={ss.settingRowLast}>
             <View style={ss.settingLeft}>
-              <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>
                 Daily nudge limit
               </Text>
               <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2 }]}>
@@ -207,11 +207,11 @@ export default function NotificationSettingsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Decrease nudge limit"
               >
-                <Text style={[ss.stepBtnText, { color: colors.textSecondary, ...ff(700) }]}>
+                <Text style={[ss.stepBtnText, { color: colors.textSecondary }]}>
                   −
                 </Text>
               </TouchableOpacity>
-              <Text style={[ss.stepValue, { color: colors.textPrimary, ...ff(700) }]}>
+              <Text style={[ss.stepValue, { color: colors.textPrimary }]}>
                 {draft.fatigue_limit}
               </Text>
               <TouchableOpacity
@@ -224,7 +224,7 @@ export default function NotificationSettingsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Increase nudge limit"
               >
-                <Text style={[ss.stepBtnText, { color: colors.textSecondary, ...ff(700) }]}>
+                <Text style={[ss.stepBtnText, { color: colors.textSecondary }]}>
                   +
                 </Text>
               </TouchableOpacity>
@@ -267,7 +267,7 @@ export default function NotificationSettingsScreen() {
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>Pidgin</Text>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>Pidgin</Text>
               <Text style={[type_.caption, { color: colors.textMeta, marginTop: 1 }]}>
                 E.g. &quot;You don use 82% of Groceries money this month&quot;
               </Text>
@@ -301,7 +301,7 @@ export default function NotificationSettingsScreen() {
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[type_.body, { color: colors.textPrimary, ...ff(600) }]}>Formal</Text>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>Formal</Text>
               <Text style={[type_.caption, { color: colors.textMeta, marginTop: 1 }]}>
                 E.g. &quot;You&apos;ve used 82% of your Groceries budget for March&quot;
               </Text>
@@ -364,6 +364,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       borderRadius: 10,
       paddingVertical: 6,
       paddingHorizontal: 10,
+      ...ff(700),
       fontSize: 13,
       textAlign: 'center',
       minWidth: 72,
@@ -377,12 +378,8 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    stepBtnText: { fontSize: 18, lineHeight: 22 },
-    stepValue: {
-      fontSize: 18,
-      minWidth: 24,
-      textAlign: 'center',
-    },
+    stepBtnText: { ...ff(700), fontSize: 18, lineHeight: 22 },
+    stepValue: { ...ff(700), fontSize: 18, minWidth: 24, textAlign: 'center' },
     // tone selector
     toneWrap: { gap: spacing.sm },
     toneOpt: {

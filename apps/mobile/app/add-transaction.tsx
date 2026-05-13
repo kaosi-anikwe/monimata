@@ -19,8 +19,9 @@
  *
  * Route: /add-transaction
  */
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import * as Haptics from "expo-haptics";
 import { useRouter } from 'expo-router';
-import * as Haptics from "expo-haptics"
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -34,23 +35,22 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Path, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import Svg, { Path, Polyline } from 'react-native-svg';
 
-import { useTheme } from '@/lib/theme';
-import { type_ } from '@/lib/typography';
-import { radius, spacing } from '@/lib/tokens';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { useAccounts } from '@/hooks/useAccounts';
-import type { BankAccount } from '@/types/account';
-import { RECURRENCE_OPTIONS } from '@/types/recurring';
-import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCreateRecurringRule } from '@/hooks/useRecurring';
 import { useCreateTransaction } from '@/hooks/useTransactions';
-import { computeNextDue, nairaStringToKobo } from '@/utils/money';
+import { useTheme } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
+import type { BankAccount } from '@/types/account';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
+import { RECURRENCE_OPTIONS } from '@/types/recurring';
+import { computeNextDue, nairaStringToKobo } from '@/utils/money';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -183,7 +183,7 @@ function Frow({ label, isLast = false, children }: { label: string; isLast?: boo
   const colors = useTheme();
   return (
     <View style={[ss.frow, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}>
-      <Text style={[type_.small, { color: colors.textMeta, fontWeight: '500', width: 90 }]}>{label}</Text>
+      <Text style={[type_.small, { color: colors.textMeta, width: 90 }]}>{label}</Text>
       <View style={ss.frowValue}>{children}</View>
     </View>
   );
@@ -419,7 +419,7 @@ export default function AddTransactionScreen() {
               onPress={() => { setDtPickerMode('date'); setShowDatePicker(true); }}
               accessibilityRole="button" accessibilityLabel="Select date and time"
             >
-              <Text style={[type_.small, { color: colors.textPrimary, fontWeight: '600', flex: 1 }]}>
+              <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
                 {formatDateTime(txDatetime)}
               </Text>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -434,11 +434,10 @@ export default function AddTransactionScreen() {
               accessibilityRole="button" accessibilityLabel="Select account"
             >
               <Text
-                style={[type_.small, {
-                  color: selectedAccount ? colors.textPrimary : colors.textTertiary,
-                  fontWeight: selectedAccount ? '600' : '400',
-                  flex: 1,
-                }]}
+                style={[
+                  { ...ff(selectedAccount ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                  { color: selectedAccount ? colors.textPrimary : colors.textTertiary, flex: 1 },
+                ]}
                 numberOfLines={1}
               >
                 {selectedAccount
@@ -456,11 +455,10 @@ export default function AddTransactionScreen() {
               onPress={() => setShowCategoryPicker(true)}
               accessibilityRole="button" accessibilityLabel="Select category"
             >
-              <Text style={[type_.small, {
-                color: selectedCategory ? colors.brand : colors.textTertiary,
-                fontWeight: selectedCategory ? '600' : '400',
-                flex: 1,
-              }]}>
+              <Text style={[
+                { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
+              ]}>
                 {selectedCategory ? selectedCategory.name : 'Optional'}
               </Text>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -485,11 +483,10 @@ export default function AddTransactionScreen() {
               onPress={() => setShowRecurrencePicker(true)}
               accessibilityRole="button" accessibilityLabel="Select recurrence"
             >
-              <Text style={[type_.small, {
-                color: recurrence ? colors.textPrimary : colors.textTertiary,
-                fontWeight: recurrence ? '600' : '400',
-                flex: 1,
-              }]}>
+              <Text style={[
+                { ...ff(recurrence ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { color: recurrence ? colors.textPrimary : colors.textTertiary, flex: 1 },
+              ]}>
                 {recurrence ? recurrence.label : 'Never'}
               </Text>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -601,7 +598,7 @@ const ss = StyleSheet.create({
   typeToggle: { flexDirection: 'row', borderRadius: radius.sm + 1, padding: 3, overflow: 'hidden' },
   typePill: { position: 'absolute', top: 3, bottom: 3, borderRadius: spacing.smd },
   typeBtn: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  typeBtnText: { fontSize: 14, fontWeight: '700', fontFamily: 'PlusJakartaSans-Bold' },
+  typeBtnText: { ...type_.btnSm },
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
@@ -617,8 +614,8 @@ const ss = StyleSheet.create({
     alignItems: 'center',
   },
   amtRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  amtSym: { fontSize: 20, fontWeight: '800', fontFamily: 'PlusJakartaSans-ExtraBold', lineHeight: 52, marginRight: 2 },
-  amtNum: { fontSize: 48, fontWeight: '800', fontFamily: 'PlusJakartaSans-ExtraBold', letterSpacing: -2 },
+  amtSym: { ...ff(800), fontSize: 20, lineHeight: 52, marginRight: 2 },
+  amtNum: { ...ff(800), fontSize: 48, letterSpacing: -2 },
   formCard: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
   frow: {
     flexDirection: 'row',
@@ -629,12 +626,12 @@ const ss = StyleSheet.create({
     minHeight: 48,
   },
   frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  frowInput: { flex: 1, fontSize: 13, fontWeight: '600', fontFamily: 'PlusJakartaSans-SemiBold', padding: 0 },
+  frowInput: { flex: 1, ...ff(600), fontSize: 13, padding: 0 },
   frowValue: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   numpad: { marginHorizontal: 0, borderRadius: radius.md, overflow: 'hidden', gap: 1 },
   numRow: { flexDirection: 'row', gap: 1 },
   numKey: { flex: 1, height: 50, alignItems: 'center', justifyContent: 'center' },
-  numKeyText: { fontSize: 19, fontWeight: '600', fontFamily: 'PlusJakartaSans-SemiBold' },
+  numKeyText: { ...type_.numpad },
   saveBar: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
   pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: 7 },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },

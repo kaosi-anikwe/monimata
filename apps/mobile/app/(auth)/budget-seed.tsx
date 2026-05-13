@@ -35,20 +35,20 @@
  *   Returns: { groups: SeedGroup[] }
  */
 
-import { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ff } from '@/lib/typography';
-import { useAppDispatch } from '@/store/hooks';
-import { markOnboarded } from '@/store/authSlice';
-import type { OnboardingAnswers } from './onboarding';
-import { radius, shadow, spacing } from '@/lib/tokens';
 import { useTheme, type ThemeColors } from '@/lib/theme';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
+import { markOnboarded } from '@/store/authSlice';
+import { useAppDispatch } from '@/store/hooks';
+import type { OnboardingAnswers } from './onboarding';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -353,10 +353,8 @@ function makeStyles(colors: ThemeColors) {
       marginBottom: 14,
     },
     title: {
-      ...ff(800),
-      fontSize: 22,
+      ...type_.h1,
       color: colors.white,
-      letterSpacing: -0.4,
       textAlign: 'center',
       marginBottom: 8,
     },
@@ -378,10 +376,8 @@ function makeStyles(colors: ThemeColors) {
       alignItems: 'center',
     },
     statNum: {
-      ...ff(800),
-      fontSize: 24,
+      ...type_.displayMd,
       color: colors.lime,
-      letterSpacing: -0.5,
     },
     statLbl: {
       ...ff(400),
@@ -463,8 +459,7 @@ function makeStyles(colors: ThemeColors) {
       flexShrink: 0,
     },
     catName: {
-      ...ff(600),
-      fontSize: 14,
+      ...type_.body,
       flex: 1,
     },
     targetBadge: {
@@ -481,8 +476,7 @@ function makeStyles(colors: ThemeColors) {
     },
     // ── Footer ──
     footerHint: {
-      ...ff(400),
-      fontSize: 13,
+      ...type_.bodyReg,
       textAlign: 'center',
       paddingVertical: 12,
       paddingHorizontal: spacing.md,
@@ -510,8 +504,7 @@ function makeStyles(colors: ThemeColors) {
       gap: 8,
     },
     customiseTxt: {
-      ...ff(600),
-      fontSize: 14,
+      ...type_.body,
     },
   });
 }
