@@ -350,7 +350,7 @@ async def bank_alert_webhook(
         logger.warning("bank_alert_webhook: unparseable recipient=%s", recipient)
         return {"status": "skipped", "reason": "invalid_recipient"}
 
-    user: User | None = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.username == username).first()
     if user is None:
         logger.warning("bank_alert_webhook: no user for username=%s", username)
         return {"status": "skipped", "reason": "user_not_found"}
@@ -363,7 +363,7 @@ async def bank_alert_webhook(
         logger.warning("bank_alert_webhook: unrecognised sender=%s", effective_sender)
         return {"status": "skipped", "reason": "unknown_sender"}
 
-    account: BankAccount | None = (
+    account = (
         db.query(BankAccount)
         .filter(
             BankAccount.user_id == str(user.id),

@@ -541,9 +541,9 @@ def process_receipt(
         parse_receipt,
     )
     from app.services.nudge_engine import (
+        send_receipt_duplicate_push,
         send_receipt_failed_push,
         send_receipt_processed_push,
-        send_receipt_received_push,
     )
     from app.ws_manager import notify_user
 
@@ -578,12 +578,6 @@ def process_receipt(
 
         bank_slug, suffixes = identification
         bank_display = bank_slug.replace("_", " ").title()
-
-        # Fire "received" push now that we know the bank name.
-        try:
-            send_receipt_received_push(user=user, bank_name=bank_display)
-        except Exception:
-            logger.exception("process_receipt: send_receipt_received_push failed")
 
         # ── Resolve account + parse in one pass ───────────────────────────────
         # `identify()` returns suffixes from ALL phones on the receipt (both
@@ -665,6 +659,14 @@ def process_receipt(
                     parsed.transaction_ref,
                     account_id,
                 )
+                try:
+                    send_receipt_duplicate_push(
+                        user=user,
+                        bank_name=bank_display,
+                        amount_kobo=abs(parsed.amount_kobo),
+                    )
+                except Exception:
+                    logger.exception("process_receipt: send_receipt_duplicate_push failed")
                 return
 
         # ── Build transaction ─────────────────────────────────────────────────
