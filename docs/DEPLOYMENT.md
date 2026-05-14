@@ -131,9 +131,9 @@ REDIS_URL=redis://localhost:6379/0
 # CORS — set to your actual API domain
 CORS_ORIGINS=["https://api.yourdomain.com"]
 
-# JWT RS256 keys (see below)
-JWT_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+# base64 encoded JWT RS256 keys (see below)
+JWT_PRIVATE_KEY="LS0tLS1CRUdJTiBQUklWQ..."
+JWT_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
 
 # AES key for PII encryption
 AES_ENCRYPTION_KEY=<64-char hex string>
@@ -149,7 +149,7 @@ LOG_DIR=/srv/monimata/logs/api
 ### 4.2 Generate RS256 JWT keys
 
 ```bash
-sudo -u monimata /srv/monimata/app/apps/api/.venv/bin/python3 -c "
+python3 -c "
 import base64
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
