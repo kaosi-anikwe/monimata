@@ -17,42 +17,122 @@
 """
 Receipt channel dispatcher.
 
-Entry point: ``parse_receipt(text, bank_slug)``
+Entry points
+------------
+``identify_receipt(image_bytes)``
+    Try every registered parser's ``identify()`` method in turn; return
+    ``(bank_slug, account_suffix)`` from the first parser that recognises
+    the image, or ``None`` if no parser matches.  Mirrors the statement
+    channel's ``identify_statement()`` pattern.  No bank slug or account ID
+    needs to be known in advance — the parser extracts everything from the
+    image.
 
-OCR (Tesseract / Google Vision API) is performed **upstream** by the caller
-before this function is invoked.  The dispatcher only deals with plain text.
+``parse_receipt(image_bytes, bank_slug, account_number)``
+    Delegate to the named bank's parser.  The caller is responsible for
+    resolving the account first via ``identify_receipt`` + a DB lookup.
 
-The bank is identified by the slug the user selected when sharing the
-receipt.  If the user has only one account, it can be inferred automatically.
+``extract_text(content)``
+    Shared Tesseract wrapper.  Bank parsers import this directly so OCR
+    configuration is defined once but each parser calls it with its own
+    image bytes.
 
 Raises
 ------
 ``UnsupportedChannelError``
-    The bank is registered but has no receipt parser yet.
+    The bank is registered but has no receipt parser.
 ``UnsupportedBankError``
-    The slug is not registered at all.
+    The bank slug is not in the registry at all.
 """
 
 from __future__ import annotations
 
+import io
+
+import pytesseract
+from PIL import Image
+
 from app.services.ingestion.base import ParsedTransaction
 from app.services.ingestion.channels.email import UnsupportedBankError
 from app.services.ingestion.channels.statement import UnsupportedChannelError
-from app.services.ingestion.registry import _BANKS, _RECEIPT_PARSERS
+from app.services.ingestion.registry import _BANKS, _RECEIPT_PARSERS, iter_receipt_parsers
+
+# ── Shared text extraction utility ────────────────────────────────────────────
 
 
-def parse_receipt(text: str, bank_slug: str) -> ParsedTransaction | None:
-    """Parse OCR-extracted text from a transaction receipt.
+def extract_text(content: bytes) -> str:
+    """Extract plain text from a receipt image or PDF.
+
+    Receipts arrive as either image screenshots (JPEG / PNG / WebP) or PDF
+    exports of the same in-app screen.  This function handles both:
+
+    - **PDF** (detected by the ``%PDF`` magic bytes): text is extracted
+      directly via pdfplumber.  No OCR needed because OPay receipt PDFs
+      embed selectable text.
+    - **Image**: converted to greyscale and upscaled 2× before being
+      passed to Tesseract for OCR.
+
+    Bank parsers import and call this rather than invoking pytesseract or
+    pdfplumber directly, so format detection is centralised here.
+    """
+    if content[:4] == b"%PDF":
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    img = Image.open(io.BytesIO(content)).convert("L")
+    w, h = img.size
+    img = img.resize((w * 2, h * 2), Image.Resampling.LANCZOS)
+    return pytesseract.image_to_string(img, config="--oem 3 --psm 6")
+
+
+# ── Auto-identification ───────────────────────────────────────────────────────
+
+
+def identify_receipt(image_bytes: bytes) -> tuple[str, list[str]] | None:
+    """Try every registered parser; return ``(bank_slug, candidate_suffixes)`` or ``None``.
+
+    Each parser's ``identify()`` OCRs the image and returns the account-number
+    suffixes it can extract from ALL phone numbers on the receipt — both full
+    numbers (last 4 digits) and masked numbers (digits after the asterisks).
+    This covers both the credit case (user's full number is visible) and the
+    debit case (user's number is masked).
+
+    The task matches each suffix against the user's decrypted account numbers
+    and uses ``parse()`` as the final disambiguator to confirm the correct
+    account and direction.
+    """
+    for info, parser in iter_receipt_parsers():
+        suffixes = parser.identify(image_bytes)
+        if suffixes is not None:
+            return info.slug, suffixes
+    return None
+
+
+# ── Parser dispatch ───────────────────────────────────────────────────────────
+
+
+def parse_receipt(
+    image_bytes: bytes,
+    bank_slug: str,
+    account_number: str,
+) -> ParsedTransaction | None:
+    """Parse a receipt image using the bank-specific parser.
 
     Parameters
     ----------
-    text:
-        Plain text produced by the OCR step.
+    image_bytes:
+        Raw image bytes (JPEG / PNG / WebP).  The parser performs OCR
+        internally.
     bank_slug:
-        Slug of the bank the user selected, e.g. ``"opay"``.
+        Slug of the bank whose parser to invoke.
+    account_number:
+        The user's full decrypted account number, used by the parser to
+        determine credit vs. debit direction.
 
-    Returns a ``ParsedTransaction`` on success, or ``None`` if the text does
-    not match any known receipt template for this bank.
+    Returns a ``ParsedTransaction`` on success, or ``None`` if parsing fails.
+    Raises ``UnsupportedBankError`` / ``UnsupportedChannelError`` as
+    appropriate.
     """
     if bank_slug not in _BANKS:
         raise UnsupportedBankError(f"No bank registered with slug: {bank_slug!r}")
@@ -63,4 +143,4 @@ def parse_receipt(text: str, bank_slug: str) -> ParsedTransaction | None:
             f"{_BANKS[bank_slug].display_name!r} does not yet support receipt ingestion"
         )
 
-    return parser.parse(text)
+    return parser.parse(image_bytes, account_number)

@@ -93,9 +93,17 @@ async def add_manual_account(
     The alias field is the user-facing display name and is always editable.
     account_name mirrors alias on creation and can be updated independently.
     """
+    from app.core.security import decrypt_pii
+    from app.services.ingestion.registry import is_bank_supported
+
+    if not is_bank_supported(payload.bank_slug):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported bank: {payload.bank_slug!r}. Use GET /accounts/supported-banks.",
+        )
+
     # Check if the user already has a live account with the same account number.
     # account_number is stored encrypted; decrypt each candidate and compare.
-    from app.core.security import decrypt_pii
 
     for candidate in (
         db.query(BankAccount)
@@ -123,6 +131,7 @@ async def add_manual_account(
     bank_account = BankAccount(
         user_id=current_user.id,
         institution=payload.institution,
+        bank_slug=payload.bank_slug,
         account_name=payload.alias,
         alias=payload.alias,
         account_number=encrypt_pii(payload.account_number),

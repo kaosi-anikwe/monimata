@@ -51,6 +51,7 @@ from app.routers import (  # noqa: E402
     reports,
     sync,
     transactions,
+    uploads,
     webhooks,
     ws,
 )
@@ -94,6 +95,7 @@ app.include_router(sync.router, prefix="/sync", tags=["sync"])
 app.include_router(content.router, prefix="/content", tags=["content"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(recurring.router, prefix="/recurring-rules", tags=["recurring"])
+app.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 app.include_router(ws.router, tags=["websocket"])
 
 

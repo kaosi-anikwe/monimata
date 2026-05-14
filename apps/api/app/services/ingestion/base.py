@@ -99,13 +99,27 @@ class ReceiptBankParser(Protocol):
     """
     Protocol that every bank-specific receipt parser must satisfy.
 
-    OCR (Tesseract / Vision API) is performed upstream by the channel
-    dispatcher before this parser is called.  The parser only sees plain
-    text.
+    Each parser is fully self-contained: it performs its own OCR from raw
+    image bytes, so different banks can use different preprocessing or OCR
+    configs without the channel dispatcher knowing.  The shared
+    ``extract_text()`` utility in ``channels.receipt`` is available for parsers
+    that want a sensible default (greyscale + 2× upscale + Tesseract).
 
-    ``parse(text)`` — receives OCR-extracted plain text from a receipt
-        image or PDF.  Returns a single ``ParsedTransaction`` on success,
-        or ``None`` if the text does not match any known receipt template.
+    ``identify(image_bytes)`` — OCR the image; if it looks like this bank's
+        receipt, return a list of account-number suffixes extracted from all
+        phone numbers visible on the receipt (full numbers contribute their
+        last 4 digits; masked numbers contribute the digits after the
+        asterisks).  Both the user’s number and the counterparty’s number
+        appear on the receipt; returning all candidates lets the task try
+        each against the user’s accounts and use ``parse()`` as the final
+        disambiguator.  Return ``None`` if the image is not recognised as
+        this bank’s receipt.
+
+    ``parse(image_bytes, account_number)`` — OCR the image and extract the
+        transaction.  ``account_number`` is the user’s full decrypted account
+        number, used to determine credit vs. debit direction.  Returns a
+        ``ParsedTransaction`` on success, or ``None`` if parsing fails.
     """
 
-    def parse(self, text: str) -> ParsedTransaction | None: ...
+    def identify(self, image_bytes: bytes) -> list[str] | None: ...
+    def parse(self, image_bytes: bytes, account_number: str) -> ParsedTransaction | None: ...

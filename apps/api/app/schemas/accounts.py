@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class AddManualAccountRequest(BaseModel):
     institution: str
+    bank_slug: str  # registry slug from GET /accounts/supported-banks
     account_number: str = Field(min_length=10, max_length=10, pattern=r"^\d{10}$")
     alias: str  # user-defined display name
     account_type: str = "SAVINGS"  # "SAVINGS" | "CURRENT"
@@ -48,6 +49,7 @@ class SupportedBankResponse(BaseModel):
 class BankAccountResponse(BaseModel):
     id: str
     institution: str
+    bank_slug: str | None = None
     account_name: str
     alias: str | None = None
     account_number: str | None = None

@@ -301,7 +301,7 @@ def process_bank_statement(
     from app.models.user import User
     from app.services.ingestion import UnsupportedBankError
     from app.services.ingestion.channels.statement import UnsupportedChannelError, parse_statement
-    from app.services.nudge_engine import send_statement_processed_push
+    from app.services.nudge_engine import send_statement_failed_push, send_statement_processed_push
     from app.ws_manager import notify_user
 
     bank_display = bank_slug.replace("_", " ").title()
@@ -309,6 +309,17 @@ def process_bank_statement(
     db = SessionLocal()
     try:
         pdf_bytes = _base64.b64decode(pdf_b64)
+
+        # Load user early so we can send a failure push if parsing blows up.
+        user: User | None = db.get(User, user_id)
+        account: BankAccount | None = db.get(BankAccount, account_id)
+        if account is None or user is None:
+            logger.warning(
+                "process_bank_statement: account or user not found account=%s user=%s",
+                account_id,
+                user_id,
+            )
+            return
 
         try:
             parsed_txns = parse_statement(pdf_bytes, filename, bank_slug)
@@ -319,16 +330,10 @@ def process_bank_statement(
                 account_id,
                 exc,
             )
-            return
-
-        account: BankAccount | None = db.get(BankAccount, account_id)
-        user: User | None = db.get(User, user_id)
-        if account is None or user is None:
-            logger.warning(
-                "process_bank_statement: account or user not found account=%s user=%s",
-                account_id,
-                user_id,
-            )
+            try:
+                send_statement_failed_push(user=user, bank_name=bank_display)
+            except Exception:
+                logger.exception("process_bank_statement: send_statement_failed_push failed")
             return
 
         if not parsed_txns:
@@ -487,6 +492,239 @@ def process_bank_statement(
             bank_slug,
             account_id,
         )
+        raise
+    finally:
+        db.close()
+
+
+# ── process_receipt ───────────────────────────────────────────────────────────
+
+
+@celery_app.task(name="app.worker.tasks.process_receipt", bind=True)
+def process_receipt(
+    self,
+    image_b64: str,
+    user_id: str,
+) -> None:
+    """Identify the bank and account from a receipt image, then upsert the transaction.
+
+    Parameters
+    ----------
+    image_b64:
+        Base64-encoded raw image bytes (JPEG / PNG / WebP).
+    user_id:
+        UUID string of the ``User`` who uploaded the receipt.
+
+    Flow
+    ----
+    1. Decode bytes and call ``identify_receipt()`` — tries every registered
+       parser's ``identify()`` until one recognises the image and returns
+       ``(bank_slug, account_suffix)``.
+    2. Decrypt all the user's accounts for that bank, find the one whose
+       account number ends with the suffix.
+    3. Call ``parse_receipt(image_bytes, bank_slug, account_number)`` for the
+       full parse.
+    4. Dedup by ``external_ref``, upsert, categorize, notify.
+    """
+    import base64 as _base64
+
+    from sqlalchemy.exc import IntegrityError
+
+    from app.core.security import decrypt_pii
+    from app.models.bank_account import BankAccount
+    from app.models.transaction import Transaction, TransactionSource
+    from app.models.user import User
+    from app.services.ingestion.channels.receipt import (
+        UnsupportedBankError,
+        UnsupportedChannelError,
+        identify_receipt,
+        parse_receipt,
+    )
+    from app.services.nudge_engine import (
+        send_receipt_failed_push,
+        send_receipt_processed_push,
+        send_receipt_received_push,
+    )
+    from app.ws_manager import notify_user
+
+    db = SessionLocal()
+    try:
+        image_bytes = _base64.b64decode(image_b64)
+
+        # Load user first so we can send failure notifications at any exit point.
+        user: User | None = db.get(User, user_id)
+        if user is None:
+            logger.warning("process_receipt: user not found user=%s", user_id)
+            return
+
+        # ── Identify bank + account suffix ────────────────────────────────────
+        try:
+            identification = identify_receipt(image_bytes)
+        except Exception as exc:
+            logger.warning("process_receipt: identify_receipt failed user=%s: %s", user_id, exc)
+            try:
+                send_receipt_failed_push(user=user, reason="unrecognised")
+            except Exception:
+                logger.exception("process_receipt: send_receipt_failed_push failed")
+            return
+
+        if identification is None:
+            logger.info("process_receipt: no parser recognised the receipt user=%s", user_id)
+            try:
+                send_receipt_failed_push(user=user, reason="unrecognised")
+            except Exception:
+                logger.exception("process_receipt: send_receipt_failed_push failed")
+            return
+
+        bank_slug, suffixes = identification
+        bank_display = bank_slug.replace("_", " ").title()
+
+        # Fire "received" push now that we know the bank name.
+        try:
+            send_receipt_received_push(user=user, bank_name=bank_display)
+        except Exception:
+            logger.exception("process_receipt: send_receipt_received_push failed")
+
+        # ── Resolve account + parse in one pass ───────────────────────────────
+        # `identify()` returns suffixes from ALL phones on the receipt (both
+        # user and counterparty), so multiple accounts may match a suffix.
+        # We call `parse()` on each candidate — the first successful parse
+        # with a non-None result is the correct account/direction.
+        candidates = (
+            db.query(BankAccount)
+            .filter(
+                BankAccount.user_id == user_id,
+                BankAccount.bank_slug == bank_slug,
+                BankAccount.deleted_at.is_(None),
+            )
+            .all()
+        )
+
+        account: BankAccount | None = None
+        account_id: str = ""
+        parsed = None
+        suffix_matched = False  # tracks whether any candidate's number matched a suffix
+
+        for candidate in candidates:
+            if candidate.account_number is None:
+                continue
+            try:
+                decrypted = decrypt_pii(candidate.account_number)
+            except Exception:
+                continue
+            if not any(decrypted.endswith(s) for s in suffixes):
+                continue
+            suffix_matched = True
+            try:
+                result = parse_receipt(image_bytes, bank_slug, decrypted)
+            except (UnsupportedBankError, UnsupportedChannelError, ValueError) as exc:
+                logger.warning(
+                    "process_receipt: parse failed bank=%s account=%s: %s",
+                    bank_slug,
+                    candidate.id,
+                    exc,
+                )
+                continue
+            if result is not None:
+                account = candidate
+                account_id = str(candidate.id)
+                parsed = result
+                break
+
+        if parsed is None or account is None:
+            # Distinguish: did we find a matching account number but parsing failed,
+            # or did no account number match the suffix at all?
+            failure_reason = "parse_failed" if suffix_matched else "no_account"
+            logger.warning(
+                "process_receipt: could not resolve account or parse receipt "
+                "bank=%s suffixes=%s user=%s reason=%s",
+                bank_slug,
+                suffixes,
+                user_id,
+                failure_reason,
+            )
+            try:
+                send_receipt_failed_push(user=user, reason=failure_reason, bank_name=bank_display)
+            except Exception:
+                logger.exception("process_receipt: send_receipt_failed_push failed")
+            return
+
+        # ── Dedup by external_ref ─────────────────────────────────────────────
+        if parsed.transaction_ref:
+            existing = (
+                db.query(Transaction)
+                .filter(
+                    Transaction.account_id == account_id,
+                    Transaction.external_ref == parsed.transaction_ref,
+                )
+                .first()
+            )
+            if existing is not None:
+                logger.info(
+                    "process_receipt: duplicate ref=%s account=%s — skipping",
+                    parsed.transaction_ref,
+                    account_id,
+                )
+                return
+
+        # ── Build transaction ─────────────────────────────────────────────────
+        signed_amount = (
+            -parsed.amount_kobo if parsed.transaction_type == "debit" else parsed.amount_kobo
+        )
+        narration = parsed.narration or f"{bank_display} {parsed.transaction_type.capitalize()}"
+        tx_date = parsed.transaction_date or datetime.now(UTC)
+
+        tx = Transaction(
+            user_id=user_id,
+            account_id=account_id,
+            date=tx_date,
+            amount=signed_amount,
+            narration=narration,
+            type=parsed.transaction_type,
+            balance_after=parsed.balance_kobo,
+            source=TransactionSource.receipt,
+            external_ref=parsed.transaction_ref,
+        )
+        db.add(tx)
+        account.last_synced_at = datetime.now(UTC)
+
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            logger.warning(
+                "process_receipt: integrity error bank=%s account=%s",
+                bank_slug,
+                account_id,
+            )
+            return
+
+        tx_id = str(tx.id)
+        logger.info(
+            "process_receipt: bank=%s account=%s tx=%s amount=%d",
+            bank_slug,
+            account_id,
+            tx_id,
+            signed_amount,
+        )
+
+        # ── Categorize & notify ───────────────────────────────────────────────
+        try:
+            cast(CeleryTask, categorize_transactions).delay([tx_id])
+        except Exception:
+            logger.exception("process_receipt: failed to enqueue categorize_transactions")
+
+        notify_user(user_id, ["transactions", "budget", "accounts"])
+        send_receipt_processed_push(
+            user=user,
+            bank_name=bank_display,
+            amount_kobo=abs(signed_amount),
+            direction=parsed.transaction_type,
+        )
+
+    except Exception:
+        db.rollback()
+        logger.exception("process_receipt: unexpected error user=%s", user_id)
         raise
     finally:
         db.close()
