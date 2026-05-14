@@ -136,6 +136,8 @@ def get_budget(
                     required_this_month=req,
                     target_amount=target.target_amount if target else None,
                     target_frequency=target.frequency if target else None,
+                    target_behavior=target.behavior if target else None,
+                    target_date=target.target_date if target else None,
                 )
             )
 
@@ -195,6 +197,8 @@ def set_assignment(
         required_this_month=req,
         target_amount=target.target_amount if target else None,
         target_frequency=target.frequency if target else None,
+        target_behavior=target.behavior if target else None,
+        target_date=target.target_date if target else None,
     )
 
 

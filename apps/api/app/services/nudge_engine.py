@@ -70,14 +70,14 @@ TITLES: dict[str, str] = {
     "threshold_100": "🚨 {category_name} budget don finish!",
     "large_single_tx": "Big spend on {category_name}",
     "pay_received": "Money don enter! 🎉",
-    "bill_payment": "{biller_name} payment done ✅",
-    "transaction_received": "{type_emoji} Transaction Alert",
-    "statement_received": "📄 Statement received",
-    "statement_processed": "✅ Statement imported",
-    "receipt_received": "🧾 Receipt received",
-    "receipt_processed": "✅ Receipt imported",
-    "receipt_failed": "🧾 Receipt import failed",
-    "statement_failed": "📄 Statement import failed",
+    "transaction_received": "{tx_type} Alert",
+    "statement_received": "Statement received",
+    "statement_processed": "Statement imported",
+    "receipt_received": "Receipt received",
+    "receipt_processed": "Receipt imported",
+    "receipt_failed": "Receipt import failed",
+    "receipt_duplicate": "Already recorded",
+    "statement_failed": "Statement import failed",
 }
 
 MESSAGES: dict[str, list[str]] = {
@@ -108,11 +108,6 @@ MESSAGES: dict[str, list[str]] = {
         "Money don enter — ₦{amount_naira}. Assign am to your budget categories "
         "before e disappear.",
     ],
-    "bill_payment": [
-        "Your {biller_name} payment of ₦{amount_naira} don go through. "
-        "Your budget don update automatically.",
-        "₦{amount_naira} for {biller_name} — payment successful and budget adjusted. Well done!",
-    ],
     "transaction_received": [
         "{type_verb} ₦{amount_naira} — {narration}. Balance: ₦{balance_naira}.",
         "₦{amount_naira} {type_verb_past} your account. {narration}. Bal: ₦{balance_naira}.",
@@ -134,27 +129,34 @@ MESSAGES: dict[str, list[str]] = {
         "Transaction of ₦{amount_naira} {direction} recorded from your {bank_name} receipt.",
         "Done! ₦{amount_naira} {direction} imported from your {bank_name} receipt.",
     ],
-    "receipt_failed": {
-        # Keyed by reason string passed from the task.
-        "unrecognised": (
-            "We couldn't identify this receipt. "
-            "Make sure it's a clear, unedited photo or PDF of your bank transaction receipt."
-        ),
-        "no_account": (
-            "We recognised a {bank_name} receipt but your {bank_name} account isn't linked. "
-            "Add the account in MoniMata and re-upload."
-        ),
-        "parse_failed": (
-            "We found a {bank_name} receipt but couldn't read the transaction details. "
-            "Try a clearer photo or export the receipt as a PDF."
-        ),
-    },
+    "receipt_duplicate": [
+        "That ₦{amount_naira} {bank_name} transaction is already in your records "
+        "— no need to re-upload.",
+        "This {bank_name} receipt looks like a duplicate."
+        "The ₦{amount_naira} transaction is already saved.",
+    ],
     "statement_failed": [
         "Couldn't import your {bank_name} statement. "
         "Download a fresh copy directly from your bank app and try again.",
         "Your {bank_name} statement couldn't be parsed. "
         "Make sure it's an unmodified PDF from your bank and re-upload.",
     ],
+}
+
+# Reason-keyed messages for receipt_failed — kept separate so MESSAGES stays list[str]-typed.
+RECEIPT_FAILED_MESSAGES: dict[str, str] = {
+    "unrecognised": (
+        "We couldn't identify this receipt. "
+        "Make sure it's a clear, unedited photo or PDF of your bank transaction receipt."
+    ),
+    "no_account": (
+        "We recognised a {bank_name} receipt but your {bank_name} account isn't linked. "
+        "Add the account in MoniMata and re-upload."
+    ),
+    "parse_failed": (
+        "We found a {bank_name} receipt but couldn't read the transaction details. "
+        "Try a clearer photo or export the receipt as a PDF."
+    ),
 }
 
 
@@ -347,11 +349,11 @@ def send_transaction_received_push(
     balance_str = _kobo_to_naira_str(balance_kobo) if balance_kobo is not None else "—"
     is_credit = transaction_type == "credit"
 
-    type_emoji = "💚" if is_credit else "🔴"
+    tx_type = "Credit" if is_credit else "Debit"
     type_verb = "Credit" if is_credit else "Debit"
     type_verb_past = "credited to" if is_credit else "debited from"
 
-    title = TITLES["transaction_received"].format(type_emoji=type_emoji)
+    title = TITLES["transaction_received"].format(tx_type=tx_type)
     message = random.choice(MESSAGES["transaction_received"]).format(
         type_verb=type_verb,
         type_verb_past=type_verb_past,
@@ -445,6 +447,34 @@ def send_receipt_processed_push(
     )
 
 
+def send_receipt_duplicate_push(
+    user: User,
+    bank_name: str,
+    amount_kobo: int,
+) -> None:
+    """Fire-and-forget push: receipt was a duplicate of an existing transaction."""
+    from app.services.push_service import send_push_notification
+
+    if not user.expo_push_token:
+        return
+    amount_naira = f"{abs(amount_kobo) / 100:,.2f}"
+    body = random.choice(MESSAGES["receipt_duplicate"]).format(
+        bank_name=bank_name, amount_naira=amount_naira
+    )
+    send_push_notification(
+        token=user.expo_push_token,
+        title=TITLES["receipt_duplicate"],
+        body=body,
+        data={"trigger_type": "receipt_duplicate"},
+    )
+    logger.debug(
+        "send_receipt_duplicate_push: sent to user=%s bank=%s amount=%d",
+        user.id,
+        bank_name,
+        amount_kobo,
+    )
+
+
 def send_receipt_failed_push(
     user: User,
     reason: str,
@@ -466,7 +496,7 @@ def send_receipt_failed_push(
     if not user.expo_push_token:
         return
 
-    reasons: dict = MESSAGES["receipt_failed"]  # type: ignore[assignment]
+    reasons = RECEIPT_FAILED_MESSAGES
     template: str = reasons.get(reason, reasons["unrecognised"])
     body = template.format(bank_name=bank_name) if bank_name else template.split(".")[0] + "."
 

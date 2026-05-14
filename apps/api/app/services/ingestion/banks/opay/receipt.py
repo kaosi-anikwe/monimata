@@ -53,29 +53,56 @@ from app.services.ingestion.registry import BankInfo, register_receipt_parser
 _WAT = timezone(timedelta(hours=1))
 
 # ── Identification signals ───────────────────────────────────────────────────
-# OCR text must contain ALL of these (case-insensitive) to be an OPay receipt.
-_IDENTITY_TOKENS = ("opay", "transaction receipt")
+# Actual Tesseract output from OPay receipt images:
+#   - OPay logo → "<) Pay" (circular logo misread), but "OPay" appears in
+#     every phone line as "OPay | PHONE"
+#   - Header is literally "Transaction Receipt"
+#   - "Successful" always appears on its own line below the amount
+#   - "Recipient Details" and "Sender Details" always present
+# All three tokens below are always present in the actual OCR output.
+_IDENTITY_TOKENS = ("opay", "transaction receipt", "successful")
 
 # Masked phone suffix: "901****964" → group 1 = "964"
 _MASKED_SUFFIX_RE = re.compile(r"\*+(\d+)")
 
 # ── Regex patterns ───────────────────────────────────────────────────────────
 
-# Amount: ₦7,500.00 — tesseract may render ₦ as N, #, or H
-_AMOUNT_RE = re.compile(r"[₦Nn#H]\s*([\d,]+\.\d{2})")
+# Amount: Tesseract never outputs the ₦ glyph from images — the number appears
+# as bare digits directly above the word "Successful".
+# Primary pattern anchored to "Successful" (image path).
+# Fallback pattern with currency prefix for pdfplumber text (PDF path).
+_AMOUNT_RE = re.compile(r"([\d,]+\.\d{2})\s*\nSuccessful", re.IGNORECASE)
+_AMOUNT_PDF_RE = re.compile(r"[₦N#]\s*([\d,]+\.\d{2})")
 
-# Date: "May 13th, 2026 20:03:36"
-_DATE_RE = re.compile(r"([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s*\d{4}\s+\d{1,2}:\d{2}:\d{2})")
+# Date: "May 13th, 2026 20:03:36"  — ordinal suffix is always present in OPay receipts
+_DATE_RE = re.compile(r"([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th),\s*\d{4}\s+\d{1,2}:\d{2}:\d{2})")
 
-# OPay phone number after "OPay |" — full ("123 456 7890") or masked ("123****890")
-# Tesseract sometimes reads | as l, I, or 1
-_OPAY_PHONE_RE = re.compile(r"OPay\s*[|lI1]\s*([\d][\d\s\*]+)", re.IGNORECASE)
+# OPay phone lines: exact OCR output is "OPay | 901 645 6964" or "OPay | 901****868"
+# The pipe is always a real | in practice; [|lI1] guards against rare misreads.
+# Single group: \d[\d *]+\d covers full numbers (spaces) and masked (asterisks).
+_OPAY_PHONE_RE = re.compile(r"OPay\s*[|lI1]\s*(\d[\d *]+\d)", re.IGNORECASE)
 
-# Transaction reference — long digit string after "Transaction No."
-_REF_RE = re.compile(r"Transaction\s+No\.?\s*[:\s]*([\d]{15,})", re.IGNORECASE)
+# Transaction reference — "Transaction No. 260513010100240293620823"
+# (no colon in actual OCR output; just one or more spaces)
+_REF_RE = re.compile(r"Transaction\s+No\.\s+([\d]{15,})", re.IGNORECASE)
 
-# ALL-CAPS name (at least two words)
-_NAME_RE = re.compile(r"([A-Z][A-Z\s]{4,})")
+# Section header anchors — always "Recipient Details" and "Sender Details"
+# These appear on the same line as the counterparty name in OCR output, e.g.:
+#   "Recipient Details KAOSISOCHUKWU HENRY ANIKWE"
+_RECIPIENT_SECTION_RE = re.compile(r"Recipient\s+Details", re.IGNORECASE)
+_SENDER_SECTION_RE = re.compile(r"Sender\s+Details", re.IGNORECASE)
+
+# Phone after any "BANK | PHONE" pattern — captures both OPay and other banks
+# (e.g. "MONIE POINT | 5044478717").  The pipe is always literal | in the OCR
+# samples but [|lI1] is kept for robustness.
+# Single group: \d[\d *]+\d covers full numbers (spaces) and masked (asterisks).
+_PIPE_PHONE_RE = re.compile(r"[|lI1]\s*(\d[\d *]+\d)")
+
+# Stop capturing the sender section at the transaction reference lines
+_SECTION_END_RE = re.compile(r"Transaction\s+No\.|Session\s+ID", re.IGNORECASE)
+
+# ALL-CAPS name sequence (person or business name)
+_NAME_RE = re.compile(r"([A-Z][A-Z ]{4,})")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -127,9 +154,14 @@ def _parse_date(s: str) -> datetime | None:
 
 
 def _extract_name_from_section(section_text: str) -> str | None:
-    """Find the ALL-CAPS name inside a Recipient or Sender section."""
-    # Remove the "OPay | PHONE" line to avoid matching "OPAY"
-    cleaned = re.sub(r"OPay\s*[|lI1].*", "", section_text, flags=re.IGNORECASE)
+    """Find the ALL-CAPS person/business name inside a Recipient or Sender section.
+
+    Strips phone-carrier lines ("OPay | ...", "MONIE POINT | ...") before
+    scanning so that bank names are not returned instead of the account holder.
+    Uses a literal pipe to avoid the [lI1] aliases accidentally matching
+    uppercase letters inside the name itself (e.g. the 'I' in "CHEESYBITE").
+    """
+    cleaned = re.sub(r"[^\n]*\|[^\n]*\n", "", section_text)
     names = _NAME_RE.findall(cleaned)
     if names:
         return names[0].strip()
@@ -183,26 +215,33 @@ class _OPayReceiptParser(ReceiptBankParser):
     def parse(self, image_bytes: bytes, account_number: str) -> ParsedTransaction | None:
         """Parse an OPay receipt image or PDF and return the transaction.
 
-        Works for both image screenshots and PDF exports of the OPay
-        transaction detail screen.  The two formats produce different text
-        orderings when extracted:
+        Tuned to the exact Tesseract output observed from OPay receipt images:
 
-        - **Image (OCR)**: section label precedes its data block
-          (``Recipient Details`` → name → phone)
-        - **PDF (pdfplumber)**: data block precedes its label
-          (name → phone → ``Recipient Details``)
+          '<) Pay Transaction Receipt\n{AMOUNT}\nSuccessful\n{DATE}\n'
+          'Recipient Details {NAME}\n\nOPay | {PHONE}\n'
+          'Sender Details {NAME}\nOPay | {PHONE}\n'
+          'Transaction No. {REF}\n'
 
-        Rather than relying on label positions, the parser uses the
-        **appearance order of "OPay | PHONE" matches**: the first match is
-        always the recipient's number and the second is the sender's,
-        regardless of whether labels come before or after the data.
+        Notable OCR behaviours:
+          - The ₦ glyph is **never** emitted; amount is bare digits.
+          - The OPay logo renders as "<) Pay"; "OPay" only appears in phone lines.
+          - Section headers share their line with the counterparty name.
+          - Pipe character is always a literal ``|``.
+          - Counterparty may be on a different bank (e.g. Monie Point).
 
-        Returns ``None`` if critical fields cannot be extracted.
+        Primary strategy: locate section headers, extract phones from each
+        section using any ``BANK | PHONE`` pattern.
+        Fallback: position-based ``OPay | PHONE`` ordering for cases where
+        section headers are not found in the OCR output.
+
+        Returns ``None`` if amount or credit/debit direction cannot be determined.
         """
         text = extract_text(image_bytes)
 
         # ── Amount ────────────────────────────────────────────────────────────
-        amount_match = _AMOUNT_RE.search(text)
+        # Image path: bare number directly above "Successful" (no ₦ from OCR)
+        # PDF path: pdfplumber preserves the ₦ prefix
+        amount_match = _AMOUNT_RE.search(text) or _AMOUNT_PDF_RE.search(text)
         if not amount_match:
             return None
         amount_kobo = _naira_to_kobo(amount_match.group(1))
@@ -217,38 +256,56 @@ class _OPayReceiptParser(ReceiptBankParser):
         ref_match = _REF_RE.search(text)
         txn_ref = ref_match.group(1) if ref_match else None
 
-        # ── Phone matching (position-based, layout-agnostic) ──────────────────
-        # Regardless of whether labels precede or follow data blocks, the
-        # first "OPay | PHONE" match is the recipient's and the second is the
-        # sender's.  This ordering is consistent for both image OCR and PDF
-        # text extraction.
-        phone_matches = list(_OPAY_PHONE_RE.finditer(text))
-        if len(phone_matches) < 2:
-            return None
-
-        recipient_phone = _clean_phone(phone_matches[0].group(1))
-        sender_phone = _clean_phone(phone_matches[1].group(1))
-
         # ── Credit / debit determination ──────────────────────────────────────
         is_credit: bool | None = None
-        if _phone_matches(recipient_phone, account_number):
-            is_credit = True
-        elif _phone_matches(sender_phone, account_number):
-            is_credit = False
+        counterparty_name: str | None = None
+
+        # Strategy 1: section-header anchoring (handles cross-bank receipts)
+        recipient_m = _RECIPIENT_SECTION_RE.search(text)
+        sender_m = _SENDER_SECTION_RE.search(text)
+
+        if recipient_m and sender_m:
+            recipient_section = text[recipient_m.end() : sender_m.start()]
+
+            # Stop the sender region before "Transaction No." / "Session ID"
+            sentinel = _SECTION_END_RE.search(text, sender_m.end())
+            sender_end = sentinel.start() if sentinel else sender_m.end() + 300
+            sender_section = text[sender_m.end() : sender_end]
+
+            r_phones = [
+                _clean_phone(m.group(1)) for m in _PIPE_PHONE_RE.finditer(recipient_section)
+            ]
+            s_phones = [_clean_phone(m.group(1)) for m in _PIPE_PHONE_RE.finditer(sender_section)]
+
+            if any(_phone_matches(p, account_number) for p in r_phones):
+                is_credit = True
+                counterparty_name = _extract_name_from_section(sender_section)
+            elif any(_phone_matches(p, account_number) for p in s_phones):
+                is_credit = False
+                counterparty_name = _extract_name_from_section(recipient_section)
+
+        # Strategy 2: position-based OPay phone ordering (fallback)
+        if is_credit is None:
+            all_opay = list(_OPAY_PHONE_RE.finditer(text))
+            if len(all_opay) >= 2:
+                recipient_phone = _clean_phone(all_opay[0].group(1))
+                sender_phone = _clean_phone(all_opay[1].group(1))
+                cp_match = None
+                if _phone_matches(recipient_phone, account_number):
+                    is_credit = True
+                    cp_match = all_opay[1]
+                elif _phone_matches(sender_phone, account_number):
+                    is_credit = False
+                    cp_match = all_opay[0]
+                if is_credit is not None and cp_match is not None:
+                    w_start = max(0, cp_match.start() - 150)
+                    w_end = min(len(text), cp_match.end() + 150)
+                    counterparty_name = _extract_name_from_section(text[w_start:w_end])
 
         if is_credit is None:
             return None
 
-        # ── Counterparty name ─────────────────────────────────────────────────
-        # Look for the ALL-CAPS name adjacent to the counterparty's phone
-        # match.  Slicing 150 chars on either side covers both orderings:
-        #   PDF:  …NAME\nOPay | PHONE\nLabel…  (name before phone)
-        #   OCR:  …Label NAME\nOPay | PHONE…   (name before phone, after label)
-        cp_match = phone_matches[1] if is_credit else phone_matches[0]
-        cp_start = max(0, cp_match.start() - 150)
-        cp_end = min(len(text), cp_match.end() + 150)
-        counterparty_name = _extract_name_from_section(text[cp_start:cp_end])
-
+        # ── Counterparty name → narration ─────────────────────────────────────
         txn_type = "credit" if is_credit else "debit"
         narration = (
             (
