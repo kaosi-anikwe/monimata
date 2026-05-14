@@ -15,18 +15,29 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Axios API client with request/response interceptors.
- * - Attaches Bearer token from the auth store.
- * - On 401, attempts a silent token refresh and retries once.
- * - On refresh failure, clears auth and redirects to /login.
+ * Type-safe HTTP client built on openapi-fetch + the generated OpenAPI spec.
+ *
+ * The client attaches a Bearer token to every request via a custom fetch
+ * wrapper.  On a 401 the wrapper attempts a silent token refresh (with
+ * request queueing so concurrent calls are not lost) then retries.  On
+ * refresh failure it wipes stored tokens and invokes the logout handler
+ * registered by app/_layout.tsx.
+ *
+ * Exports:
+ *   default / client  – openapi-fetch typed client  (mutations, one-off calls)
+ *   $api              – openapi-react-query wrapper  (use inside components)
+ *   token helpers     – getAccessToken, saveTokens, clearTokens, …
+ *   setLogoutHandler  – breaks the circular dep with the Redux store
  */
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import createClient from 'openapi-fetch';
+import createQueryClient from 'openapi-react-query';
 
-// Callback registered by app/_layout.tsx after both this module and the Redux
-// store are initialised. Breaks the circular dependency:
-//   api.ts → store/index.ts → authSlice.ts → api.ts
-// Instead of importing the store here, the store registers itself after boot.
+import type { paths } from '@monimata/shared-types';
+
+// ── Logout callback ───────────────────────────────────────────────────────────
+// Registered by app/_layout.tsx after the Redux store is initialised.
+// Avoids the circular dependency:  api → store/index → authSlice → api
 let _onLogout: (() => void) | null = null;
 export function setLogoutHandler(handler: () => void): void {
     _onLogout = handler;
@@ -40,6 +51,7 @@ if (!BASE_URL) {
     );
 }
 
+// ── SecureStore keys ──────────────────────────────────────────────────────────
 const SECURE_KEYS = {
     ACCESS_TOKEN: 'mm_access_token',
     REFRESH_TOKEN: 'mm_refresh_token',
@@ -47,7 +59,7 @@ const SECURE_KEYS = {
     LAST_USER_ID: 'mm_last_uid',
 } as const;
 
-// In-memory token cache — avoids a Keychain syscall on every API request.
+// ── In-memory token cache ─────────────────────────────────────────────────────
 // undefined = not yet loaded from SecureStore
 // null      = loaded and confirmed absent
 // string    = loaded, valid token
@@ -97,78 +109,114 @@ export async function clearLastUserId(): Promise<void> {
     await SecureStore.deleteItemAsync(SECURE_KEYS.LAST_USER_ID);
 }
 
+// ── 401 refresh queue ─────────────────────────────────────────────────────────
 let isRefreshing = false;
-let failedQueue: { resolve: (v: string) => void; reject: (e: unknown) => void }[] = [];
+let failedQueue: { resolve: (token: string) => void; reject: (e: unknown) => void }[] = [];
 
 function processQueue(error: unknown, token: string | null) {
-    failedQueue.forEach((prom) => {
-        if (token) prom.resolve(token);
-        else prom.reject(error);
+    failedQueue.forEach((p) => {
+        if (token) p.resolve(token);
+        else p.reject(error);
     });
     failedQueue = [];
 }
 
-const api: AxiosInstance = axios.create({
-    baseURL: BASE_URL,
-    headers: { 'Content-Type': 'application/json' },
-});
+// ── Custom fetch: auth header + silent 401 refresh ────────────────────────────
+// We normalise the input to (url string, init) immediately so that retrying
+// after a token refresh never reads an already-consumed Request body stream.
+//
+// openapi-fetch constructs a Request object and calls fetch(request, undefined).
+// We must extract method/body/headers from it — otherwise origInit is {} and
+// every call silently falls back to GET (the fetch default).
+async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    let url: string;
+    let origInit: RequestInit;
 
-// Attach access token to every request
-api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-    const token = await getAccessToken();
-    if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
+    if (input instanceof Request) {
+        url = input.url;
+        // Read body as text now so it can be replayed on retry without re-reading
+        // a consumed ReadableStream.  We call text() unconditionally — React Native's
+        // fetch polyfill stores the body internally but sets request.body = null, so
+        // a truthiness check on .body always skips the read and sends an empty body.
+        const bodyText = await input.text();
+        origInit = {
+            method: input.method,
+            headers: new Headers(input.headers),
+            body: bodyText || undefined,
+            credentials: input.credentials,
+            cache: input.cache,
+            redirect: input.redirect,
+            mode: input.mode,
+            ...(init ?? {}),
+        };
+    } else {
+        url = String(input);
+        origInit = init ?? {};
     }
-    return config;
-});
 
-// Handle 401 — silent refresh
-api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        const originalRequest = error.config;
+    const headers = new Headers(origInit.headers);
+    const token = await getAccessToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
 
-        if (error.response?.status !== 401 || originalRequest._retry) {
-            return Promise.reject(error);
-        }
+    const response = await fetch(url, { ...origInit, headers });
+    if (response.status !== 401) return response;
 
-        if (isRefreshing) {
-            return new Promise((resolve, reject) => {
-                failedQueue.push({ resolve, reject });
-            }).then((token) => {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-                return api(originalRequest);
-            });
-        }
+    // 401 — attempt silent refresh ────────────────────────────────────────────
+    if (isRefreshing) {
+        // Queue this call; it will be retried once the in-flight refresh settles.
+        return new Promise<string>((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+        }).then((newToken) => {
+            const retryHeaders = new Headers(origInit.headers);
+            retryHeaders.set('Authorization', `Bearer ${newToken}`);
+            return fetch(url, { ...origInit, headers: retryHeaders });
+        });
+    }
 
-        originalRequest._retry = true;
-        isRefreshing = true;
+    isRefreshing = true;
+    try {
+        const storedRefresh = await getRefreshToken();
+        if (!storedRefresh) throw new Error('No refresh token stored');
 
-        try {
-            const refreshToken = await getRefreshToken();
-            if (!refreshToken) throw new Error('No refresh token');
+        const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: storedRefresh }),
+        });
+        if (!refreshRes.ok) throw new Error('Token refresh failed');
 
-            const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
-                refresh_token: refreshToken,
-            });
+        const tokens: { access_token: string; refresh_token: string } = await refreshRes.json();
+        _cachedAccessToken = tokens.access_token;
+        await SecureStore.setItemAsync(SECURE_KEYS.ACCESS_TOKEN, tokens.access_token);
+        await SecureStore.setItemAsync(SECURE_KEYS.REFRESH_TOKEN, tokens.refresh_token);
+        processQueue(null, tokens.access_token);
 
-            const newAccess: string = data.access_token;
-            const newRefresh: string = data.refresh_token;
-            _cachedAccessToken = newAccess; // keep memory cache in sync
-            await SecureStore.setItemAsync(SECURE_KEYS.ACCESS_TOKEN, newAccess);
-            await SecureStore.setItemAsync(SECURE_KEYS.REFRESH_TOKEN, newRefresh);
-            processQueue(null, newAccess);
-            originalRequest.headers.Authorization = `Bearer ${newAccess}`;
-            return api(originalRequest);
-        } catch (refreshError) {
-            processQueue(refreshError, null);
-            await clearTokens();
-            _onLogout?.();
-            return Promise.reject(refreshError);
-        } finally {
-            isRefreshing = false;
-        }
-    },
-);
+        const retryHeaders = new Headers(origInit.headers);
+        retryHeaders.set('Authorization', `Bearer ${tokens.access_token}`);
+        return fetch(url, { ...origInit, headers: retryHeaders });
+    } catch (err) {
+        processQueue(err, null);
+        await clearTokens();
+        _onLogout?.();
+        return response; // return the original 401 so callers see the failure
+    } finally {
+        isRefreshing = false;
+    }
+}
 
-export default api;
+// ── Typed clients ─────────────────────────────────────────────────────────────
+const client = createClient<paths>({ baseUrl: BASE_URL, fetch: authFetch });
+
+/**
+ * openapi-react-query wrapper — use $api.useQuery / $api.useMutation inside
+ * React components for fully typed TanStack Query hooks without writing
+ * queryFn boilerplate.
+ *
+ * @example
+ *   const { data } = $api.useQuery('get', '/accounts');
+ *   const mutation = $api.useMutation('post', '/accounts/manual');
+ */
+export const $api = createQueryClient(client);
+
+export default client;
+

@@ -49,6 +49,16 @@ export interface paths {
      */
     get: operations["check_username_auth_check_username_get"];
   };
+  "/accounts/supported-banks": {
+    /**
+     * Supported Banks
+     * @description Return every bank that MoniMata can ingest data from.
+     *
+     * Open endpoint — no authentication required.  Used to drive the bank
+     * picker in the "add account" flow.
+     */
+    get: operations["supported_banks_accounts_supported_banks_get"];
+  };
   "/accounts/manual": {
     /**
      * Add Manual Account
@@ -352,6 +362,36 @@ export interface paths {
      */
     patch: operations["update_rule_recurring_rules__rule_id__patch"];
   };
+  "/uploads/receipt": {
+    /**
+     * Upload Receipt
+     * @description Upload a transaction receipt image or PDF for background import.
+     *
+     * The bank and account are identified automatically from the file — the
+     * client does not need to specify either.  The file is processed in a
+     * Celery background task; the transaction appears once processing
+     * completes.
+     *
+     * Supported formats: JPEG, PNG, WebP, PDF (max 5 MB).
+     * Returns ``{"status": "accepted"}`` immediately.
+     */
+    post: operations["upload_receipt_uploads_receipt_post"];
+  };
+  "/uploads/statement": {
+    /**
+     * Upload Statement
+     * @description Upload a bank statement PDF for background import.
+     *
+     * The statement is parsed to extract all transactions it contains.
+     * The bank and account are identified from the PDF itself — the client
+     * does not need to specify either.  The account must already exist in
+     * MoniMata; if it is not found, a 404 is returned.
+     *
+     * Accepted formats: PDF only (max 5 MB).
+     * Returns ``{"status": "accepted"}`` immediately.
+     */
+    post: operations["upload_statement_uploads_statement_post"];
+  };
   "/health": {
     /** Health Check */
     get: operations["health_check_health_get"];
@@ -378,6 +418,8 @@ export interface components {
     AddManualAccountRequest: {
       /** Institution */
       institution: string;
+      /** Bank Slug */
+      bank_slug: string;
       /** Account Number */
       account_number: string;
       /** Alias */
@@ -426,6 +468,8 @@ export interface components {
       id: string;
       /** Institution */
       institution: string;
+      /** Bank Slug */
+      bank_slug?: string | null;
       /** Account Name */
       account_name: string;
       /** Alias */
@@ -451,6 +495,16 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /** Body_upload_receipt_uploads_receipt_post */
+    Body_upload_receipt_uploads_receipt_post: {
+      /** File */
+      file: string;
+    };
+    /** Body_upload_statement_uploads_statement_post */
+    Body_upload_statement_uploads_statement_post: {
+      /** File */
+      file: string;
     };
     /** BudgetCategoryResponse */
     BudgetCategoryResponse: {
@@ -923,6 +977,15 @@ export interface components {
       /** Phone */
       phone?: string | null;
     };
+    /** SupportedBankResponse */
+    SupportedBankResponse: {
+      /** Slug */
+      slug: string;
+      /** Name */
+      name: string;
+      /** Channels */
+      channels: ("email" | "statement" | "receipt")[];
+    };
     /** TBBResponse */
     TBBResponse: {
       /** Month */
@@ -1040,7 +1103,7 @@ export interface components {
      * TransactionSource
      * @enum {string}
      */
-    TransactionSource: "bank_alert" | "manual";
+    TransactionSource: "bank_alert" | "statement" | "receipt" | "manual";
     /** TransactionSplitItem */
     TransactionSplitItem: {
       /**
@@ -1315,6 +1378,23 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Supported Banks
+   * @description Return every bank that MoniMata can ingest data from.
+   *
+   * Open endpoint — no authentication required.  Used to drive the bank
+   * picker in the "add account" flow.
+   */
+  supported_banks_accounts_supported_banks_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SupportedBankResponse"][];
         };
       };
     };
@@ -2526,6 +2606,76 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["RecurringRuleResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Upload Receipt
+   * @description Upload a transaction receipt image or PDF for background import.
+   *
+   * The bank and account are identified automatically from the file — the
+   * client does not need to specify either.  The file is processed in a
+   * Celery background task; the transaction appears once processing
+   * completes.
+   *
+   * Supported formats: JPEG, PNG, WebP, PDF (max 5 MB).
+   * Returns ``{"status": "accepted"}`` immediately.
+   */
+  upload_receipt_uploads_receipt_post: {
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_upload_receipt_uploads_receipt_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Upload Statement
+   * @description Upload a bank statement PDF for background import.
+   *
+   * The statement is parsed to extract all transactions it contains.
+   * The bank and account are identified from the PDF itself — the client
+   * does not need to specify either.  The account must already exist in
+   * MoniMata; if it is not found, a 404 is returned.
+   *
+   * Accepted formats: PDF only (max 5 MB).
+   * Returns ``{"status": "accepted"}`` immediately.
+   */
+  upload_statement_uploads_statement_post: {
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_upload_statement_uploads_statement_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */

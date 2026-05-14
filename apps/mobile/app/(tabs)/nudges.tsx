@@ -31,14 +31,14 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -46,19 +46,19 @@ import { Badge, BottomSheet, Button, EmptyState, ListRow, ScreenHeader } from '@
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import {
-  useDismissNudge,
-  useMarkAllNudgesRead,
-  useNudges,
-  useOpenNudge,
-} from '../../hooks/useNudges';
 import type { Nudge, NudgeTriggerType } from '@monimata/shared-types';
+import {
+    useDismissNudge,
+    useMarkAllNudgesRead,
+    useNudges,
+    useOpenNudge,
+} from '../../hooks/useNudges';
 import type {
-  BillPaymentContext,
-  LargeSingleTxContext,
-  PayReceivedContext,
-  Threshold100Context,
-  Threshold80Context,
+    BillPaymentContext,
+    LargeSingleTxContext,
+    PayReceivedContext,
+    Threshold100Context,
+    Threshold80Context,
 } from '../../types/nudge';
 
 
@@ -267,7 +267,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
 
   function handleDismiss() {
     if (!nudge) return;
-    dismiss.mutate(nudge.id);
+    dismiss.mutate({ params: { path: { nudge_id: nudge.id } } });
     onClose();
   }
 
@@ -440,7 +440,7 @@ export default function NudgesScreen() {
   const handleCardPress = useCallback(
     (nudge: Nudge) => {
       if (!nudge.is_opened) {
-        openNudge.mutate(nudge.id);
+      openNudge.mutate({ params: { path: { nudge_id: nudge.id } } });
       }
       setActiveNudge(nudge);
     },
@@ -464,7 +464,7 @@ export default function NudgesScreen() {
         onBack={() => router.back()}
         rightSlot={
           <TouchableOpacity
-            onPress={() => markAllRead.mutate()}
+            onPress={() => markAllRead.mutate({})}
             style={[ss.markAllBtn, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}
             activeOpacity={0.75}
             accessibilityRole="button"

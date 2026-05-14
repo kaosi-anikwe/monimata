@@ -406,7 +406,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => dismissNudge.mutate(firstNudge.id)}
+                  onPress={() => dismissNudge.mutate({ params: { path: { nudge_id: firstNudge.id } } })}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
                   accessibilityLabel="Dismiss nudge"

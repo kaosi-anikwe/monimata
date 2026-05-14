@@ -18,10 +18,8 @@
  * Auth Redux slice — holds minimal auth UI state.
  * Tokens themselves live in SecureStore (never in Redux).
  */
-import { isAxiosError } from 'axios';
-
 import { clearDatabase } from '@/database';
-import api, { clearLastUserId, clearTokens, getLastUserId, saveLastUserId, saveTokens } from '@/services/api';
+import client, { clearLastUserId, clearTokens, getLastUserId, saveLastUserId, saveTokens } from '@/services/api';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface AuthUser {
@@ -49,6 +47,31 @@ const initialState: AuthState = {
     error: null,
 };
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Extracts a human-readable message from a FastAPI error body.
+ *
+ * FastAPI returns two shapes:
+ *   - 4xx (non-validation):  { detail: string }
+ *   - 422 (validation):      { detail: [{loc, msg, type}, …] }
+ *
+ * Joining the `msg` fields of the validation array gives a usable message.
+ */
+function extractDetail(err: unknown, fallback: string | null): string | null {
+    const detail = (err as { detail?: unknown } | null)?.detail;
+    if (!detail) return fallback;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+        const msgs = detail
+            .map((d: unknown) => (d as { msg?: string }).msg)
+            .filter(Boolean)
+            .join(', ');
+        return msgs || fallback;
+    }
+    return fallback;
+}
+
 // ── Async thunks ──────────────────────────────────────────────────────────────
 
 export const register = createAsyncThunk(
@@ -67,19 +90,23 @@ export const register = createAsyncThunk(
         let refreshToken: string | null = null;
 
         try {
-            const { data } = await api.post('/auth/register', payload);
-            accessToken = data.access_token ?? null;
-            refreshToken = data.refresh_token ?? null;
-        } catch (err: unknown) {
-            // If this is a "real" client error (4xx), surface it immediately —
-            // no point trying to login, the account was not created.
-            if (isAxiosError(err) && err.response && err.response.status < 500) {
-                console.log('[register] 4xx error:', err.response.status, err.response.data);
-                return rejectWithValue(err.response.data?.detail ?? 'Registration failed');
+            const { data: regData, error: regError, response: regResponse } =
+                await client.POST('/auth/register', { body: payload });
+            if (regError) {
+                if (regResponse.status < 500) {
+                    console.log('[register] 4xx error:', regResponse.status, regError);
+                    return rejectWithValue(extractDetail(regError, 'Registration failed'));
+                }
+                // 5xx — user may have been created; fall through to login.
+                console.log('[register] server error — will attempt login fallback:', regError);
+                registrationError = regError;
+            } else {
+                accessToken = regData?.access_token ?? null;
+                refreshToken = regData?.refresh_token ?? null;
             }
-            // 5xx / network error: the user record may have been created. Fall
-            // through and try logging in before giving up.
-            console.log('[register] server error or no response — will attempt login fallback:', err);
+        } catch (err) {
+            // Network error — fall through to login fallback.
+            console.log('[register] network error — will attempt login fallback:', err);
             registrationError = err;
         }
 
@@ -89,20 +116,20 @@ export const register = createAsyncThunk(
         //   B) Register 2xx but tokens not included in the response body
         if (!accessToken || !refreshToken) {
             try {
-                const { data: loginData } = await api.post('/auth/login', {
-                    email: payload.email,
-                    password: payload.password,
+                const { data: loginData, error: loginError } = await client.POST('/auth/login', {
+                    body: { email: payload.email, password: payload.password },
                 });
-                accessToken = loginData.access_token ?? null;
-                refreshToken = loginData.refresh_token ?? null;
-            } catch (loginErr: unknown) {
-                // Login also failed — surface the original registration error
-                // if it was informative, otherwise the login error.
-                const surfaced = registrationError ?? loginErr;
-                if (isAxiosError(surfaced)) {
-                    console.log('[register] login fallback also failed:', surfaced.response?.status, surfaced.response?.data);
-                    return rejectWithValue(surfaced.response?.data?.detail ?? 'Registration failed');
+                if (loginError) {
+                    console.log('[register] login fallback also failed:', loginError);
+                    return rejectWithValue(
+                        extractDetail(registrationError, null) ??
+                        extractDetail(loginError, null) ??
+                        'Registration failed',
+                    );
                 }
+                accessToken = loginData?.access_token ?? null;
+                refreshToken = loginData?.refresh_token ?? null;
+            } catch {
                 return rejectWithValue('Registration failed');
             }
         }
@@ -115,16 +142,13 @@ export const register = createAsyncThunk(
             // refreshToken may legitimately be absent (stateless / cookie-based
             // refresh backends). saveTokens accepts null for refresh.
             await saveTokens(accessToken, refreshToken ?? '');
-            const meRes = await api.get('/auth/me');
-            const user = meRes.data as AuthUser;
+            const { data: me, error: meError } = await client.GET('/auth/me', {});
+            if (meError || !me) return rejectWithValue('Registration failed');
             await clearDatabase();
-            await saveLastUserId(user.id);
-            return user;
+            await saveLastUserId(me.id);
+            return me as AuthUser;
         } catch (err: unknown) {
             console.log('[register] post-auth step failed:', err);
-            if (isAxiosError(err)) {
-                return rejectWithValue(err.response?.data?.detail ?? 'Registration failed');
-            }
             return rejectWithValue('Registration failed');
         }
     },
@@ -134,23 +158,21 @@ export const login = createAsyncThunk(
     'auth/login',
     async (payload: { email: string; password: string }, { rejectWithValue }) => {
         try {
-            const { data } = await api.post('/auth/login', payload);
+            const { data, error } = await client.POST('/auth/login', { body: payload });
+            if (error) return rejectWithValue(extractDetail(error, 'Login failed'));
+            if (!data) return rejectWithValue('Login failed');
             await saveTokens(data.access_token, data.refresh_token);
-            const meRes = await api.get('/auth/me');
-            const user = meRes.data as AuthUser;
+            const { data: me, error: meError } = await client.GET('/auth/me', {});
+            if (meError || !me) return rejectWithValue('Login failed');
+            const user = me as AuthUser;
             // Wipe local DB when a different account uses this device.
-            // WatermelonDB is a local cache — data re-syncs on first pull, so
-            // clearing it is always safe and prevents cross-account data leaks.
             const lastId = await getLastUserId();
             if (lastId !== null && lastId !== user.id) {
                 await clearDatabase();
             }
             await saveLastUserId(user.id);
             return user;
-        } catch (err: unknown) {
-            if (isAxiosError(err)) {
-                return rejectWithValue(err.response?.data?.detail ?? 'Login failed');
-            }
+        } catch {
             return rejectWithValue('Login failed');
         }
     },
@@ -158,7 +180,7 @@ export const login = createAsyncThunk(
 
 export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
     try {
-        await api.post('/auth/logout');
+        await client.POST('/auth/logout', {});
     } finally {
         // Wipe local DB on logout so the next user (or same user re-logging in
         // after a longer gap) starts with a clean, server-authoritative state.
@@ -171,7 +193,8 @@ export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) =>
 
 export const restoreSession = createAsyncThunk('auth/restoreSession', async (_, { rejectWithValue }) => {
     try {
-        const { data } = await api.get('/auth/me');
+        const { data, error } = await client.GET('/auth/me', {});
+        if (error || !data) return rejectWithValue('No active session');
         return data as AuthUser;
     } catch {
         return rejectWithValue('No active session');
@@ -182,12 +205,11 @@ export const markOnboardedThunk = createAsyncThunk(
     'auth/markOnboarded',
     async (_, { rejectWithValue }) => {
         try {
-            const { data } = await api.patch('/auth/me', { onboarded: true });
+            const { data, error } = await client.PATCH('/auth/me', { body: { onboarded: true } });
+            if (error) return rejectWithValue(extractDetail(error, 'Failed to update onboarding status'));
+            if (!data) return rejectWithValue('Failed to update onboarding status');
             return data as AuthUser;
-        } catch (err: unknown) {
-            if (isAxiosError(err)) {
-                return rejectWithValue(err.response?.data?.detail ?? 'Failed to update onboarding status');
-            }
+        } catch {
             return rejectWithValue('Failed to update onboarding status');
         }
     },

@@ -1,4 +1,9 @@
 "use strict";
+
+// Set a stable API base URL so tests that import services/api.ts don't throw
+// on the BASE_URL validation check.
+process.env.EXPO_PUBLIC_API_URL = "http://localhost:8000";
+
 /**
  * Runs via Jest `setupFiles` — BEFORE jest-expo's setupFilesAfterFramework.
  *

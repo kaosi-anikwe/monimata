@@ -8,6 +8,7 @@ module.exports = {
   resolver: "./__tests__/setup/expoRuntimeResolver.js",
   // setupFiles runs BEFORE jest-expo's setupFilesAfterFramework.
   setupFiles: ["./__tests__/setup/preSetup.js"],
+  setupFilesAfterFramework: ["./__tests__/setup/mswSetup.ts"],
   moduleNameMapper: {
     // Map the @/* path alias defined in tsconfig.json
     "^@/(.*)$": "<rootDir>/$1",
@@ -26,7 +27,11 @@ module.exports = {
       "@sentry/.*|" +
       "@shopify/flash-list|" +
       "@nozbe/watermelondb|" +
-      "@tanstack/react-query" +
+      "@tanstack/react-query|" +
+      "openapi-fetch|" +
+      "openapi-react-query|" +
+      "msw|" +
+      "@mswjs" +
       ")",
   ],
   collectCoverageFrom: [

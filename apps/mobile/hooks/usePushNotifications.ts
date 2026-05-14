@@ -30,18 +30,18 @@
  *      that navigates to the Nudges tab.
  */
 
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { useSelector } from 'react-redux';
-import * as SecureStore from 'expo-secure-store';
-import * as Notifications from 'expo-notifications';
-import { useEffect, useRef, useState } from 'react';
 
+import { useToast } from '@/components/Toast';
+import { registerPromptSetter, resetBridgeForUser } from '@/lib/notifPromptBridge';
 import { lightColors } from '@/lib/theme';
 import type { RootState } from '../store';
-import { useToast } from '@/components/Toast';
 import { useRegisterDevice } from './useNudges';
-import { registerPromptSetter, resetBridgeForUser } from '@/lib/notifPromptBridge';
 
 // Show notifications as banners even when the app is in the foreground.
 Notifications.setNotificationHandler({
@@ -89,7 +89,7 @@ export function usePushNotifications(): PushNotificationConsent {
     });
 
     if (mountedRef.current) {
-      registerDevice.mutate({ token: tokenData.data });
+      registerDevice.mutate({ body: { token: tokenData.data } });
     }
   }
 

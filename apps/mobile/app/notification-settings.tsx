@@ -23,15 +23,15 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -81,7 +81,7 @@ export default function NotificationSettingsScreen() {
       showError('Invalid time', 'Please use HH:MM format (e.g. 23:00).');
       return;
     }
-    updateSettings.mutate(draft, {
+    updateSettings.mutate({ body: draft as never }, {
       onSuccess: () => router.back(),
       onError: () => showError('Error', 'Could not save settings. Please try again.'),
     });
