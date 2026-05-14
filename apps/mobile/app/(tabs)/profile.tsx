@@ -22,12 +22,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -63,7 +63,7 @@ export default function ProfileScreen() {
   const nudgeLang = nudgeSettings?.language ?? 'pidgin';
 
   function setNudgeLang(lang: 'pidgin' | 'formal') {
-    updateNudgeSettings.mutate({ language: lang });
+    updateNudgeSettings.mutate({ body: { language: lang } });
   }
 
 

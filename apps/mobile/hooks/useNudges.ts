@@ -14,28 +14,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 
-import api from '../services/api';
 import { queryKeys } from '../lib/queryKeys';
-import type {
-  Nudge,
-  NudgeListResponse,
-  NudgeSettings,
-  NudgeSettingsUpdate,
-} from '@monimata/shared-types';
+import { $api } from '../services/api';
 
 // ── List ──────────────────────────────────────────────────────────────────
 
 export function useNudges(includeDismissed = true) {
-  return useQuery<NudgeListResponse>({
-    queryKey: queryKeys.nudges(),
-    queryFn: () =>
-      api.get('/nudges', {
-        params: { include_dismissed: includeDismissed, limit: 50 },
-      }).then((r) => r.data),
-    staleTime: 60_000,
-  });
+  return $api.useQuery(
+    'get',
+    '/nudges',
+    { params: { query: { include_dismissed: includeDismissed, limit: 50 } } },
+    { staleTime: 60_000 },
+  );
 }
 
 // ── Unread count (lightweight helper) ────────────────────────────────────
@@ -49,8 +41,7 @@ export function useNudgeUnreadCount(): number {
 
 export function useOpenNudge() {
   const qc = useQueryClient();
-  return useMutation<Nudge, unknown, string>({
-    mutationFn: (id) => api.post(`/nudges/${id}/open`).then((r) => r.data),
+  return $api.useMutation('post', '/nudges/{nudge_id}/open', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.nudges() }),
   });
 }
@@ -59,8 +50,7 @@ export function useOpenNudge() {
 
 export function useDismissNudge() {
   const qc = useQueryClient();
-  return useMutation<Nudge, unknown, string>({
-    mutationFn: (id) => api.post(`/nudges/${id}/dismiss`).then((r) => r.data),
+  return $api.useMutation('post', '/nudges/{nudge_id}/dismiss', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.nudges() }),
   });
 }
@@ -69,8 +59,7 @@ export function useDismissNudge() {
 
 export function useDeleteNudge() {
   const qc = useQueryClient();
-  return useMutation<void, unknown, string>({
-    mutationFn: (id) => api.delete(`/nudges/${id}`).then((r) => r.data),
+  return $api.useMutation('delete', '/nudges/{nudge_id}', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.nudges() }),
   });
 }
@@ -79,8 +68,7 @@ export function useDeleteNudge() {
 
 export function useMarkAllNudgesRead() {
   const qc = useQueryClient();
-  return useMutation<void, unknown, void>({
-    mutationFn: () => api.post('/nudges/mark-all-read').then((r) => r.data),
+  return $api.useMutation('post', '/nudges/mark-all-read', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.nudges() }),
   });
 }
@@ -88,17 +76,12 @@ export function useMarkAllNudgesRead() {
 // ── Settings ──────────────────────────────────────────────────────────────
 
 export function useNudgeSettings() {
-  return useQuery<NudgeSettings>({
-    queryKey: queryKeys.nudgeSettings(),
-    queryFn: () => api.get('/nudges/settings').then((r) => r.data),
-    staleTime: 5 * 60_000,
-  });
+  return $api.useQuery('get', '/nudges/settings', {}, { staleTime: 5 * 60_000 });
 }
 
 export function useUpdateNudgeSettings() {
   const qc = useQueryClient();
-  return useMutation<NudgeSettings, unknown, NudgeSettingsUpdate>({
-    mutationFn: (body) => api.patch('/nudges/settings', body).then((r) => r.data),
+  return $api.useMutation('patch', '/nudges/settings', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.nudgeSettings() }),
   });
 }
@@ -106,8 +89,5 @@ export function useUpdateNudgeSettings() {
 // ── Device token registration ─────────────────────────────────────────────
 
 export function useRegisterDevice() {
-  return useMutation<void, unknown, { token: string }>({
-    mutationFn: (body) =>
-      api.post('/nudges/register-device', body).then((r) => r.data),
-  });
+  return $api.useMutation('post', '/nudges/register-device');
 }

@@ -52,8 +52,8 @@ import {
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { BankAccount } from '@monimata/shared-types';
 import { formatNaira } from '@/utils/money';
+import type { BankAccount } from '@monimata/shared-types';
 
 // ── Tour definition ─────────────────────────────────────────────────────
 
@@ -108,7 +108,7 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
       account_type: accountType,
       balance: balance ? Math.round(parseFloat(balance) * 100) : 0,
     };
-    addMutation.mutate(payload, { onSuccess: handleClose });
+    addMutation.mutate({ body: payload as never }, { onSuccess: handleClose });
   }
 
   return (
@@ -219,7 +219,10 @@ function UpdateBalanceSheet({ account, onClose }: UpdateBalanceSheetProps) {
       return;
     }
     updateMutation.mutate(
-      { accountId: account.id, balance: Math.round(parsed * 100), note: note.trim() || undefined },
+      {
+        params: { path: { account_id: account.id } },
+        body: { balance: Math.round(parsed * 100), note: note.trim() || undefined },
+      },
       { onSuccess: handleClose },
     );
   }
@@ -294,7 +297,7 @@ function RenameSheet({ account, onClose }: RenameSheetProps) {
       return;
     }
     renameMutation.mutate(
-      { accountId: account.id, alias: alias.trim() },
+      { params: { path: { account_id: account.id } }, body: { alias: alias.trim() } },
       { onSuccess: handleClose },
     );
   }
@@ -536,7 +539,7 @@ export default function AccountsScreen() {
       message: `Remove ${account.institution} from MoniMata? Your transaction history will be preserved.`,
       confirmText: 'Remove',
       confirmStyle: 'destructive',
-      onConfirm: () => deleteMutation.mutate(account.id),
+      onConfirm: () => deleteMutation.mutate({ params: { path: { account_id: account.id } } }),
     });
   }
 

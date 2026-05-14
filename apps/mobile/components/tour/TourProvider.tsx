@@ -31,28 +31,28 @@
  */
 
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
 } from 'react';
 import {
-  Animated as RNAnimated,
-  Dimensions,
-  Easing,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Easing,
+    Modal,
+    Platform,
+    Animated as RNAnimated,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
-import { ff } from '@/lib/typography';
-import { radius, spacing } from '@/lib/tokens';
 import { useTheme, type ThemeColors } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
+import { ff } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -157,6 +157,9 @@ function TourOverlay({ steps, stepIndex, rect, spotX, spotY, spotW, spotH, spotR
   const step = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
   const sh = SCREEN.height;
+
+  // Safety guard — stepIndex out of range (e.g. empty steps array slipped through).
+  if (!step) return null;
 
   // A step is in "fallback" mode when it has fallbackFullscreen AND no rect
   // has arrived (target not currently rendered on screen).
@@ -384,6 +387,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   const startTour = useCallback((steps: TourStep[], onDone?: (deferredSteps: TourStep[]) => void) => {
     if (activeTourRef.current) return; // already running
+    if (!steps.length) { onDone?.([]); return; } // nothing to show
     onDoneRef.current = onDone;
     deferredStepsRef.current = [];
     isFirstRectRef.current = true; // next rect should jump, not animate

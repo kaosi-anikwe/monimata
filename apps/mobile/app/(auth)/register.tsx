@@ -40,7 +40,7 @@ import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import api from '@/services/api';
+import client from '@/services/api';
 import { AuthHdr, BackBtn, s } from './_authShared';
 
 const USERNAME_RE = /^[a-z0-9_-]+$/;
@@ -87,10 +87,10 @@ export default function RegisterScreen() {
     setUsernameStatus('checking');
     debounceRef.current = setTimeout(async () => {
       try {
-        const { data } = await api.get<{ available: boolean }>(
-          `/auth/check-username?username=${encodeURIComponent(value)}`,
-        );
-        setUsernameStatus(data.available ? 'available' : 'taken');
+        const { data } = await client.GET('/auth/check-username', {
+          params: { query: { username: value } },
+        });
+        setUsernameStatus(data?.['available'] ? 'available' : 'taken');
       } catch {
         setUsernameStatus('idle');
       }
@@ -159,9 +159,9 @@ export default function RegisterScreen() {
               render={({ field: { value, onChange, onBlur } }) => {
                 const hint =
                   usernameStatus === 'checking' ? null
-                  : usernameStatus === 'available' ? 'Username is available'
-                  : usernameStatus === 'taken' ? 'Username is already taken'
-                  : undefined;
+                    : usernameStatus === 'available' ? 'Username is available'
+                      : usernameStatus === 'taken' ? 'Username is already taken'
+                        : undefined;
                 const hintColor =
                   usernameStatus === 'available' ? colors.brand : colors.error;
                 return (

@@ -14,12 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useToast } from '@/components/Toast';
 import { queryKeys } from '@/lib/queryKeys';
-import api from '@/services/api';
-import type { BankAccount } from '@monimata/shared-types';
+import { $api } from '@/services/api';
 
 export interface AddManualAccountPayload {
   institution: string;
@@ -42,13 +41,7 @@ export interface UpdateAliasPayload {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export function useAccounts() {
-  return useQuery({
-    queryKey: queryKeys.accounts(),
-    queryFn: async () => {
-      const { data } = await api.get<BankAccount[]>('/accounts');
-      return data;
-    },
-  });
+  return $api.useQuery('get', '/accounts', {});
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -56,9 +49,7 @@ export function useAccounts() {
 export function useAddManualAccount() {
   const qc = useQueryClient();
   const { error } = useToast();
-  return useMutation({
-    mutationFn: (payload: AddManualAccountPayload) =>
-      api.post<BankAccount>('/accounts/manual', payload),
+  return $api.useMutation('post', '/accounts/manual', {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.accounts() });
       // The opening balance transaction also affects TBB and the tx list.
@@ -72,9 +63,7 @@ export function useAddManualAccount() {
 export function useUpdateBalance() {
   const qc = useQueryClient();
   const { error } = useToast();
-  return useMutation({
-    mutationFn: ({ accountId, ...body }: UpdateBalancePayload & { accountId: string }) =>
-      api.patch<BankAccount>(`/accounts/${accountId}/balance`, body),
+  return $api.useMutation('patch', '/accounts/{account_id}/balance', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
     onError: () => error('Error', 'Could not update balance. Try again.'),
   });
@@ -83,9 +72,7 @@ export function useUpdateBalance() {
 export function useUpdateAlias() {
   const qc = useQueryClient();
   const { error } = useToast();
-  return useMutation({
-    mutationFn: ({ accountId, alias }: UpdateAliasPayload & { accountId: string }) =>
-      api.patch<BankAccount>(`/accounts/${accountId}/alias`, { alias }),
+  return $api.useMutation('patch', '/accounts/{account_id}/alias', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
     onError: () => error('Error', 'Could not update account name. Try again.'),
   });
@@ -94,8 +81,7 @@ export function useUpdateAlias() {
 export function useDeleteAccount() {
   const qc = useQueryClient();
   const { error } = useToast();
-  return useMutation({
-    mutationFn: (accountId: string) => api.delete(`/accounts/${accountId}`),
+  return $api.useMutation('delete', '/accounts/{account_id}', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
     onError: () => error('Error', 'Could not remove account. Try again.'),
   });

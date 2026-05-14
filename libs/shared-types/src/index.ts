@@ -40,6 +40,7 @@ export type RefreshPayload = components['schemas']['RefreshRequest'];
 
 // ── Accounts ─────────────────────────────────────────────────────────────────
 export type BankAccount = components['schemas']['BankAccountResponse'];
+export type SupportedBank = components['schemas']['SupportedBankResponse'];
 export type AddManualAccountPayload = components['schemas']['AddManualAccountRequest'];
 export type UpdateAliasPayload = components['schemas']['UpdateAliasRequest'];
 export type UpdateManualBalancePayload = components['schemas']['UpdateManualBalanceRequest'];
