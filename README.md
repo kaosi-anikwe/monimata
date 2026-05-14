@@ -19,7 +19,9 @@ MoniMata (Pidgin: _Money Matters_) is a zero-based budgeting app built specifica
 ## Features
 
 - **Automatic Transaction Capture** — Bank alert emails are forwarded by a Cloudflare Worker and parsed into transactions automatically
-- **Manual Transaction Entry** — Log cash purchases and any transaction not covered by email alerts
+- **Receipt Upload** — Snap or export a bank transaction receipt (JPEG, PNG, WebP, or PDF); the bank and account are identified automatically via OCR and a pluggable parser registry
+- **Statement Upload** — Upload a bank statement PDF directly from the app; all transactions are imported in the background with full deduplication
+- **Manual Transaction Entry** — Log cash purchases and any transaction not covered by the above channels
 - **Zero-Based Budgeting** — Every Naira assigned to a category before it is spent (YNAB model: TBB, Assigned, Activity, Available)
 - **Category Targets** — Monthly, weekly, or date-based savings goals per category
 - **AI Nudge Engine** — Personalised, Pidgin-infused spending alerts triggered by incoming transactions
@@ -38,25 +40,46 @@ MoniMata (Pidgin: _Money Matters_) is a zero-based budgeting app built specifica
 
 MoniMata is a **cloud-primary, device-cached** system. Financial records are authoritative in PostgreSQL on the server. The device holds a read-optimised local cache (WatermelonDB / SQLCipher) of the last 90 days that also queues writes for server sync.
 
+### Transaction Ingestion Channels
+
+Transactions can enter the system through three independent channels, all funnelling into the same deduplication and categorisation pipeline:
+
+| Channel               | Trigger                                                        | Parser                         | Notes                                                                                                               |
+| --------------------- | -------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| **Email alert**       | Bank debit/credit SMS-style email forwarded via Cloudflare     | `EmailBankParser` per bank     | Zero-friction; no user action after initial forwarding setup                                                        |
+| **Statement PDF**     | User uploads via `POST /uploads/statement` or email attachment | `StatementBankParser` per bank | Bulk-imports historical transactions; deduplicates against existing rows                                            |
+| **Receipt image/PDF** | User uploads via `POST /uploads/receipt`                       | `ReceiptBankParser` per bank   | OCR (Tesseract) for images; direct text extraction (pdfplumber) for PDFs; bank auto-identified from receipt content |
+
+All three channels share the same registry of supported banks (`app/services/ingestion/registry.py`). Adding support for a new bank means implementing one or more parser protocols and registering them at import time — no changes to the channel or routing layer.
+
 ```
 [GTBank / Kuda / Zenith / OPay]
       |
       | Bank sends alert email to user's inbox
       ↓
 [Cloudflare Email Routing] → [email-parser (postal-mime)]
-      |
+      |                                    |
+      |                                    | Attached PDF? → identify_statement()
+      |                                    ↓
       | POST /webhooks/bank-alerts  (X-MoniMata-Secret)
       ↓
-[FastAPI Backend]
-      |
-      ├── Verify shared secret (constant-time compare)
-      ├── Parse alert → Transaction row (upsert)
-      ├── Enqueue Celery tasks
+[FastAPI Backend]  ←──────────────────────────────────────────┐
+      |                                                         |
+      ├── Verify shared secret (constant-time compare)         |
+      ├── Parse alert → Transaction row (upsert)               |
+      ├── Enqueue Celery tasks                                  |
+      |                                                         |
+      |            [Mobile App]                                 |
+      |                 │                                       |
+      |     POST /uploads/receipt (image or PDF)               |
+      |     POST /uploads/statement (PDF)    ──────────────────┘
       |
       ├── [PostgreSQL]    ← source of financial truth
       ├── [Redis]         ← Celery broker + token store + rate limits
       └── [Celery Workers + Beat]
               ├── categorize_transactions
+              ├── process_receipt        ← OCR + parse + upsert
+              ├── process_bank_statement ← PDF parse + bulk upsert
               ├── evaluate_nudges
               ├── deliver_queued_nudges  (7:05 AM WAT)
               └── reconcile_budget_activity  (4:00 AM WAT)
@@ -88,6 +111,9 @@ MoniMata is a **cloud-primary, device-cached** system. Financial records are aut
 | PII encryption     | AES-256-GCM (account numbers)                   |
 | Password hashing   | bcrypt min cost 12                              |
 | Push notifications | Firebase Admin SDK                              |
+| OCR                | Tesseract 4 via pytesseract (receipt images)    |
+| PDF parsing        | pdfplumber (statements + receipt PDFs)          |
+| Error reporting    | Sentry (`sentry-sdk` + FastAPI integration)     |
 | HTTP client        | httpx                                           |
 | Runtime            | Python 3.11+                                    |
 
@@ -101,7 +127,7 @@ MoniMata is a **cloud-primary, device-cached** system. Financial records are aut
 | Server state    | TanStack Query v5                       |
 | Global state    | Redux Toolkit                           |
 | Forms           | React Hook Form                         |
-| Crash reporting | Sentry                                  |
+| Crash reporting | Sentry (`@sentry/react-native`)         |
 | Animations      | React Native Reanimated 4               |
 | Lists           | Shopify FlashList                       |
 
@@ -138,7 +164,15 @@ monimata/
 │   │   │   ├── models/         # SQLAlchemy ORM models
 │   │   │   ├── routers/        # One file per endpoint group
 │   │   │   ├── schemas/        # Pydantic request/response schemas
-│   │   │   ├── services/       # Bank alert parser, categorisation, nudge engine, push
+│   │   │   ├── services/
+│   │   │   │   ├── ingestion/          # Transaction ingestion pipeline
+│   │   │   │   │   ├── base.py         # Parser protocols (Email/Statement/ReceiptBankParser)
+│   │   │   │   │   ├── registry.py     # Bank registry + iter_*_parsers helpers
+│   │   │   │   │   ├── channels/       # Per-channel dispatch (email, statement, receipt)
+│   │   │   │   │   └── banks/          # Per-bank parser implementations
+│   │   │   │   ├── categorization.py   # Rule-based + fuzzy narration categorisation
+│   │   │   │   ├── nudge_engine.py     # Nudge triggers, quiet hours, fatigue limits
+│   │   │   │   └── push_service.py     # Expo push notification delivery
 │   │   │   └── worker/         # Celery app, tasks, beat schedule
 │   │   └── alembic/            # Database migrations
 │   ├── email-parser/           # Cloudflare Email Worker
@@ -171,6 +205,7 @@ monimata/
 - Node.js 20+ and npm
 - PostgreSQL 15+
 - Redis 7+
+- Tesseract 4+ (`tesseract-ocr` package) — required for receipt image OCR
 - Java 17 (for Android builds)
 - Android SDK (for Android builds)
 
@@ -288,23 +323,25 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 ## API Endpoints
 
-| Prefix                  | Description                                           |
-| ----------------------- | ----------------------------------------------------- |
-| `GET /health`           | Health check                                          |
-| `/auth`                 | Register, login, token refresh                        |
-| `/accounts`             | Bank account management (manual accounts)             |
-| `/transactions`         | Transaction CRUD and manual entry                     |
-| `/budget`               | Budget month management                               |
-| `/categories`           | Category CRUD                                         |
-| `/category-groups`      | Category group CRUD                                   |
-| `/recurring-rules`      | Recurring transaction rules                           |
-| `/sync/pull`            | WatermelonDB delta pull                               |
-| `/sync/push`            | WatermelonDB delta push                               |
-| `/ws/events`            | WebSocket real-time events                            |
-| `/nudges`               | AI-generated spending nudges                          |
-| `/reports`              | Spending, income vs. expense, net worth               |
-| `/content`              | Knowledge Hub articles                                |
-| `/webhooks/bank-alerts` | Bank alert email receiver (forwarded by email-parser) |
+| Prefix                  | Description                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `GET /health`           | Health check                                                                  |
+| `/auth`                 | Register, login, token refresh                                                |
+| `/accounts`             | Bank account management; `GET /accounts/supported-banks` returns the registry |
+| `/transactions`         | Transaction CRUD and manual entry                                             |
+| `/budget`               | Budget month management                                                       |
+| `/categories`           | Category CRUD                                                                 |
+| `/category-groups`      | Category group CRUD                                                           |
+| `/recurring-rules`      | Recurring transaction rules                                                   |
+| `/uploads/receipt`      | Upload a receipt image or PDF — bank auto-identified                          |
+| `/uploads/statement`    | Upload a bank statement PDF — transactions bulk-imported                      |
+| `/sync/pull`            | WatermelonDB delta pull                                                       |
+| `/sync/push`            | WatermelonDB delta push                                                       |
+| `/ws/events`            | WebSocket real-time events                                                    |
+| `/nudges`               | AI-generated spending nudges                                                  |
+| `/reports`              | Spending, income vs. expense, net worth                                       |
+| `/content`              | Knowledge Hub articles                                                        |
+| `/webhooks/bank-alerts` | Bank alert email receiver (forwarded by email-parser)                         |
 
 ---
 
