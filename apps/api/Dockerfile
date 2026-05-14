@@ -23,6 +23,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bash \
+        tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -258,7 +258,7 @@ async def bank_alert_webhook(
                 db.query(BankAccount)
                 .filter(
                     BankAccount.user_id == str(user.id),
-                    BankAccount.institution.ilike(f"%{bank_slug}%"),
+                    BankAccount.bank_slug == bank_slug,
                     BankAccount.deleted_at.is_(None),
                 )
                 .all()
@@ -362,19 +362,18 @@ async def bank_alert_webhook(
     if bank_info is None:
         logger.warning("bank_alert_webhook: unrecognised sender=%s", effective_sender)
         return {"status": "skipped", "reason": "unknown_sender"}
-    institution = bank_info.display_name
 
     account: BankAccount | None = (
         db.query(BankAccount)
         .filter(
             BankAccount.user_id == str(user.id),
-            BankAccount.institution.ilike(f"%{institution}%"),
+            BankAccount.bank_slug == bank_info.slug,
             BankAccount.deleted_at.is_(None),
         )
         .first()
     )
     if account is None:
-        logger.warning("bank_alert_webhook: no %s account for user=%s", institution, user.id)
+        logger.warning("bank_alert_webhook: no %s account for user=%s", bank_info.slug, user.id)
         return {"status": "skipped", "reason": "no_matching_account"}
 
     # ── 4. Deduplicate ────────────────────────────────────────────────────────
@@ -401,7 +400,7 @@ async def bank_alert_webhook(
     tx_date = alert.transaction_date or datetime.now(UTC)
     # Amounts are signed: debits negative, credits positive (kobo)
     signed_amount = -alert.amount_kobo if alert.transaction_type == "debit" else alert.amount_kobo
-    narration = alert.narration or f"{institution} {alert.transaction_type.capitalize()}"
+    narration = alert.narration or f"{bank_info.display_name} {alert.transaction_type.capitalize()}"
 
     tx = Transaction(
         user_id=str(user.id),

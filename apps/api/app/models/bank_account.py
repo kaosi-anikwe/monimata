@@ -39,6 +39,10 @@ class BankAccount(Base):
         UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     institution: Mapped[str] = mapped_column(Text, nullable=False)
+    # Machine-readable registry slug, e.g. "opay", "gtbank".  Set from the
+    # supported-banks list when the account is created; used for exact-match
+    # filtering instead of case-insensitive institution name searches.
+    bank_slug: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     account_name: Mapped[str] = mapped_column(Text, nullable=False)
     # User-defined display name — always editable, overrides account_name in the UI
     alias: Mapped[str | None] = mapped_column(Text, nullable=True)

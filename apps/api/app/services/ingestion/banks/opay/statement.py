@@ -316,21 +316,6 @@ def _parse_row(
     )
 
 
-def _account_last4_from_filename(filename: str) -> str | None:
-    """Extract last-4 digits of account number from OPay filename convention.
-
-    Expected format: ``NAME_ACCOUNTNUMBER_TIMESTAMP.pdf``
-    """
-    try:
-        stem = filename.rsplit(".pdf", 1)[0]
-        parts = stem.split("_")
-        if len(parts) >= 2:
-            return parts[1][-4:] or None
-    except Exception:
-        pass
-    return None
-
-
 # ── parser ───────────────────────────────────────────────────────────────────
 
 

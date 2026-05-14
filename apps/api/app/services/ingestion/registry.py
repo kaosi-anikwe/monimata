@@ -128,6 +128,10 @@ def register_statement_parser(bank: BankInfo, parser: StatementBankParser) -> No
 def register_receipt_parser(bank: BankInfo, parser: ReceiptBankParser) -> None:
     """Register *bank* and its receipt *parser*.
 
+    The parser's ``identify()`` method is responsible for recognising the
+    bank's receipt images and extracting the account-number suffix.  No
+    separate identity tokens are needed here.
+
     Same merge semantics as ``register_statement_parser``.
     """
     existing = _BANKS.get(bank.slug)
@@ -187,4 +191,15 @@ def iter_statement_parsers() -> Iterator[tuple[BankInfo, StatementBankParser]]:
     bank and account number from a forwarded statement attachment.
     """
     for slug, parser in _STATEMENT_PARSERS.items():
+        yield _BANKS[slug], parser
+
+
+def iter_receipt_parsers() -> Iterator[tuple[BankInfo, ReceiptBankParser]]:
+    """Yield ``(BankInfo, parser)`` for every registered receipt parser.
+
+    Used by ``channels.receipt.identify_receipt()`` to auto-detect the bank
+    and account-number suffix from a receipt image without requiring the user
+    to specify the bank explicitly.
+    """
+    for slug, parser in _RECEIPT_PARSERS.items():
         yield _BANKS[slug], parser

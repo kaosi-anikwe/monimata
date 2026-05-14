@@ -74,6 +74,10 @@ TITLES: dict[str, str] = {
     "transaction_received": "{type_emoji} Transaction Alert",
     "statement_received": "📄 Statement received",
     "statement_processed": "✅ Statement imported",
+    "receipt_received": "🧾 Receipt received",
+    "receipt_processed": "✅ Receipt imported",
+    "receipt_failed": "🧾 Receipt import failed",
+    "statement_failed": "📄 Statement import failed",
 }
 
 MESSAGES: dict[str, list[str]] = {
@@ -121,6 +125,35 @@ MESSAGES: dict[str, list[str]] = {
         "{imported} new transactions imported from your {bank_name} statement."
         "{updated} existing updated.",
         "Done! {imported} new, {updated} updated from your {bank_name} statement.",
+    ],
+    "receipt_received": [
+        "Your {bank_name} receipt don land. We dey process am now.",
+        "{bank_name} receipt received — importing your transaction in the background.",
+    ],
+    "receipt_processed": [
+        "Transaction of ₦{amount_naira} {direction} recorded from your {bank_name} receipt.",
+        "Done! ₦{amount_naira} {direction} imported from your {bank_name} receipt.",
+    ],
+    "receipt_failed": {
+        # Keyed by reason string passed from the task.
+        "unrecognised": (
+            "We couldn't identify this receipt. "
+            "Make sure it's a clear, unedited photo or PDF of your bank transaction receipt."
+        ),
+        "no_account": (
+            "We recognised a {bank_name} receipt but your {bank_name} account isn't linked. "
+            "Add the account in MoniMata and re-upload."
+        ),
+        "parse_failed": (
+            "We found a {bank_name} receipt but couldn't read the transaction details. "
+            "Try a clearer photo or export the receipt as a PDF."
+        ),
+    },
+    "statement_failed": [
+        "Couldn't import your {bank_name} statement. "
+        "Download a fresh copy directly from your bank app and try again.",
+        "Your {bank_name} statement couldn't be parsed. "
+        "Make sure it's an unmodified PDF from your bank and re-upload.",
     ],
 }
 
@@ -368,6 +401,112 @@ def send_statement_processed_push(user: User, bank_name: str, imported: int, upd
             bank_name=bank_name, imported=imported, updated=updated
         ),
         data={"trigger_type": "statement_processed", "imported": imported, "updated": updated},
+    )
+
+
+def send_receipt_received_push(user: User, bank_name: str) -> None:
+    """Fire-and-forget push: receipt image received, processing in background."""
+    from app.services.push_service import send_push_notification
+
+    if not user.expo_push_token:
+        return
+    send_push_notification(
+        token=user.expo_push_token,
+        title=TITLES["receipt_received"],
+        body=random.choice(MESSAGES["receipt_received"]).format(bank_name=bank_name),
+        data={"trigger_type": "receipt_received"},
+    )
+
+
+def send_receipt_processed_push(
+    user: User, bank_name: str, amount_kobo: int, direction: str
+) -> None:
+    """Fire-and-forget push: receipt transaction fully imported.
+
+    Parameters
+    ----------
+    amount_kobo:
+        Absolute amount in kobo.
+    direction:
+        ``"credit"`` or ``"debit"``.
+    """
+    from app.services.push_service import send_push_notification
+
+    if not user.expo_push_token:
+        return
+    amount_naira = f"{abs(amount_kobo) / 100:,.2f}"
+    send_push_notification(
+        token=user.expo_push_token,
+        title=TITLES["receipt_processed"],
+        body=random.choice(MESSAGES["receipt_processed"]).format(
+            bank_name=bank_name, amount_naira=amount_naira, direction=direction
+        ),
+        data={"trigger_type": "receipt_processed"},
+    )
+
+
+def send_receipt_failed_push(
+    user: User,
+    reason: str,
+    bank_name: str = "",
+) -> None:
+    """Fire-and-forget push: receipt processing failed.
+
+    Parameters
+    ----------
+    reason:
+        One of ``"unrecognised"``, ``"no_account"``, or ``"parse_failed"``.
+        Controls the message body so the user gets an actionable hint.
+    bank_name:
+        Display name of the identified bank, if known.  May be empty when
+        the receipt could not be identified at all.
+    """
+    from app.services.push_service import send_push_notification
+
+    if not user.expo_push_token:
+        return
+
+    reasons: dict = MESSAGES["receipt_failed"]  # type: ignore[assignment]
+    template: str = reasons.get(reason, reasons["unrecognised"])
+    body = template.format(bank_name=bank_name) if bank_name else template.split(".")[0] + "."
+
+    send_push_notification(
+        token=user.expo_push_token,
+        title=TITLES["receipt_failed"],
+        body=body,
+        data={"trigger_type": "receipt_failed", "reason": reason},
+    )
+    logger.debug(
+        "send_receipt_failed_push: sent to user=%s reason=%s bank=%s",
+        user.id,
+        reason,
+        bank_name,
+    )
+
+
+def send_statement_failed_push(user: User, bank_name: str) -> None:
+    """Fire-and-forget push: statement processing failed.
+
+    Sent when the statement PDF cannot be parsed (wrong format, corrupted,
+    or unsupported bank variant).  Always includes the bank name so the
+    user knows which file to re-download.
+    """
+    from app.services.push_service import send_push_notification
+
+    if not user.expo_push_token:
+        return
+
+    body = random.choice(MESSAGES["statement_failed"]).format(bank_name=bank_name)
+    send_push_notification(
+        token=user.expo_push_token,
+        title=TITLES["statement_failed"],
+        body=body,
+        data={"trigger_type": "statement_failed"},
+    )
+    logger.debug(
+        "send_statement_failed_push: sent to user=%s bank=%s",
+        user.id,
+        bank_name,
     )
 
 
