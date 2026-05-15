@@ -406,10 +406,10 @@ function UpdateBalanceSheet({ account, onClose }: UpdateBalanceSheetProps) {
     <BottomSheet visible={!!account} onClose={handleClose} title="Update Balance">
       <View style={ss.sheetBody}>
         {account && (
-          <Text style={[type_.bodyReg, { color: colors.textMeta, marginBottom: spacing.lg }]}>
+          <Text style={[type_.bodyReg, { color: colors.textMeta, marginBottom: spacing.smd }]}>
             {account.institution} · {account.alias ?? account.account_name}
             {'  '}
-            <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>
+            <Text style={[{ color: colors.textPrimary }, ff(700)]}>
               Current: {formatNaira(account.balance)}
             </Text>
           </Text>

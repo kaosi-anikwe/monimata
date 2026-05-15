@@ -1,10 +1,12 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-native",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "types": ["jest"],
     "paths": {
       "@/*": ["./*"],
       "@monimata/shared-types": ["../../libs/shared-types/src/index.ts"]

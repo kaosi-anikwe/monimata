@@ -30,6 +30,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -103,19 +104,15 @@ function getCurrentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// ── Streak (fake data) ────────────────────────────────────────────────────────
-// Phase 14 will replace this with real data from the gamification service.
-// See docs/UI_MIGRATION_PLAN.md Phase 14 for backend design notes.
-
-const FAKE_STREAK = 5;
+// ── Streak ───────────────────────────────────────────────────────────────────
 const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
 // Convert JS getDay() (0 = Sun) to Mon-indexed (0 = Mon … 6 = Sun)
 const TODAY_IDX = (new Date().getDay() + 6) % 7;
 
-function streakDayState(i: number): 'done' | 'today' | 'future' {
+function streakDayState(i: number, streak: number): 'done' | 'today' | 'future' {
   if (i === TODAY_IDX) return 'today';
   const diff = TODAY_IDX - i;
-  if (diff > 0 && diff < FAKE_STREAK) return 'done';
+  if (diff > 0 && diff < streak) return 'done';
   return 'future';
 }
 
@@ -128,6 +125,15 @@ export default function HomeScreen() {
   const startTourIfUnseen = useTour();
   const { activeTargetId } = useTourContext();
   const scrollRef = useRef<ScrollView>(null);
+  const streakScale = useRef(new Animated.Value(1)).current;
+
+  // Pulse the streak card once on mount to draw attention.
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(streakScale, { toValue: 1.2, duration: 500, useNativeDriver: true }),
+      Animated.spring(streakScale, { toValue: 1, friction: 7, tension: 120, useNativeDriver: true }),
+    ]).start();
+  }, [streakScale]);
 
   useFocusEffect(
     useCallback(() => {
@@ -403,10 +409,12 @@ export default function HomeScreen() {
           <View style={[s.streakCard, { backgroundColor: colors.darkGreen }]}>
             <View style={s.streakTop}>
               <View>
-                <Text style={[s.streakNum, { color: colors.white }]}>
-                  {FAKE_STREAK}
-                  <Text style={[s.streakNumSm, { color: colors.lime }]}> day streak</Text>
-                </Text>
+                <Animated.View style={{ transform: [{ scale: streakScale }] }}>
+                  <Text style={[s.streakNum, { color: colors.white }]}>
+                    {user?.streak ?? 0}
+                    <Text style={[s.streakNumSm, { color: colors.lime }]}> day streak</Text>
+                  </Text>
+                </Animated.View>
                 <Text style={[s.streakDesc, { color: glass.textFaint }]}>
                   Budgeting streak 🔥
                 </Text>
@@ -418,7 +426,7 @@ export default function HomeScreen() {
 
             <View style={s.streakDays}>
               {DAY_LABELS.map((label, i) => {
-                const state = streakDayState(i);
+                const state = streakDayState(i, user?.streak ?? 0);
                 return (
                   <View
                     key={label}
@@ -452,8 +460,6 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
-
-        {/* Goals section */}
         <View style={[s.sec, { paddingBottom: spacing.md }]}>
           <View style={s.secRow}>
             <Text style={[s.secTitle, { color: colors.textPrimary }]}>Goals</Text>

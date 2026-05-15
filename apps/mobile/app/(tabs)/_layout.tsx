@@ -34,8 +34,8 @@ function SharedFAB() {
   const segments = useSegments();
 
   // Only show at the root level of a tab (segments.length <= 2),
-  // not when a stack screen is pushed on top, and not on the profile page.
-  if (segments.length > 2 || segments[1] === 'profile') return null;
+  // not when a stack screen is pushed on top, and not on profile/hub.
+  if (segments.length > 2 || segments[1] === 'profile' || segments[1] === 'hub') return null;
 
   const bottomOffset = layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.sm;
 
