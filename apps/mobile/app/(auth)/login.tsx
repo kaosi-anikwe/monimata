@@ -131,7 +131,10 @@ export default function LoginScreen() {
                 )}
               />
               {/* Forgot password */}
-              <TouchableOpacity style={{ alignSelf: 'flex-end', marginTop: 6 }}>
+              <TouchableOpacity
+                style={{ alignSelf: 'flex-end', marginTop: 6 }}
+                onPress={() => router.push('/(auth)/forgot-password')}
+              >
                 <Text style={[s.forgot, { color: colors.textMeta }]}>
                   Forgot password?{' '}
                   <Text style={{ color: colors.brand, ...ff(600) }}>Reset</Text>
