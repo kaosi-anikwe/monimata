@@ -34,11 +34,12 @@ import base64
 import logging
 from typing import cast
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.limiter import limiter
 from app.models.bank_account import BankAccount
 from app.models.user import User
 from app.services.ingestion.channels.statement import identify_statement
@@ -76,7 +77,9 @@ def _detect_mime(content: bytes) -> str | None:
 
 
 @router.post("/receipt", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("20/minute")
 async def upload_receipt(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -139,7 +142,9 @@ async def upload_receipt(
 
 
 @router.post("/statement", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("5/minute")
 async def upload_statement(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

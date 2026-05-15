@@ -16,11 +16,13 @@ from typing import cast
 
 import sentry_sdk
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from slowapi.util import get_remote_address
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.bank_account import BankAccount
 from app.models.transaction import Transaction, TransactionSource
 from app.models.user import User
@@ -106,6 +108,7 @@ def _resolve_sender(direct_sender: str, body: str) -> str:
 
 
 @router.post("/bank-alerts", status_code=status.HTTP_200_OK)
+@limiter.limit("300/minute", key_func=get_remote_address)
 async def bank_alert_webhook(
     request: Request,
     x_monimata_secret: str = Header(default="", alias="x-monimata-secret"),

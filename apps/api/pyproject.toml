@@ -74,6 +74,7 @@ dependencies = [
     "sentry-sdk==2.54.0",
     "shellingham==1.5.4",
     "six==1.17.0",
+    "slowapi>=0.1.9",
     "sqlalchemy==2.0.48",
     "starlette==0.52.1",
     "thefuzz==0.22.1",

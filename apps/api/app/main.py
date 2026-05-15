@@ -18,8 +18,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from rich.console import Console
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.core.logging_config import configure_logging
 
 configure_logging(log_dir=settings.LOG_DIR, log_level=settings.LOG_LEVEL)
@@ -56,23 +59,16 @@ from app.routers import (  # noqa: E402
     ws,
 )
 
+_console = Console(stderr=True)
+
 app = FastAPI(
     title="MoniMata API",
     description="Zero-based budgeting for Nigerians — Every Kobo, Accounted For.",
     version="0.0.1",
 )
 
-_console = Console(stderr=True)
-
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Render unhandled exceptions with Rich and return a safe 500 response."""
-    _console.print_exception(max_frames=5, show_locals=True, word_wrap=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"},
-    )
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 
 app.add_middleware(
@@ -97,6 +93,21 @@ app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(recurring.router, prefix="/recurring-rules", tags=["recurring"])
 app.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 app.include_router(ws.router, tags=["websocket"])
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=429, content={"detail": str(exc)})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Render unhandled exceptions with Rich and return a safe 500 response."""
+    _console.print_exception(max_frames=5, show_locals=True, word_wrap=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 @app.get("/health")
