@@ -1,4 +1,4 @@
-# Building a Local Release APK for Android
+﻿# Building a Local Release APK for Android
 
 Use this guide to build and share a signed APK with colleagues without going through EAS or the Play Store.
 
@@ -39,13 +39,13 @@ keytool -genkeypair -v \
 
 You will be prompted for a keystore password and a key password. Keep these — you cannot re-sign previously distributed APKs without the same keystore.
 
+Place the generated `monimata-release.keystore` at `apps/mobile/` (next to `package.json`).
+
 ---
 
-## Step 3 — Configure Gradle signing
+## Step 3 — Add signing credentials to `android/gradle.properties`
 
-### `apps/mobile/android/gradle.properties`
-
-Add these lines at the bottom, substituting your actual passwords:
+Append these four lines to `apps/mobile/android/gradle.properties`, substituting your actual passwords:
 
 ```properties
 MYAPP_UPLOAD_STORE_FILE=../../monimata-release.keystore
@@ -54,29 +54,156 @@ MYAPP_UPLOAD_STORE_PASSWORD=yourpassword
 MYAPP_UPLOAD_KEY_PASSWORD=yourpassword
 ```
 
-> The path is relative to `android/app/`, so `../../` points back to `apps/mobile/` where the keystore lives.
+> The path is relative to `android/app/`, so `../../` resolves to `apps/mobile/` — where the keystore lives.
 
-### `apps/mobile/android/app/build.gradle`
+**Security:** if `android/gradle.properties` is ever tracked by git, move the four password lines to `~/.gradle/gradle.properties` on each developer's machine instead.
 
-Inside the `react { }` block, **uncomment** the `root` line (expo prebuild leaves it commented):
+---
+
+## Step 4 — Patch `android/app/build.gradle`
+
+`expo prebuild` generates a working-but-incomplete `build.gradle`. Several patches are required before a release build will succeed. The complete target file is shown at the end of this section — apply all changes at once after each prebuild.
+
+### 4a — Uncomment the monorepo project root
+
+Prebuild leaves this line commented. Uncomment it:
 
 ```groovy
 react {
     // ...
-    root = file("../../")   // ← uncomment this line
+    root = file("../../")   // ← uncomment
     // ...
 }
 ```
 
-`file("../../")` is resolved relative to `android/app/build.gradle`'s own directory, giving `apps/mobile/` — the correct project root. Without this, Gradle's default resolves relative to `android/` and walks up to the monorepo root instead, causing Metro to fail.
+Without this, Gradle resolves Metro paths relative to `android/` and walks up to the monorepo root, causing bundling to fail.
 
-Also inside the `android { }` block, add a `signingConfigs` section and wire it into the `release` build type:
+### 4b — Add the release signing config
+
+Prebuild wires `buildTypes.release` to the debug keystore. Add a `release` signing config block and point `buildTypes.release` at it:
 
 ```groovy
+signingConfigs {
+    debug { ... }           // generated — leave as-is
+    release {               // ← ADD
+        storeFile file(MYAPP_UPLOAD_STORE_FILE)
+        storePassword MYAPP_UPLOAD_STORE_PASSWORD
+        keyAlias MYAPP_UPLOAD_KEY_ALIAS
+        keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+    }
+}
+
+buildTypes {
+    release {
+        signingConfig signingConfigs.release    // ← change from signingConfigs.debug
+        // ... rest unchanged ...
+    }
+}
+```
+
+### 4c — Fix `packagingOptions` for SQLCipher and WatermelonDB
+
+Prebuild adds only the `libc++_shared.so` rule. SQLCipher ships its own `libcrypto.so` for every ABI; without `pickFirst` rules Gradle aborts with a duplicate-file error. Replace the entire `jniLibs` block:
+
+```groovy
+packagingOptions {
+    jniLibs {
+        def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
+        useLegacyPackaging enableLegacyPackaging.toBoolean()
+        pickFirst 'lib/x86/libcrypto.so'
+        pickFirst 'lib/x86_64/libcrypto.so'
+        pickFirst 'lib/armeabi-v7a/libcrypto.so'
+        pickFirst 'lib/arm64-v8a/libcrypto.so'
+        pickFirst '**/libc++_shared.so'
+    }
+}
+```
+
+### 4d — Pin CMake version (required on Windows)
+
+Add this block inside `android { }` to avoid Windows long-path failures during the NDK build:
+
+```groovy
+externalNativeBuild {
+    cmake {
+        version "3.30.3+"
+    }
+}
+```
+
+### 4e — Add SQLCipher and WatermelonDB JSI dependencies
+
+Prebuild does **not** add these. Append them inside the `dependencies { }` block.
+
+> ⚠️ Prebuild sometimes places the `watermelondb-jsi` line **outside** the `dependencies { }` closing brace. If you see it there, move it inside.
+
+```groovy
+dependencies {
+    // ... generated lines unchanged ...
+
+    // SQLCipher — AES-256 at-rest encryption for WatermelonDB
+    implementation "net.zetetic:android-database-sqlcipher:4.5.4"
+    // Required SQLite bridge for the SQLCipher adapter
+    implementation "androidx.sqlite:sqlite:2.4.0"
+
+    // WatermelonDB JSI C++ bridge (required for jsi: true in SQLiteAdapter)
+    implementation project(':watermelondb-jsi')
+}
+```
+
+### Complete target `android/app/build.gradle`
+
+After all patches, the file should look exactly like this:
+
+```groovy
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+
+react {
+    entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
+    reactNativeDir = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+    hermesCommand = new File(["node", "--print", "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/hermesc/%OS-BIN%/hermesc"
+    codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+
+    enableBundleCompression = (findProperty('android.enableBundleCompression') ?: false).toBoolean()
+    cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
+    bundleCommand = "export:embed"
+
+    root = file("../../")   // monorepo root — MUST be uncommented after every prebuild
+
+    autolinkLibrariesWithApp()
+}
+
+def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: false).toBoolean()
+def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+apply from: new File(["node", "--print", "require('path').dirname(require.resolve('@sentry/react-native/package.json'))"].execute().text.trim(), "sentry.gradle")
+
 android {
-    // ... existing config ...
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace 'ng.monimata'
+    defaultConfig {
+        applicationId 'ng.monimata'
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "0.2.0"
+        buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+    }
 
     signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
         release {
             storeFile file(MYAPP_UPLOAD_STORE_FILE)
             storePassword MYAPP_UPLOAD_STORE_PASSWORD
@@ -86,19 +213,35 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
-            // ... existing minifyEnabled etc. ...
-            signingConfig signingConfigs.release   // ← add this line
+            signingConfig signingConfigs.release
+            def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
+            shrinkResources enableShrinkResources.toBoolean()
+            minifyEnabled enableMinifyInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
+            crunchPngs enablePngCrunchInRelease.toBoolean()
         }
     }
-}
-```
 
-Use a newer version of CMake (3.28+) to avoid Windows long path issues during the build:
+    packagingOptions {
+        jniLibs {
+            def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
+            useLegacyPackaging enableLegacyPackaging.toBoolean()
+            pickFirst 'lib/x86/libcrypto.so'
+            pickFirst 'lib/x86_64/libcrypto.so'
+            pickFirst 'lib/armeabi-v7a/libcrypto.so'
+            pickFirst 'lib/arm64-v8a/libcrypto.so'
+            pickFirst '**/libc++_shared.so'
+        }
+    }
 
-```groovy
-android {
-    // ... existing config ...
+    androidResources {
+        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
 
     externalNativeBuild {
         cmake {
@@ -106,29 +249,72 @@ android {
         }
     }
 }
+
+// Apply static packagingOptions from gradle.properties (pickFirsts / excludes / merges / doNotStrip)
+["pickFirsts", "excludes", "merges", "doNotStrip"].each { prop ->
+    def options = (findProperty("android.packagingOptions.$prop") ?: "").split(",")
+    for (i in 0..<options.size()) options[i] = options[i].trim()
+    options -= ""
+    if (options.length > 0) {
+        println "android.packagingOptions.$prop += $options ($options.length)"
+        options.each { android.packagingOptions[prop] += it }
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+
+    def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true"
+    def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true"
+    def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true"
+
+    if (isGifEnabled) {
+        implementation("com.facebook.fresco:animated-gif:${expoLibs.versions.fresco.get()}")
+    }
+    if (isWebpEnabled) {
+        implementation("com.facebook.fresco:webpsupport:${expoLibs.versions.fresco.get()}")
+        if (isWebpAnimatedEnabled) {
+            implementation("com.facebook.fresco:animated-webp:${expoLibs.versions.fresco.get()}")
+        }
+    }
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+
+    // SQLCipher — AES-256 at-rest encryption for WatermelonDB
+    implementation "net.zetetic:android-database-sqlcipher:4.5.4"
+    implementation "androidx.sqlite:sqlite:2.4.0"
+
+    // WatermelonDB JSI C++ bridge
+    implementation project(':watermelondb-jsi')
+}
+
+apply plugin: 'com.google.gms.google-services'
 ```
 
 ---
 
-## Step 4 — Build the release APK
-
-```bash
-cd apps/mobile/android
-./gradlew assembleRelease
-```
-
-On Windows:
+## Step 5 — Build the release APK
 
 ```powershell
 cd apps\mobile\android
 .\gradlew.bat assembleRelease
 ```
 
+On macOS/Linux:
+
+```bash
+cd apps/mobile/android
+./gradlew assembleRelease
+```
+
 The first build downloads Gradle dependencies and takes ~5–10 minutes. Subsequent builds are faster.
 
 ---
 
-## Step 5 — Find and distribute the APK
+## Step 6 — Find and distribute the APK
 
 The signed APK is output to:
 
@@ -142,93 +328,85 @@ Recipients must enable **"Install from unknown sources"** (or **"Install unknown
 
 ---
 
+## Step 7 — FCM setup for push notifications
+
+Android push notifications require Firebase Cloud Messaging (FCM). Without valid FCM credentials, `expo-notifications` will register a device token but the Expo push service will silently fail to deliver any notifications to Android devices.
+
+### 7a — Create a Firebase project
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com/) and create a project (or open the existing one).
+2. Click **Add app** → select Android → enter package name `ng.monimata`.
+3. Download the generated `google-services.json` and replace the placeholder at `apps/mobile/android/app/google-services.json`.
+
+> `google-services.json` contains no secrets — it is safe to commit.
+
+### 7b — Generate a service account key
+
+FCM v1 (the current API) authenticates via a Google service account, not a legacy server key.
+
+1. Firebase Console → **Project Settings** → **Service Accounts** tab.
+2. Click **Generate new private key** → **Generate key**.
+3. A JSON file downloads. **Do not commit this file.** Store it in the team password manager.
+
+### 7c — Upload credentials to EAS
+
+The Expo push service reads the service account key via EAS credentials. You must upload it even for local APK builds, because the backend routes Android notifications through Expo's infrastructure.
+
+```bash
+cd apps/mobile
+eas credentials --platform android
+```
+
+Follow the prompts to upload the FCM V1 service account JSON file.
+
+Alternatively, upload through [expo.dev](https://expo.dev) → your project → **Credentials** → **Android** → **FCM V1 Service Account Key**.
+
+> **Full guide:** [docs.expo.dev/push-notifications/fcm-credentials](https://docs.expo.dev/push-notifications/fcm-credentials/)
+
+### 7d — Verify
+
+Send a test notification from [expo.dev/notifications](https://expo.dev/notifications) using a device token from an Android device running the app. If it arrives, FCM is configured correctly.
+
+---
+
 ## Security checklist
 
 - [ ] `monimata-release.keystore` is **not** committed to git
-- [ ] Passwords are **not** hardcoded in any committed file — if `gradle.properties` is tracked, move the password lines to a local `~/.gradle/gradle.properties` instead
-- [ ] Store the keystore and passwords in a team password manager in case you need to re-sign a future release
+- [ ] Signing passwords are **not** hardcoded in any committed file
+- [ ] FCM service account JSON is **not** committed to git
+- [ ] Keystore, passwords, and service account key are stored in the team password manager
 
 ---
 
 ## Re-building after code changes
 
-If you only changed JavaScript/TypeScript:
+**JS/TS changes only** — no prebuild needed:
 
-```bash
-cd apps/mobile/android
+```powershell
+cd apps\mobile\android
 .\gradlew.bat assembleRelease
 ```
 
-If you added/removed Expo plugins or changed `app.json` native fields, re-run prebuild first:
+**After adding/removing Expo plugins or changing `app.json` native fields:**
 
-```bash
-cd apps/mobile
+```powershell
+cd apps\mobile
 npx expo prebuild --platform android --clean
 cd android
 .\gradlew.bat assembleRelease
 ```
 
-> **Important:** `expo prebuild --clean` regenerates `android/app/build.gradle` and will comment out `root = file("../../")` again. After every clean prebuild, re-apply the Step 3 edit to `build.gradle` before building.
+> ⚠️ `expo prebuild --clean` wipes and regenerates the entire `android/` folder. All patches from Step 4 must be re-applied before building. Use the complete target file in Step 4 as your reference.
 
 ---
 
-## Post-prebuild manual changes (required after every `prebuild --clean`)
+## Post-prebuild patch checklist
 
-`expo prebuild --clean` deletes and regenerates the entire `android/` folder. The following
-changes must be re-applied manually every time after a clean prebuild. Keep this list in sync
-if you add more native dependencies in the future.
+After every `expo prebuild --platform android --clean`, tick these off before running `assembleRelease`:
 
-### 1 · SQLCipher — `android/app/build.gradle`
-
-SQLCipher provides AES-256 at-rest encryption for the WatermelonDB local database. It is not
-an Expo module and cannot be auto-linked; the Gradle dependency must be added manually.
-
-Find the `dependencies { }` block (near the bottom of the file) and add the two lines marked
-with `// ← ADD`:
-
-```groovy
-dependencies {
-    implementation("com.facebook.react:react-android")
-
-    // ... gif/webp/hermes lines generated by prebuild, leave as-is ...
-
-    // ← ADD: SQLCipher for WatermelonDB at-rest encryption
-    implementation "net.zetetic:android-database-sqlcipher:4.5.4"
-    // ← ADD: required SQLite bridge for SQLCipher adapter
-    implementation "androidx.sqlite:sqlite:2.4.0"
-}
-```
-
-### 2 · SQLCipher native library conflicts — `android/app/build.gradle`
-
-SQLCipher ships `libcrypto.so` for each ABI. Without `pickFirst` rules, Gradle aborts with
-`More than one file was found with OS independent path 'lib/arm64-v8a/libcrypto.so'`.
-
-Find the `packagingOptions { jniLibs { ... } }` block and add the four `pickFirst` lines:
-
-```groovy
-packagingOptions {
-    jniLibs {
-        useLegacyPackaging false   // generated by prebuild, leave as-is
-        // ← ADD: prevent libcrypto.so packaging conflicts from SQLCipher
-        pickFirst 'lib/x86/libcrypto.so'
-        pickFirst 'lib/x86_64/libcrypto.so'
-        pickFirst 'lib/armeabi-v7a/libcrypto.so'
-        pickFirst 'lib/arm64-v8a/libcrypto.so'
-    }
-}
-```
-
-### 3 · Summary checklist after each clean prebuild
-
-After running `expo prebuild --platform android --clean`, tick these off before building:
-
-- [ ] `root = file("../../")` uncommented in `react { }` block (Step 3 above)
-- [ ] Signing config added to `android { signingConfigs }` and `buildTypes.release` (Step 3 above)
-- [ ] SQLCipher dependencies added to `dependencies { }` (Post-prebuild step 1)
-- [ ] SQLCipher `pickFirst` rules added to `packagingOptions.jniLibs { }` (Post-prebuild step 2)
-
-> **Tip:** Consider using an [Expo config plugin](https://docs.expo.dev/guides/config-plugins/) to
-> automate steps 1 and 2 so they survive prebuild automatically. A config plugin runs during
-> prebuild and can patch `build.gradle` programmatically. Worth investing in once these manual
-> steps become a recurring friction point.
+- [ ] `root = file("../../")` uncommented in the `react { }` block
+- [ ] `signingConfigs.release` block added; `buildTypes.release` points to it
+- [ ] All five `pickFirst` rules present in `packagingOptions.jniLibs`
+- [ ] `externalNativeBuild { cmake { version "3.30.3+" } }` block present
+- [ ] SQLCipher dependencies inside `dependencies { }` block
+- [ ] `implementation project(':watermelondb-jsi')` inside `dependencies { }` block (not after the closing brace)
