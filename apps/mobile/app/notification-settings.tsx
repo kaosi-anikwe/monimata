@@ -21,27 +21,31 @@
  */
 
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  AppState,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/Toast';
 import { Button, ScreenHeader, SectionHeader } from '@/components/ui';
-import { useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
-import { useTheme } from '@/lib/theme';
+import { useNudgeSettings, useRegisterDevice, useUpdateNudgeSettings } from '@/hooks/useNudges';
+import { lightColors, useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
+import { Ionicons } from '@expo/vector-icons';
 import type { NudgeSettings } from '@monimata/shared-types';
+import * as Notifications from 'expo-notifications';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -49,10 +53,79 @@ export default function NotificationSettingsScreen() {
   const colors = useTheme();
   const ss = makeStyles(colors);
   const insets = useSafeAreaInsets();
-  const { error: showError } = useToast();
+  const { error: showError, success: showSuccess } = useToast();
 
   const { data: settings } = useNudgeSettings();
   const updateSettings = useUpdateNudgeSettings();
+  const registerDevice = useRegisterDevice();
+
+  // ── Push notification OS permission ──────────────────────────────────────
+  type PermState = { granted: boolean; canAskAgain: boolean } | null;
+  const [perm, setPerm] = useState<PermState>(null);
+  const [permBusy, setPermBusy] = useState(false);
+  const appStateRef = useRef(AppState.currentState);
+
+  useEffect(() => {
+    // Check permissions on mount and whenever the app returns to the foreground
+    // (e.g. after the user changes the setting in the OS Settings app).
+    const check = () =>
+      Notifications.getPermissionsAsync().then(({ granted, canAskAgain }) =>
+        setPerm({ granted, canAskAgain }),
+      );
+
+    check();
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (appStateRef.current.match(/inactive|background/) && state === 'active') check();
+      appStateRef.current = state;
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Silently re-register the push token whenever we confirm permission is granted.
+  const prevGranted = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (perm?.granted && prevGranted.current !== true) {
+      registerPushToken().catch(() => { });
+    }
+    prevGranted.current = perm?.granted ?? null;
+  }, [perm?.granted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function registerPushToken() {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'MoniMata Nudges',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: lightColors.brand,
+      });
+    }
+    const { data: token } = await Notifications.getExpoPushTokenAsync({
+      projectId: '6f68cf17-0eea-4815-8e6c-e821e0823fe6',
+    });
+    registerDevice.mutate({ body: { token } });
+  }
+
+  async function handleEnableNotifications() {
+    if (perm?.granted) return;
+    if (perm?.canAskAgain === false) {
+      await Linking.openSettings();
+      return;
+    }
+    setPermBusy(true);
+    try {
+      const { granted, canAskAgain } = await Notifications.requestPermissionsAsync();
+      setPerm({ granted, canAskAgain });
+      if (granted) {
+        await registerPushToken();
+        showSuccess('Notifications enabled!', "You'll now receive spending alerts.");
+      }
+    } catch {
+      // silently ignore — user may have dismissed the OS dialog
+    } finally {
+      setPermBusy(false);
+    }
+  }
 
   const [draft, setDraft] = useState<NudgeSettings>(() =>
     settings ?? {
@@ -106,6 +179,45 @@ export default function NotificationSettingsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── OS push permission card ───────────────────────────────────── */}
+        <View style={[ss.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={ss.settingRowLast}>
+            <View style={ss.settingLeft}>
+              <Text style={[type_.body, { color: colors.textPrimary }]}>Push Notifications</Text>
+              <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2 }]}>
+                {perm === null
+                  ? 'Checking…'
+                  : perm.granted
+                    ? 'Active — this device will receive nudges'
+                    : perm.canAskAgain
+                      ? 'Not yet enabled on this device'
+                      : 'Blocked — tap to open system settings'}
+              </Text>
+            </View>
+            {perm?.granted ? (
+              <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+            ) : (
+              <TouchableOpacity
+                style={[
+                  ss.permBtn,
+                  {
+                    backgroundColor: perm?.canAskAgain !== false ? colors.brand : colors.surface,
+                    borderColor: colors.brand,
+                  },
+                ]}
+                onPress={handleEnableNotifications}
+                disabled={permBusy || perm === null}
+                accessibilityRole="button"
+                accessibilityLabel={perm?.canAskAgain !== false ? 'Enable push notifications' : 'Open system settings'}
+              >
+                <Text style={[ss.permBtnText, { color: perm?.canAskAgain !== false ? colors.white : colors.brand }]}>
+                  {perm?.canAskAgain !== false ? 'Enable' : 'Open Settings'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         {/* ── Master settings card ──────────────────────────────────────── */}
         <View style={[ss.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           {/* Enable AI Nudges */}
@@ -411,5 +523,13 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       paddingTop: spacing.xl,
       paddingBottom: spacing.xxxl,
     },
+    // push permission
+    permBtn: {
+      borderRadius: radius.xs,
+      borderWidth: 1.5,
+      paddingVertical: 6,
+      paddingHorizontal: spacing.md,
+    },
+    permBtnText: { ...ff(700), fontSize: 12 },
   });
 }
