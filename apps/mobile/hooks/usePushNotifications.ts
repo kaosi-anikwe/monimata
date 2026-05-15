@@ -33,14 +33,16 @@
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { useSelector } from 'react-redux';
 
 import { useToast } from '@/components/Toast';
+import { getDatabase } from '@/database';
 import { registerPromptSetter, resetBridgeForUser } from '@/lib/notifPromptBridge';
 import { lightColors } from '@/lib/theme';
 import type { RootState } from '../store';
+
 import { useRegisterDevice } from './useNudges';
 
 // Show notifications as banners even when the app is in the foreground.
@@ -72,7 +74,43 @@ export function usePushNotifications(): PushNotificationConsent {
 
   const mountedRef = useRef(true);
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
-  const responseListener = useRef<Notifications.EventSubscription | null>(null);
+  const handledResponseIdRef = useRef<string | null>(null);
+
+  // useLastNotificationResponse covers both cold-start (app killed) and
+  // background-tap cases without the deprecated getLastNotificationResponseAsync.
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
+
+  const handleNotificationTap = useCallback(async (data: Record<string, unknown> | null) => {
+    const triggerType = data?.trigger_type;
+    if (
+      (triggerType === 'receipt_processed' || triggerType === 'receipt_duplicate') &&
+      typeof data?.transaction_id === 'string'
+    ) {
+      try {
+        await getDatabase().get('transactions').find(data.transaction_id);
+        router.push(`/transaction/${data.transaction_id}` as never);
+      } catch {
+        router.push('/(tabs)/transactions');
+      }
+    } else if (
+      triggerType === 'receipt_received' ||
+      triggerType === 'statement_processed' ||
+      triggerType === 'statement_received'
+    ) {
+      router.push('/(tabs)/transactions');
+    } else {
+      router.push('/(tabs)/nudges');
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (!lastNotificationResponse || !isAuthenticated) return;
+    const notifId = lastNotificationResponse.notification.request.identifier;
+    if (handledResponseIdRef.current === notifId) return;
+    handledResponseIdRef.current = notifId;
+    const data = lastNotificationResponse.notification.request.content.data as Record<string, unknown> | null;
+    handleNotificationTap(data);
+  }, [lastNotificationResponse, isAuthenticated, handleNotificationTap]);
 
   async function doTokenSetup() {
     if (Platform.OS === 'android') {
@@ -135,12 +173,6 @@ export function usePushNotifications(): PushNotificationConsent {
         }
       });
 
-    // Response handler — user taps push banner → navigate to nudges
-    responseListener.current =
-      Notifications.addNotificationResponseReceivedListener(() => {
-        router.push('/(tabs)/nudges');
-      });
-
     async function checkAndSetup() {
       try {
         const { status, canAskAgain } = await Notifications.getPermissionsAsync();
@@ -173,7 +205,6 @@ export function usePushNotifications(): PushNotificationConsent {
     return () => {
       mountedRef.current = false;
       notificationListener.current?.remove();
-      responseListener.current?.remove();
     };
   }, [isAuthenticated, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 

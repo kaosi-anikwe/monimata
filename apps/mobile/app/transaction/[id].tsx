@@ -880,9 +880,9 @@ export default function TransactionDetailsScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      <StatusBar style={tx.source === 'manual' ? 'dark' : 'light'} />
+      <StatusBar style={tx.source !== 'statement' ? 'dark' : 'light'} />
       {/* ── Header: white for manual, dark gradient hero for bank ── */}
-      {tx.source === 'manual' ? (
+      {tx.source !== 'statement' ? (
         <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
           <TouchableOpacity
             style={[ss.backBtn, { backgroundColor: colors.surface }]}
@@ -924,7 +924,7 @@ export default function TransactionDetailsScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {tx.source === 'manual' ? (
+        {tx.source !== 'statement' ? (
           <ManualEditForm
             tx={tx}
             accounts={accounts}
