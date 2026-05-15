@@ -15,22 +15,25 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Auth router — register, login, refresh, logout.
+Auth router — register, login, refresh, logout, forgot/reset password.
 """
 
 from __future__ import annotations
 
+import hmac
 import logging
 from datetime import UTC, datetime
 from typing import cast
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
+from slowapi.util import get_remote_address
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import bearer_scheme, get_current_user
+from app.core.limiter import limiter
 from app.core.redis_client import (
     blocklist_token,
     delete_refresh_token,
@@ -47,12 +50,16 @@ from app.core.security import (
 from app.models.user import User
 from app.schemas.auth import (
     AccessTokenResponse,
+    ForgotPasswordRequest,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    ResetPasswordRequest,
+    ResetTokenResponse,
     TokenResponse,
     UpdateProfileRequest,
     UserResponse,
+    VerifyResetCodeRequest,
 )
 from app.services.budget_logic import seed_default_categories
 
@@ -64,7 +71,10 @@ router = APIRouter()
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit("10/hour", key_func=get_remote_address)
+async def register(
+    request: Request, payload: RegisterRequest, db: Session = Depends(get_db)
+) -> TokenResponse:
     user = User(
         email=payload.email.lower(),
         username=payload.username,
@@ -95,7 +105,10 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> T
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit("20/minute", key_func=get_remote_address)
+async def login(
+    request: Request, payload: LoginRequest, db: Session = Depends(get_db)
+) -> TokenResponse:
     user: User | None = db.query(User).filter(User.email == payload.email.lower()).first()
 
     # Constant-time check — always call verify_password even on miss to avoid timing attacks
@@ -120,8 +133,9 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenRe
 
 
 @router.post("/refresh", response_model=AccessTokenResponse)
+@limiter.limit("30/minute")
 async def refresh_token(
-    payload: RefreshRequest, db: Session = Depends(get_db)
+    request: Request, payload: RefreshRequest, db: Session = Depends(get_db)
 ) -> AccessTokenResponse:
     """
     Exchange a valid refresh token for a new access token.
@@ -163,7 +177,9 @@ async def refresh_token(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
 async def logout(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     current_user: User = Depends(get_current_user),
 ) -> None:
@@ -244,12 +260,14 @@ async def update_profile(
 
 
 @router.get("/check-username")
-async def check_username(username: str, db: Session = Depends(get_db)) -> dict[str, bool]:
+@limiter.limit("60/minute", key_func=get_remote_address)
+async def check_username(
+    request: Request, username: str, db: Session = Depends(get_db)
+) -> dict[str, bool]:
     """
     Real-time uniqueness check for use during signup.
     Returns {"available": true} when the username is valid and not yet taken.
     No authentication required — called as the user types.
-    Rate-limited by the API gateway / Nginx upstream.
     """
     import re
 
@@ -258,3 +276,132 @@ async def check_username(username: str, db: Session = Depends(get_db)) -> dict[s
         return {"available": False}
     taken = db.query(User.id).filter(User.username == username).first() is not None
     return {"available": not taken}
+
+
+# ── POST /auth/forgot-password ────────────────────────────────────────────────
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+@limiter.limit("5/hour", key_func=get_remote_address)
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """
+    Step 1 of the password-reset flow.
+
+    Generates a 6-digit OTP, stores it in Redis for 10 minutes, and emails it
+    to the user.  Always returns 200 regardless of whether the email is
+    registered — this prevents user enumeration.
+
+    Rate-limited to 5/hour per IP via slowapi.
+    """
+    from app.core.redis_client import store_otp
+    from app.core.security import generate_otp
+    from app.services.email_service import send_email
+
+    email = payload.email.lower()
+    _RESPONSE = {"detail": "If this email is registered, a reset code has been sent"}
+
+    user: User | None = db.query(User).filter(User.email == email).first()
+    if user:
+        otp = generate_otp()
+        store_otp(email, otp)
+        send_email(
+            to=email,
+            subject="Your MoniMata password reset code",
+            body=(
+                f"Your password reset code is: {otp}\n\n"
+                "This code expires in 10 minutes.\n\n"
+                "If you did not request a password reset, please ignore this email."
+            ),
+        )
+
+    return _RESPONSE
+
+
+# ── POST /auth/verify-reset-code ──────────────────────────────────────────────
+
+
+@router.post("/verify-reset-code", response_model=ResetTokenResponse)
+@limiter.limit("10/hour", key_func=get_remote_address)
+async def verify_reset_code(
+    request: Request, payload: VerifyResetCodeRequest
+) -> ResetTokenResponse:
+    """
+    Step 2 of the password-reset flow.
+
+    Verifies the OTP sent in step 1.  On success the OTP is consumed (deleted)
+    and a single-use reset token valid for 15 minutes is returned.  The client
+    presents this token in step 3 instead of the raw OTP.
+
+    Rate-limited to 10/hour per IP via slowapi.
+    """
+    import secrets
+
+    from app.core.redis_client import (
+        delete_otp,
+        get_otp,
+        store_reset_token,
+    )
+
+    email = payload.email.lower()
+
+    stored_otp = get_otp(email)
+    # Use hmac.compare_digest to prevent timing-based OTP oracle attacks.
+    if not stored_otp or not hmac.compare_digest(stored_otp, payload.code.strip()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired code",
+        )
+
+    delete_otp(email)
+
+    reset_token = secrets.token_hex(32)
+    store_reset_token(reset_token, email)
+
+    return ResetTokenResponse(reset_token=reset_token)
+
+
+# ── POST /auth/reset-password ─────────────────────────────────────────────────
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/hour", key_func=get_remote_address)
+async def reset_password(
+    request: Request, payload: ResetPasswordRequest, db: Session = Depends(get_db)
+) -> None:
+    """
+    Step 3 of the password-reset flow.
+
+    Validates the reset token issued in step 2, updates the user's password,
+    consumes the reset token (single-use), and revokes all active refresh
+    tokens — forcing a fresh login after the reset completes.
+    """
+    from app.core.redis_client import (
+        delete_refresh_token,
+        delete_reset_token,
+        get_reset_token_email,
+    )
+    from app.core.security import hash_password
+
+    email = get_reset_token_email(payload.reset_token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    user: User | None = db.query(User).filter(User.email == email).first()
+    if not user:
+        delete_reset_token(payload.reset_token)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    user.password_hash = hash_password(payload.new_password)
+    delete_reset_token(payload.reset_token)
+    delete_refresh_token(user.id)  # revoke all active sessions
+    db.commit()

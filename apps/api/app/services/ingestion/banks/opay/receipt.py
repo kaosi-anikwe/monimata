@@ -153,6 +153,47 @@ def _parse_date(s: str) -> datetime | None:
     return None
 
 
+def _extract_green_amount(image_bytes: bytes) -> str | None:
+    """OCR the green-coloured amount text from an OPay receipt image.
+
+    OPay renders the transaction amount in a large, bold green font.
+    Standard grayscale OCR loses it because the green luminance (~162/255)
+    blends with the white background at Tesseract's default threshold.
+
+    Strategy: build a binary mask where every pixel whose green channel
+    exceeds its red channel by > 40 *and* whose green value is > 120 is
+    coloured black; everything else is white.  Running OCR on this
+    single-colour canvas reliably extracts the amount digits.
+
+    Returns the bare numeric string (e.g. ``"100.00"`` or ``"7,500.00"``)
+    or ``None`` if nothing is found.  Only meaningful for image receipts;
+    callers must skip this for PDFs.
+    """
+    import io as _io
+
+    import numpy as np
+    from PIL import Image
+
+    try:
+        img = Image.open(_io.BytesIO(image_bytes)).convert("RGB")
+        w, h = img.size
+        img = img.resize((w * 2, h * 2), Image.Resampling.LANCZOS)
+        arr = np.array(img)
+        r = arr[:, :, 0].astype(int)
+        g = arr[:, :, 1].astype(int)
+        green_mask = (g - r > 40) & (g > 120)
+        canvas = np.full(arr.shape[:2], 255, dtype=np.uint8)
+        canvas[green_mask] = 0
+        green_img = Image.fromarray(canvas)
+        import pytesseract
+
+        ocr_text = pytesseract.image_to_string(green_img, config="--oem 3 --psm 6")
+        m = re.search(r"[\d,]+\.\d{2}", ocr_text)
+        return m.group() if m else None
+    except Exception:
+        return None
+
+
 def _extract_name_from_section(section_text: str) -> str | None:
     """Find the ALL-CAPS person/business name inside a Recipient or Sender section.
 
@@ -242,9 +283,18 @@ class _OPayReceiptParser(ReceiptBankParser):
         # Image path: bare number directly above "Successful" (no ₦ from OCR)
         # PDF path: pdfplumber preserves the ₦ prefix
         amount_match = _AMOUNT_RE.search(text) or _AMOUNT_PDF_RE.search(text)
-        if not amount_match:
-            return None
-        amount_kobo = _naira_to_kobo(amount_match.group(1))
+        if amount_match:
+            amount_kobo = _naira_to_kobo(amount_match.group(1))
+        else:
+            # OPay renders the amount in brand-green text, which standard
+            # grayscale OCR cannot distinguish from the white background.
+            # Run a dedicated green-pixel-mask pass to recover it.
+            if image_bytes[:4] == b"%PDF":
+                return None
+            raw_amount = _extract_green_amount(image_bytes)
+            if raw_amount is None:
+                return None
+            amount_kobo = _naira_to_kobo(raw_amount)
         if amount_kobo is None:
             return None
 

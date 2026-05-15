@@ -46,12 +46,12 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.core.redis_client import check_rate_limit
+from app.core.limiter import limiter
 from app.models.bank_account import BankAccount
 from app.models.budget import BudgetMonth
 from app.models.category import Category, CategoryGroup
@@ -251,7 +251,9 @@ def _generate_recurring_transactions(db: Session, user_id: str, today: date) -> 
 
 
 @router.get("/pull")
+@limiter.limit("60/minute")
 def pull(
+    request: Request,
     last_pulled_at: int = Query(
         0, description="Unix millisecond timestamp of last successful pull"
     ),
@@ -458,7 +460,9 @@ def pull(
 
 
 @router.post("/push", status_code=status.HTTP_200_OK)
+@limiter.limit("60/minute")
 def push(
+    request: Request,
     last_pulled_at: int = Query(
         0, description="Unix millisecond timestamp of last successful pull"
     ),
@@ -468,14 +472,8 @@ def push(
 ) -> dict[str, Any]:
     """
     Process client-side writes for all six WatermelonDB tables.
-    Rate-limited to 60 pushes per user per minute.
+    Rate-limited to 60 pushes per user per minute via slowapi.
     """
-    # ── Rate limit ────────────────────────────────────────────────────────────
-    if not check_rate_limit(str(current_user.id), "sync_push", limit=60, window_seconds=60):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many sync requests. Please slow down.",
-        )
     user_id = str(current_user.id)
     # `last_pulled_at` is the server_timestamp from the preceding pull.
     # Using it as created_at for newly pushed records ensures created_at <= last_pulled_at

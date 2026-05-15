@@ -87,28 +87,42 @@ def is_token_blocklisted(jti: str) -> bool:
     return int(get_redis().exists(f"{_BLOCKLIST_PREFIX}{jti}")) > 0  # type: ignore[arg-type]
 
 
-# ── Per-user rate limiter ─────────────────────────────────────────────────────
+# ── Password-reset OTP store ──────────────────────────────────────────────────
+# OTPs are short-lived (10 min) and keyed by lowercased email.
+# After successful verification the OTP is deleted immediately (single-use).
+
+_OTP_PREFIX = "pw_otp:"
+OTP_TTL_SECONDS = 600  # 10 minutes
 
 
-def check_rate_limit(user_id: str, action: str, limit: int, window_seconds: int) -> bool:
-    """
-    Sliding-window rate limiter backed by a Redis counter.
+def store_otp(email: str, otp: str) -> None:
+    get_redis().setex(f"{_OTP_PREFIX}{email.lower()}", OTP_TTL_SECONDS, otp)
 
-    Returns True when the request is within the limit, False when it exceeds it.
-    Uses a simple fixed-window approach: INCR + EXPIRE on the first hit in
-    each window.  This is O(1) and has no race conditions for the expiry path
-    because INCR is atomic.
 
-    Args:
-        user_id:        The authenticated user's ID.
-        action:         A short string identifying the endpoint, e.g. "sync_push".
-        limit:          Maximum allowed requests in the window.
-        window_seconds: Window length in seconds.
-    """
-    r = get_redis()
-    key = f"rl:{action}:{user_id}"
-    count = int(r.incr(key))  # type: ignore[arg-type]
-    if count == 1:
-        # First request in this window — set the expiry.
-        r.expire(key, window_seconds)
-    return count <= limit
+def get_otp(email: str) -> str | None:
+    return cast(str | None, get_redis().get(f"{_OTP_PREFIX}{email.lower()}"))
+
+
+def delete_otp(email: str) -> None:
+    get_redis().delete(f"{_OTP_PREFIX}{email.lower()}")
+
+
+# ── Password-reset token store ────────────────────────────────────────────────
+# After OTP verification the client receives an opaque reset token.
+# This token is single-use and expires after 15 minutes.  The value stored
+# is the user's email so step 3 can look up the account without re-querying OTP.
+
+_RESET_TOKEN_PREFIX = "pw_reset:"
+RESET_TOKEN_TTL_SECONDS = 900  # 15 minutes
+
+
+def store_reset_token(token: str, email: str) -> None:
+    get_redis().setex(f"{_RESET_TOKEN_PREFIX}{token}", RESET_TOKEN_TTL_SECONDS, email.lower())
+
+
+def get_reset_token_email(token: str) -> str | None:
+    return cast(str | None, get_redis().get(f"{_RESET_TOKEN_PREFIX}{token}"))
+
+
+def delete_reset_token(token: str) -> None:
+    get_redis().delete(f"{_RESET_TOKEN_PREFIX}{token}")

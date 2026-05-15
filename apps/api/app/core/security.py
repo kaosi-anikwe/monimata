@@ -97,6 +97,11 @@ def create_refresh_token() -> str:
     return secrets.token_hex(64)
 
 
+def generate_otp(length: int = 6) -> str:
+    """Return a cryptographically random numeric OTP of the given length."""
+    return "".join(str(secrets.randbelow(10)) for _ in range(length))
+
+
 def decode_access_token(token: str) -> dict[str, Any]:
     """
     Decode and verify an access token.
