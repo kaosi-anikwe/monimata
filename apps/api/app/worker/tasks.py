@@ -331,7 +331,7 @@ def process_bank_statement(
                 exc,
             )
             try:
-                send_statement_failed_push(user=user, bank_name=bank_display)
+                send_statement_failed_push(db, user=user, bank_name=bank_display)
             except Exception:
                 logger.exception("process_bank_statement: send_statement_failed_push failed")
             return
@@ -342,7 +342,9 @@ def process_bank_statement(
                 bank_slug,
                 account_id,
             )
-            send_statement_processed_push(user=user, bank_name=bank_display, imported=0, updated=0)
+            send_statement_processed_push(
+                db, user=user, bank_name=bank_display, imported=0, updated=0
+            )
             return
 
         # Build ref → transaction lookup for O(1) dedup.
@@ -479,6 +481,7 @@ def process_bank_statement(
 
         notify_user(user_id, ["transactions", "budget", "accounts"])
         send_statement_processed_push(
+            db,
             user=user,
             bank_name=bank_display,
             imported=len(inserted_ids),
@@ -563,7 +566,7 @@ def process_receipt(
         except Exception as exc:
             logger.warning("process_receipt: identify_receipt failed user=%s: %s", user_id, exc)
             try:
-                send_receipt_failed_push(user=user, reason="unrecognised")
+                send_receipt_failed_push(db, user=user, reason="unrecognised")
             except Exception:
                 logger.exception("process_receipt: send_receipt_failed_push failed")
             return
@@ -571,7 +574,7 @@ def process_receipt(
         if identification is None:
             logger.info("process_receipt: no parser recognised the receipt user=%s", user_id)
             try:
-                send_receipt_failed_push(user=user, reason="unrecognised")
+                send_receipt_failed_push(db, user=user, reason="unrecognised")
             except Exception:
                 logger.exception("process_receipt: send_receipt_failed_push failed")
             return
@@ -638,7 +641,9 @@ def process_receipt(
                 failure_reason,
             )
             try:
-                send_receipt_failed_push(user=user, reason=failure_reason, bank_name=bank_display)
+                send_receipt_failed_push(
+                    db, user=user, reason=failure_reason, bank_name=bank_display
+                )
             except Exception:
                 logger.exception("process_receipt: send_receipt_failed_push failed")
             return
@@ -661,9 +666,11 @@ def process_receipt(
                 )
                 try:
                     send_receipt_duplicate_push(
+                        db,
                         user=user,
                         bank_name=bank_display,
                         amount_kobo=abs(parsed.amount_kobo),
+                        transaction_id=str(existing.id),
                     )
                 except Exception:
                     logger.exception("process_receipt: send_receipt_duplicate_push failed")
@@ -718,10 +725,12 @@ def process_receipt(
 
         notify_user(user_id, ["transactions", "budget", "accounts"])
         send_receipt_processed_push(
+            db,
             user=user,
             bank_name=bank_display,
             amount_kobo=abs(signed_amount),
             direction=parsed.transaction_type,
+            transaction_id=tx_id,
         )
 
     except Exception:

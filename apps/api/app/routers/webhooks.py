@@ -292,7 +292,7 @@ async def bank_alert_webhook(
                 from app.services.nudge_engine import send_statement_received_push
 
                 send_statement_received_push(
-                    user=user, bank_name=bank_slug.replace("_", " ").title()
+                    db, user=user, bank_name=bank_slug.replace("_", " ").title()
                 )
             except Exception:
                 logger.exception("bank_alert_webhook: send_statement_received_push failed")
