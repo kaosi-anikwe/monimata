@@ -1255,6 +1255,8 @@ export interface components {
       identity_verified: boolean;
       /** Onboarded */
       onboarded: boolean;
+      /** Streak */
+      streak: number;
       /**
        * Created At
        * Format: date-time

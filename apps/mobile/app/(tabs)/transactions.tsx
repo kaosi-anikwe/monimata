@@ -193,7 +193,6 @@ function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLas
         ss.txRow,
         { borderBottomColor: colors.separator },
         !isLast && ss.txRowBorder,
-        tx.source === 'manual' && { borderLeftColor: colors.info, borderLeftWidth: 3 },
       ]}
       onPress={onPress}
       activeOpacity={0.7}

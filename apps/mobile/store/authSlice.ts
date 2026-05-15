@@ -20,18 +20,13 @@
  */
 import { clearDatabase } from '@/database';
 import client, { clearLastUserId, clearTokens, getLastUserId, saveLastUserId, saveTokens } from '@/services/api';
+import type { User } from '@monimata/shared-types';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-export interface AuthUser {
-    id: string;
-    email: string;
-    first_name: string | null;
-    last_name: string | null;
-    onboarded: boolean;
-}
+export type { User as AuthUser };
 
 export interface AuthState {
-    user: AuthUser | null;
+    user: User | null;
     isAuthenticated: boolean;
     /** True once the initial restoreSession check has settled (success or failure). */
     isInitialised: boolean;
@@ -146,7 +141,7 @@ export const register = createAsyncThunk(
             if (meError || !me) return rejectWithValue('Registration failed');
             await clearDatabase();
             await saveLastUserId(me.id);
-            return me as AuthUser;
+            return me as User;
         } catch (err: unknown) {
             console.log('[register] post-auth step failed:', err);
             return rejectWithValue('Registration failed');
@@ -164,7 +159,7 @@ export const login = createAsyncThunk(
             await saveTokens(data.access_token, data.refresh_token);
             const { data: me, error: meError } = await client.GET('/auth/me', {});
             if (meError || !me) return rejectWithValue('Login failed');
-            const user = me as AuthUser;
+            const user = me as User;
             // Wipe local DB when a different account uses this device.
             const lastId = await getLastUserId();
             if (lastId !== null && lastId !== user.id) {
@@ -195,7 +190,7 @@ export const restoreSession = createAsyncThunk('auth/restoreSession', async (_, 
     try {
         const { data, error } = await client.GET('/auth/me', {});
         if (error || !data) return rejectWithValue('No active session');
-        return data as AuthUser;
+        return data as User;
     } catch {
         return rejectWithValue('No active session');
     }
@@ -208,7 +203,7 @@ export const markOnboardedThunk = createAsyncThunk(
             const { data, error } = await client.PATCH('/auth/me', { body: { onboarded: true } });
             if (error) return rejectWithValue(extractDetail(error, 'Failed to update onboarding status'));
             if (!data) return rejectWithValue('Failed to update onboarding status');
-            return data as AuthUser;
+            return data as User;
         } catch {
             return rejectWithValue('Failed to update onboarding status');
         }
@@ -232,7 +227,7 @@ const authSlice = createSlice({
     },
     extraReducers: (builder) => {
         const setLoading = (state: AuthState) => { state.loading = true; state.error = null; };
-        const setUser = (state: AuthState, action: PayloadAction<AuthUser>) => {
+        const setUser = (state: AuthState, action: PayloadAction<User>) => {
             state.loading = false;
             state.user = action.payload;
             state.isAuthenticated = true;

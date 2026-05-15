@@ -21,7 +21,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useRef } from 'react';
 import {
+  Animated,
   ScrollView,
   StyleSheet,
   Switch,
@@ -41,9 +43,6 @@ import { ff, type_ } from '@/lib/typography';
 import { logout } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
-// ── Hardcoded gamification constants (Phase 14 will fetch from API) ──────────
-const FAKE_STREAK = 14;
-
 // ── ProfileRow — reusable menu row ────────────────────────────────────────────
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -57,6 +56,14 @@ export default function ProfileScreen() {
   const { user } = useAppSelector((s) => s.auth);
   const { confirm, info } = useToast();
   const { isEnrolled, isEnabled: biometricEnabled, toggleEnabled: toggleBiometric } = useBiometricLock();
+
+  const streakScale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(streakScale, { toValue: 1.2, duration: 500, useNativeDriver: true }),
+      Animated.spring(streakScale, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }),
+    ]).start();
+  }, [streakScale]);
 
   const { isDark, setIsDark } = useThemePreference();
   const { data: nudgeSettings } = useNudgeSettings();
@@ -127,7 +134,9 @@ export default function ProfileScreen() {
 
         {/* Gamification badge pills */}
         <View style={ss.badges}>
-          <Badge variant="lime">{FAKE_STREAK}-day streak 🔥</Badge>
+          <Animated.View style={{ transform: [{ scale: streakScale }] }}>
+            <Badge variant="lime">{(user?.streak ?? 0)}-day streak 🔥</Badge>
+          </Animated.View>
         </View>
       </View>
 
