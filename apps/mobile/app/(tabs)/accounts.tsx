@@ -19,15 +19,17 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -41,10 +43,12 @@ import { Button } from '@/components/ui/Button';
 import { Divider } from '@/components/ui/Divider';
 import { Input } from '@/components/ui/Input';
 import { ListRow } from '@/components/ui/ListRow';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 import {
   useAccounts,
   useAddManualAccount,
   useDeleteAccount,
+  useSupportedBanks,
   useUpdateAlias,
   useUpdateBalance,
   type AddManualAccountPayload,
@@ -52,8 +56,151 @@ import {
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
+import { StatementAccountNotFoundError, uploadStatement } from '@/services/api';
 import { formatNaira } from '@/utils/money';
-import type { BankAccount } from '@monimata/shared-types';
+import type { BankAccount, SupportedBank } from '@monimata/shared-types';
+
+// ─── Bank Picker Sheet ───────────────────────────────────────────────────────
+
+interface BankPickerSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (bank: SupportedBank) => void;
+}
+
+function BankPickerSheet({ visible, onClose, onSelect }: BankPickerSheetProps) {
+  const colors = useTheme();
+  const [search, setSearch] = useState('');
+  const { data: banks = [], isLoading } = useSupportedBanks();
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = [...banks].sort((a, b) => a.name.localeCompare(b.name));
+    if (!q) return list;
+    return list.filter((b) => b.name.toLowerCase().includes(q));
+  }, [banks, search]);
+
+  function handleClose() {
+    setSearch('');
+    onClose();
+  }
+
+  return (
+    <BottomSheet visible={visible} onClose={handleClose} title="Select Bank" scrollable={false}>
+      {/* Search input */}
+      <View style={[bps.searchWrap, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
+        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+          <Circle cx={11} cy={11} r={8} stroke={colors.textTertiary} strokeWidth={2} />
+          <Path d="M21 21l-4.35-4.35" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
+        </Svg>
+        <TextInput
+          style={[bps.searchInput, { color: colors.textPrimary }]}
+          placeholder="Search banks…"
+          placeholderTextColor={colors.textTertiary}
+          value={search}
+          onChangeText={setSearch}
+          autoFocus={false}
+          accessibilityLabel="Search banks"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
+            </Svg>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {isLoading ? (
+        <ActivityIndicator style={{ margin: spacing.xl }} color={colors.brand} />
+      ) : (
+        <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {filtered.length === 0 ? (
+            <Text style={[type_.bodyReg, { color: colors.textMeta, textAlign: 'center', padding: spacing.xl }]}>
+              No banks match &ldquo;{search}&rdquo;
+            </Text>
+          ) : (
+            filtered.map((bank, i) => (
+              <TouchableOpacity
+                key={bank.slug}
+                style={[
+                  bps.row,
+                  { borderBottomColor: colors.separator },
+                  i < filtered.length - 1 && bps.rowBorder,
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSearch('');
+                  onSelect(bank);
+                  onClose();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={bank.name}
+              >
+                <View style={ss.bankInfo}>
+                  <View style={[ss.bankIc, { backgroundColor: colors.surface }]}>
+                    <Ionicons name="business-outline" size={16} color={colors.brand} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[type_.body, { color: colors.textPrimary }]}>{bank.name}</Text>
+                    <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: 2, flexWrap: 'wrap' }}>
+                      {bank.channels.map((ch) => (
+                        <View key={ch} style={[bps.chip, { backgroundColor: colors.surface }]}>
+                          <Text style={[bps.chipTxt, { color: colors.brand }]}>{ch}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                  <Path d="M9 18l6-6-6-6" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      )}
+    </BottomSheet>
+  );
+}
+
+const bps = StyleSheet.create({
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    height: 40,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...ff(400),
+    fontSize: 14,
+    padding: 0,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.smd,
+  },
+  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth },
+  chip: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  chipTxt: {
+    ...ff(600),
+    fontSize: 9,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+});
 
 // ── Tour definition ─────────────────────────────────────────────────────
 
@@ -78,14 +225,15 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
   const addMutation = useAddManualAccount();
   const { error } = useToast();
   const [alias, setAlias] = useState('');
-  const [institution, setInstitution] = useState('');
+  const [selectedBank, setSelectedBank] = useState<SupportedBank | null>(null);
+  const [showBankPicker, setShowBankPicker] = useState(false);
   const [accountNumber, setAccountNumber] = useState('');
   const [accountType, setAccountType] = useState<'SAVINGS' | 'CURRENT'>('SAVINGS');
   const [balance, setBalance] = useState('');
 
   function reset() {
     setAlias('');
-    setInstitution('');
+    setSelectedBank(null);
     setAccountNumber('');
     setAccountType('SAVINGS');
     setBalance('');
@@ -97,13 +245,14 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
   }
 
   function handleSubmit() {
-    if (!alias.trim() || !institution.trim() || accountNumber.length !== 10) {
-      error('Missing details', 'Please fill in all required fields. Account number must be 10 digits.');
+    if (!alias.trim() || !selectedBank || accountNumber.length !== 10) {
+      error('Missing details', !selectedBank ? 'Please select a bank.' : 'Please fill in all required fields. Account number must be 10 digits.');
       return;
     }
     const payload: AddManualAccountPayload = {
       alias: alias.trim(),
-      institution: institution.trim(),
+      institution: selectedBank.name,
+      bank_slug: selectedBank.slug,
       account_number: accountNumber.trim(),
       account_type: accountType,
       balance: balance ? Math.round(parseFloat(balance) * 100) : 0,
@@ -112,82 +261,114 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
   }
 
   return (
-    <BottomSheet visible={visible} onClose={handleClose} title="Add Account Manually" scrollable>
-      <View style={ss.sheetBody}>
-        <Input
-          label="Account Nickname *"
-          value={alias}
-          onChangeText={setAlias}
-          placeholder="e.g. My Salary Account"
-          autoFocus
-          accessibilityLabel="Account nickname"
-        />
-        <Input
-          label="Bank Name *"
-          value={institution}
-          onChangeText={setInstitution}
-          placeholder="e.g. First Bank"
-          accessibilityLabel="Bank name"
-        />
-        <Input
-          label="Account Number *"
-          value={accountNumber}
-          onChangeText={setAccountNumber}
-          placeholder="10-digit NUBAN"
-          keyboardType="number-pad"
-          maxLength={10}
-          accessibilityLabel="Account number"
-        />
+    <>
+      <BottomSheet visible={visible} onClose={handleClose} title="Add Account Manually" scrollable>
+        <View style={ss.sheetBody}>
+          <Input
+            label="Account Nickname *"
+            value={alias}
+            onChangeText={setAlias}
+            placeholder="e.g. My Salary Account"
+            autoFocus
+            accessibilityLabel="Account nickname"
+          />
 
-        {/* Account type segment */}
-        <View style={ss.inputBlock}>
-          <Text style={[type_.labelSm, { color: colors.textSecondary, marginBottom: spacing.xs }]}>Account Type</Text>
-          <View style={ss.segmentRow}>
-            {(['SAVINGS', 'CURRENT'] as const).map((t) => (
-              <TouchableOpacity
-                key={t}
-                style={[
-                  ss.segment,
-                  { borderColor: colors.border, backgroundColor: colors.cardBg },
-                  accountType === t && { borderColor: colors.brand, backgroundColor: colors.surface },
-                ]}
-                onPress={() => setAccountType(t)}
-                accessibilityRole="button"
-                accessibilityLabel={t}
-              >
-                <Text
-                  style={[
-                    type_.label,
-                    { color: accountType === t ? colors.brand : colors.textMeta },
-                  ]}
-                >
-                  {t}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* Bank selector */}
+          <View style={ss.inputBlock}>
+            <Text style={[type_.labelSm, { color: colors.textSecondary, marginBottom: spacing.xs }]}>Bank *</Text>
+            <TouchableOpacity
+              style={[
+                ss.bankSelectBtn,
+                {
+                  borderColor: selectedBank ? colors.brand : colors.border,
+                  backgroundColor: colors.cardBg,
+                },
+              ]}
+              onPress={() => setShowBankPicker(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Select bank"
+            >
+              {selectedBank ? (
+                <View style={[ss.bankInfo, { flex: 1 }]}>
+                  <View style={[ss.bankIc, { backgroundColor: colors.surface }]}>
+                    <Ionicons name="business-outline" size={16} color={colors.brand} />
+                  </View>
+                  <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{selectedBank.name}</Text>
+                </View>
+              ) : (
+                <Text style={[type_.body, { color: colors.textTertiary, flex: 1 }]}>Select a bank…</Text>
+              )}
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M6 9l6 6 6-6" stroke={selectedBank ? colors.brand : colors.textTertiary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </TouchableOpacity>
           </View>
+          <Input
+            label="Account Number *"
+            value={accountNumber}
+            onChangeText={setAccountNumber}
+            placeholder="10-digit NUBAN"
+            keyboardType="number-pad"
+            maxLength={10}
+            accessibilityLabel="Account number"
+          />
+
+          {/* Account type segment */}
+          <View style={ss.inputBlock}>
+            <Text style={[type_.labelSm, { color: colors.textSecondary, marginBottom: spacing.xs }]}>Account Type</Text>
+            <View style={ss.segmentRow}>
+              {(['SAVINGS', 'CURRENT'] as const).map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[
+                    ss.segment,
+                    { borderColor: colors.border, backgroundColor: colors.cardBg },
+                    accountType === t && { borderColor: colors.brand, backgroundColor: colors.surface },
+                  ]}
+                  onPress={() => setAccountType(t)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t}
+                >
+                  <Text
+                    style={[
+                      type_.label,
+                      { color: accountType === t ? colors.brand : colors.textMeta },
+                    ]}
+                  >
+                    {t}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <Input
+            label="Opening Balance (₦) — optional"
+            value={balance}
+            onChangeText={setBalance}
+            placeholder="0.00"
+            keyboardType="decimal-pad"
+            accessibilityLabel="Opening balance"
+          />
+
+          <Button
+            variant="green"
+            onPress={handleSubmit}
+            disabled={addMutation.isPending}
+            loading={addMutation.isPending}
+            accessibilityLabel="Add account"
+          >
+            Add Account
+          </Button>
         </View>
+      </BottomSheet>
 
-        <Input
-          label="Opening Balance (₦) — optional"
-          value={balance}
-          onChangeText={setBalance}
-          placeholder="0.00"
-          keyboardType="decimal-pad"
-          accessibilityLabel="Opening balance"
-        />
-
-        <Button
-          variant="green"
-          onPress={handleSubmit}
-          disabled={addMutation.isPending}
-          loading={addMutation.isPending}
-          accessibilityLabel="Add account"
-        >
-          Add Account
-        </Button>
-      </View>
-    </BottomSheet>
+      <BankPickerSheet
+        visible={showBankPicker}
+        onClose={() => setShowBankPicker(false)}
+        onSelect={(bank) => setSelectedBank(bank)}
+      />
+    </>
   );
 }
 
@@ -327,6 +508,163 @@ function RenameSheet({ account, onClose }: RenameSheetProps) {
   );
 }
 
+// ─── Upload Statement Sheet ──────────────────────────────────────────────────
+
+type StatementUploadState = 'idle' | 'uploading' | 'done' | 'error';
+
+interface UploadStatementSheetProps {
+  account: BankAccount | null;
+  onClose: () => void;
+}
+
+function UploadStatementSheet({ account, onClose }: UploadStatementSheetProps) {
+  const colors = useTheme();
+  const { success, error } = useToast();
+  const [file, setFile] = useState<{ uri: string; name: string; size?: number } | null>(null);
+  const [uploadState, setUploadState] = useState<StatementUploadState>('idle');
+  const [progress, setProgress] = useState(0);
+
+  function resetState() {
+    setFile(null);
+    setUploadState('idle');
+    setProgress(0);
+  }
+
+  function handleClose() {
+    if (uploadState === 'uploading') return;
+    resetState();
+    onClose();
+  }
+
+  async function pickPDF() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    setFile({ uri: asset.uri, name: asset.name, size: asset.size ?? undefined });
+    setUploadState('idle');
+    setProgress(0);
+  }
+
+  async function handleUpload() {
+    if (!file) return;
+    setUploadState('uploading');
+    setProgress(0);
+    try {
+      await uploadStatement(
+        { uri: file.uri, mimeType: 'application/pdf', name: file.name },
+        (fraction) => { setProgress(Math.min(fraction * 0.9, 0.9)); },
+      );
+      setProgress(1);
+      setUploadState('done');
+      success('Statement uploaded!', 'Transactions will appear shortly.');
+      setTimeout(() => { resetState(); onClose(); }, 1200);
+    } catch (err) {
+      setProgress(0);
+      setUploadState('error');
+      if (err instanceof StatementAccountNotFoundError) {
+        error('Account not found', (err as Error).message);
+      } else {
+        error('Upload failed', (err as Error).message);
+      }
+    }
+  }
+
+  const isUploading = uploadState === 'uploading';
+  const isDone = uploadState === 'done';
+
+  return (
+    <BottomSheet visible={!!account} onClose={handleClose} title="Upload Statement">
+      <View style={ss.sheetBody}>
+        {/* Context note */}
+        {account && (
+          <View style={[ss.stmtNote, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z" stroke={colors.brand} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M13 2v7h7" stroke={colors.brand} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+            <Text style={[type_.small, { color: colors.textMeta, flex: 1, lineHeight: 17 }]}>
+              The PDF will be matched to your{' '}
+              <Text style={[{ color: colors.textPrimary }, ff(600)]}>{account.institution}</Text>{' '}
+              account automatically.
+            </Text>
+          </View>
+        )}
+
+        {/* PDF picker button */}
+        <TouchableOpacity
+          style={[
+            ss.stmtPickBtn,
+            { borderColor: file ? colors.brand : colors.border, backgroundColor: colors.cardBg },
+          ]}
+          onPress={pickPDF}
+          disabled={isUploading || isDone}
+          accessibilityRole="button"
+          accessibilityLabel="Select PDF statement"
+        >
+          <View style={[ss.stmtPickIc, { backgroundColor: file ? colors.surface : colors.surface }]}>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+              <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={file ? colors.brand : colors.textTertiary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3" stroke={file ? colors.brand : colors.textTertiary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </View>
+          <View style={{ flex: 1 }}>
+            {file ? (
+              <>
+                <Text style={[type_.body, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {file.name}
+                </Text>
+                {file.size !== undefined && (
+                  <Text style={[type_.caption, { color: colors.textMeta, marginTop: 1 }]}>
+                    {(file.size / 1024).toFixed(1)} KB · PDF
+                  </Text>
+                )}
+              </>
+            ) : (
+              <Text style={[type_.body, { color: colors.textTertiary }]}>Tap to select a PDF…</Text>
+            )}
+          </View>
+          {file && !isUploading && !isDone && (
+            <TouchableOpacity
+              onPress={() => { setFile(null); setUploadState('idle'); setProgress(0); }}
+              hitSlop={8}
+              accessibilityLabel="Remove selected file"
+            >
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
+              </Svg>
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+
+        {/* Progress bar */}
+        {(isUploading || isDone) && (
+          <ProgressBar progress={progress} state={isDone ? 'ok' : 'brand'} size="sm" animate />
+        )}
+
+        <Button
+          variant="green"
+          onPress={handleUpload}
+          disabled={!file || isUploading || isDone}
+          loading={isUploading}
+          accessibilityLabel="Upload statement"
+        >
+          {isDone ? 'Uploaded!' : 'Upload Statement'}
+        </Button>
+
+        {/* Tip */}
+        <View style={[ss.stmtTip, { backgroundColor: colors.infoSubtle ?? colors.surface, borderColor: colors.infoBorder ?? colors.border }]}>
+          <Text style={[type_.caption, { color: colors.textMeta, lineHeight: 17 }]}>
+            PDF only · max 5 MB. Parsed in the background — transactions appear within a few minutes.
+          </Text>
+        </View>
+      </View>
+    </BottomSheet>
+  );
+}
+
 // ─── More Actions Sheet ───────────────────────────────────────────────────────
 
 interface MoreActionsSheetProps {
@@ -334,6 +672,7 @@ interface MoreActionsSheetProps {
   onClose: () => void;
   onRename: () => void;
   onUpdateBalance: () => void;
+  onUploadStatement: () => void;
   onDelete: () => void;
 }
 
@@ -342,6 +681,7 @@ function MoreActionsSheet({
   onClose,
   onRename,
   onUpdateBalance,
+  onUploadStatement,
   onDelete,
 }: MoreActionsSheetProps) {
   const colors = useTheme();
@@ -382,6 +722,21 @@ function MoreActionsSheet({
           title="Update Balance"
           subtitle="Manually set the current balance"
           onPress={() => action(onUpdateBalance)}
+          showChevron
+        />
+
+        {/* Upload Statement */}
+        <ListRow
+          leftIcon={
+            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+              <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          }
+          iconBg={colors.surface}
+          title="Upload Statement"
+          subtitle="Import all transactions from a PDF"
+          onPress={() => action(onUploadStatement)}
           showChevron
         />
 
@@ -519,6 +874,7 @@ export default function AccountsScreen() {
   const [balanceAccount, setBalanceAccount] = useState<BankAccount | null>(null);
   const [renameAccount, setRenameAccount] = useState<BankAccount | null>(null);
   const [moreAccount, setMoreAccount] = useState<BankAccount | null>(null);
+  const [statementAccount, setStatementAccount] = useState<BankAccount | null>(null);
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
@@ -681,11 +1037,16 @@ export default function AccountsScreen() {
         account={renameAccount}
         onClose={() => setRenameAccount(null)}
       />
+      <UploadStatementSheet
+        account={statementAccount}
+        onClose={() => setStatementAccount(null)}
+      />
       <MoreActionsSheet
         account={moreAccount}
         onClose={() => setMoreAccount(null)}
         onRename={() => { setMoreAccount(null); setRenameAccount(moreAccount); }}
         onUpdateBalance={() => { setMoreAccount(null); setBalanceAccount(moreAccount); }}
+        onUploadStatement={() => { setMoreAccount(null); setTimeout(() => setStatementAccount(moreAccount), 220); }}
         onDelete={() => moreAccount && handleDelete(moreAccount)}
       />
     </View>
@@ -903,6 +1264,15 @@ const ss = StyleSheet.create({
   // Sheet body
   sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.md },
   inputBlock: {},
+  bankSelectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    height: 48,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing.md,
+  },
   segmentRow: { flexDirection: 'row', gap: spacing.sm },
   segment: {
     flex: 1,
@@ -914,6 +1284,41 @@ const ss = StyleSheet.create({
 
   // More actions sheet  — ash-list pattern
   ashList: { paddingBottom: spacing.xxxl },
+
+  // Upload statement sheet
+  stmtNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.smd,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.smd,
+  },
+  stmtPickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smd,
+    borderWidth: 1.5,
+    borderRadius: radius.sm,
+    borderStyle: 'dashed',
+    padding: spacing.md,
+    minHeight: 64,
+  },
+  stmtPickIc: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  stmtTip: {
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.smd,
+  },
 
   // Error state
   errorContainer: {

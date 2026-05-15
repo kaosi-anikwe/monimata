@@ -66,7 +66,7 @@ function streakDayState(i: number): 'done' | 'today' | 'future' {
 
 // ── Badge data type ───────────────────────────────────────────────────────────
 
-interface Badge {
+interface BadgeType {
   slug: string;
   emoji: string;
   name: string;
@@ -75,7 +75,7 @@ interface Badge {
   lockHint?: string;          // shown when locked
 }
 
-const BADGES: Badge[] = [
+const BADGES: BadgeType[] = [
   { slug: 'first_budget', emoji: '🥇', name: 'First Budget', earned: true, isNew: true },
   { slug: 'streak_7', emoji: '🔥', name: '7-Day Streak', earned: true },
   { slug: 'goal_setter', emoji: '🎯', name: 'Goal Setter', earned: true },
@@ -177,7 +177,7 @@ function BadgeCell({
   ss,
   colors,
 }: {
-  badge: Badge;
+  badge: BadgeType;
   ss: ReturnType<typeof makeStyles>;
   colors: ReturnType<typeof useTheme>;
 }) {
@@ -340,8 +340,8 @@ function XpBar({
 
 export default function RewardsScreen() {
   const colors = useTheme();
-  const ss = makeStyles(colors);
   const insets = useSafeAreaInsets();
+  const ss = makeStyles(colors, insets.bottom);
   const { info } = useToast();
 
   const [challenges, setChallenges] = useState<Challenge[]>(CHALLENGES);
@@ -498,11 +498,11 @@ export default function RewardsScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-function makeStyles(colors: ReturnType<typeof useTheme>) {
+function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
   return StyleSheet.create({
     root: { flex: 1 },
     scroll: { flex: 1 },
-    scrollContent: { paddingBottom: layout.tabBarHeight + spacing.xl },
+    scrollContent: { paddingBottom: Math.max(bottomInset, 4) + spacing.xl },
 
     // ── Header ───────────────────────────────────────────────────────────────
     header: {

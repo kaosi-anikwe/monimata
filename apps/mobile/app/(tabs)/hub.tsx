@@ -526,8 +526,8 @@ function QuizCard({
 
 export default function HubScreen() {
   const colors = useTheme();
-  const ss = makeStyles(colors);
   const insets = useSafeAreaInsets();
+  const ss = makeStyles(colors, insets.bottom);
   const { info } = useToast();
 
   const [activeTab, setActiveTab] = useState<HubTab>('articles');
@@ -787,12 +787,12 @@ export default function HubScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-function makeStyles(colors: ReturnType<typeof useTheme>) {
+function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
   return StyleSheet.create({
     // Layout
     root: { flex: 1 },
     scroll: { flex: 1 },
-    scrollContent: { paddingBottom: layout.tabBarHeight + spacing.xl },
+    scrollContent: { paddingBottom: Math.max(bottomInset, 4) + spacing.xl },
 
     // ── Header ───────────────────────────────────────────────────────────────
     header: {

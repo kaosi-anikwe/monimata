@@ -47,10 +47,10 @@ import { useCreateTransaction } from '@/hooks/useTransactions';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { BankAccount } from '@monimata/shared-types';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
 import { computeNextDue, nairaStringToKobo } from '@/utils/money';
+import type { BankAccount } from '@monimata/shared-types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -374,7 +374,18 @@ export default function AddTransactionScreen() {
           </Svg>
         </TouchableOpacity>
         <Text style={[type_.h3, { color: colors.textPrimary }]}>Add Transaction</Text>
-        <View style={ss.closeBtn} />
+        <TouchableOpacity
+          style={[ss.closeBtn, { backgroundColor: colors.surface }]}
+          onPress={() => router.push('/upload-receipt' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Upload receipt"
+        >
+          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M14 2v6h6" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M12 12v6M9 15l3-3 3 3" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        </TouchableOpacity>
       </View>
 
       {/* ── Type toggle ── */}

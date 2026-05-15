@@ -29,38 +29,40 @@ import {
   PlusJakartaSans_800ExtraBold_Italic,
   useFonts,
 } from '@expo-google-fonts/plus-jakarta-sans';
-import { Provider } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef, useState } from 'react';
-import { Stack, usePathname, useRouter } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ActivityIndicator, AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Stack, usePathname, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, AppStateStatus, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Provider } from 'react-redux';
 
-import { store } from '@/store';
-import { ff } from '@/lib/typography';
+import { AppLockScreen } from '@/components/AppLockScreen';
+import { AppWelcome } from '@/components/AppWelcome';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ToastProvider, useToast } from '@/components/Toast';
+import { TourProvider } from '@/components/tour';
 import { initDatabase } from '@/database';
 import { syncDatabase } from '@/database/sync';
-import { Database } from '@nozbe/watermelondb';
-import { radius, spacing } from '@/lib/tokens';
-import { getTheme, useTheme } from '@/lib/theme';
-import { TourProvider } from '@/components/tour';
-import { initSentry, Sentry } from '@/lib/sentry';
-import { setLogoutHandler } from '@/services/api';
-import { ToastProvider } from '@/components/Toast';
-import { ThemeProvider } from '@/lib/ThemeProvider';
-import { useJobEvents } from '@/hooks/useJobEvents';
-import { AppWelcome } from '@/components/AppWelcome';
-import { syncToCurrentMonth } from '@/store/budgetSlice';
-import { AppLockScreen } from '@/components/AppLockScreen';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useBiometricLock } from '@/hooks/useBiometricLock';
-import { clearAuth, restoreSession } from '@/store/authSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useJobEvents } from '@/hooks/useJobEvents';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { initSentry, Sentry } from '@/lib/sentry';
+import { getTheme, useTheme } from '@/lib/theme';
+import { ThemeProvider } from '@/lib/ThemeProvider';
+import { radius, spacing } from '@/lib/tokens';
+import { ff } from '@/lib/typography';
+import { setLogoutHandler, uploadReceipt } from '@/services/api';
+import { store } from '@/store';
+import { clearAuth, restoreSession } from '@/store/authSlice';
+import { syncToCurrentMonth } from '@/store/budgetSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { Database } from '@nozbe/watermelondb';
+import * as QuickActions from 'expo-quick-actions';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 
 // Initialise Sentry before the app renders so the first frame is covered.
 initSentry();
@@ -99,6 +101,51 @@ function RootNavigator() {
 
   // WebSocket connection — real-time cache invalidation after Celery jobs.
   useJobEvents();
+
+  // ── Home-screen quick actions ────────────────────────────────────────────────
+  // Register shortcuts once the user is authenticated so they appear on the
+  // home screen long-press menu.  Removed automatically when the user logs out.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      QuickActions.setItems([]);
+      return;
+    }
+
+    QuickActions.setItems([
+      {
+        id: 'add-transaction',
+        title: 'Add Transaction',
+        subtitle: 'Log a manual entry',
+        // iOS: SF Symbol   Android: adaptive drawable defined in plugin config
+        icon: Platform.OS === 'android' ? 'add_transaction_icon' : 'symbol:plus.circle.fill',
+        params: { href: '/add-transaction' },
+      },
+      {
+        id: 'upload-receipt',
+        title: 'Upload Receipt',
+        subtitle: 'Scan or import a receipt',
+        icon: Platform.OS === 'android' ? 'upload_receipt_icon' : 'symbol:doc.viewfinder',
+        params: { href: '/upload-receipt' },
+      },
+    ]);
+
+    // Handle the action that cold-started the app.
+    if (QuickActions.initial) {
+      const href = QuickActions.initial.params?.href;
+      if (typeof href === 'string') {
+        // Defer one frame so the navigator tree is mounted before pushing.
+        const id = requestAnimationFrame(() => router.push(href as never));
+        return () => cancelAnimationFrame(id);
+      }
+    }
+
+    // Handle taps while the app is already running.
+    const sub = QuickActions.addListener((action) => {
+      const href = action.params?.href;
+      if (typeof href === 'string') router.push(href as never);
+    });
+    return () => sub.remove();
+  }, [isAuthenticated, router]);
 
   // Biometric lock.
   const { isLocked, unlock } = useBiometricLock();
@@ -198,6 +245,9 @@ function RootNavigator() {
       {isAuthenticated && (user?.onboarded ?? false) && user?.id && (
         <AppWelcome userId={user.id} />
       )}
+
+      {/* Share-intent file upload — processes files shared from other apps */}
+      {isAuthenticated && <ShareIntentHandler />}
 
       {/* Pre-permission explanatory modal — shown once before the OS dialog */}
       <Modal
@@ -379,26 +429,83 @@ function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <Provider store={store}>
-          <QueryClientProvider client={queryClient}>
-            <DatabaseProvider database={db}>
-              <SafeAreaProvider>
-                <ToastProvider>
-                  <TourProvider>
-                    <ErrorBoundary>
-                      <RootNavigator />
-                    </ErrorBoundary>
-                  </TourProvider>
-                </ToastProvider>
-              </SafeAreaProvider>
-            </DatabaseProvider>
-          </QueryClientProvider>
-        </Provider>
-      </GestureHandlerRootView>
-    </ThemeProvider>
+    <ShareIntentProvider>
+      <ThemeProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+              <DatabaseProvider database={db}>
+                <SafeAreaProvider>
+                  <ToastProvider>
+                    <TourProvider>
+                      <ErrorBoundary>
+                        <RootNavigator />
+                      </ErrorBoundary>
+                    </TourProvider>
+                  </ToastProvider>
+                </SafeAreaProvider>
+              </DatabaseProvider>
+            </QueryClientProvider>
+          </Provider>
+        </GestureHandlerRootView>
+      </ThemeProvider>
+    </ShareIntentProvider>
   );
+}
+
+// ── ShareIntentHandler ───────────────────────────────────────────────────────
+// Mounted inside RootNavigator so it has access to ToastProvider.
+// Processes incoming share-extension files silently — uploads to /uploads/receipt
+// without navigating the user anywhere.
+function ShareIntentHandler() {
+  const { shareIntent, resetShareIntent } = useShareIntentContext();
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
+  const handlingRef = useRef(false);
+
+  useEffect(() => {
+    if (!shareIntent || handlingRef.current) return;
+
+    const files = shareIntent.files;
+    if (!files?.length) {
+      resetShareIntent();
+      return;
+    }
+
+    handlingRef.current = true;
+    const sharedFile = files[0];
+
+    // Accept images and PDFs only.
+    const mime = sharedFile.mimeType ?? '';
+    const isImage = mime.startsWith('image/');
+    const isPdf = mime === 'application/pdf';
+    if (!isImage && !isPdf) {
+      toastError('Unsupported file', 'Only images and PDFs are accepted as receipts.');
+      resetShareIntent();
+      handlingRef.current = false;
+      return;
+    }
+
+    toastInfo('Uploading receipt…', 'Processing your file in the background.');
+
+    uploadReceipt({
+      uri: sharedFile.path,
+      mimeType: mime,
+      name: sharedFile.fileName ?? `shared_receipt_${Date.now()}`,
+    })
+      .then(() => {
+        toastSuccess('Receipt uploaded!', "We'll notify you when the transaction is ready.");
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Please try again.';
+        toastError('Upload failed', msg);
+      })
+      .finally(() => {
+        resetShareIntent();
+        handlingRef.current = false;
+      });
+  }, [shareIntent, resetShareIntent, toastSuccess, toastError, toastInfo]);
+
+  return null;
 }
 
 // Sentry.wrap instruments the root component for performance tracing and

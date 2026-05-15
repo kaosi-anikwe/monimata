@@ -467,13 +467,15 @@ export default function TransactionsScreen() {
           <Text style={[ss.hdrTitle, { color: colors.textPrimary }]}>Transactions</Text>
           <TouchableOpacity
             style={[ss.hdrIconBtn, { backgroundColor: colors.surface }]}
+            onPress={() => router.push('/upload-receipt' as never)}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel="Bulk categorise info"
+            accessibilityLabel="Upload receipt"
           >
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-              <Circle cx={12} cy={12} r={10} stroke={colors.textMeta} strokeWidth={1.8} />
-              <Path d="M12 8v4M12 16h.01" stroke={colors.textMeta} strokeWidth={1.8} strokeLinecap="round" />
+              <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M14 2v6h6" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M12 12v6M9 15l3-3 3 3" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </TouchableOpacity>
         </View>
@@ -559,7 +561,7 @@ export default function TransactionsScreen() {
             }
           />
         }
-        contentContainerStyle={{ paddingBottom: layout.tabBarHeight + spacing.lg }}
+        contentContainerStyle={{ paddingBottom: layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.lg }}
         accessibilityLabel="Transactions list"
       />
 

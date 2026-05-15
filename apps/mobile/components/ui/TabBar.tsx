@@ -67,10 +67,10 @@ interface TabConfig {
 // Matches the mockup home screen bnav (scr-home) from left to right.
 
 const TABS: TabConfig[] = [
-  { routeName: 'index', label: 'Home', icon: 'home-outline', iconActive: 'home-outline' },
-  { routeName: 'budget', label: 'Budget', icon: 'card-outline', iconActive: 'card-outline' },
-  { routeName: 'transactions', label: 'Transactions', icon: 'document-text-outline', iconActive: 'document-text-outline' },
-  { routeName: 'nudges', label: 'Nudges', icon: 'notifications-outline', iconActive: 'notifications-outline' },
+  { routeName: 'index', label: 'Home', icon: 'home-outline', iconActive: 'home' },
+  { routeName: 'budget', label: 'Budget', icon: 'card-outline', iconActive: 'card' },
+  { routeName: 'transactions', label: 'Transactions', icon: 'document-text-outline', iconActive: 'document-text' },
+  { routeName: 'nudges', label: 'Nudges', icon: 'notifications-outline', iconActive: 'notifications' },
 ] as const;
 
 // ─── Tab item ─────────────────────────────────────────────────────────────────
@@ -146,6 +146,10 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
   const nudgeUnread = useNudgeUnreadCount();
 
   const activeRouteName = state.routes[state.index]?.name ?? '';
+
+  // Only render on the four nav-bar pages; all others manage their own chrome.
+  const NAV_TABS = new Set(['index', 'budget', 'transactions', 'nudges']);
+  if (!NAV_TABS.has(activeRouteName)) return null;
 
   // Minimum bottom inset of 4 pt so the bar doesn't look cramped on devices
   // with no home indicator (Android).

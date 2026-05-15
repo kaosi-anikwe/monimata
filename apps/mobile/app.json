@@ -52,7 +52,6 @@
         }
       ],
       "expo-image",
-      "expo-web-browser",
       "expo-secure-store",
       "expo-sqlite",
       "@react-native-community/datetimepicker",
@@ -74,7 +73,32 @@
           "organization": "desktop-technologies-limited"
         }
       ],
-      "./plugins/withWatermelonDBJSI"
+      "./plugins/withWatermelonDBJSI",
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsImageWithMaxCount": 1,
+            "NSExtensionActivationSupportsFileWithMaxCount": 1
+          },
+          "androidIntentFilters": ["image/*", "application/pdf"]
+        }
+      ],
+      [
+        "expo-quick-actions",
+        {
+          "androidIcons": {
+            "add_transaction_icon": {
+              "foregroundImage": "./assets/icons/adaptive-icon.png",
+              "backgroundColor": "#2D6A2D"
+            },
+            "upload_receipt_icon": {
+              "foregroundImage": "./assets/icons/adaptive-icon.png",
+              "backgroundColor": "#2D6A2D"
+            }
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
