@@ -50,6 +50,8 @@ import random
 from datetime import UTC, datetime, time, timedelta, timezone
 from typing import TYPE_CHECKING
 
+from sqlalchemy.orm import Session
+
 logger = logging.getLogger(__name__)
 
 # West Africa Time — UTC+1, no daylight saving.
@@ -195,7 +197,7 @@ def _today_wat_utc_start() -> datetime:
     )
 
 
-def _count_today_nudges(db, user_id: str) -> int:
+def _count_today_nudges(db: Session, user_id: str) -> int:
     """Count nudges already created for this user today (WAT day)."""
     from sqlalchemy import func
 
@@ -213,7 +215,7 @@ def _count_today_nudges(db, user_id: str) -> int:
 
 
 def _today_nudge_exists(
-    db,
+    db: Session,
     user_id: str,
     trigger_type: str,
     category_id: str | None,
@@ -234,7 +236,7 @@ def _today_nudge_exists(
 
 
 def can_send_nudge(
-    db,
+    db: Session,
     user: User,
     trigger_type: str,
     category_id: str | None = None,
@@ -260,7 +262,7 @@ def can_send_nudge(
 
 
 def create_nudge(
-    db,
+    db: Session,
     user: User,
     trigger_type: str,
     title: str,
@@ -269,6 +271,7 @@ def create_nudge(
     category_id: str | None = None,
     *,
     send_push: bool = True,
+    push_data: dict | None = None,
 ) -> Nudge:
     """
     Persist a Nudge row and optionally dispatch a push notification.
@@ -298,11 +301,14 @@ def create_nudge(
     db.flush()  # populate nudge.id without committing the outer transaction
 
     if send_push and not quiet and user.expo_push_token:
+        _push_data = {"nudge_id": nudge.id, "trigger_type": trigger_type}
+        if push_data:
+            _push_data.update(push_data)
         send_push_notification(
             token=user.expo_push_token,
             title=title,
             body=message,
-            data={"nudge_id": nudge.id, "trigger_type": trigger_type},
+            data=_push_data,
         )
 
     logger.info(
@@ -376,52 +382,62 @@ def send_transaction_received_push(
     )
 
 
-def send_statement_received_push(user: User, bank_name: str) -> None:
+def send_statement_received_push(db: Session, user: User, bank_name: str) -> None:
     """Fire-and-forget push: statement received, processing in background."""
-    from app.services.push_service import send_push_notification
-
-    if not user.expo_push_token:
+    if not can_send_nudge(db, user, "statement_received"):
         return
-    send_push_notification(
-        token=user.expo_push_token,
-        title=TITLES["statement_received"],
-        body=random.choice(MESSAGES["statement_received"]).format(bank_name=bank_name),
-        data={"trigger_type": "statement_received"},
+    create_nudge(
+        db,
+        user,
+        "statement_received",
+        TITLES["statement_received"],
+        random.choice(MESSAGES["statement_received"]).format(bank_name=bank_name),
+        context={"bank_name": bank_name},
     )
+    db.commit()
 
 
-def send_statement_processed_push(user: User, bank_name: str, imported: int, updated: int) -> None:
+def send_statement_processed_push(
+    db: Session, user: User, bank_name: str, imported: int, updated: int
+) -> None:
     """Fire-and-forget push: statement fully imported."""
-    from app.services.push_service import send_push_notification
-
-    if not user.expo_push_token:
+    if not can_send_nudge(db, user, "statement_processed"):
         return
-    send_push_notification(
-        token=user.expo_push_token,
-        title=TITLES["statement_processed"],
-        body=random.choice(MESSAGES["statement_processed"]).format(
+    create_nudge(
+        db,
+        user,
+        "statement_processed",
+        TITLES["statement_processed"],
+        random.choice(MESSAGES["statement_processed"]).format(
             bank_name=bank_name, imported=imported, updated=updated
         ),
-        data={"trigger_type": "statement_processed", "imported": imported, "updated": updated},
+        context={"bank_name": bank_name, "imported": imported, "updated": updated},
     )
+    db.commit()
 
 
-def send_receipt_received_push(user: User, bank_name: str) -> None:
+def send_receipt_received_push(db: Session, user: User, bank_name: str) -> None:
     """Fire-and-forget push: receipt image received, processing in background."""
-    from app.services.push_service import send_push_notification
-
-    if not user.expo_push_token:
+    if not can_send_nudge(db, user, "receipt_received"):
         return
-    send_push_notification(
-        token=user.expo_push_token,
-        title=TITLES["receipt_received"],
-        body=random.choice(MESSAGES["receipt_received"]).format(bank_name=bank_name),
-        data={"trigger_type": "receipt_received"},
+    create_nudge(
+        db,
+        user,
+        "receipt_received",
+        TITLES["receipt_received"],
+        random.choice(MESSAGES["receipt_received"]).format(bank_name=bank_name),
+        context={"bank_name": bank_name},
     )
+    db.commit()
 
 
 def send_receipt_processed_push(
-    user: User, bank_name: str, amount_kobo: int, direction: str
+    db: Session,
+    user: User,
+    bank_name: str,
+    amount_kobo: int,
+    direction: str,
+    transaction_id: str,
 ) -> None:
     """Fire-and-forget push: receipt transaction fully imported.
 
@@ -431,51 +447,64 @@ def send_receipt_processed_push(
         Absolute amount in kobo.
     direction:
         ``"credit"`` or ``"debit"``.
+    transaction_id:
+        ID of the imported transaction.
     """
-    from app.services.push_service import send_push_notification
-
-    if not user.expo_push_token:
+    if not can_send_nudge(db, user, "receipt_processed"):
         return
     amount_naira = f"{abs(amount_kobo) / 100:,.2f}"
-    send_push_notification(
-        token=user.expo_push_token,
-        title=TITLES["receipt_processed"],
-        body=random.choice(MESSAGES["receipt_processed"]).format(
+    create_nudge(
+        db,
+        user,
+        "receipt_processed",
+        TITLES["receipt_processed"],
+        random.choice(MESSAGES["receipt_processed"]).format(
             bank_name=bank_name, amount_naira=amount_naira, direction=direction
         ),
-        data={"trigger_type": "receipt_processed"},
+        context={
+            "bank_name": bank_name,
+            "amount_kobo": amount_kobo,
+            "amount_naira": amount_naira,
+            "direction": direction,
+            "transaction_id": transaction_id,
+        },
+        push_data={"transaction_id": transaction_id},
     )
+    db.commit()
 
 
 def send_receipt_duplicate_push(
+    db: Session,
     user: User,
     bank_name: str,
     amount_kobo: int,
+    transaction_id: str,
 ) -> None:
     """Fire-and-forget push: receipt was a duplicate of an existing transaction."""
-    from app.services.push_service import send_push_notification
-
-    if not user.expo_push_token:
+    if not can_send_nudge(db, user, "receipt_duplicate"):
         return
     amount_naira = f"{abs(amount_kobo) / 100:,.2f}"
-    body = random.choice(MESSAGES["receipt_duplicate"]).format(
-        bank_name=bank_name, amount_naira=amount_naira
+    create_nudge(
+        db,
+        user,
+        "receipt_duplicate",
+        TITLES["receipt_duplicate"],
+        random.choice(MESSAGES["receipt_duplicate"]).format(
+            bank_name=bank_name, amount_naira=amount_naira
+        ),
+        context={
+            "bank_name": bank_name,
+            "amount_kobo": amount_kobo,
+            "amount_naira": amount_naira,
+            "transaction_id": transaction_id,
+        },
+        push_data={"transaction_id": transaction_id},
     )
-    send_push_notification(
-        token=user.expo_push_token,
-        title=TITLES["receipt_duplicate"],
-        body=body,
-        data={"trigger_type": "receipt_duplicate"},
-    )
-    logger.debug(
-        "send_receipt_duplicate_push: sent to user=%s bank=%s amount=%d",
-        user.id,
-        bank_name,
-        amount_kobo,
-    )
+    db.commit()
 
 
 def send_receipt_failed_push(
+    db: Session,
     user: User,
     reason: str,
     bank_name: str = "",
@@ -491,56 +520,43 @@ def send_receipt_failed_push(
         Display name of the identified bank, if known.  May be empty when
         the receipt could not be identified at all.
     """
-    from app.services.push_service import send_push_notification
-
-    if not user.expo_push_token:
+    if not can_send_nudge(db, user, "receipt_failed"):
         return
-
     reasons = RECEIPT_FAILED_MESSAGES
     template: str = reasons.get(reason, reasons["unrecognised"])
     body = template.format(bank_name=bank_name) if bank_name else template.split(".")[0] + "."
-
-    send_push_notification(
-        token=user.expo_push_token,
-        title=TITLES["receipt_failed"],
-        body=body,
-        data={"trigger_type": "receipt_failed", "reason": reason},
+    create_nudge(
+        db,
+        user,
+        "receipt_failed",
+        TITLES["receipt_failed"],
+        body,
+        context={"reason": reason, "bank_name": bank_name},
     )
-    logger.debug(
-        "send_receipt_failed_push: sent to user=%s reason=%s bank=%s",
-        user.id,
-        reason,
-        bank_name,
-    )
+    db.commit()
 
 
-def send_statement_failed_push(user: User, bank_name: str) -> None:
+def send_statement_failed_push(db: Session, user: User, bank_name: str) -> None:
     """Fire-and-forget push: statement processing failed.
 
     Sent when the statement PDF cannot be parsed (wrong format, corrupted,
     or unsupported bank variant).  Always includes the bank name so the
     user knows which file to re-download.
     """
-    from app.services.push_service import send_push_notification
-
-    if not user.expo_push_token:
+    if not can_send_nudge(db, user, "statement_failed"):
         return
-
-    body = random.choice(MESSAGES["statement_failed"]).format(bank_name=bank_name)
-    send_push_notification(
-        token=user.expo_push_token,
-        title=TITLES["statement_failed"],
-        body=body,
-        data={"trigger_type": "statement_failed"},
+    create_nudge(
+        db,
+        user,
+        "statement_failed",
+        TITLES["statement_failed"],
+        random.choice(MESSAGES["statement_failed"]).format(bank_name=bank_name),
+        context={"bank_name": bank_name},
     )
-    logger.debug(
-        "send_statement_failed_push: sent to user=%s bank=%s",
-        user.id,
-        bank_name,
-    )
+    db.commit()
 
 
-def evaluate_transaction_nudges(db, tx: Transaction) -> None:
+def evaluate_transaction_nudges(db: Session, tx: Transaction) -> None:
     """
     Evaluate all nudge triggers for a newly categorized transaction and create
     any applicable Nudge rows.
