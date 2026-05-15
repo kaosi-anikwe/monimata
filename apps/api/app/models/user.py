@@ -17,10 +17,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -73,6 +73,8 @@ class User(Base):
     expo_push_token: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # Expo push token ("ExponentPushToken[...]"); NULL = notifications not granted
+    streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_streak_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # relationships
     bank_accounts: Mapped[list[BankAccount]] = relationship(

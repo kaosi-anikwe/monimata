@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import hmac
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -65,6 +65,30 @@ from app.services.budget_logic import seed_default_categories
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ── Streak helper ─────────────────────────────────────────────────────────────
+
+
+def _update_streak(user: User) -> None:
+    """
+    Increment the user's daily-open streak.
+
+    Rules (all dates in UTC):
+      - Same day as last_streak_date  → no change (already counted today).
+      - Exactly one day after         → streak += 1.
+      - Any longer gap, or first ever → streak resets to 1.
+
+    The caller is responsible for db.commit().
+    """
+    today: date = datetime.now(UTC).date()
+    if user.last_streak_date == today:
+        return
+    if user.last_streak_date == today - timedelta(days=1):
+        user.streak += 1
+    else:
+        user.streak = 1
+    user.last_streak_date = today
 
 
 # ── POST /auth/register ───────────────────────────────────────────────────────
@@ -168,6 +192,9 @@ async def refresh_token(
     delete_refresh_token(user_id)
     new_refresh = create_refresh_token()
     store_refresh_token(user.id, new_refresh)
+
+    _update_streak(user)
+    db.commit()
 
     access_token = create_access_token(subject=user.id)
     return AccessTokenResponse(access_token=access_token, refresh_token=new_refresh)

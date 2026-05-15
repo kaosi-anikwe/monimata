@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -131,6 +131,8 @@ class UserResponse(BaseModel):
     phone: str | None
     identity_verified: bool
     onboarded: bool
+    streak: int
+    last_streak_date: date | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
