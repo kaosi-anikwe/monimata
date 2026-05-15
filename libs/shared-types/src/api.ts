@@ -45,9 +45,45 @@ export interface paths {
      * @description Real-time uniqueness check for use during signup.
      * Returns {"available": true} when the username is valid and not yet taken.
      * No authentication required — called as the user types.
-     * Rate-limited by the API gateway / Nginx upstream.
      */
     get: operations["check_username_auth_check_username_get"];
+  };
+  "/auth/forgot-password": {
+    /**
+     * Forgot Password
+     * @description Step 1 of the password-reset flow.
+     *
+     * Generates a 6-digit OTP, stores it in Redis for 10 minutes, and emails it
+     * to the user.  Always returns 200 regardless of whether the email is
+     * registered — this prevents user enumeration.
+     *
+     * Rate-limited to 5/hour per IP via slowapi.
+     */
+    post: operations["forgot_password_auth_forgot_password_post"];
+  };
+  "/auth/verify-reset-code": {
+    /**
+     * Verify Reset Code
+     * @description Step 2 of the password-reset flow.
+     *
+     * Verifies the OTP sent in step 1.  On success the OTP is consumed (deleted)
+     * and a single-use reset token valid for 15 minutes is returned.  The client
+     * presents this token in step 3 instead of the raw OTP.
+     *
+     * Rate-limited to 10/hour per IP via slowapi.
+     */
+    post: operations["verify_reset_code_auth_verify_reset_code_post"];
+  };
+  "/auth/reset-password": {
+    /**
+     * Reset Password
+     * @description Step 3 of the password-reset flow.
+     *
+     * Validates the reset token issued in step 2, updates the user's password,
+     * consumes the reset token (single-use), and revokes all active refresh
+     * tokens — forcing a fresh login after the reset completes.
+     */
+    post: operations["reset_password_auth_reset_password_post"];
   };
   "/accounts/supported-banks": {
     /**
@@ -308,7 +344,7 @@ export interface paths {
     /**
      * Push
      * @description Process client-side writes for all six WatermelonDB tables.
-     * Rate-limited to 60 pushes per user per minute.
+     * Rate-limited to 60 pushes per user per minute via slowapi.
      */
     post: operations["push_sync_push_post"];
   };
@@ -716,6 +752,14 @@ export interface components {
       /** Is Hidden */
       is_hidden?: boolean | null;
     };
+    /** ForgotPasswordRequest */
+    ForgotPasswordRequest: {
+      /**
+       * Email
+       * Format: email
+       */
+      email: string;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -977,6 +1021,18 @@ export interface components {
       /** Phone */
       phone?: string | null;
     };
+    /** ResetPasswordRequest */
+    ResetPasswordRequest: {
+      /** Reset Token */
+      reset_token: string;
+      /** New Password */
+      new_password: string;
+    };
+    /** ResetTokenResponse */
+    ResetTokenResponse: {
+      /** Reset Token */
+      reset_token: string;
+    };
     /** SupportedBankResponse */
     SupportedBankResponse: {
       /** Slug */
@@ -1218,6 +1274,16 @@ export interface components {
       /** Context */
       ctx?: Record<string, never>;
     };
+    /** VerifyResetCodeRequest */
+    VerifyResetCodeRequest: {
+      /**
+       * Email
+       * Format: email
+       */
+      email: string;
+      /** Code */
+      code: string;
+    };
   };
   responses: never;
   parameters: never;
@@ -1357,7 +1423,6 @@ export interface operations {
    * @description Real-time uniqueness check for use during signup.
    * Returns {"available": true} when the username is valid and not yet taken.
    * No authentication required — called as the user types.
-   * Rate-limited by the API gateway / Nginx upstream.
    */
   check_username_auth_check_username_get: {
     parameters: {
@@ -1373,6 +1438,97 @@ export interface operations {
             [key: string]: boolean;
           };
         };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Forgot Password
+   * @description Step 1 of the password-reset flow.
+   *
+   * Generates a 6-digit OTP, stores it in Redis for 10 minutes, and emails it
+   * to the user.  Always returns 200 regardless of whether the email is
+   * registered — this prevents user enumeration.
+   *
+   * Rate-limited to 5/hour per IP via slowapi.
+   */
+  forgot_password_auth_forgot_password_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ForgotPasswordRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: string;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Verify Reset Code
+   * @description Step 2 of the password-reset flow.
+   *
+   * Verifies the OTP sent in step 1.  On success the OTP is consumed (deleted)
+   * and a single-use reset token valid for 15 minutes is returned.  The client
+   * presents this token in step 3 instead of the raw OTP.
+   *
+   * Rate-limited to 10/hour per IP via slowapi.
+   */
+  verify_reset_code_auth_verify_reset_code_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VerifyResetCodeRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ResetTokenResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Reset Password
+   * @description Step 3 of the password-reset flow.
+   *
+   * Validates the reset token issued in step 2, updates the user's password,
+   * consumes the reset token (single-use), and revokes all active refresh
+   * tokens — forcing a fresh login after the reset completes.
+   */
+  reset_password_auth_reset_password_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ResetPasswordRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        content: never;
       };
       /** @description Validation Error */
       422: {
@@ -2425,7 +2581,7 @@ export interface operations {
   /**
    * Push
    * @description Process client-side writes for all six WatermelonDB tables.
-   * Rate-limited to 60 pushes per user per minute.
+   * Rate-limited to 60 pushes per user per minute via slowapi.
    */
   push_sync_push_post: {
     parameters: {
