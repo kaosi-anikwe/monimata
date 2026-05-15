@@ -121,6 +121,45 @@ function processQueue(error: unknown, token: string | null) {
     failedQueue = [];
 }
 
+/**
+ * Shared token-refresh logic used by both authFetch and the XHR upload helpers.
+ *
+ * Integrates with the module-level refresh queue so concurrent callers
+ * (fetch + XHR) never trigger more than one /auth/refresh round-trip.
+ * On failure it clears tokens and invokes the logout handler.
+ */
+async function doTokenRefresh(): Promise<string> {
+    if (isRefreshing) {
+        return new Promise<string>((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+        });
+    }
+    isRefreshing = true;
+    try {
+        const storedRefresh = await getRefreshToken();
+        if (!storedRefresh) throw new Error('No refresh token stored');
+        const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: storedRefresh }),
+        });
+        if (!refreshRes.ok) throw new Error('Token refresh failed');
+        const tokens: { access_token: string; refresh_token: string } = await refreshRes.json();
+        _cachedAccessToken = tokens.access_token;
+        await SecureStore.setItemAsync(SECURE_KEYS.ACCESS_TOKEN, tokens.access_token);
+        await SecureStore.setItemAsync(SECURE_KEYS.REFRESH_TOKEN, tokens.refresh_token);
+        processQueue(null, tokens.access_token);
+        return tokens.access_token;
+    } catch (err) {
+        processQueue(err, null);
+        await clearTokens();
+        _onLogout?.();
+        throw err;
+    } finally {
+        isRefreshing = false;
+    }
+}
+
 // ── Custom fetch: auth header + silent 401 refresh ────────────────────────────
 // We normalise the input to (url string, init) immediately so that retrying
 // after a token refresh never reads an already-consumed Request body stream.
@@ -161,46 +200,14 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     const response = await fetch(url, { ...origInit, headers });
     if (response.status !== 401) return response;
 
-    // 401 — attempt silent refresh ────────────────────────────────────────────
-    if (isRefreshing) {
-        // Queue this call; it will be retried once the in-flight refresh settles.
-        return new Promise<string>((resolve, reject) => {
-            failedQueue.push({ resolve, reject });
-        }).then((newToken) => {
-            const retryHeaders = new Headers(origInit.headers);
-            retryHeaders.set('Authorization', `Bearer ${newToken}`);
-            return fetch(url, { ...origInit, headers: retryHeaders });
-        });
-    }
-
-    isRefreshing = true;
+    // 401 — attempt silent refresh via shared doTokenRefresh() ────────────────
     try {
-        const storedRefresh = await getRefreshToken();
-        if (!storedRefresh) throw new Error('No refresh token stored');
-
-        const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: storedRefresh }),
-        });
-        if (!refreshRes.ok) throw new Error('Token refresh failed');
-
-        const tokens: { access_token: string; refresh_token: string } = await refreshRes.json();
-        _cachedAccessToken = tokens.access_token;
-        await SecureStore.setItemAsync(SECURE_KEYS.ACCESS_TOKEN, tokens.access_token);
-        await SecureStore.setItemAsync(SECURE_KEYS.REFRESH_TOKEN, tokens.refresh_token);
-        processQueue(null, tokens.access_token);
-
+        const newToken = await doTokenRefresh();
         const retryHeaders = new Headers(origInit.headers);
-        retryHeaders.set('Authorization', `Bearer ${tokens.access_token}`);
+        retryHeaders.set('Authorization', `Bearer ${newToken}`);
         return fetch(url, { ...origInit, headers: retryHeaders });
-    } catch (err) {
-        processQueue(err, null);
-        await clearTokens();
-        _onLogout?.();
+    } catch {
         return response; // return the original 401 so callers see the failure
-    } finally {
-        isRefreshing = false;
     }
 }
 
@@ -220,3 +227,111 @@ export const $api = createQueryClient(client);
 
 export default client;
 
+// ── Receipt / Statement upload helpers ────────────────────────────────────────
+// Uses XMLHttpRequest rather than fetch so we can track upload progress.
+// Both functions handle 401 → token refresh → retry using the shared queue.
+
+export interface UploadReceiptFile {
+    uri: string;
+    mimeType: string;
+    name: string;
+}
+
+/**
+ * Low-level XHR POST helper.  Returns { status, responseText } so the
+ * caller can decide how to handle each status code.
+ * Progress fraction (0 → <1) is reported via onProgress; the caller is
+ * responsible for emitting the final 1 on success.
+ */
+function xhrSend(
+    url: string,
+    formData: FormData,
+    token: string | null,
+    onProgress: ((fraction: number) => void) | undefined,
+    timeout: number,
+): Promise<{ status: number; responseText: string }> {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = (e: ProgressEvent) => {
+            if (e.lengthComputable) onProgress?.(e.loaded / e.total);
+        };
+        xhr.onload = () => resolve({ status: xhr.status, responseText: xhr.responseText });
+        xhr.onerror = () => reject(new Error('Network error — check your connection.'));
+        xhr.ontimeout = () => reject(new Error('Upload timed out.'));
+        xhr.timeout = timeout;
+        xhr.send(formData);
+    });
+}
+
+/**
+ * POST multipart/form-data to /uploads/receipt with real upload-progress events.
+ * Automatically refreshes the access token on 401 and retries once.
+ *
+ * @param file       Local file info ({ uri, mimeType, name }).
+ * @param onProgress Callback receiving a fraction 0 → 1 as bytes transmit.
+ */
+export async function uploadReceipt(
+    file: UploadReceiptFile,
+    onProgress?: (fraction: number) => void,
+): Promise<void> {
+    let token = await getAccessToken().catch(() => null);
+    const fd = new FormData();
+    fd.append('file', { uri: file.uri, type: file.mimeType, name: file.name } as unknown as Blob);
+
+    let { status, responseText } = await xhrSend(`${BASE_URL}/uploads/receipt`, fd, token, onProgress, 60_000);
+
+    if (status === 401) {
+        token = await doTokenRefresh(); // throws → clears tokens + logout on failure
+        ({ status, responseText } = await xhrSend(`${BASE_URL}/uploads/receipt`, fd, token, onProgress, 60_000));
+    }
+
+    if (status === 202 || status === 200) {
+        onProgress?.(1);
+    } else {
+        throw new Error(responseText || `HTTP ${status}`);
+    }
+}
+
+/**
+ * POST multipart/form-data to /uploads/statement with real upload-progress events.
+ * Automatically refreshes the access token on 401 and retries once.
+ *
+ * The server identifies the bank account from the PDF itself — no account_id needed.
+ * Returns immediately (202); transactions are imported asynchronously.
+ * Rejects with StatementAccountNotFoundError on 404.
+ *
+ * @param file       Local file info ({ uri, mimeType, name }). Must be application/pdf.
+ * @param onProgress Callback receiving a fraction 0 → 1 as bytes transmit.
+ */
+export class StatementAccountNotFoundError extends Error {
+    constructor() {
+        super('Account not found — make sure this bank account is added to MoniMata.');
+        this.name = 'StatementAccountNotFoundError';
+    }
+}
+
+export async function uploadStatement(
+    file: UploadReceiptFile,
+    onProgress?: (fraction: number) => void,
+): Promise<void> {
+    let token = await getAccessToken().catch(() => null);
+    const fd = new FormData();
+    fd.append('file', { uri: file.uri, type: file.mimeType, name: file.name } as unknown as Blob);
+
+    let { status, responseText } = await xhrSend(`${BASE_URL}/uploads/statement`, fd, token, onProgress, 120_000);
+
+    if (status === 401) {
+        token = await doTokenRefresh();
+        ({ status, responseText } = await xhrSend(`${BASE_URL}/uploads/statement`, fd, token, onProgress, 120_000));
+    }
+
+    if (status === 202 || status === 200) {
+        onProgress?.(1);
+    } else if (status === 404) {
+        throw new StatementAccountNotFoundError();
+    } else {
+        throw new Error(responseText || `HTTP ${status}`);
+    }
+}

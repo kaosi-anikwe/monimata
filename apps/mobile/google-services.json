@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:512673962306:android:67b8efec79963f83d150db",
+        "mobilesdk_app_id": "1:512673962306:android:d28e9a44c142d5bdd150db",
         "android_client_info": {
-          "package_name": "ng.com.monimata"
+          "package_name": "ng.monimata"
         }
       },
       "oauth_client": [],

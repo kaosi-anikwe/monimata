@@ -31,34 +31,34 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Badge, BottomSheet, Button, EmptyState, ListRow, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
-import { radius, shadow, spacing } from '@/lib/tokens';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import type { Nudge, NudgeTriggerType } from '@monimata/shared-types';
 import {
-    useDismissNudge,
-    useMarkAllNudgesRead,
-    useNudges,
-    useOpenNudge,
+  useDismissNudge,
+  useMarkAllNudgesRead,
+  useNudges,
+  useOpenNudge,
 } from '../../hooks/useNudges';
 import type {
-    BillPaymentContext,
-    LargeSingleTxContext,
-    PayReceivedContext,
-    Threshold100Context,
-    Threshold80Context,
+  BillPaymentContext,
+  LargeSingleTxContext,
+  PayReceivedContext,
+  Threshold100Context,
+  Threshold80Context,
 } from '../../types/nudge';
 
 
@@ -440,7 +440,7 @@ export default function NudgesScreen() {
   const handleCardPress = useCallback(
     (nudge: Nudge) => {
       if (!nudge.is_opened) {
-      openNudge.mutate({ params: { path: { nudge_id: nudge.id } } });
+        openNudge.mutate({ params: { path: { nudge_id: nudge.id } } });
       }
       setActiveNudge(nudge);
     },
@@ -510,7 +510,7 @@ export default function NudgesScreen() {
           renderItem={({ item }) => (
             <NudgeCard nudge={item} onPress={handleCardPress} />
           )}
-          contentContainerStyle={ss.list}
+          contentContainerStyle={[ss.list, { paddingBottom: layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.lg }]}
           ItemSeparatorComponent={() => <View style={ss.separator} />}
           refreshControl={
             <RefreshControl
@@ -553,7 +553,7 @@ const ss = StyleSheet.create({
     paddingHorizontal: 40,
     gap: 12,
   },
-  list: { paddingTop: 14, paddingBottom: 32, paddingHorizontal: 16 },
+  list: { paddingTop: 14, paddingHorizontal: 16 },
   separator: { height: 9 },
   // card
   card: {

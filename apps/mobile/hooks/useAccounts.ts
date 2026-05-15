@@ -22,6 +22,7 @@ import { $api } from '@/services/api';
 
 export interface AddManualAccountPayload {
   institution: string;
+  bank_slug: string;
   account_number: string;
   alias: string;
   account_type?: string;
@@ -42,6 +43,10 @@ export interface UpdateAliasPayload {
 
 export function useAccounts() {
   return $api.useQuery('get', '/accounts', {});
+}
+
+export function useSupportedBanks() {
+  return $api.useQuery('get', '/accounts/supported-banks', {});
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
