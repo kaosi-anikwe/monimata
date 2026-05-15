@@ -489,7 +489,7 @@ export default function TransactionsScreen() {
             </Svg>
             <TextInput
               style={[ss.searchInput, { color: colors.textPrimary }]}
-              placeholder="Search transactions…"
+              placeholder="Search by category, name, amount…"
               placeholderTextColor={colors.textTertiary}
               value={search}
               onChangeText={setSearch}

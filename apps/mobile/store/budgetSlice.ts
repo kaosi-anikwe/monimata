@@ -5,7 +5,7 @@ function currentMonthStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-interface BudgetState {
+export interface BudgetState {
   selectedMonth: string // "YYYY-MM"
 }
 

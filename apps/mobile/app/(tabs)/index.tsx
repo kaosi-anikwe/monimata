@@ -68,13 +68,6 @@ const HOME_TOUR: TourStep[] = [
     fallbackFullscreen: true,
   },
   {
-    targetId: 'home-all-accounts',
-    title: 'View your accounts',
-    body: 'Tap here to see all your bank accounts or add a manual account. Accounts lives in the More tab.',
-    tooltipSide: 'below',
-    fallbackFullscreen: true,
-  },
-  {
     targetId: 'home-this-month',
     title: 'This month at a glance',
     body: 'Total In is all the money you received this month. Total Out is everything you spent. Keep an eye on the gap!',
@@ -290,20 +283,7 @@ export default function HomeScreen() {
         {/* Balance card (.bal-card) — frosted glass, top-rounded only */}
         <TourTarget id="home-net-worth">
           <View style={s.balCard}>
-            <View style={s.balTop}>
-              <Text style={s.balLbl}>NET WORTH</Text>
-              <TourTarget id="home-all-accounts">
-                <TouchableOpacity
-                  style={s.balChip}
-                  onPress={() => router.push('/(tabs)/accounts')}
-                  activeOpacity={0.75}
-                  accessibilityRole="link"
-                  accessibilityLabel="View all accounts"
-                >
-                  <Text style={[s.balChipTxt, { color: colors.lime }]}>All accounts</Text>
-                </TouchableOpacity>
-              </TourTarget>
-            </View>
+            <Text style={s.balLbl}>NET WORTH</Text>
             <Text style={[s.balAmt, { color: colors.white }]}>
               {formatMoney(netWorth)}
             </Text>
@@ -611,11 +591,6 @@ const s = StyleSheet.create({
     padding: spacing.xl,
     paddingBottom: 18,
   },
-  balTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
   balLbl: {
     ...ff(600),
     fontSize: 11,
@@ -623,13 +598,6 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.5,
   },
-  balChip: {
-    backgroundColor: glass.chip,
-    borderRadius: radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  balChipTxt: { ...ff(700), fontSize: 11 },
   balAmt: {
     ...type_.display,
     marginTop: spacing.sm,

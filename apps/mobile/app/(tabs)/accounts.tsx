@@ -206,12 +206,6 @@ const bps = StyleSheet.create({
 
 const ACCOUNTS_TOUR: TourStep[] = [];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatBalanceDate(dateStr: string | null): string {
-  if (!dateStr) return '';
-  return `as of ${new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}`;
-}
 
 // ─── Add Manual Account Sheet ─────────────────────────────────────────────────
 
@@ -543,6 +537,10 @@ function UploadStatementSheet({ account, onClose }: UploadStatementSheetProps) {
     });
     if (result.canceled) return;
     const asset = result.assets[0];
+    if (asset.size !== undefined && asset.size > 5 * 1024 * 1024) {
+      error('File too large', 'Please select a PDF under 5 MB.');
+      return;
+    }
     setFile({ uri: asset.uri, name: asset.name, size: asset.size ?? undefined });
     setUploadState('idle');
     setProgress(0);
@@ -812,16 +810,6 @@ function AccountCard({ account, onMoreActions }: AccountCardProps) {
         <Text style={[ss.balanceAmt, { color: colors.textPrimary }]}>
           {formatNaira(account.balance)}
         </Text>
-        {account.balance_as_of && (
-          <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2, marginBottom: spacing.sm }]}>
-            {formatBalanceDate(account.balance_as_of)}
-          </Text>
-        )}
-
-        {/* Status */}
-        <View style={ss.syncStatusRow}>
-          <Text style={[type_.caption, { color: colors.textMeta }]}>Manual account</Text>
-        </View>
       </View>
 
       {/* Card footer */}
@@ -834,13 +822,6 @@ function AccountCard({ account, onMoreActions }: AccountCardProps) {
           },
         ]}
       >
-        <View style={ss.footerSyncInfo}>
-          <Text style={[type_.caption, { color: colors.textMeta }]}>
-            {account.balance_as_of
-              ? `Updated: ${formatBalanceDate(account.balance_as_of)}`
-              : 'Add transactions manually or via email alerts'}
-          </Text>
-        </View>
         <View style={ss.footerBtns}>
           <TouchableOpacity
             style={[ss.footerBtnMore, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
@@ -984,15 +965,6 @@ export default function AccountsScreen() {
             <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
               <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
               <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
-              <View style={ss.syncNote}>
-                <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                  <Path d="M23 4v6h-6M1 20v-6h6" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke={colors.textInverseFaint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-                <Text style={[ss.syncNoteTxt, { color: colors.textInverseFaint }]}>
-                  Syncs every 12 AM
-                </Text>
-              </View>
             </View>
 
             {/* ── Account cards ── */}
@@ -1003,24 +975,6 @@ export default function AccountsScreen() {
                 onMoreActions={() => setMoreAccount(account)}
               />
             ))}
-
-            {/* ── Add more prompt card ── */}
-            <View style={[ss.linkMoreCard, { backgroundColor: colors.darkGreen }]}>
-              {/* Radial glow overlay */}
-              <View style={[ss.linkMoreGlow, { backgroundColor: colors.limeGlow }]} />
-              <Text style={[ss.linkMoreTitle, { color: colors.textInverse }]}>Got another account?</Text>
-              <Text style={[ss.linkMoreSub, { color: colors.textInverseSecondary }]}>
-                Add your OPay, Zenith, or Access account for a complete picture of your money.
-              </Text>
-              <TouchableOpacity
-                style={[ss.linkMoreBtn, { backgroundColor: colors.lime }]}
-                onPress={() => setShowAddSheet(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Add another account"
-              >
-                <Text style={[ss.linkMoreBtnTxt, { color: colors.darkGreen }]}>Add Another Account</Text>
-              </TouchableOpacity>
-            </View>
 
             <View style={{ height: spacing.xxl + 60 }} />
           </>
@@ -1088,25 +1042,19 @@ const ss = StyleSheet.create({
   // Total Balance Card  — matches .tbb-card in HTML
   totalCard: {
     borderRadius: radius.md,
-    padding: spacing.mdn,
+    padding: spacing.xl,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.xs,
   },
   totalLbl: {
     ...type_.label,
     letterSpacing: 1.3,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.md,
   },
   totalAmt: {
     ...type_.display,
+    marginBottom: spacing.sm,
   },
-  syncNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingTop: spacing.sm,
-  },
-  syncNoteTxt: { ...type_.caption },
 
   // Global re-auth banner  — matches .reauth-banner
   globalReauthBanner: {
@@ -1171,12 +1119,11 @@ const ss = StyleSheet.create({
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.smd,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  footerSyncInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },
   footerBtns: { flexDirection: 'row', gap: spacing.xs },
   footerBtn: {
     flexDirection: 'row',
@@ -1197,40 +1144,6 @@ const ss = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.xs,
   },
-
-  // Link more card  — matches .link-more-card
-  linkMoreCard: {
-    borderRadius: radius.md,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.smd,
-    padding: spacing.lg,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  linkMoreGlow: {
-    position: 'absolute',
-    right: -20,
-    top: -20,
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-  },
-  linkMoreTitle: {
-    ...type_.userName,
-    marginBottom: spacing.xs,
-  },
-  linkMoreSub: {
-    ...type_.small,
-    marginBottom: spacing.md,
-    lineHeight: 18,
-  },
-  linkMoreBtn: {
-    alignSelf: 'flex-start',
-    borderRadius: spacing.smd,
-    paddingVertical: 9,
-    paddingHorizontal: spacing.lg,
-  },
-  linkMoreBtnTxt: { ...type_.btnSm },
 
   // Empty state
   emptyWrap: {

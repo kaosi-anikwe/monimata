@@ -56,7 +56,7 @@ import { ThemeProvider } from '@/lib/ThemeProvider';
 import { radius, spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
 import { setLogoutHandler, uploadReceipt } from '@/services/api';
-import { store } from '@/store';
+import { store, type RootState } from '@/store';
 import { clearAuth, restoreSession } from '@/store/authSlice';
 import { syncToCurrentMonth } from '@/store/budgetSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -82,7 +82,7 @@ const queryClient = new QueryClient({
 
 function RootNavigator() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, loading, isInitialised, user } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, loading, isInitialised, user } = useAppSelector((s: RootState) => s.auth);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const router = useRouter();
 

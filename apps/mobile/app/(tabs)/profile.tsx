@@ -19,15 +19,15 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -52,6 +52,7 @@ export default function ProfileScreen() {
   const ss = makeStyles(colors);
 
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((s) => s.auth);
   const { confirm, info } = useToast();
@@ -97,19 +98,31 @@ export default function ProfileScreen() {
         ]}
       >
         {/* Avatar + name + email */}
-        <View style={ss.avWrap}>
-          <Avatar
-            name={user ? `${user.first_name} ${user.last_name}` : undefined}
-            size="lg"
-          />
-          <View>
-            <Text style={[ss.profName, { color: colors.white }]}>
-              {user ? `${user.first_name} ${user.last_name}` : 'Hey there'}
-            </Text>
-            {user?.email ? (
-              <Text style={[ss.profEmail, { color: colors.textInverseFaint }]}>{user.email}</Text>
-            ) : null}
+        <View style={ss.hdrTopRow}>
+          <View style={ss.avWrap}>
+            <Avatar
+              name={user ? `${user.first_name} ${user.last_name}` : undefined}
+              size="lg"
+            />
+            <View>
+              <Text style={[ss.profName, { color: colors.white }]}>
+                {user ? `${user.first_name} ${user.last_name}` : 'Hey there'}
+              </Text>
+              {user?.email ? (
+                <Text style={[ss.profEmail, { color: colors.textInverseFaint }]}>{user.email}</Text>
+              ) : null}
+            </View>
           </View>
+          {navigation.canGoBack() && (
+            <TouchableOpacity
+              style={ss.backBtn}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="arrow-back" size={18} color={colors.white} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Gamification badge pills */}
@@ -307,7 +320,23 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
+    },
+    hdrTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       marginBottom: spacing.md,
+    },
+    backBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'flex-start',
     },
     profName: { ...ff(800), fontSize: 19, letterSpacing: -0.3 },
     profEmail: { ...type_.bodyReg, marginTop: 1 },
