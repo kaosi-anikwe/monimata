@@ -15,7 +15,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import { configureStore } from '@reduxjs/toolkit';
+import type { AuthState } from './authSlice';
 import authReducer from './authSlice';
+import type { BudgetState } from './budgetSlice';
 import budgetReducer from './budgetSlice';
 
 export const store = configureStore({
@@ -25,5 +27,8 @@ export const store = configureStore({
     },
 });
 
-export type RootState = ReturnType<typeof store.getState>;
+export interface RootState {
+    auth: AuthState;
+    budget: BudgetState;
+}
 export type AppDispatch = typeof store.dispatch;

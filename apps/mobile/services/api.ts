@@ -265,6 +265,23 @@ function xhrSend(
     });
 }
 
+/** Extracts a human-readable message from a FastAPI error body.
+ * Non-validation errors:  { detail: string }
+ * Validation errors:      { detail: [{msg, …}, …] }
+ */
+function parseErrorMessage(responseText: string): string {
+    try {
+        const body = JSON.parse(responseText);
+        if (typeof body?.detail === 'string') return body.detail;
+        if (Array.isArray(body?.detail)) {
+            return (body.detail as { msg: string }[]).map((d) => d.msg).join(', ');
+        }
+    } catch {
+        // not valid JSON — fall through to raw text
+    }
+    return responseText;
+}
+
 /**
  * POST multipart/form-data to /uploads/receipt with real upload-progress events.
  * Automatically refreshes the access token on 401 and retries once.
@@ -290,7 +307,7 @@ export async function uploadReceipt(
     if (status === 202 || status === 200) {
         onProgress?.(1);
     } else {
-        throw new Error(responseText || `HTTP ${status}`);
+        throw new Error(parseErrorMessage(responseText) || `HTTP ${status}`);
     }
 }
 
@@ -332,6 +349,6 @@ export async function uploadStatement(
     } else if (status === 404) {
         throw new StatementAccountNotFoundError();
     } else {
-        throw new Error(responseText || `HTTP ${status}`);
+        throw new Error(parseErrorMessage(responseText) || `HTTP ${status}`);
     }
 }

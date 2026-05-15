@@ -69,9 +69,9 @@ export default function TabsLayout() {
         <Tabs.Screen name="budget" options={{ title: 'Budget' }} />
         <Tabs.Screen name="transactions" options={{ title: 'Transactions' }} />
         <Tabs.Screen name="nudges" options={{ title: 'Nudges' }} />
+        <Tabs.Screen name="accounts" options={{ title: 'Accounts' }} />
 
         {/* ── Hidden — accessible via router.push() ────────────────────── */}
-        <Tabs.Screen name="accounts" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
         <Tabs.Screen name="hub" options={{ href: null }} />
         <Tabs.Screen name="rewards" options={{ href: null }} />

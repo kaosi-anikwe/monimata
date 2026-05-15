@@ -302,6 +302,18 @@ export default function AddTransactionScreen() {
   const [memo, setMemo] = useState('');
   const [recurrence, setRecurrence] = useState<typeof RECURRENCE_OPTIONS[number] | null>(null);
 
+  const caretOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const blink = Animated.loop(
+      Animated.sequence([
+        Animated.timing(caretOpacity, { toValue: 0, duration: 530, useNativeDriver: true }),
+        Animated.timing(caretOpacity, { toValue: 1, duration: 530, useNativeDriver: true }),
+      ])
+    );
+    blink.start();
+    return () => blink.stop();
+  }, [caretOpacity]);
+
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showRecurrencePicker, setShowRecurrencePicker] = useState(false);
@@ -404,6 +416,7 @@ export default function AddTransactionScreen() {
           <View style={ss.amtRow}>
             <Text style={[ss.amtSym, { color: amountColor }]}>₦</Text>
             <Text style={[ss.amtNum, { color: amountColor }]}>{formatAmountDisplay(amountStr)}</Text>
+            <Animated.View style={[ss.caret, { backgroundColor: amountColor, opacity: caretOpacity }]} />
           </View>
           <Text style={[type_.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
             Enter amount using keypad below
@@ -624,7 +637,8 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
   },
-  amtRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  amtRow: { flexDirection: 'row', alignItems: 'center' },
+  caret: { width: 3, height: 46, borderRadius: 1.5, marginLeft: 3 },
   amtSym: { ...ff(800), fontSize: 20, lineHeight: 52, marginRight: 2 },
   amtNum: { ...ff(800), fontSize: 48, letterSpacing: -2 },
   formCard: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },

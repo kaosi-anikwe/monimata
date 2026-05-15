@@ -71,6 +71,7 @@ const TABS: TabConfig[] = [
   { routeName: 'budget', label: 'Budget', icon: 'card-outline', iconActive: 'card' },
   { routeName: 'transactions', label: 'Transactions', icon: 'document-text-outline', iconActive: 'document-text' },
   { routeName: 'nudges', label: 'Nudges', icon: 'notifications-outline', iconActive: 'notifications' },
+  { routeName: 'accounts', label: 'Accounts', icon: 'wallet-outline', iconActive: 'wallet' },
 ] as const;
 
 // ─── Tab item ─────────────────────────────────────────────────────────────────
@@ -148,7 +149,7 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
   const activeRouteName = state.routes[state.index]?.name ?? '';
 
   // Only render on the four nav-bar pages; all others manage their own chrome.
-  const NAV_TABS = new Set(['index', 'budget', 'transactions', 'nudges']);
+  const NAV_TABS = new Set(['index', 'budget', 'transactions', 'nudges', 'accounts']);
   if (!NAV_TABS.has(activeRouteName)) return null;
 
   // Minimum bottom inset of 4 pt so the bar doesn't look cramped on devices
@@ -217,6 +218,12 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
           badge={nudgeUnread}
           colors={colors}
         />
+        <TabItem
+          config={TABS[4]}
+          isActive={activeRouteName === 'accounts'}
+          onPress={() => handleTabPress('accounts')}
+          colors={colors}
+        />
       </View>
     </View>
   );
@@ -243,7 +250,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     height: layout.tabBarHeight,
     alignItems: 'flex-start',
-    paddingTop: spacing.smd,
+    paddingTop: spacing.xl,
   },
 
   tabItem: {

@@ -35,13 +35,13 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { scheduleOnRN } from 'react-native-worklets';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { useTheme } from '@/lib/theme';
 import { layout, spacing } from '@/lib/tokens';
@@ -263,7 +263,7 @@ const s = StyleSheet.create({
   title: {
     ...type_.h2,
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.smd,
+    paddingVertical: spacing.md,
   },
   subtitle: {
     ...type_.bodyReg,

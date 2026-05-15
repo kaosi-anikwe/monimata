@@ -470,7 +470,7 @@ export default function NudgesScreen() {
             accessibilityRole="button"
             accessibilityLabel="Mark all nudges as read"
           >
-            <Text style={[ss.markAllText, { color: colors.lime }]}>Mark all</Text>
+            <Text style={[ss.markAllText, { color: colors.lime }]}>Read all</Text>
           </TouchableOpacity>
         }
         paddingTop={insets.top + 16}

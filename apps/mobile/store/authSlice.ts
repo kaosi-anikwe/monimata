@@ -30,7 +30,7 @@ export interface AuthUser {
     onboarded: boolean;
 }
 
-interface AuthState {
+export interface AuthState {
     user: AuthUser | null;
     isAuthenticated: boolean;
     /** True once the initial restoreSession check has settled (success or failure). */
