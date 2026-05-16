@@ -52,7 +52,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AiMonitorPanel } from '@/components/categorization/AiMonitorPanel';
+import { AiMonitorPanel, AiMonitorPanelSkeleton } from '@/components/categorization/AiMonitorPanel';
 import { useToast } from '@/components/Toast';
 import { Badge, BottomSheet, Button, Chip, EmptyState, ScreenHeader, SectionHeader } from '@/components/ui';
 import {
@@ -66,6 +66,7 @@ import {
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
+import { Ionicons } from '@expo/vector-icons';
 import type { components } from '@monimata/shared-types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -103,7 +104,7 @@ export default function AiSettingsScreen() {
   const { confirm, success: showSuccess, error: showError } = useToast();
 
   const { data: credentials = [], isLoading: credsLoading } = useAiCredentials();
-  const { data: usageData } = useAiUsage();
+  const { data: usageData, isLoading: usageLoading } = useAiUsage();
   const { data: clustersData } = useClusters();
 
   const addMutation = useAddAiCredential();
@@ -203,7 +204,7 @@ export default function AiSettingsScreen() {
 
         {!credsLoading && credentials.length === 0 ? (
           <EmptyState
-            emoji="🔑"
+            icon={<Ionicons name="key-outline" size={36} color={colors.textMeta} />}
             title="No AI provider connected"
             body="Add a key to enable Tier 3 categorisation for transactions the offline engine can't match."
             style={ss.credEmptyState}
@@ -263,7 +264,7 @@ export default function AiSettingsScreen() {
         </View>
 
         {/* ── Section C: AI Efficiency Monitor ── */}
-        {usageData && (
+        {(usageData || usageLoading) && (
           <>
             <SectionHeader
               title="Efficiency Monitor"
@@ -272,7 +273,7 @@ export default function AiSettingsScreen() {
               style={ss.sectionHeader}
             />
             <View style={ss.monitorWrap}>
-              <AiMonitorPanel data={usageData} />
+              {usageData ? <AiMonitorPanel data={usageData} /> : <AiMonitorPanelSkeleton />}
             </View>
           </>
         )}

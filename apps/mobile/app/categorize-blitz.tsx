@@ -52,6 +52,7 @@ import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCategorizeCluster, useClusters } from '@/hooks/useCategorization';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
+import { Ionicons } from '@expo/vector-icons';
 
 // ─── CategorizeBlitzScreen ───────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ export default function CategorizeBlitzScreen() {
   const insets = useSafeAreaInsets();
   const { error: showError } = useToast();
 
-  const { data, isLoading } = useClusters();
+  const { data, isLoading, isError, refetch } = useClusters();
   const { data: groups = [] } = useCategoryGroups();
   const categorizeMutation = useCategorizeCluster();
 
@@ -129,6 +130,7 @@ export default function CategorizeBlitzScreen() {
               next.delete(clusterKey);
               return next;
             });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             showError('Error', 'Could not categorise. Please try again.');
           },
         },
@@ -155,6 +157,7 @@ export default function CategorizeBlitzScreen() {
 
   const isEmpty =
     !isLoading &&
+    !isError &&
     data !== undefined &&
     (data.total_uncategorised === 0 || visibleClusters.length === 0);
 
@@ -176,10 +179,23 @@ export default function CategorizeBlitzScreen() {
             <ClusterCardSkeleton key={i} />
           ))}
         </ScrollView>
+      ) : isError ? (
+        /* ── Network error state ── */
+        <EmptyState
+          icon={<Ionicons name="cloud-offline-outline" size={36} color={colors.textMeta} />}
+          title="Couldn't load clusters"
+          body="Check your connection and try again."
+          action={{
+            label: 'Retry',
+            onPress: () => refetch(),
+            variant: 'green',
+          }}
+          style={ss.emptyState}
+        />
       ) : isEmpty ? (
         /* ── Empty / all-done state ── */
         <EmptyState
-          emoji="✅"
+          icon={<Ionicons name="checkmark-circle-outline" size={36} color={colors.success} />}
           title="All caught up!"
           body="Every merchant has been categorised."
           action={{

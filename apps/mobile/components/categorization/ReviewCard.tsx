@@ -39,7 +39,7 @@
  */
 
 import * as Haptics from 'expo-haptics';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -47,7 +47,9 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { Badge, Chip } from '@/components/ui';
@@ -335,5 +337,65 @@ const ss = StyleSheet.create({
   },
   chip: {
     // Chip sizes itself by content.
+  },
+});
+
+// ─── ReviewCardSkeleton ───────────────────────────────────────────────────────
+
+/** Pulsing placeholder shown while the review queue is loading. */
+export function ReviewCardSkeleton() {
+  const colors = useTheme();
+  const opacity = useSharedValue(0.45);
+
+  useEffect(() => {
+    opacity.value = withRepeat(withTiming(1, { duration: 750 }), -1, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <View
+      style={[
+        skelSs.card,
+        shadow.md,
+        { backgroundColor: colors.cardBg, marginHorizontal: spacing.xl },
+      ]}
+    >
+      <Animated.View style={pulseStyle}>
+        {/* Amount placeholder */}
+        <View style={[skelSs.line, { width: '45%', height: spacing.xxxl, backgroundColor: colors.surfaceElevated }]} />
+        {/* Narration placeholder */}
+        <View style={[skelSs.line, { width: '90%', height: spacing.lg, marginTop: spacing.md, backgroundColor: colors.surface }]} />
+        <View style={[skelSs.line, { width: '65%', height: spacing.lg, marginTop: spacing.sm, backgroundColor: colors.surface }]} />
+        {/* Meta placeholder */}
+        <View style={[skelSs.line, { width: '50%', height: spacing.md, marginTop: spacing.sm, backgroundColor: colors.surface }]} />
+        {/* Suggestion chips placeholder */}
+        <View style={[skelSs.chipsRow, { marginTop: spacing.xl }]}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={[skelSs.chip, { backgroundColor: colors.surface }]} />
+          ))}
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+const skelSs = StyleSheet.create({
+  card: {
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+  },
+  line: {
+    borderRadius: radius.xs,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  chip: {
+    height: spacing.xl + spacing.sm,
+    width: spacing.xxxl + spacing.xxxl,
+    borderRadius: radius.xs,
   },
 });
