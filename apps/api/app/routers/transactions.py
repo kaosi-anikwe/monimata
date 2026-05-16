@@ -61,22 +61,6 @@ def _get_tx_or_404(db: Session, tx_id: str, user_id: str) -> Transaction:
     return tx
 
 
-def _recalculate_budget_activity(db: Session, tx: Transaction, old_category_id: str | None) -> None:
-    """
-    When a transaction's category changes, subtract its amount from the OLD
-    budget month and add to the NEW one.
-    """
-    month_str = tx.date.strftime("%Y-%m")
-
-    if old_category_id:
-        old_bm = get_or_create_budget_month(db, str(tx.user_id), old_category_id, month_str)
-        old_bm.activity -= tx.amount  # undo the previous contribution
-
-    if tx.category_id:
-        new_bm = get_or_create_budget_month(db, str(tx.user_id), str(tx.category_id), month_str)
-        new_bm.activity += tx.amount
-
-
 def _upsert_narration_map(db: Session, user_id: str, narration: str, category_id: str) -> None:
     """
     Store / update the user's narration→category mapping at confidence 1.0.

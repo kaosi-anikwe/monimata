@@ -41,6 +41,7 @@ def send_push_notification(
     title: str,
     body: str,
     data: dict | None = None,
+    channel_id: str = "default",
 ) -> None:
     """
     Send a push notification via the Expo push API.
@@ -49,10 +50,13 @@ def send_push_notification(
     never break the caller's transaction or HTTP response.
 
     Args:
-        token: Expo push token ("ExponentPushToken[...]").  No-op if None.
-        title: Notification title.
-        body:  Notification body text.
-        data:  Optional key-value payload forwarded to the app.
+        token:      Expo push token ("ExponentPushToken[...]").  No-op if None.
+        title:      Notification title.
+        body:       Notification body text.
+        data:       Optional key-value payload forwarded to the app.
+        channel_id: Android notification channel ID.  The channel must be
+                    registered in the app with AndroidImportance.HIGH or MAX
+                    for heads-up (banner) display.  Defaults to ``"default"``.
     """
     if not token:
         return
@@ -63,6 +67,8 @@ def send_push_notification(
         "title": title,
         "body": body,
         "data": data or {},
+        "priority": "high",
+        "channelId": channel_id,
     }
 
     try:

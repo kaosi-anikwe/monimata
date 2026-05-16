@@ -232,25 +232,51 @@ def update_manual_balance(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BankAccount:
-    """Update the balance of a manual account and append an audit entry."""
+    """Update the balance of a manual account via an adjustment transaction.
+
+    The delta between the current computed balance and the target is recorded
+    as a credit (balance increase) or debit (balance decrease) transaction.
+    This keeps TBB accurate and lets the user assign the adjustment to a
+    category — particularly useful when updating from a zero balance.
+    """
     account = _get_live_account_or_404(db, account_id, current_user.id)
+
+    current_balance: int = account.starting_balance + int(
+        db.query(func.sum(Transaction.amount)).filter(Transaction.account_id == account_id).scalar()
+        or 0
+    )
+    delta = payload.balance - current_balance
 
     now = datetime.now(UTC)
     audit_entry: dict[str, Any] = {
-        "previous_balance": account.balance,
+        "previous_balance": current_balance,
         "new_balance": payload.balance,
+        "delta": delta,
         "changed_at": now.isoformat(),
     }
     if payload.note:
         audit_entry["note"] = payload.note
 
+    if delta != 0:
+        db.add(
+            Transaction(
+                user_id=current_user.id,
+                account_id=account.id,
+                date=now,
+                amount=delta,
+                narration=payload.note or "Balance adjustment",
+                type="credit" if delta > 0 else "debit",
+                source=TransactionSource.manual,
+            )
+        )
+
     account.balance = payload.balance
-    account.starting_balance = payload.balance  # reset so computed_balance stays in sync
     account.balance_as_of = now
     account.balance_adjustments = (account.balance_adjustments or []) + [audit_entry]
 
     db.commit()
     db.refresh(account)
+    notify_user(current_user.id, ["accounts", "transactions", "budget"])
     return account
 
 
