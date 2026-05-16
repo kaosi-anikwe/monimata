@@ -38,8 +38,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Polyline } from 'react-native-svg';
 
+import { Button, ScreenHeader } from '@/components/ui';
 import { BottomSheet } from '@/components/ui/BottomSheet';
-import { Button } from '@/components/ui/Button';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCreateRecurringRule } from '@/hooks/useRecurring';
@@ -371,35 +371,29 @@ export default function AddTransactionScreen() {
   const isDebit = txType === 'debit';
   const amountColor = isDebit ? colors.error : colors.success;
 
-  useStatusBarStyle('dark');
+  useStatusBarStyle('light');
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      {/* ── Header ── */}
-      <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity
-          style={[ss.closeBtn, { backgroundColor: colors.surface }]}
-          onPress={() => router.back()}
-          accessibilityRole="button" accessibilityLabel="Close"
-        >
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textSecondary} strokeWidth={2.5} strokeLinecap="round" />
-          </Svg>
-        </TouchableOpacity>
-        <Text style={[type_.h3, { color: colors.textPrimary }]}>Add Transaction</Text>
-        <TouchableOpacity
-          style={[ss.closeBtn, { backgroundColor: colors.surface }]}
-          onPress={() => router.push('/upload-receipt' as never)}
-          accessibilityRole="button"
-          accessibilityLabel="Upload receipt"
-        >
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M14 2v6h6" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M12 12v6M9 15l3-3 3 3" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-          </Svg>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Add Transaction"
+        onBack={() => router.back()}
+        paddingTop={insets.top + 10}
+        rightSlot={
+          <Button
+            variant="icon"
+            iconTheme="dark"
+            onPress={() => router.push('/upload-receipt' as never)}
+            accessibilityLabel="Upload receipt"
+          >
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+              <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={colors.white} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M14 2v6h6" stroke={colors.white} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M12 12v6M9 15l3-3 3 3" stroke={colors.white} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </Button>
+        }
+      />
 
       {/* ── Type toggle ── */}
       <View style={[ss.typeToggleWrap, { backgroundColor: colors.cardBg, borderBottomColor: colors.border }]}>

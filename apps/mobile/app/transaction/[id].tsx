@@ -50,6 +50,7 @@ import { Button } from '@/components/ui/Button';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCreateRecurringRule, useDeactivateRecurringRule } from '@/hooks/useRecurring';
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import {
   useDeleteTransaction,
   useRemoveSplit,
@@ -928,6 +929,8 @@ export default function TransactionDetailsScreen() {
   const removeSplit = useRemoveSplit();
   const [showActions, setShowActions] = useState(false);
 
+  useStatusBarStyle("dark")
+
   const categoryMap = useMemo(() => {
     const m = new Map<string, CategoryItem>();
     groups.forEach((g) => g.categories.forEach((c) => m.set(c.id, c)));
@@ -997,7 +1000,7 @@ export default function TransactionDetailsScreen() {
               <Path d="M19 12H5M12 5l-7 7 7 7" stroke={colors.textSecondary} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </TouchableOpacity>
-          <Text style={[type_.h3, { color: colors.textPrimary }]}>Manual Transaction</Text>
+          <Text style={[type_.h1, { color: colors.textPrimary }]}>Manual Transaction</Text>
           <TouchableOpacity
             style={[ss.backBtn, { backgroundColor: colors.surface }]}
             onPress={() => setShowActions(true)}

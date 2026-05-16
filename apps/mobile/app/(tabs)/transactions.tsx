@@ -605,7 +605,7 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  hdrTitle: { ...type_.h2 },
+  hdrTitle: { ...type_.h1 },
   hdrIconBtn: {
     width: 36,
     height: 36,

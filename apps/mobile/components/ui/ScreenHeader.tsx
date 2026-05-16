@@ -61,7 +61,7 @@ import {
 
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { ff, type_ } from '@/lib/typography';
 import { Button } from './Button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -196,6 +196,8 @@ const s = StyleSheet.create({
   },
   rightSlot: {
     flexShrink: 0,
+    minWidth: 36,
+    alignItems: 'flex-end',
   },
   iconPlaceholder: {
     width: 36,
@@ -216,9 +218,7 @@ const s = StyleSheet.create({
   },
   // Shared
   title: {
-    ...ff(700),
-    fontSize: 22,
-    letterSpacing: -0.4,
+    ...type_.h1
   },
   subtitle: {
     ...ff(400),

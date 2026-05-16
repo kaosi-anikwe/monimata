@@ -7,7 +7,6 @@
  * Route: /split-transaction?id=<txId>
 */
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import {
   ScrollView,
@@ -23,7 +22,9 @@ import Svg, { Path, Polyline } from 'react-native-svg';
 import { useToast } from '@/components/Toast';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useCategoryGroups } from '@/hooks/useCategories';
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useSplitTransaction, useTransaction } from '@/hooks/useTransactions';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
@@ -237,6 +238,7 @@ export default function SplitTransactionScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { success: showSuccess, error: showError } = useToast();
+  useStatusBarStyle('light')
 
   const { data: tx } = useTransaction(id);
   const { data: groups = [] } = useCategoryGroups();
@@ -304,22 +306,11 @@ export default function SplitTransactionScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      <StatusBar style="dark" />
-      {/* ── Header ── */}
-      <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity
-          style={[ss.backBtn, { backgroundColor: colors.surface }]}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M19 12H5M12 5l-7 7 7 7" stroke={colors.textSecondary} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-          </Svg>
-        </TouchableOpacity>
-        <Text style={[type_.h3, { color: colors.textPrimary }]}>Split Transaction</Text>
-        <View style={ss.backBtn} />
-      </View>
+      <ScreenHeader
+        title="Split Transaction"
+        onBack={() => router.back()}
+        paddingTop={insets.top + 10}
+      />
 
       <ScrollView
         style={ss.scroll}

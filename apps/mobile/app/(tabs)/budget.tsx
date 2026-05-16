@@ -210,7 +210,7 @@ const ms = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  title: { ...ff(700), fontSize: 18, letterSpacing: -0.3 },
+  title: { ...type_.h1 },
   editBtn: {
     width: 36,
     height: 36,

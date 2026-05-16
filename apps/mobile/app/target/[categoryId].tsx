@@ -24,9 +24,7 @@
  * Route: /target/[categoryId]
  */
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -42,6 +40,7 @@ import {
 import Animated, { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ui';
 import { useBudget } from '@/hooks/useBudget';
 import { useTarget, useUpsertTarget } from '@/hooks/useTargets';
 import { useTheme } from '@/lib/theme';
@@ -496,36 +495,12 @@ export default function TargetEditScreen() {
 
   return (
     <View style={[ts.flex, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" />
-      {/* ── Dark green header ── */}
-      <View
-        style={[ts.hdr, {
-          paddingTop: insets.top + 10,
-          borderBottomLeftRadius: radius.xl,
-          borderBottomRightRadius: radius.xl,
-        }]}
+      <ScreenHeader
+        title={category ? `Set Target — ${category.name}` : 'Set Target'}
+        onBack={() => router.back()}
+        paddingTop={insets.top + 10}
+        rightSlot={<View />}
       >
-        <LinearGradient
-          colors={[colors.darkGreen, colors.darkGreenMid]}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Back row */}
-        <View style={ts.hdrTop}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={[ts.backBtn, { backgroundColor: colors.overlayGhost }]}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="chevron-back" size={22} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={[ts.hdrTitle, { color: colors.white }]} numberOfLines={1}>
-            {category ? `Set Target — ${category.name}` : 'Set Target'}
-          </Text>
-          <View style={{ width: 36 }} />
-        </View>
-
         {/* Pill tab bar (.hub-tabs style) */}
         <View
           style={[ts.pillBar, { backgroundColor: colors.overlayGhost }]}
@@ -554,7 +529,7 @@ export default function TargetEditScreen() {
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      </ScreenHeader>
 
       {/* ── Tab content ── */}
       <KeyboardAvoidingView
@@ -628,7 +603,7 @@ export default function TargetEditScreen() {
 const ts = StyleSheet.create({
   flex: { flex: 1 },
 
-  // ── Header ───────────────────────────────────────────────────────────────
+  // ── Header (unused — replaced by ScreenHeader) ────────────────────────────
   hdr: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.lg,
@@ -645,30 +620,31 @@ const ts = StyleSheet.create({
   backBtn: {
     width: 36,
     height: 36,
-    borderRadius: 11,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent', // overridden inline with colors.overlayGhost
+    backgroundColor: 'transparent',
   },
 
   // ── Pill tab bar (.hub-tabs) ──────────────────────────────────────────────
   pillBar: {
+    marginTop: spacing.lg,
     flexDirection: 'row',
-    borderRadius: 12,
-    padding: 3,
+    borderRadius: radius.sm,
+    padding: spacing.xxs,
     gap: 0,
   },
   pillIndicator: {
     position: 'absolute',
-    top: 3,
-    bottom: 3,
-    left: 3,
-    borderRadius: 9,
+    top: spacing.xxs,
+    bottom: spacing.xxs,
+    left: spacing.xxs,
+    borderRadius: 9, // derived: radius.sm - spacing.xxs
   },
   pillTab: {
     flex: 1,
     height: 34,
-    borderRadius: 9,
+    borderRadius: 9, // derived: radius.sm - spacing.xxs
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -680,7 +656,7 @@ const ts = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  sentence: { ...ff(600), fontSize: 20, marginBottom: 4, marginTop: 12 },
+  sentence: { ...ff(600), fontSize: 20, marginBottom: spacing.xs, marginTop: spacing.md },
 
   // ── Amount input ─────────────────────────────────────────────────────────
   amountRow: {
@@ -701,11 +677,11 @@ const ts = StyleSheet.create({
   },
 
   // ── Section ───────────────────────────────────────────────────────────────
-  section: { marginTop: 20 },
+  section: { marginTop: spacing.xl },
   sectionLabel: {
     ...ff(700),
     fontSize: 11,
-    marginBottom: 10,
+    marginBottom: spacing.smd,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -714,18 +690,18 @@ const ts = StyleSheet.create({
   weekdayRow: { flexDirection: 'row', gap: 6 },
   weekdayBtn: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.xs,
     alignItems: 'center',
   },
   weekdayText: { ...ff(600), fontSize: 12 },
 
   // ── Day stepper ───────────────────────────────────────────────────────────
-  dayInputRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  dayInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   dayStepBtn: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: radius.xs,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -735,24 +711,24 @@ const ts = StyleSheet.create({
   dateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.smd,
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: spacing.md,
   },
   dateBtnTxt: { ...ff(600), fontSize: 15, flex: 1 },
   datePickerWrap: {
     borderWidth: 1,
     borderRadius: 10,
-    marginTop: 8,
+    marginTop: spacing.sm,
     overflow: 'hidden',
   },
   datePickerDone: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 8,
-    paddingVertical: 10,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    borderRadius: radius.xs,
+    paddingVertical: spacing.smd,
     alignItems: 'center',
   },
   datePickerDoneTxt: { ...ff(600), fontSize: 14 },
@@ -760,27 +736,27 @@ const ts = StyleSheet.create({
   // ── Repeats toggle ────────────────────────────────────────────────────────
   repeatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
-  hint: { ...ff(400), fontSize: 13, marginTop: 10, lineHeight: 18 },
+  hint: { ...ff(400), fontSize: 13, marginTop: spacing.smd, lineHeight: 18 },
 
   // ── Behavior picker ───────────────────────────────────────────────────────
   behaviorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    gap: spacing.md,
+    paddingVertical: spacing.smd,
+    paddingHorizontal: spacing.md,
     borderRadius: 10,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   radioOuter: {
     width: 20,
     height: 20,
-    borderRadius: 10,
+    borderRadius: 10, // half of width — keeps circular shape
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  radioInner: { width: 10, height: 10, borderRadius: 5 },
+  radioInner: { width: 10, height: 10, borderRadius: 5 }, // half of width
   behaviorText: { flex: 1 },
   behaviorLabel: { ...ff(600), fontSize: 15 },
   behaviorDesc: { ...ff(400), fontSize: 12, marginTop: 2 },

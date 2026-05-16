@@ -17,7 +17,6 @@
 /**
  * Accounts tab — manage bank accounts (manual entry).
  */
-import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -53,6 +52,7 @@ import {
   useUpdateBalance,
   type AddManualAccountPayload,
 } from '@/hooks/useAccounts';
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
