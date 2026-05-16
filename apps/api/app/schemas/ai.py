@@ -23,3 +23,26 @@ class AiCredentialResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class AiUsageResponse(BaseModel):
+    """AI efficiency monitor panel data (spec §8.3)."""
+
+    # Categorisation breakdown
+    total_categorised: int
+    offline_categorised: int
+    llm_categorised: int
+    offline_success_rate: float  # 0.0-1.0
+    llm_handled_pct: float  # 0.0-1.0
+
+    # Current-month token usage
+    current_month_calls: int
+    current_month_prompt_tokens: int
+    current_month_completion_tokens: int
+    current_month_total_tokens: int
+
+    # Lifetime token usage
+    lifetime_calls: int
+    lifetime_prompt_tokens: int
+    lifetime_completion_tokens: int
+    lifetime_total_tokens: int

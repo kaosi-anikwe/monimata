@@ -101,6 +101,7 @@ app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(recurring.router, prefix="/recurring-rules", tags=["recurring"])
 app.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 app.include_router(ai.router, prefix="/ai/credentials", tags=["ai"])
+app.include_router(ai.usage_router, prefix="/ai", tags=["ai"])
 app.include_router(ws.router, tags=["websocket"])
 
 
