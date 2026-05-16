@@ -35,8 +35,14 @@
  *     • "Lifetime:   N tokens"
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ProgressBar } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
@@ -198,4 +204,59 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+});
+
+// ─── AiMonitorPanelSkeleton ─────────────────────────────────────────────────────
+
+/** Pulsing placeholder while AiUsageResponse is loading. */
+export function AiMonitorPanelSkeleton() {
+  const colors = useTheme();
+  const opacity = useSharedValue(0.45);
+
+  useEffect(() => {
+    opacity.value = withRepeat(withTiming(1, { duration: 750 }), -1, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <View style={[sk.panel, shadow.sm, { backgroundColor: colors.surface }]}>
+      <Animated.View style={pulseStyle}>
+        {/* Title placeholder */}
+        <View style={[sk.line, { width: '60%', backgroundColor: colors.surfaceElevated }]} />
+        {/* Two-column stat placeholders */}
+        <View style={[sk.statsRow]}>
+          <View style={sk.statCol}>
+            <View style={[sk.bigLine, { backgroundColor: colors.surfaceElevated }]} />
+            <View style={[sk.line, { marginTop: spacing.sm, backgroundColor: colors.surface }]} />
+          </View>
+          <View style={sk.statCol}>
+            <View style={[sk.bigLine, { backgroundColor: colors.surfaceElevated }]} />
+            <View style={[sk.line, { marginTop: spacing.sm, backgroundColor: colors.surface }]} />
+          </View>
+        </View>
+        {/* Token row placeholders */}
+        <View style={[sk.divider, { backgroundColor: colors.separator }]} />
+        <View style={[sk.tokenRow]}>
+          <View style={[sk.line, { width: '30%', backgroundColor: colors.surfaceElevated }]} />
+          <View style={[sk.line, { width: '40%', backgroundColor: colors.surface }]} />
+        </View>
+        <View style={[sk.tokenRow, { marginTop: spacing.sm }]}>
+          <View style={[sk.line, { width: '25%', backgroundColor: colors.surfaceElevated }]} />
+          <View style={[sk.line, { width: '35%', backgroundColor: colors.surface }]} />
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+const sk = StyleSheet.create({
+  panel: { borderRadius: radius.lg, padding: spacing.lg },
+  line: { height: spacing.md, borderRadius: radius.xs },
+  bigLine: { height: spacing.xl + spacing.sm, borderRadius: radius.xs },
+  statsRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.lg },
+  statCol: { flex: 1 },
+  divider: { height: StyleSheet.hairlineWidth, marginBottom: spacing.md },
+  tokenRow: { flexDirection: 'row', justifyContent: 'space-between' },
 });

@@ -47,7 +47,7 @@ import { FadeInRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategorySearchSheet } from '@/components/categorization/CategorySearchSheet';
-import { ReviewCard } from '@/components/categorization/ReviewCard';
+import { ReviewCard, ReviewCardSkeleton } from '@/components/categorization/ReviewCard';
 import { SwipeDirectionHint } from '@/components/categorization/SwipeDirectionHint';
 import { useToast } from '@/components/Toast';
 import { Badge, EmptyState, ScreenHeader } from '@/components/ui';
@@ -55,6 +55,7 @@ import { useConfirmCategory, useReviewQueue } from '@/hooks/useCategorization';
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
+import { Ionicons } from '@expo/vector-icons';
 
 // ─── CategorizeQueueScreen ────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ export default function CategorizeQueueScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
           onError: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             showError('Error', 'Could not save category. Please try again.');
           },
         },
@@ -142,10 +144,15 @@ export default function CategorizeQueueScreen() {
         paddingTop={insets.top + spacing.md}
       />
 
-      {isEmpty ? (
+      {isLoading ? (
+        /* ── Loading state ── */
+        <View style={[ss.deckContainer, { paddingBottom: insets.bottom + spacing.xl }]}>
+          <ReviewCardSkeleton />
+        </View>
+      ) : isEmpty ? (
         /* ── Empty / all-done state ── */
         <EmptyState
-          emoji="✅"
+          icon={<Ionicons name="checkmark-circle-outline" size={36} color={colors.success} />}
           title="Queue clear!"
           body="Every transaction in your queue has been reviewed."
           action={{
