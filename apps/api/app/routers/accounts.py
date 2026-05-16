@@ -52,7 +52,7 @@ from app.schemas.accounts import (
     UpdateAliasRequest,
     UpdateManualBalanceRequest,
 )
-from app.services.ingestion.registry import list_supported_banks
+from app.services.ingestion import list_supported_banks
 from app.ws_manager import notify_user
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ async def add_manual_account(
     account_name mirrors alias on creation and can be updated independently.
     """
     from app.core.security import decrypt_pii
-    from app.services.ingestion.registry import is_bank_supported
+    from app.services.ingestion import is_bank_supported
 
     if not is_bank_supported(payload.bank_slug):
         raise HTTPException(

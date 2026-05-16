@@ -45,13 +45,50 @@ Public API
 # Import the banks package — this single import triggers all bank modules,
 # which call register_email_parser() as a module-level side-effect.
 from app.services.ingestion import banks as _banks  # noqa: F401
-from app.services.ingestion.channels.email import UnsupportedBankError, parse_email_alert
+from app.services.ingestion.base import (
+    EmailBankParser,
+    ParsedTransaction,
+    ReceiptBankParser,
+    StatementBankParser,
+)
+from app.services.ingestion.channels.email import (
+    UnsupportedBankError,
+    parse_email_alert,
+    probe_email_content,
+)
+from app.services.ingestion.channels.receipt import (
+    extract_text,
+    identify_receipt,
+    parse_receipt,
+)
+from app.services.ingestion.channels.statement import (
+    UnsupportedChannelError,
+    identify_statement,
+    parse_statement,
+)
 from app.services.ingestion.registry import BankInfo, is_bank_supported, list_supported_banks
 
 __all__ = [
+    # Base types
+    "ParsedTransaction",
+    "EmailBankParser",
+    "StatementBankParser",
+    "ReceiptBankParser",
+    # Registry
     "BankInfo",
-    "UnsupportedBankError",
     "is_bank_supported",
     "list_supported_banks",
+    # Exceptions
+    "UnsupportedBankError",
+    "UnsupportedChannelError",
+    # Email channel
     "parse_email_alert",
+    "probe_email_content",
+    # Statement channel
+    "parse_statement",
+    "identify_statement",
+    # Receipt channel
+    "identify_receipt",
+    "parse_receipt",
+    "extract_text",
 ]

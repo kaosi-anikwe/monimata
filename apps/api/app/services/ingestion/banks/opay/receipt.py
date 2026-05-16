@@ -84,7 +84,9 @@ _OPAY_PHONE_RE = re.compile(r"OPay\s*[|lI1]\s*(\d[\d *]+\d)", re.IGNORECASE)
 
 # Transaction reference — "Transaction No. 260513010100240293620823"
 # (no colon in actual OCR output; just one or more spaces)
-_REF_RE = re.compile(r"Transaction\s+No\.\s+([\d]{15,})", re.IGNORECASE)
+# Tesseract sometimes inserts a space inside the long digit run; allow one
+# internal space and strip it afterwards.
+_REF_RE = re.compile(r"Transaction\s+No\.\s+([\d]{10,}(?:\s[\d]{5,})?)", re.IGNORECASE)
 
 # Section header anchors — always "Recipient Details" and "Sender Details"
 # These appear on the same line as the counterparty name in OCR output, e.g.:
@@ -280,21 +282,25 @@ class _OPayReceiptParser(ReceiptBankParser):
         text = extract_text(image_bytes)
 
         # ── Amount ────────────────────────────────────────────────────────────
-        # Image path: bare number directly above "Successful" (no ₦ from OCR)
-        # PDF path: pdfplumber preserves the ₦ prefix
-        amount_match = _AMOUNT_RE.search(text) or _AMOUNT_PDF_RE.search(text)
-        if amount_match:
-            amount_kobo = _naira_to_kobo(amount_match.group(1))
-        else:
-            # OPay renders the amount in brand-green text, which standard
-            # grayscale OCR cannot distinguish from the white background.
-            # Run a dedicated green-pixel-mask pass to recover it.
-            if image_bytes[:4] == b"%PDF":
-                return None
+        # For image receipts, the green-pixel-mask pass is the primary source:
+        #   - sometimes ₦ is invisible to grayscale (amount absent from text)
+        #   - sometimes ₦ is misread as "4" (e.g. "46,000.00" instead of "6,000.00")
+        # For PDFs, pdfplumber preserves the ₦ prefix so regex suffices.
+        if image_bytes[:4] != b"%PDF":
             raw_amount = _extract_green_amount(image_bytes)
-            if raw_amount is None:
+            if raw_amount is not None:
+                amount_kobo = _naira_to_kobo(raw_amount)
+            else:
+                # Green mask found nothing; fall back to anchored regex
+                amount_match = _AMOUNT_RE.search(text)
+                if not amount_match:
+                    return None
+                amount_kobo = _naira_to_kobo(amount_match.group(1))
+        else:
+            amount_match = _AMOUNT_PDF_RE.search(text)
+            if not amount_match:
                 return None
-            amount_kobo = _naira_to_kobo(raw_amount)
+            amount_kobo = _naira_to_kobo(amount_match.group(1))
         if amount_kobo is None:
             return None
 
@@ -304,7 +310,7 @@ class _OPayReceiptParser(ReceiptBankParser):
 
         # ── Transaction reference ─────────────────────────────────────────────
         ref_match = _REF_RE.search(text)
-        txn_ref = ref_match.group(1) if ref_match else None
+        txn_ref = re.sub(r"\s+", "", ref_match.group(1)) if ref_match else None
 
         # ── Credit / debit determination ──────────────────────────────────────
         is_credit: bool | None = None

@@ -299,8 +299,11 @@ def process_bank_statement(
     from app.models.bank_account import BankAccount
     from app.models.transaction import Transaction, TransactionSource
     from app.models.user import User
-    from app.services.ingestion import UnsupportedBankError
-    from app.services.ingestion.channels.statement import UnsupportedChannelError, parse_statement
+    from app.services.ingestion import (
+        UnsupportedBankError,
+        UnsupportedChannelError,
+        parse_statement,
+    )
     from app.services.nudge_engine import send_statement_failed_push, send_statement_processed_push
     from app.ws_manager import notify_user
 
@@ -537,7 +540,7 @@ def process_receipt(
     from app.models.bank_account import BankAccount
     from app.models.transaction import Transaction, TransactionSource
     from app.models.user import User
-    from app.services.ingestion.channels.receipt import (
+    from app.services.ingestion import (
         UnsupportedBankError,
         UnsupportedChannelError,
         identify_receipt,
