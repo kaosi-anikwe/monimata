@@ -51,6 +51,9 @@ export type { ProgressBarProps, ProgressBarSize, ProgressBarState } from './Prog
 export { AmountDisplay } from './AmountDisplay';
 export type { AmountDisplayProps, AmountSize } from './AmountDisplay';
 
+export { AmountInput } from './AmountInput';
+export type { AmountInputProps } from './AmountInput';
+
 export { Chip } from './Chip';
 export type { ChipProps } from './Chip';
 
@@ -58,7 +61,7 @@ export { Divider } from './Divider';
 export type { DividerProps } from './Divider';
 
 export { EmptyState } from './EmptyState';
-export type { EmptyStateProps, EmptyStateAction } from './EmptyState';
+export type { EmptyStateAction, EmptyStateProps } from './EmptyState';
 
 export { ListRow } from './ListRow';
 export type { ListRowProps } from './ListRow';

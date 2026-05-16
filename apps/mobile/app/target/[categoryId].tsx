@@ -33,14 +33,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ScreenHeader } from '@/components/ui';
+import { AmountInput, ScreenHeader } from '@/components/ui';
 import { useBudget } from '@/hooks/useBudget';
 import { useTarget, useUpsertTarget } from '@/hooks/useTargets';
 import { useTheme } from '@/lib/theme';
@@ -57,37 +56,6 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function koboToNaira(kobo: number): string {
   return (kobo / 100).toFixed(0);
-}
-
-// ─── Amount input ─────────────────────────────────────────────────────────────
-
-function AmountInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const colors = useTheme();
-  // Display formatted with commas; store raw digits only
-  const formatted = value ? Number(value).toLocaleString('en-NG') : '';
-
-  function handleChange(text: string) {
-    // Strip all non-digit characters before storing
-    const raw = text.replace(/[^0-9]/g, '');
-    onChange(raw);
-  }
-
-  return (
-    <View style={[ts.amountRow, {
-      backgroundColor: colors.surface,
-      borderColor: colors.brand,
-    }]}>
-      <Text style={[ts.currencySymbol, { color: colors.brand }]}>₦</Text>
-      <TextInput
-        style={[ts.amountInput, { color: colors.brand }]}
-        value={formatted}
-        onChangeText={handleChange}
-        keyboardType="numeric"
-        placeholder="0"
-        placeholderTextColor={colors.textTertiary}
-      />
-    </View>
-  );
 }
 
 // ─── Behavior picker ─────────────────────────────────────────────────────────
@@ -657,24 +625,6 @@ const ts = StyleSheet.create({
   },
 
   sentence: { ...ff(600), fontSize: 20, marginBottom: spacing.xs, marginTop: spacing.md },
-
-  // ── Amount input ─────────────────────────────────────────────────────────
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.smd,
-    marginVertical: spacing.sm,
-  },
-  currencySymbol: { ...ff(700), fontSize: 24, marginRight: 6 },
-  amountInput: {
-    flex: 1,
-    fontSize: 32,
-    ...ff(800),
-    padding: 0,
-  },
 
   // ── Section ───────────────────────────────────────────────────────────────
   section: { marginTop: spacing.xl },
