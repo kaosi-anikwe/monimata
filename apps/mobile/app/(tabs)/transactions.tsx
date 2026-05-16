@@ -555,7 +555,7 @@ export default function TransactionsScreen() {
             accessibilityLabel={`${clustersData?.total_uncategorised} transactions need categories. Tap to categorise.`}
           >
             <Text style={[type_.label, { color: colors.darkGreen }]}>
-              ⚡ {clustersData?.total_uncategorised} transactions need categories
+              {clustersData?.total_uncategorised} transactions need categories
             </Text>
             <Text style={[type_.small, { color: colors.darkGreen }]}>
               Tap to categorise them quickly →
@@ -750,7 +750,8 @@ const ss = StyleSheet.create({
   // Uncategorised banner
   uncatBanner: {
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    marginTop: spacing.md,
     borderRadius: radius.md,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,

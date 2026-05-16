@@ -71,6 +71,20 @@ export function useReviewQueue() {
   return $api.useQuery('get', '/transactions/review-queue', {});
 }
 
+/**
+ * Full list of uncategorised transactions (oldest-first) for the Review
+ * Queue local-queue mode.
+ *
+ * Fetched once on screen mount; the screen manages order client-side so
+ * "Later" (defer) moves a transaction to the back without a server round-trip.
+ * Large limit is intentional — categorisation sessions rarely exceed 200 items.
+ */
+export function useUncategorisedQueue() {
+  return $api.useQuery('get', '/transactions', {
+    params: { query: { uncategorized: true, limit: 100 } },
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ── CATEGORIZATION — Mutations ────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +130,7 @@ export function useConfirmCategory() {
   return $api.useMutation('post', '/transactions/{tx_id}/confirm-category', {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.reviewQueue() });
+      qc.invalidateQueries({ queryKey: queryKeys.uncategorisedQueue() });
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: ['budget'] });
     },

@@ -105,7 +105,7 @@ export function ClusterCard({
 
   return (
     <Animated.View
-      entering={FadeInDown.springify().damping(18)}
+      entering={FadeInDown.springify().damping(26)}
       exiting={FadeOutUp.duration(220)}
     >
       <View
