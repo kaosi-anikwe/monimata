@@ -31,7 +31,6 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.bank_account import BankAccount
 from app.models.category import Category
-from app.models.narration_map import NarrationCategoryMap
 from app.models.transaction import Transaction, TransactionSource, TransactionSplit
 from app.models.user import User
 from app.schemas.transactions import (
@@ -62,38 +61,44 @@ def _get_tx_or_404(db: Session, tx_id: str, user_id: str) -> Transaction:
 
 
 def _upsert_narration_map(db: Session, user_id: str, narration: str, category_id: str) -> None:
-    """
-    Store / update the user's narration→category mapping at confidence 1.0.
-    Also retroactively categorizes uncategorized transactions with the same key.
-    """
-    from app.services.categorization import _normalize_narration  # avoid circular
+    """Store / update the user's narration→category mapping.
 
-    key = _normalize_narration(narration)
-    if not key:
+    Writes to UserCategoryRule (Tier 1 exact-match cache) and retroactively
+    categorises uncategorised transactions whose cleaned_narration matches
+    the new rule, back-filling telemetry fields.
+    """
+    from datetime import UTC, datetime
+
+    from app.models.user_category_rule import UserCategoryRule
+    from app.services.categorization import clean_narration
+
+    cleaned_key = clean_narration(narration)
+    if not cleaned_key:
         return
 
-    existing = (
-        db.query(NarrationCategoryMap)
+    # ── UserCategoryRule (Tier 1 cache) ───────────────────────────────────────
+    rule = (
+        db.query(UserCategoryRule)
         .filter(
-            NarrationCategoryMap.user_id == user_id,
-            NarrationCategoryMap.narration_key == key,
+            UserCategoryRule.user_id == user_id,
+            UserCategoryRule.cleaned_narration == cleaned_key,
         )
         .first()
     )
-    if existing:
-        existing.category_id = category_id
-        existing.confidence = 1.0
+    if rule:
+        rule.category_id = category_id
+        rule.hit_count += 1
+        rule.last_triggered = datetime.now(UTC)
     else:
         db.add(
-            NarrationCategoryMap(
+            UserCategoryRule(
                 user_id=user_id,
-                narration_key=key,
+                cleaned_narration=cleaned_key,
                 category_id=category_id,
-                confidence=1.0,
             )
         )
 
-    # Retroactively assign uncategorized transactions with same narration key
+    # ── Retroactive back-fill ─────────────────────────────────────────────────
     uncategorized = (
         db.query(Transaction)
         .filter(
@@ -103,9 +108,12 @@ def _upsert_narration_map(db: Session, user_id: str, narration: str, category_id
         .all()
     )
     for other_tx in uncategorized:
-        if _normalize_narration(other_tx.narration) == key:
+        other_key = other_tx.cleaned_narration or clean_narration(other_tx.narration)
+        if other_key == cleaned_key:
             month_str = other_tx.date.strftime("%Y-%m")
             other_tx.category_id = category_id
+            other_tx.categorization_source = "exact_match"
+            other_tx.category_confidence = 100
             bm = get_or_create_budget_month(db, user_id, category_id, month_str)
             bm.activity += other_tx.amount
 
