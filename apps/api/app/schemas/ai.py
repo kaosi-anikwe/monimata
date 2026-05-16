@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 
 class AiCredentialCreate(BaseModel):
-    provider: Literal["gemini", "openai"]
+    provider: Literal["gemini", "openai", "anthropic"]
     api_key: str = Field(..., min_length=10, description="Plaintext API key — encrypted at rest")
 
 

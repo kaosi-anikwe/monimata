@@ -5,11 +5,12 @@
 
 """BYOK LLM categorisation service (Tier 4 fallback).
 
-Supports two providers:
-  - "gemini"  → Gemini 1.5 Flash via Google Generative Language REST API
-  - "openai"  → GPT-4o-mini via OpenAI Chat Completions API
+Supports three providers:
+  - "gemini"    → Gemini 1.5 Flash via Google Generative Language REST API
+  - "openai"    → GPT-4o-mini via OpenAI Chat Completions API
+  - "anthropic" → Claude Haiku via Anthropic Messages API
 
-Both paths accept a batch of transactions and return structured JSON so that
+All paths accept a batch of transactions and return structured JSON so that
 a single API call handles many transactions at once.
 
 This module must only be imported inside Celery tasks — never in the request
@@ -123,6 +124,42 @@ def _call_gemini(
     )
 
 
+def _call_anthropic(
+    api_key: str,
+    transactions: list[dict[str, str]],
+    categories: list[str],
+) -> tuple[list[dict[str, Any]], int, int]:
+    """Call Claude Haiku via the Anthropic Messages API.
+    Returns (results_list, prompt_tokens, completion_tokens).
+    """
+    user_msg = _build_prompt(transactions, categories)
+    payload = {
+        "model": "claude-haiku-4-5",
+        "system": _SYSTEM_PROMPT,
+        "messages": [{"role": "user", "content": user_msg}],
+    }
+    resp = httpx.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        json=payload,
+        timeout=60,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    usage = body.get("usage", {})
+    content = body["content"][0]["text"]
+    data = json.loads(content)
+    return (
+        data["results"],
+        usage.get("input_tokens", 0),
+        usage.get("output_tokens", 0),
+    )
+
+
 # ── Public interface ──────────────────────────────────────────────────────────
 
 
@@ -146,6 +183,8 @@ def call_llm(
             return _call_openai(api_key, transactions, categories)
         elif provider == "gemini":
             return _call_gemini(api_key, transactions, categories)
+        elif provider == "anthropic":
+            return _call_anthropic(api_key, transactions, categories)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider!r}")
     except httpx.HTTPStatusError as exc:
