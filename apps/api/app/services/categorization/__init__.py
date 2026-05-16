@@ -123,8 +123,23 @@ KEYWORD_RULES: list[tuple[re.Pattern[str], str]] = [
 
 
 def _find_category_by_name(db: Session, user_id: str, name: str) -> str | None:
+    """Resolve a canonical merchant category name to a user category id.
+
+    Falls through three strategies so users whose categories are named
+    differently from the canonical registry still get a match:
+
+    1. Substring ilike on the full canonical name (e.g. "Groceries" in "Food & Groceries").
+    2. Word-token ilike — try each meaningful word (≥4 chars) from the canonical
+       name individually (e.g. "Food" from "Food & Dining" matches category "Food").
+    3. rapidfuzz token_set_ratio fuzzy match against all visible categories
+       — catches minor spelling differences (e.g. "Transport" → "Transportation").
+       Threshold: 65 to avoid bad guesses.
+    """
+    from rapidfuzz import fuzz as rfuzz
+
     from app.models.category import Category
 
+    # 1. Full-name substring match.
     cat = (
         db.query(Category)
         .filter(
@@ -134,7 +149,36 @@ def _find_category_by_name(db: Session, user_id: str, name: str) -> str | None:
         )
         .first()
     )
-    return cat.id if cat else None
+    if cat:
+        return cat.id
+
+    # 2. Word-token fallback: split on whitespace / & / - / /
+    tokens = [w for w in re.split(r"[\s&\-/]+", name) if len(w) >= 4]
+    for token in tokens:
+        cat = (
+            db.query(Category)
+            .filter(
+                Category.user_id == user_id,
+                Category.name.ilike(f"%{token}%"),
+                ~Category.is_hidden,
+            )
+            .first()
+        )
+        if cat:
+            return cat.id
+
+    # 3. Fuzzy fallback against all visible categories.
+    all_cats = db.query(Category).filter(Category.user_id == user_id, ~Category.is_hidden).all()
+    best_id: str | None = None
+    best_score: int = 0
+    for c in all_cats:
+        score = int(rfuzz.token_set_ratio(name, c.name))
+        if score > best_score:
+            best_score, best_id = score, c.id
+    if best_score >= 65:
+        return best_id
+
+    return None
 
 
 # Cosine distance threshold for vector matches (0 = identical, 2 = opposite).
@@ -213,6 +257,13 @@ def categorize_transaction(db: Session, tx: Any) -> str | None:
     if not key:
         return None
 
+    # If the user wrote a memo, append it to the search text for keyword and
+    # heuristic tiers.  Tier 1 (exact-match cache) and Tier 2a (merchant tokens)
+    # remain narration-only — the cache key must be stable, and merchant tokens
+    # are too specific to apply against user-authored free text.
+    memo_suffix = f" {tx.memo.lower().strip()}" if getattr(tx, "memo", None) else ""
+    extended_key = f"{key}{memo_suffix}"
+
     # Tier 1: UserCategoryRule exact match
     rule = (
         db.query(UserCategoryRule)
@@ -240,7 +291,7 @@ def categorize_transaction(db: Session, tx: Any) -> str | None:
 
     # Tier 2b: regex keyword rules
     for pattern, category_name in KEYWORD_RULES:
-        if pattern.search(key):
+        if pattern.search(extended_key):
             cat_id = _find_category_by_name(db, tx.user_id, category_name)
             if cat_id:
                 tx.categorization_source = "keyword"
@@ -258,7 +309,7 @@ def categorize_transaction(db: Session, tx: Any) -> str | None:
     # Tier 3: heuristic scoring engine (fuzzy candidate + multi-factor rules)
     from app.services.categorization.scoring import HeuristicEngine
 
-    result = HeuristicEngine().run(db, tx, key)
+    result = HeuristicEngine().run(db, tx, extended_key)
     if result:
         cat_id, confidence = result
         tx.categorization_source = "heuristic"
@@ -291,6 +342,11 @@ def get_category_suggestions(
     key = tx.cleaned_narration or clean_narration(tx.narration)
     suggestions: list[dict[str, Any]] = []
     seen: set[str] = set()
+
+    # Memo extends the search key for keyword and heuristic tiers only.
+    # Tier 1 (exact match) and Tier 2a (merchant tokens) remain narration-only.
+    memo_suffix = f" {tx.memo.lower().strip()}" if getattr(tx, "memo", None) else ""
+    extended_key = f"{key}{memo_suffix}"
 
     def _add(cat_id: str, confidence: int, source: str) -> None:
         if cat_id in seen:
@@ -335,7 +391,7 @@ def get_category_suggestions(
     for pattern, category_name in KEYWORD_RULES:
         if len(suggestions) >= limit:
             break
-        if pattern.search(key):
+        if pattern.search(extended_key):
             cat_id = _find_category_by_name(db, tx.user_id, category_name)
             if cat_id:
                 _add(cat_id, 75, "keyword")
@@ -343,7 +399,7 @@ def get_category_suggestions(
     # Tier 3: heuristic engine candidates (scored, not just the winner)
     if len(suggestions) < limit:
         engine = HeuristicEngine()
-        candidates = engine._get_candidates(db, tx.user_id, key)  # noqa: SLF001
+        candidates = engine._get_candidates(db, tx.user_id, extended_key)  # noqa: SLF001
         history = engine._get_history(db, tx.user_id)  # noqa: SLF001
         from app.services.categorization.scoring import ScoringContext
 

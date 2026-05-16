@@ -288,7 +288,7 @@ DEFAULT_CATEGORIES: list[tuple[str, list[str]]] = [
     ),
     (
         "Irregular Expenses",
-        ["Car Maintenance", "Home Repairs", "Travel"],
+        ["Car Maintenance", "Home Repairs", "Travel", "Taxes"],
     ),
 ]
 

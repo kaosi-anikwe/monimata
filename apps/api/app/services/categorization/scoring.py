@@ -54,7 +54,9 @@ _FUZZY_CANDIDATE_THRESHOLD: int = 60
 _CONFIDENCE_THRESHOLD: int = 75
 
 # Category name fragments that are income-only (debit txs should never match)
-_INCOME_FRAGMENTS: frozenset[str] = frozenset({"income", "salary", "dividend", "refund"})
+_INCOME_FRAGMENTS: frozenset[str] = frozenset(
+    {"income", "salary", "dividend", "refund", "interest"}
+)
 
 # Category name fragments for recurring monthly expenses (temporal rule applies)
 _RECURRING_FRAGMENTS: frozenset[str] = frozenset(
