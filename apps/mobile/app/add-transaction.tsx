@@ -19,10 +19,10 @@
  *
  * Route: /add-transaction
  */
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Haptics from "expo-haptics";
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -371,9 +371,10 @@ export default function AddTransactionScreen() {
   const isDebit = txType === 'debit';
   const amountColor = isDebit ? colors.error : colors.success;
 
+  useStatusBarStyle('dark');
+
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      <StatusBar style="dark" />
       {/* ── Header ── */}
       <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity

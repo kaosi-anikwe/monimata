@@ -21,13 +21,13 @@
  * Pull-to-refresh triggers a WatermelonDB sync.
  * Search bar + filter chips (All / Uncategorised / Debits / Credits / per-account).
  */
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -339,6 +339,7 @@ export default function TransactionsScreen() {
   useFocusEffect(
     useCallback(() => { startTourIfUnseen('transactions', TRANSACTIONS_TOUR); }, [startTourIfUnseen]),
   );
+  useStatusBarStyle('dark');
 
   const {
     data: txPages,
@@ -455,7 +456,6 @@ export default function TransactionsScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      <StatusBar style="dark" />
       {/* ── Header ── */}
       <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         {/* Title row */}

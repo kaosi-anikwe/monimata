@@ -17,11 +17,11 @@
 /**
  * Accounts tab — manage bank accounts (manual entry).
  */
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
-import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -863,6 +863,7 @@ export default function AccountsScreen() {
   useFocusEffect(
     useCallback(() => { startTourIfUnseen('accounts', ACCOUNTS_TOUR); }, [startTourIfUnseen]),
   );
+  useStatusBarStyle('dark');
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -907,7 +908,6 @@ export default function AccountsScreen() {
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      <StatusBar style="dark" />
       {/* ── Header ── */}
       <View
         style={[

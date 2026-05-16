@@ -25,11 +25,11 @@
  *  - Budget data comes from the API via React Query
  *  - FAB (Add Transaction) is rendered by the tab _layout.tsx
  */
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -1036,6 +1036,7 @@ export default function BudgetScreen() {
   useFocusEffect(
     useCallback(() => { startTourIfUnseen('budget', BUDGET_TOUR, () => setWalkthroughReady(true)); }, [startTourIfUnseen]),
   );
+  useStatusBarStyle('dark');
 
   function toggleGroup(id: string) {
     LayoutAnimation.configureNext({
@@ -1122,7 +1123,6 @@ export default function BudgetScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar style="dark" />
       <MonthHeader month={selectedMonth} tbb={data?.tbb ?? 0} onAutoAssign={() => setShowAutoAssign(true)} />
 
       <ScrollView
