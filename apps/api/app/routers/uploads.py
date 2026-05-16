@@ -42,7 +42,7 @@ from app.core.deps import get_current_user
 from app.core.limiter import limiter
 from app.models.bank_account import BankAccount
 from app.models.user import User
-from app.services.ingestion.channels.statement import identify_statement
+from app.services.ingestion import identify_statement
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -27,9 +27,12 @@ from app.models.bank_account import BankAccount
 from app.models.transaction import Transaction, TransactionSource
 from app.models.user import User
 from app.services.email_service import send_email
-from app.services.ingestion import UnsupportedBankError, parse_email_alert
-from app.services.ingestion.channels.email import probe_email_content
-from app.services.ingestion.channels.statement import identify_statement
+from app.services.ingestion import (
+    UnsupportedBankError,
+    identify_statement,
+    parse_email_alert,
+    probe_email_content,
+)
 from app.services.ingestion.registry import get_bank_by_email_domain
 from app.ws_manager import notify_user
 
