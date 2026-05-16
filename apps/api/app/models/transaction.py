@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -85,6 +85,15 @@ class Transaction(Base):
     # A partial unique index on (account_id, external_ref) WHERE external_ref
     # IS NOT NULL prevents duplicate ingestion of the same bank alert.
     external_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Categorisation pipeline fields — populated at ingestion time.
+    # cleaned_narration: protocol-stripped, lowercase, max-255-char version of
+    #   narration used for O(1) cache lookups and Levenshtein clustering.
+    # categorization_source: which tier assigned the category
+    #   ("exact_match", "global_merchant", "heuristic", "vector", "llm", "manual").
+    # category_confidence: 0–100 score set by the assigning tier.
+    cleaned_narration: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    categorization_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    category_confidence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

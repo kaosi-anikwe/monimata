@@ -408,12 +408,15 @@ async def bank_alert_webhook(
     signed_amount = -alert.amount_kobo if alert.transaction_type == "debit" else alert.amount_kobo
     narration = alert.narration or f"{bank_info.display_name} {alert.transaction_type.capitalize()}"
 
+    from app.services.categorization import clean_narration  # avoid circular at module level
+
     tx = Transaction(
         user_id=str(user.id),
         account_id=str(account.id),
         date=tx_date,
         amount=signed_amount,
         narration=narration,
+        cleaned_narration=clean_narration(narration),
         type=alert.transaction_type,
         balance_after=alert.balance_kobo,
         source=TransactionSource.bank_alert,

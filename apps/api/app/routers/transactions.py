@@ -473,12 +473,15 @@ def create_manual_transaction(
     # Amount sign convention: debit → negative, credit → positive
     signed_amount = -abs(body.amount) if body.type == "debit" else abs(body.amount)
 
+    from app.services.categorization import clean_narration
+
     tx = Transaction(
         user_id=str(current_user.id),
         account_id=str(body.account_id),
         date=body.date,
         amount=signed_amount,
         narration=body.narration,
+        cleaned_narration=clean_narration(body.narration),
         type=body.type,
         category_id=str(body.category_id) if body.category_id else None,
         memo=body.memo,

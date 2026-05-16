@@ -149,12 +149,15 @@ async def add_manual_account(
     # into TBB.  Without this, the balance lives only in bank_accounts.balance
     # and TBB (which sums credit transactions) never sees it.
     if bank_account.balance != 0:
+        from app.services.categorization import clean_narration
+
         opening_tx = Transaction(
             user_id=current_user.id,
             account_id=bank_account.id,
             date=datetime.now(UTC),
             amount=bank_account.balance,
             narration="Starting balance",
+            cleaned_narration=clean_narration("Starting balance"),
             type="credit",
             source=TransactionSource.manual,
         )
@@ -258,13 +261,17 @@ def update_manual_balance(
         audit_entry["note"] = payload.note
 
     if delta != 0:
+        from app.services.categorization import clean_narration
+
+        bal_narration = payload.note or "Balance adjustment"
         db.add(
             Transaction(
                 user_id=current_user.id,
                 account_id=account.id,
                 date=now,
                 amount=delta,
-                narration=payload.note or "Balance adjustment",
+                narration=bal_narration,
+                cleaned_narration=clean_narration(bal_narration),
                 type="credit" if delta > 0 else "debit",
                 source=TransactionSource.manual,
             )
