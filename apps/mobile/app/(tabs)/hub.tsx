@@ -815,7 +815,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    titleTxt: { ...type_.h2 },
+    titleTxt: { ...type_.h1 },
     titleSpacer: { width: 36 },
     heroHeading: { fontSize: 21, letterSpacing: -0.3 },
     heroSub: { ...type_.bodyReg, marginTop: 3 },

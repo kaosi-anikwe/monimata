@@ -47,6 +47,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 
 import { useToast } from '@/components/Toast';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
@@ -264,40 +265,15 @@ export default function UploadReceiptScreen() {
   const uploadBtnBg = isDone ? colors.successSubtle : isUploading ? colors.surface : colors.brand;
   const uploadBtnTextColor = isDone ? colors.successText : isUploading ? colors.textMeta : colors.white;
 
-  useStatusBarStyle('dark');
+  useStatusBarStyle('light');
 
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      {/* ── Header ── */}
-      <View
-        style={[
-          ss.header,
-          {
-            backgroundColor: colors.cardBg,
-            borderBottomColor: colors.border,
-            paddingTop: insets.top + 10,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={[ss.closeBtn, { backgroundColor: colors.surface }]}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path
-              d="M18 6L6 18M6 6l12 12"
-              stroke={colors.textSecondary}
-              strokeWidth={2.5}
-              strokeLinecap="round"
-            />
-          </Svg>
-        </TouchableOpacity>
-        <Text style={[type_.h3, { color: colors.textPrimary }]}>Upload Receipt</Text>
-        {/* spacer to centre title */}
-        <View style={ss.closeBtn} />
-      </View>
+      <ScreenHeader
+        title="Upload Receipt"
+        onBack={() => router.back()}
+        paddingTop={insets.top + 10}
+      />
 
       <ScrollView
         style={ss.scroll}

@@ -26,9 +26,7 @@
  */
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -52,7 +50,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/Toast';
-import { ProgressBar } from '@/components/ui';
+import { ProgressBar, ScreenHeader } from '@/components/ui';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import {
   useBudget,
@@ -819,30 +817,12 @@ export default function BudgetEditScreen() {
 
   return (
     <View style={[ss.flex, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" />
-      {/* ── Dark green header (.edit-hdr) ── */}
-      <View
-        style={[ss.hdr, { paddingTop: insets.top + 10, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl }]}
+      <ScreenHeader
+        title="Edit Budget"
+        onBack={() => router.back()}
+        paddingTop={insets.top + 10}
+        rightSlot={<View />}
       >
-        <LinearGradient
-          colors={[colors.darkGreen, colors.darkGreenMid]}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Header top row */}
-        <View style={ss.hdrTop}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={[ss.backBtn]}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="chevron-back" size={22} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={[ss.hdrTitle, { color: colors.white }]}>Edit Budget</Text>
-          <View style={{ width: 36 }} />
-        </View>
-
         {/* CTBM card (.ctbm-card) */}
         <View style={[ss.ctbmCard, { backgroundColor: glass.card, borderColor: glass.borderLime }]}>
           <Text style={[ss.ctbmLabel, { color: glass.labelDim }]}>COST TO BE ME</Text>
@@ -862,7 +842,7 @@ export default function BudgetEditScreen() {
             trackStyle={{ marginTop: spacing.smd, backgroundColor: glass.borderWhiteStrong }}
           />
         </View>
-      </View>
+      </ScreenHeader>
 
       {/* ── Groups + Categories ── */}
       <NestableScrollContainer
@@ -1063,7 +1043,7 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
   },
-  hdrTitle: { ...type_.h2 },
+  hdrTitle: { ...type_.h1 },
   backBtn: {
     width: 36,
     height: 36,
@@ -1075,6 +1055,7 @@ const ss = StyleSheet.create({
 
   // ── CTBM card (.ctbm-card) ───────────────────────────────────────────────
   ctbmCard: {
+    marginTop: spacing.lg,
     borderRadius: radius.md,
     padding: spacing.lg,
     borderWidth: 1,
