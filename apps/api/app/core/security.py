@@ -157,3 +157,29 @@ def decrypt_pii(blob: str) -> str:
     nonce, ct = raw[:12], raw[12:]
     aesgcm = AESGCM(key)
     return aesgcm.decrypt(nonce, ct, None).decode()
+
+
+# ── Fernet BYOK key encryption ────────────────────────────────────────────────
+
+
+def _fernet():
+    from cryptography.fernet import Fernet
+
+    key = settings.FERNET_KEY
+    if not key:
+        raise RuntimeError(
+            "FERNET_KEY is not set. "
+            'Generate one with: python -c "from cryptography.fernet import Fernet;'
+            'print(Fernet.generate_key().decode())"'
+        )
+    return Fernet(key.encode())
+
+
+def encrypt_api_key(plaintext: str) -> str:
+    """Encrypt a BYOK API key for storage in UserAiCredential.encrypted_api_key."""
+    return _fernet().encrypt(plaintext.encode()).decode()
+
+
+def decrypt_api_key(ciphertext: str) -> str:
+    """Decrypt a stored BYOK API key. Use in Celery workers only; never log the result."""
+    return _fernet().decrypt(ciphertext.encode()).decode()

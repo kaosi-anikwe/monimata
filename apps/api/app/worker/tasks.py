@@ -23,8 +23,6 @@ from the request path or needs a scheduled trigger.
   categorize_transactions          — enqueued by bank-alert webhook after upsert
   evaluate_nudges_for_transactions — enqueued by POST /sync/push
   deliver_queued_nudges            — beat: 7:05 AM WAT
-  reconcile_budget_activity        — beat: 4:00 AM WAT (drift safety net)
-  weekly_review_nudges             — beat: Friday 5 PM WAT (Phase 2 LLM path)
 """
 
 from __future__ import annotations
@@ -60,6 +58,7 @@ def categorize_transactions(self, transaction_ids: list[str]) -> None:
         from app.models.transaction import Transaction
 
         user_ids: set[str] = set()
+        unresolved_by_user: dict[str, list[str]] = {}
         for tx_id in transaction_ids:
             tx = db.get(Transaction, tx_id)
             if tx and tx.category_id is None:
@@ -72,9 +71,16 @@ def categorize_transactions(self, transaction_ids: list[str]) -> None:
                         evaluate_transaction_nudges(db, tx)
                     except Exception:
                         logger.exception("evaluate_transaction_nudges failed for tx=%s", tx_id)
+                else:
+                    # Tier 1-3 all failed — queue for LLM fallback.
+                    unresolved_by_user.setdefault(str(tx.user_id), []).append(tx_id)
             if tx:
                 user_ids.add(str(tx.user_id))
         db.commit()
+
+        # Enqueue LLM batch per user for any transactions still uncategorised.
+        for uid, ids in unresolved_by_user.items():
+            cast(CeleryTask, run_llm_categorization).delay(uid, ids)
 
         for uid in user_ids:
             notify_user(uid, ["transactions", "nudges"])
@@ -169,76 +175,192 @@ def deliver_queued_nudges() -> None:
         db.close()
 
 
-# ── weekly_review_nudges ──────────────────────────────────────────────────────
+# ── run_llm_categorization ───────────────────────────────────────────────────
 
 
-@celery_app.task(name="app.worker.tasks.weekly_review_nudges")
-def weekly_review_nudges() -> None:
-    """Generate weekly review nudges for all active users. (Phase 2 — LLM path)"""
-    logger.info("weekly_review_nudges: skipped — LLM path not yet implemented")
+@celery_app.task(
+    name="app.worker.tasks.run_llm_categorization",
+    bind=True,
+    max_retries=3,
+)
+def run_llm_categorization(self, user_id: str, tx_ids: list[str]) -> None:  # type: ignore[misc]
+    """Batch-categorise transactions using the user's BYOK LLM credential.
 
-
-# ── reconcile_budget_activity ─────────────────────────────────────────────────
-
-
-@celery_app.task(name="app.worker.tasks.reconcile_budget_activity")
-def reconcile_budget_activity() -> None:
-    """Recompute budget_months.activity from the canonical transactions table.
-
-    Runs nightly at 4:00 AM WAT as a safety net against drift that can occur
-    from edge cases (e.g. manual-transaction deletes that failed to update
-    activity, category re-assignment race conditions).
+    Called by categorize_transactions after Tiers 1-3 leave transactions
+    uncategorised.  Errors are handled per-status:
+      - 429 / 503 → exponential backoff retry
+      - 401 / 402 → deactivate credential + send push nudge, no retry
+      - Persistent failure → leave category_id=None, set category_confidence=0
     """
-    from sqlalchemy import text
+    from app.core.security import decrypt_api_key
+    from app.models.category import Category
+    from app.models.transaction import Transaction
+    from app.models.user_ai_credential import UserAiCredential
+    from app.models.user_ai_usage_log import UserAiUsageLog
+    from app.services.llm import LlmHttpError, call_llm
+    from app.services.nudge_engine import create_nudge
 
     db = SessionLocal()
     try:
-        rows = db.execute(
-            text("""
-                SELECT
-                    t.user_id,
-                    t.category_id,
-                    to_char(DATE_TRUNC('month', t.date), 'YYYY-MM') AS month,
-                    SUM(t.amount) AS correct_activity
-                FROM transactions t
-                WHERE t.category_id IS NOT NULL
-                GROUP BY t.user_id, t.category_id, DATE_TRUNC('month', t.date)
-                """)
-        ).fetchall()
-
-        corrected = 0
-        for row in rows:
-            user_id, category_id, month, correct_activity = row
-            bm = (
-                db.query(BudgetMonth)
-                .filter(
-                    BudgetMonth.user_id == str(user_id),
-                    BudgetMonth.category_id == str(category_id),
-                    BudgetMonth.month == month,
-                )
-                .first()
+        # Find the user's active credential (prefer gemini for cost).
+        credential = (
+            db.query(UserAiCredential)
+            .filter(
+                UserAiCredential.user_id == user_id,
+                UserAiCredential.is_active.is_(True),
             )
-            if bm is None:
-                bm = BudgetMonth(
-                    user_id=str(user_id),
-                    category_id=str(category_id),
-                    month=month,
-                    assigned=0,
-                    activity=int(correct_activity),
+            .order_by(UserAiCredential.created_at.desc())
+            .first()
+        )
+        if credential is None:
+            logger.info("run_llm_categorization: no active credential for user=%s", user_id)
+            return
+
+        # Decrypt the API key in-memory — never log it.
+        api_key = decrypt_api_key(credential.encrypted_api_key)
+
+        # Load transactions that are still uncategorised.
+        txs = (
+            db.query(Transaction)
+            .filter(
+                Transaction.id.in_(tx_ids),
+                Transaction.user_id == user_id,
+                Transaction.category_id.is_(None),
+            )
+            .all()
+        )
+        if not txs:
+            return
+
+        # Load the user's visible categories.
+        categories = (
+            db.query(Category).filter(Category.user_id == user_id, ~Category.is_hidden).all()
+        )
+        category_names = [c.name for c in categories]
+        category_by_name = {c.name.lower(): c for c in categories}
+
+        tx_batch = [{"id": tx.id, "narration": tx.cleaned_narration or tx.narration} for tx in txs]
+
+        try:
+            results, prompt_tokens, completion_tokens = call_llm(
+                provider=credential.provider,
+                api_key=api_key,
+                transactions=tx_batch,
+                categories=category_names,
+            )
+        except LlmHttpError as exc:
+            if exc.status_code in (401, 402):
+                # Invalid or exhausted key — deactivate and notify the user.
+                credential.is_active = False
+                db.commit()
+                from app.models.user import User
+
+                user_obj = db.get(User, user_id)
+                if user_obj:
+                    create_nudge(
+                        db=db,
+                        user=user_obj,
+                        trigger_type="ai_credential_invalid",
+                        title="AI tracking paused",
+                        message=(
+                            "Your AI API key is invalid or has run out of credit. Tap to restore."
+                        ),
+                        context={},
+                    )
+                    db.commit()
+                logger.warning(
+                    "run_llm_categorization: credential deactivated (HTTP %s) user=%s",
+                    exc.status_code,
+                    user_id,
                 )
-                db.add(bm)
-                corrected += 1
-            elif bm.activity != int(correct_activity):
-                bm.activity = int(correct_activity)
-                bm.updated_at = datetime.now(UTC)
-                corrected += 1
+                return
+            # 429 / 503 — transient; retry with exponential backoff.
+            countdown = 30 * (2**self.request.retries)
+            raise self.retry(exc=exc, countdown=countdown)
+
+        finally:
+            # Best-effort: overwrite the local variable before GC.
+            api_key = ""  # noqa: F841
+
+        # Apply results to transactions and log usage.
+        tx_by_id = {tx.id: tx for tx in txs}
+        for item in results:
+            tx_id = item.get("tx_id")
+            cat_name = item.get("category")
+            confidence = int(item.get("confidence", 0))
+            tx = tx_by_id.get(str(tx_id))
+            if tx is None:
+                continue
+
+            matched_cat = category_by_name.get(cat_name.lower()) if cat_name else None
+            if matched_cat and confidence > 0:
+                tx.category_id = matched_cat.id
+                tx.categorization_source = "llm"
+                tx.category_confidence = min(confidence, 100)
+                _update_budget_activity(db, tx)
+            else:
+                tx.categorization_source = "llm"
+                tx.category_confidence = 0
+
+            db.add(
+                UserAiUsageLog(
+                    user_id=user_id,
+                    transaction_id=tx.id,
+                    provider=credential.provider,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                )
+            )
 
         db.commit()
-        logger.info("reconcile_budget_activity: corrected %d budget_month rows", corrected)
-    except Exception:
+        logger.info(
+            "run_llm_categorization: processed %d transactions for user=%s",
+            len(txs),
+            user_id,
+        )
+    except Exception as exc:
         db.rollback()
-        logger.exception("reconcile_budget_activity failed")
-        raise
+        logger.exception("run_llm_categorization failed for user=%s", user_id)
+        raise self.retry(exc=exc, countdown=60 * (2**self.request.retries))
+    finally:
+        db.close()
+
+
+# ── embed_category_rule ───────────────────────────────────────────────────────
+
+
+@celery_app.task(
+    name="app.worker.tasks.embed_category_rule",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=30,
+    queue="embeddings",
+)
+def embed_category_rule(self, rule_id: str) -> None:  # type: ignore[misc]
+    """Generate and store a 384-dim embedding for a UserCategoryRule.
+
+    Routed to the 'embeddings' queue whose worker must be started with
+    --concurrency=1 to prevent concurrent PyTorch matrix operations.
+
+    Enqueued automatically when a UserCategoryRule is created or its
+    cleaned_narration is updated (see _upsert_narration_map in transactions.py).
+    """
+    from app.models.user_category_rule import UserCategoryRule
+    from app.services.categorization.embeddings import encode
+
+    db = SessionLocal()
+    try:
+        rule = db.get(UserCategoryRule, rule_id)
+        if rule is None:
+            logger.warning("embed_category_rule: rule %s not found — skipping", rule_id)
+            return
+        rule.embedding = encode(rule.cleaned_narration)
+        db.commit()
+        logger.info("embed_category_rule: embedded rule %s", rule_id)
+    except Exception as exc:
+        db.rollback()
+        logger.exception("embed_category_rule failed for rule=%s", rule_id)
+        raise self.retry(exc=exc)
     finally:
         db.close()
 

@@ -45,7 +45,27 @@ celery_app.conf.update(
     # Windows: prefork pool uses Unix semaphores which Windows doesn't support.
     # Use solo (single-threaded) on Windows; prefork is used on Linux/macOS in production.
     worker_pool="solo" if sys.platform == "win32" else "prefork",
+    # Route embedding tasks to their own queue so the worker for that queue
+    # can be started with --concurrency=1, preventing concurrent PyTorch ops.
+    task_routes={
+        "app.worker.tasks.embed_category_rule": {"queue": "embeddings"},
+    },
 )
+
+
+# ── Embedding model boot signal ─────────────────────────────────────────────────────────
+# Load the SentenceTransformer model once per worker process so it is warm
+# before any embed_category_rule task arrives.  This prevents every task from
+# paying the ~2-4 s cold-start cost of loading the model from disk.
+
+from celery.signals import worker_process_init  # noqa: E402
+
+
+@worker_process_init.connect
+def _load_embedding_model(**kwargs: Any) -> None:  # type: ignore[misc]
+    from app.services.categorization.embeddings import init_embedding_model
+
+    init_embedding_model()
 
 
 # ── Typing helper ─────────────────────────────────────────────────────────────

@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # ── Encryption ────────────────────────────────────────────────────────────
     # 32-byte (64-char hex) key for AES-256-GCM used on PII columns
     AES_ENCRYPTION_KEY: str = ""
+    # Fernet key for BYOK AI API keys stored in UserAiCredential.
+    # Generate:
+    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    FERNET_KEY: str = ""
 
     # ── Sentry ────────────────────────────────────────────────────────────────
     SENTRY_DSN: str = ""  # Leave blank to disable Sentry

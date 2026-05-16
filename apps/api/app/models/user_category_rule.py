@@ -29,6 +29,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -64,6 +65,9 @@ class UserCategoryRule(Base):
         nullable=False,
         default=lambda: datetime.now(UTC),
     )
+    # 384-dim embedding of cleaned_narration produced by all-MiniLM-L6-v2.
+    # NULL until the Celery embed_category_rule task has run after rule creation.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(384), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
