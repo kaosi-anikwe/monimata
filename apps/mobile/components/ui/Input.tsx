@@ -200,9 +200,9 @@ const s = StyleSheet.create({
   field: {
     flex: 1,
     height: '100%',
-    fontSize: 15,
+    ...type_.body,
     fontFamily: 'PlusJakartaSans_400Regular',
-    paddingHorizontal: 14,
+    paddingHorizontal: spacing.mdn,
   },
   fieldWithLeft: {
     paddingLeft: 6,

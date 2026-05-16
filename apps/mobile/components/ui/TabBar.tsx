@@ -49,8 +49,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useNudgeUnreadCount } from '@/hooks/useNudges';
 import { type ThemeColors, useTheme } from '@/lib/theme';
-import { layout, shadow, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -261,7 +261,7 @@ const s = StyleSheet.create({
 
   tabInner: {
     alignItems: 'center',
-    gap: 3,
+    gap: spacing.xxs,
   },
 
   iconWrap: {
@@ -270,7 +270,7 @@ const s = StyleSheet.create({
 
   /** Font family set inline per-item (active=700, inactive=500). fontSize only here. */
   label: {
-    fontSize: 10,
+    ...type_.navItem,
   },
 
   /** Notification badge overlaid on the icon — matches .ni-badge in mockup. */
@@ -280,7 +280,7 @@ const s = StyleSheet.create({
     right: -8,
     minWidth: 14,
     height: 14,
-    borderRadius: 7,
+    borderRadius: radius.xs,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -288,9 +288,7 @@ const s = StyleSheet.create({
   },
 
   badgeText: {
-    ...ff(800),
-    fontSize: 8,
-    lineHeight: 14,
+    ...type_.badge,
     includeFontPadding: false,
     textAlignVertical: 'center',
   },

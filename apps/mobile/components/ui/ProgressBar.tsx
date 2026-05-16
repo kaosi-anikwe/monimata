@@ -25,17 +25,18 @@
  *   brand — brand-to-lime gradient fill   (goals / targets)
  */
 
-import React, { useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
+import React, { useEffect } from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 
 import { useTheme } from '@/lib/theme';
+import { radius } from '@/lib/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -252,11 +253,11 @@ function resolveFillColor(
 const s = StyleSheet.create({
   track: {
     width: '100%',
-    borderRadius: 99,
+    borderRadius: radius.full,
     overflow: 'hidden',
   },
   fill: {
-    borderRadius: 99,
+    borderRadius: radius.full,
   },
   fillAbsolute: {
     position: 'absolute',
@@ -271,6 +272,6 @@ const s = StyleSheet.create({
     // Lightens the hue to create a visibly grayed-out version of the fill color.
     // Opaque white at 52% makes any hue look washed-out without bleed-through.
     backgroundColor: 'rgba(255,255,255,0.52)',
-    borderRadius: 99,
+    borderRadius: radius.full,
   },
 });

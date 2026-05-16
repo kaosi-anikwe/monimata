@@ -60,7 +60,7 @@ import {
   type ManualTransactionBody,
 } from '@/hooks/useTransactions';
 import { GRADIENTS, useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
+import { layout, radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
@@ -157,7 +157,7 @@ function DetailRow({ label, value, isLast = false }: { label: string; value: str
       !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
     ]}>
       <Text style={[type_.small, { color: colors.textMeta }]}>{label}</Text>
-      <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.textPrimary, flex: 1, textAlign: 'right' }]} numberOfLines={2}>
+      <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.textPrimary, flex: 1, textAlign: 'right' }]} numberOfLines={2}>
         {value}
       </Text>
     </View>
@@ -292,7 +292,7 @@ function SplitBreakdownCard({
           {isRemoving ? (
             <ActivityIndicator color={colors.error} size="small" />
           ) : (
-            <Text style={[{ ...ff(600), fontSize: 12 }, { color: colors.error }]}>Remove</Text>
+            <Text style={[type_.small, { color: colors.error }]}>Remove</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -315,12 +315,12 @@ function SplitBreakdownCard({
                 <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>
                   {cat ? cat.name : 'Uncategorised'}
                 </Text>
-                <Text style={[{ ...ff(700), fontSize: 13 }, { color: colors.textPrimary }]}>
+                <Text style={[type_.bodyReg, { color: colors.textPrimary }]}>
                   {formatNaira(s.amount)}
                 </Text>
               </View>
               {s.memo ? (
-                <Text style={[{ ...ff(400), fontSize: 12 }, { color: colors.textMeta, marginTop: 2 }]}>
+                <Text style={[type_.small, { color: colors.textMeta, marginTop: 2 }]}>
                   {s.memo}
                 </Text>
               ) : null}
@@ -453,10 +453,10 @@ function BankViewForm({
         <Frow label="Category">
           {tx.is_split ? (
             <View style={ss.frowTouchable}>
-              <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.info, flex: 1 }]}>
+              <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.info, flex: 1 }]}>
                 Split
               </Text>
-              <Text style={[{ ...ff(400), fontSize: 11 }, { color: colors.textMeta }]}>
+              <Text style={[type_.caption, { color: colors.textMeta }]}>
                 Remove split to change
               </Text>
             </View>
@@ -467,7 +467,7 @@ function BankViewForm({
               accessibilityRole="button" accessibilityLabel="Select category"
             >
               <Text style={[
-                { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { ...ff(selectedCategory ? 600 : 400), ...type_.small, lineHeight: 16 },
                 { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Uncategorised'}
@@ -699,7 +699,7 @@ function ManualEditForm({
             onPress={() => { setDtPickerMode('date'); setShowDatePicker(true); }}
             accessibilityRole="button" accessibilityLabel="Select date and time"
           >
-            <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
+            <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
               {formatTxDatetime(txDatetime.toISOString())}
             </Text>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -715,7 +715,7 @@ function ManualEditForm({
           >
             <Text
               style={[
-                { ...ff(selectedAccount ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { ...ff(selectedAccount ? 600 : 400), ...type_.small, lineHeight: 16 },
                 { color: selectedAccount ? colors.textPrimary : colors.textTertiary, flex: 1 },
               ]}
               numberOfLines={1}
@@ -732,10 +732,10 @@ function ManualEditForm({
         <Frow label="Category">
           {tx.is_split ? (
             <View style={ss.frowTouchable}>
-              <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.info, flex: 1 }]}>
+              <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.info, flex: 1 }]}>
                 Split
               </Text>
-              <Text style={[{ ...ff(400), fontSize: 11 }, { color: colors.textMeta }]}>
+              <Text style={[type_.caption, { color: colors.textMeta }]}>
                 Remove split to change
               </Text>
             </View>
@@ -746,7 +746,7 @@ function ManualEditForm({
               accessibilityRole="button" accessibilityLabel="Select category"
             >
               <Text style={[
-                { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { ...ff(selectedCategory ? 600 : 400), ...type_.small, lineHeight: 16 },
                 { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Optional'}
@@ -788,7 +788,7 @@ function ManualEditForm({
               }}
               accessibilityRole="button" accessibilityLabel="Stop recurring"
             >
-              <Text style={[{ ...ff(700), fontSize: 11, lineHeight: 14 }, { color: colors.error }]}>Stop</Text>
+              <Text style={[type_.caption, { color: colors.error }]}>Stop</Text>
             </TouchableOpacity>
           </Frow>
         ) : (
@@ -799,7 +799,7 @@ function ManualEditForm({
               accessibilityRole="button" accessibilityLabel="Select recurrence"
             >
               <Text style={[
-                { ...ff(recurrence ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { ...ff(recurrence ? 600 : 400), ...type_.small, lineHeight: 16 },
                 { color: recurrence ? colors.textPrimary : colors.textTertiary, flex: 1 },
               ]}>
                 {recurrence ? recurrence.label : 'Never'}
@@ -1110,21 +1110,21 @@ const ss = StyleSheet.create({
     paddingBottom: spacing.mdn,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: layout.iconBtnSize, height: layout.iconBtnSize, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
   // Action sheet rows
   ashRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
+    paddingVertical: spacing.mdn,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  ashIc: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  ashIc: { width: layout.iconBtnSize, height: layout.iconBtnSize, borderRadius: radius.smd, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   ashText: { flex: 1 },
   ashName: { ...type_.body },
-  ashDesc: { ...ff(400), fontSize: 12, marginTop: 1 },
+  ashDesc: { ...type_.small, marginTop: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
@@ -1144,33 +1144,33 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
   },
-  heroNavTitle: { ...type_.h2 },
+  heroNavTitle: { ...type_.h1 },
   frostBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroAmtLg: { ...ff(800), fontSize: 38, letterSpacing: -1.5, marginBottom: spacing.sm },
-  heroNarr: { ...ff(500), fontSize: 15, marginBottom: spacing.md },
+  heroAmtLg: { ...type_.displayHero, marginBottom: spacing.sm },
+  heroNarr: { ...type_.mono, marginBottom: spacing.md },
   heroChips: {
     flexDirection: 'row',
     gap: spacing.sm,
     flexWrap: 'wrap',
   },
   heroChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.xs,
     borderRadius: radius.full,
   },
-  heroChipTxt: { ...ff(800), fontSize: 11, letterSpacing: 1 },
+  heroChipTxt: { ...type_.label },
   heroChipGlass: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.xs,
     borderRadius: radius.full,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
@@ -1178,8 +1178,8 @@ const ss = StyleSheet.create({
   },
   heroChipGlassTxt: { ...type_.caption },
   // kept for typeBadge usage in any remaining manual form badges
-  typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
-  typeBadgeText: { ...ff(800), fontSize: 11, letterSpacing: 1 },
+  typeBadge: { paddingHorizontal: spacing.smd, paddingVertical: spacing.xs, borderRadius: radius.full },
+  typeBadgeText: { ...type_.label },
   // Detail card (bank view)
   detailCard: {
     borderRadius: radius.md,
@@ -1202,15 +1202,15 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: spacing.sm,
-    minHeight: 48,
+    minHeight: layout.rowMinHeight + spacing.xs,
   },
-  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  frowInput: { flex: 1, ...ff(600), fontSize: 13, padding: 0 },
+  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxs + spacing.xs },
+  frowInput: { flex: 1, ...type_.bodyReg, padding: 0 },
   frowValue: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   // Type toggle
-  typeToggle: { flexDirection: 'row', borderRadius: radius.sm + 1, padding: 3, overflow: 'hidden' },
-  typePill: { position: 'absolute', top: 3, bottom: 3, borderRadius: spacing.smd },
-  typeBtn: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  typeToggle: { flexDirection: 'row', borderRadius: radius.sm + 1, padding: spacing.xxs, overflow: 'hidden' },
+  typePill: { position: 'absolute', top: spacing.xxs, bottom: spacing.xxs, borderRadius: spacing.smd },
+  typeBtn: { flex: 1, height: layout.avatarSm + spacing.xxs, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   typeBtnText: { ...type_.btnSm },
   // Amount display (manual edit)
   amtCard: {
@@ -1221,30 +1221,30 @@ const ss = StyleSheet.create({
     alignItems: 'center',
   },
   amtRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  amtSym: { ...ff(800), fontSize: 20, lineHeight: 52, marginRight: 2 },
-  amtNum: { ...ff(800), fontSize: 48, letterSpacing: -2 },
+  amtSym: { ...type_.displaySm, lineHeight: layout.btnHeight, marginRight: 2 },
+  amtNum: { ...type_.displayXl },
   // Recurring badge
-  recurBadge: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.xs, flex: 1 },
-  stopBtn: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.xs, borderWidth: 1.5 },
+  recurBadge: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.xs, flex: 1 },
+  stopBtn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.xs, borderWidth: 1.5 },
   // Delete button
   deleteBtn: {
     borderWidth: 1.5,
     borderRadius: radius.md,
-    paddingVertical: 14,
+    paddingVertical: spacing.mdn,
     alignItems: 'center',
   },
   // Numpad
   numpad: { borderRadius: radius.md, overflow: 'hidden', gap: 1 },
   numRow: { flexDirection: 'row', gap: 1 },
-  numKey: { flex: 1, height: 50, alignItems: 'center', justifyContent: 'center' },
+  numKey: { flex: 1, height: layout.btnHeightSm, alignItems: 'center', justifyContent: 'center' },
   numKeyText: { ...type_.numpad },
   // Pickers
-  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: 7 },
+  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs + spacing.xs },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },
   // DatePicker
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  dtSheet: { paddingBottom: 24, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
-  dtDoneBtn: { margin: spacing.lg, paddingVertical: 14, borderRadius: radius.sm, alignItems: 'center' },
+  dtSheet: { paddingBottom: spacing.xxl, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
+  dtDoneBtn: { margin: spacing.lg, paddingVertical: spacing.mdn, borderRadius: radius.sm, alignItems: 'center' },
   // Split breakdown card
   splitCard: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
   splitCardHdr: {

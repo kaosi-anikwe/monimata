@@ -60,8 +60,8 @@ import {
 } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
-import { spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
+import { layout, radius, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
 import { Button } from './Button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -177,8 +177,8 @@ const s = StyleSheet.create({
   root: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
     overflow: 'hidden',
   },
   // Row layout
@@ -196,12 +196,12 @@ const s = StyleSheet.create({
   },
   rightSlot: {
     flexShrink: 0,
-    minWidth: 36,
+    minWidth: layout.iconBtnSize,
     alignItems: 'flex-end',
   },
   iconPlaceholder: {
-    width: 36,
-    height: 36,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
   },
   // Stack layout
   backBtnStack: {
@@ -221,8 +221,7 @@ const s = StyleSheet.create({
     ...type_.h1
   },
   subtitle: {
-    ...ff(400),
-    fontSize: 13,
-    marginTop: 4,
+    ...type_.bodyReg,
+    marginTop: spacing.xs,
   },
 });

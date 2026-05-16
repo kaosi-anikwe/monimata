@@ -44,7 +44,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { useTheme } from '@/lib/theme';
-import { layout, spacing } from '@/lib/tokens';
+import { layout, radius, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -246,8 +246,8 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(13,31,13,0.55)',
   },
   sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
     overflow: 'hidden',
   },
   handleArea: {

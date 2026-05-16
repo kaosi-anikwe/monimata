@@ -212,9 +212,9 @@ const ms = StyleSheet.create({
   },
   title: { ...type_.h1 },
   editBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -222,46 +222,43 @@ const ms = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
+    gap: spacing.mdn,
     marginBottom: spacing.md,
   },
   mnavBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: layout.avatarSm - spacing.xs,
+    height: layout.avatarSm - spacing.xs,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mnavLbl: { ...ff(700), fontSize: 16 },
+  mnavLbl: { ...type_.h3 },
   tbbCard: {
     borderRadius: radius.md,
-    padding: 13,
-    paddingHorizontal: 16,
+    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   tbbLbl: {
-    ...ff(700),
-    fontSize: 11,
+    ...type_.label,
     color: glass.labelDim,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
   },
   tbbVal: { ...type_.displayMd, marginTop: 1 },
-  tbbSub: { ...ff(400), fontSize: 11, color: glass.textFaint, marginTop: 1 },
+  tbbSub: { ...type_.caption, color: glass.textFaint, marginTop: 1 },
   aaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: spacing.xxs + spacing.xs,
     backgroundColor: glass.badge,
     borderWidth: 1.5,
     borderColor: glass.borderLimeStrong,
-    borderRadius: 11,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    borderRadius: radius.smd,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xxs + spacing.xs,
   },
-  aaBtnTxt: { ...ff(700), fontSize: 12 },
+  aaBtnTxt: { ...type_.small },
 });
 
 // ── Category row (.bgt-row) ───────────────────────────────────────────────────
@@ -313,7 +310,7 @@ function CategoryRow({
           <Text style={[cr.name, { color: colors.textPrimary }]} numberOfLines={1}>
             {category.name}
           </Text>
-          <Text style={[cr.assignedTxt, { color: colors.textMeta, marginTop: 3 }]}>Hidden</Text>
+          <Text style={[cr.assignedTxt, { color: colors.textMeta, marginTop: spacing.xxs }]}>Hidden</Text>
         </View>
         <Ionicons name="eye-off-outline" size={16} color={colors.textMeta} />
       </TouchableOpacity>
@@ -367,16 +364,16 @@ const cr = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    gap: spacing.smd,
+    paddingHorizontal: spacing.mdn,
+    paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   left: { flex: 1, minWidth: 0 },
   name: { ...type_.body },
   right: { alignItems: 'flex-end', minWidth: 86 },
-  avail: { ...ff(700), fontSize: 15 },
-  assignedTxt: { ...ff(400), fontSize: 11, marginTop: 1 },
+  avail: { ...type_.mono },
+  assignedTxt: { ...type_.caption, marginTop: 1 },
 });
 
 // ── Custom numpad (.assign-numpad) ───────────────────────────────────────────
@@ -415,9 +412,9 @@ function NumpadGrid({ onKey, onDel }: { onKey: (k: string) => void; onDel: () =>
 }
 
 const np = StyleSheet.create({
-  grid: { marginHorizontal: 20, marginTop: spacing.mdn, borderRadius: radius.md, overflow: 'hidden', gap: 1 },
+  grid: { marginHorizontal: spacing.xl, marginTop: spacing.mdn, borderRadius: radius.md, overflow: 'hidden', gap: 1 },
   row: { flexDirection: 'row', gap: 1 },
-  key: { flex: 1, height: 50, alignItems: 'center', justifyContent: 'center' },
+  key: { flex: 1, height: layout.btnHeightSm, alignItems: 'center', justifyContent: 'center' },
   keyTxt: { ...type_.numpad },
 });
 
@@ -750,32 +747,32 @@ const sh = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingBottom: Platform.OS === 'ios' ? spacing.xxxl : spacing.xl,
     maxHeight: '92%',
   },
   handle: {
-    width: 36,
-    height: 4,
+    width: layout.sheetHandle.width,
+    height: layout.sheetHandle.height,
     borderRadius: 2,
     alignSelf: 'center',
-    marginTop: 12,
+    marginTop: spacing.md,
   },
   // .sheet-top
   top: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.mdn,
   },
   topTitle: { ...type_.h2 },
-  topSub: { ...type_.bodyReg, marginTop: 3 },
+  topSub: { ...type_.bodyReg, marginTop: spacing.xxs },
   xBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: layout.iconBtnSize - spacing.xs,
+    height: layout.iconBtnSize - spacing.xs,
+    borderRadius: radius.smd,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -784,15 +781,15 @@ const sh = StyleSheet.create({
   // .assign-stats
   statsBox: {
     flexDirection: 'row',
-    marginHorizontal: 20,
-    marginTop: 14,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.mdn,
     borderRadius: radius.md,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  statCell: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' },
-  statLbl: { ...ff(600), fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
-  statVal: { ...ff(800), fontSize: 16, letterSpacing: -0.5, marginTop: 4 },
+  statCell: { flex: 1, paddingVertical: spacing.smd, paddingHorizontal: spacing.md, alignItems: 'center' },
+  statLbl: { ...type_.label },
+  statVal: { ...ff(800), ...type_.h3, letterSpacing: -0.5, marginTop: spacing.xs },
   statDiv: { width: 1 },
   // .assign-amt
   amtCard: {
@@ -802,28 +799,28 @@ const sh = StyleSheet.create({
     marginHorizontal: spacing.xl,
     marginTop: spacing.mdn,
     borderRadius: radius.lg,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
   },
-  amtSym: { ...ff(800), fontSize: 18, lineHeight: 46, marginRight: 2 },
-  amtNum: { ...ff(800), fontSize: 40, letterSpacing: -1.5 },
+  amtSym: { ...type_.displayXs, lineHeight: layout.fabSize, marginRight: 2 },
+  amtNum: { ...type_.displayLg },
   // .quickfills
   qfScroll: { marginTop: spacing.mdn, flexGrow: 0 },
-  qfRow: { paddingHorizontal: spacing.xl, gap: 6 },
+  qfRow: { paddingHorizontal: spacing.xl, gap: spacing.xxs + spacing.xxs },
   qfChip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    paddingVertical: spacing.xxs + spacing.xxs,
     borderRadius: radius.full,
     borderWidth: 1,
     alignSelf: 'center',
   },
-  qfTxt: { ...ff(600), fontSize: 12 },
+  qfTxt: { ...type_.small },
   // .assign-footer
   footer: {
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 14,
+    gap: spacing.smd,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.mdn,
   },
   footBtn: {
     height: 48,
@@ -834,25 +831,22 @@ const sh = StyleSheet.create({
   footTxt: { ...type_.btnSm },
   // Move mode extras
   toLabel: {
-    ...ff(700),
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 4,
+    ...type_.label,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.smd,
+    paddingBottom: spacing.xs,
   },
-  destList: { maxHeight: 140, marginHorizontal: 12, marginBottom: 4 },
+  destList: { maxHeight: 140, marginHorizontal: spacing.md, marginBottom: spacing.xs },
   destRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.smd,
+    borderRadius: radius.xs,
     marginVertical: 2,
   },
-  destName: { flex: 1, ...ff(500), fontSize: 14 },
+  destName: { flex: 1, ...type_.body },
   destAvail: { ...type_.bodyReg },
 });
 
@@ -920,13 +914,13 @@ const gh = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 14,
-    paddingRight: 14,
-    paddingVertical: 11,
+    paddingLeft: spacing.mdn,
+    paddingRight: spacing.mdn,
+    paddingVertical: spacing.smd,
   },
   name: { ...type_.label, flex: 1 },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  total: { ...ff(700), fontSize: 13 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  total: { ...type_.bodyReg },
 });
 
 // ── Unhide sheet (.unhide-sheet) ──────────────────────────────────────────────
@@ -1003,19 +997,19 @@ function UnhideSheet({
 
 const uh = StyleSheet.create({
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
   },
   content: {
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 10,
-    gap: 8,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.smd,
+    gap: spacing.sm,
   },
-  icon: { marginBottom: 4 },
+  icon: { marginBottom: spacing.xs },
   title: { ...type_.h2 },
-  sub: { ...ff(400), fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  sub: { ...type_.body, textAlign: 'center', lineHeight: 20 },
 });
 
 // ── Main screen ────────────────────────────────────────────────────────────────
@@ -1232,14 +1226,14 @@ const s = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-    gap: 6,
+    padding: spacing.xxl,
+    gap: spacing.xxs + spacing.xxs,
   },
-  errorText: { ...ff(600), fontSize: 16, textAlign: 'center' },
+  errorText: { ...type_.h3, textAlign: 'center' },
   errorSub: { ...type_.bodyReg, textAlign: 'center' },
   grpCard: {
-    marginHorizontal: 16,
-    marginTop: 10,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.smd,
     borderRadius: radius.md,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1247,18 +1241,18 @@ const s = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
-    gap: 8,
+    gap: spacing.sm,
   },
-  emptyText: { ...ff(600), fontSize: 16 },
-  emptyLink: { ...ff(600), fontSize: 14, marginTop: 4 },
+  emptyText: { ...type_.h3 },
+  emptyLink: { ...type_.body, marginTop: spacing.xs },
   hiddenToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    marginTop: 4,
+    gap: spacing.xxs + spacing.xxs,
+    paddingVertical: spacing.mdn,
+    marginTop: spacing.xs,
   },
-  hiddenToggleTxt: { ...ff(500), fontSize: 13 },
+  hiddenToggleTxt: { ...type_.bodyReg },
 });
 

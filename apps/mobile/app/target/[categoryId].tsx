@@ -616,7 +616,7 @@ const ts = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pillTabText: { ...ff(600), fontSize: 13 },
+  pillTabText: { ...type_.bodyReg, ...ff(600) },
 
   // ── Tab content ───────────────────────────────────────────────────────────
   tabContent: {
@@ -624,16 +624,14 @@ const ts = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  sentence: { ...ff(600), fontSize: 20, marginBottom: spacing.xs, marginTop: spacing.md },
+  sentence: { ...type_.bodyXl, marginBottom: spacing.xs, marginTop: spacing.md },
 
   // ── Section ───────────────────────────────────────────────────────────────
   section: { marginTop: spacing.xl },
   sectionLabel: {
-    ...ff(700),
-    fontSize: 11,
-    marginBottom: spacing.smd,
+    ...type_.label,
     letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    marginBottom: spacing.smd,
   },
 
   // ── Weekday row ───────────────────────────────────────────────────────────
@@ -644,7 +642,7 @@ const ts = StyleSheet.create({
     borderRadius: radius.xs,
     alignItems: 'center',
   },
-  weekdayText: { ...ff(600), fontSize: 12 },
+  weekdayText: { ...type_.small, ...ff(600) },
 
   // ── Day stepper ───────────────────────────────────────────────────────────
   dayInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
@@ -655,7 +653,7 @@ const ts = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dayValue: { ...ff(800), fontSize: 24, minWidth: 44, textAlign: 'center' },
+  dayValue: { ...type_.displayMd, minWidth: 44, textAlign: 'center' },
 
   // ── Date picker ───────────────────────────────────────────────────────────
   dateBtn: {
@@ -667,7 +665,7 @@ const ts = StyleSheet.create({
     paddingHorizontal: spacing.mdn,
     paddingVertical: spacing.md,
   },
-  dateBtnTxt: { ...ff(600), fontSize: 15, flex: 1 },
+  dateBtnTxt: { ...type_.bodyLg, flex: 1 },
   datePickerWrap: {
     borderWidth: 1,
     borderRadius: 10,
@@ -681,12 +679,12 @@ const ts = StyleSheet.create({
     paddingVertical: spacing.smd,
     alignItems: 'center',
   },
-  datePickerDoneTxt: { ...ff(600), fontSize: 14 },
+  datePickerDoneTxt: { ...type_.body },
 
   // ── Repeats toggle ────────────────────────────────────────────────────────
   repeatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
-  hint: { ...ff(400), fontSize: 13, marginTop: spacing.smd, lineHeight: 18 },
+  hint: { ...type_.bodyReg, marginTop: spacing.smd, lineHeight: 18 },
 
   // ── Behavior picker ───────────────────────────────────────────────────────
   behaviorRow: {
@@ -708,8 +706,8 @@ const ts = StyleSheet.create({
   },
   radioInner: { width: 10, height: 10, borderRadius: 5 }, // half of width
   behaviorText: { flex: 1 },
-  behaviorLabel: { ...ff(600), fontSize: 15 },
-  behaviorDesc: { ...ff(400), fontSize: 12, marginTop: 2 },
+  behaviorLabel: { ...type_.bodyLg },
+  behaviorDesc: { ...type_.small, ...ff(400), marginTop: 2 },
 
   // ── Save bar ──────────────────────────────────────────────────────────────
   saveBar: {

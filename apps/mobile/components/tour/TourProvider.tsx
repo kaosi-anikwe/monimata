@@ -31,28 +31,28 @@
  */
 
 import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from 'react';
 import {
-    Dimensions,
-    Easing,
-    Modal,
-    Platform,
-    Animated as RNAnimated,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Easing,
+  Modal,
+  Platform,
+  Animated as RNAnimated,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { useTheme, type ThemeColors } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { glass, radius, shadow, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ function TourOverlay({ steps, stepIndex, rect, spotX, spotY, spotW, spotH, spotR
           <RNAnimated.View style={[{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: DIM }, { top: spotBottom }]} pointerEvents="none" />
           <RNAnimated.View style={[{ position: 'absolute', left: 0, backgroundColor: DIM }, { top: spotY, width: spotX, height: spotH }]} pointerEvents="none" />
           <RNAnimated.View style={[{ position: 'absolute', right: 0, backgroundColor: DIM }, { top: spotY, left: spotRight, height: spotH }]} pointerEvents="none" />
-          <RNAnimated.View style={[{ position: 'absolute', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.22)' }, { top: spotY, left: spotX, width: spotW, height: spotH }]} pointerEvents="none" />
+          <RNAnimated.View style={[{ position: 'absolute', borderWidth: 1.5, borderColor: glass.borderWhite }, { top: spotY, left: spotX, width: spotW, height: spotH }]} pointerEvents="none" />
         </>
       )}
       {isFallback && (
@@ -508,28 +508,20 @@ const ts = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.sm,
     // Subtle shadow so it lifts off the overlay
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 8,
+    ...shadow.md,
   },
   counter: {
-    ...ff(500),
-    fontSize: 11,
+    ...type_.caption,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginBottom: 2,
   },
   title: {
-    ...ff(700),
-    fontSize: 18,
+    ...type_.subHead,
     letterSpacing: -0.2,
-    lineHeight: 24,
   },
   body: {
-    ...ff(400),
-    fontSize: 14,
+    ...type_.body,
     lineHeight: 22,
   },
   btnRow: {
@@ -539,8 +531,7 @@ const ts = StyleSheet.create({
     marginTop: spacing.sm,
   },
   skipTxt: {
-    ...ff(500),
-    fontSize: 13,
+    ...type_.bodyReg,
   },
   nextBtn: {
     paddingHorizontal: spacing.xl,
@@ -548,8 +539,8 @@ const ts = StyleSheet.create({
     borderRadius: radius.sm,
   },
   nextTxt: {
+    ...type_.body,
     ...ff(700),
-    fontSize: 14,
     letterSpacing: -0.1,
   },
   fallbackBadge: {
@@ -557,12 +548,11 @@ const ts = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: 3,
+    paddingVertical: spacing.xxs,
     marginBottom: spacing.xs,
   },
   fallbackTxt: {
-    ...ff(500),
-    fontSize: 11,
+    ...type_.caption,
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },

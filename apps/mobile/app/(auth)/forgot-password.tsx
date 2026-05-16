@@ -34,6 +34,7 @@ import { z } from 'zod';
 
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
+import { spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
 import client from '@/services/api';
 import { AuthHdr, BackBtn, TrustCard, s } from './_authShared';
@@ -132,13 +133,13 @@ export default function ForgotPasswordScreen() {
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
             loading={loading}
-            style={{ marginTop: 24 }}
+            style={{ marginTop: spacing.xxl }}
             accessibilityLabel="Send reset code"
           >
             Send Reset Code
           </Button>
 
-          <Text style={[s.navLinkText, { color: colors.textMeta, textAlign: 'center', marginTop: 20 }]}>
+          <Text style={[s.navLinkText, { color: colors.textMeta, textAlign: 'center', marginTop: spacing.xl }]}>
             {'Remember your password? '}
             <Text
               style={{ color: colors.brand, ...ff(700) }}

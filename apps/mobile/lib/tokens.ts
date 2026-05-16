@@ -42,8 +42,12 @@ import { Platform, ViewStyle } from 'react-native';
 // CSS: --rm = 16px (md), --rl = 22px (lg)
 
 export const radius = {
+  /** 4 pt — tiny dot indicators, micro badges */
+  xxs: 4,
   /** 8 pt — small chips, badges, tags */
   xs: 8,
+  /** 10 pt — small inputs, controls, inline tags */
+  smd: 10,
   /** 12 pt — buttons, small cards */
   sm: 12,
   /** 16 pt — standard cards, inputs, bottom sheets. CSS: --rm */
@@ -167,6 +171,15 @@ export const layout = {
 
   /** Standard list row minimum tap height (accessibility). */
   rowMinHeight: 44,
+
+  /** Primary CTA button height — lime variant. */
+  btnHeightLg: 54,
+  /** Standard button height — green / red / destructive. */
+  btnHeight: 52,
+  /** Secondary / ghost button height. */
+  btnHeightSm: 50,
+  /** Icon-only button width = height. */
+  iconBtnSize: 36,
 
   /** Avatar sizes. */
   avatarSm: 32,

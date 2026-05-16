@@ -69,7 +69,7 @@ import {
   useUnhideGroup,
 } from '@/hooks/useBudget';
 import { useTheme } from '@/lib/theme';
-import { glass, radius, shadow, spacing } from '@/lib/tokens';
+import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, formatMoney, type_ } from '@/lib/typography';
 import { useAppSelector } from '@/store/hooks';
 import type { BudgetCategory, BudgetGroup } from '@monimata/shared-types';
@@ -633,7 +633,7 @@ function UnhideSheetEdit({
       scrollable={false}
     >
       <View style={ss.unhideContent}>
-        <Ionicons name="eye-outline" size={24} color={colors.brand} style={{ alignSelf: 'center', marginBottom: 4 }} />
+        <Ionicons name="eye-outline" size={24} color={colors.brand} style={{ alignSelf: 'center', marginBottom: spacing.xs }} />
         <Text style={[ss.unhideSub, { color: colors.textMeta }]}>
           &quot;{item.name}&quot; will appear in your budget again.
         </Text>
@@ -1045,9 +1045,9 @@ const ss = StyleSheet.create({
   },
   hdrTitle: { ...type_.h1 },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: glass.strong,
@@ -1061,15 +1061,12 @@ const ss = StyleSheet.create({
     borderWidth: 1,
   },
   ctbmLabel: {
-    ...ff(700),
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    ...type_.label,
     marginBottom: spacing.xs,
   },
-  ctbmVal: { ...ff(800), fontSize: 22, letterSpacing: -0.5 },
-  ctbmSuffix: { ...ff(500), fontSize: 14, letterSpacing: 0 },
-  ctbmSub: { ...ff(400), fontSize: 12, marginTop: spacing.xs },
+  ctbmVal: { ...type_.h1 },
+  ctbmSuffix: { ...type_.body },
+  ctbmSub: { ...type_.small, marginTop: spacing.xs },
 
   // ── Group card wrapper (.edit-grp) ───────────────────────────────────────
   grpWrapper: {
@@ -1099,23 +1096,21 @@ const ss = StyleSheet.create({
     gap: spacing.sm,
   },
   groupName: {
-    ...ff(700),
-    fontSize: 11,
-    letterSpacing: 1.5,
+    ...type_.label,
     flex: 1,
   },
   groupAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
     paddingHorizontal: spacing.smd,
     paddingVertical: spacing.xs,
     borderRadius: radius.xs,
   },
-  groupAddText: { ...ff(600), fontSize: 12 },
+  groupAddText: { ...type_.small },
   groupMoreBtn: {
-    width: 28,
-    height: 28,
+    width: layout.avatarSm - spacing.xs,
+    height: layout.avatarSm - spacing.xs,
     borderRadius: radius.xs,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1126,12 +1121,12 @@ const ss = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.mdn,
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     gap: spacing.smd,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   dragHandleHit: {
-    padding: 4,
+    padding: spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1148,12 +1143,12 @@ const ss = StyleSheet.create({
   catName: { ...type_.body },
   catTargetChip: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 7,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.xxs,
   },
-  catTargetText: { ...ff(600), fontSize: 12 },
+  catTargetText: { ...type_.small },
   catAddTargetBtn: { paddingHorizontal: 2 },
-  catAddTargetText: { ...ff(600), fontSize: 12 },
+  catAddTargetText: { ...type_.small },
 
   // ── Add Group button (.add-grp-btn) ──────────────────────────────────────
   addGroupBtn: {
@@ -1175,15 +1170,15 @@ const ss = StyleSheet.create({
   ashRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.md,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.mdn,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   ashIc: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1203,14 +1198,13 @@ const ss = StyleSheet.create({
     flex: 1,
     borderWidth: 1.5,
     borderRadius: radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    ...ff(600),
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...type_.body,
   },
   renameConfirm: {
-    width: 36,
-    height: 36,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
     borderRadius: radius.xs,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1228,33 +1222,33 @@ const ss = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.xxl,
   },
-  modalTitle: { ...ff(700), fontSize: 18, marginBottom: spacing.lg },
+  modalTitle: { ...type_.subHead, marginBottom: spacing.lg },
   modalInput: {
     borderWidth: 1.5,
     borderRadius: radius.sm,
-    padding: 12,
-    fontSize: 16,
+    padding: spacing.md,
+    ...type_.h3,
     ...ff(500),
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
-  modalRow: { flexDirection: 'row', gap: 12 },
+  modalRow: { flexDirection: 'row', gap: spacing.md },
   modalCancel: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderRadius: radius.sm,
     alignItems: 'center',
   },
-  modalCancelText: { fontSize: 15, ...ff(600) },
+  modalCancelText: { ...type_.btnLg, ...ff(600) },
   modalSave: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderRadius: radius.sm,
     alignItems: 'center',
   },
-  modalSaveText: { fontSize: 15, ...ff(600) },
+  modalSaveText: { ...type_.btnLg, ...ff(600) },
 
   // ── Error state ──────────────────────────────────────────────────────────
-  errorContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 6 },
+  errorContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xxl, gap: spacing.xxs + spacing.xxs },
   errorText: { ...type_.h3, textAlign: 'center' },
   errorSub: { ...type_.bodyReg, textAlign: 'center' },
 
@@ -1263,19 +1257,19 @@ const ss = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    marginTop: 4,
+    gap: spacing.xxs + spacing.xxs,
+    paddingVertical: spacing.mdn,
+    marginTop: spacing.xs,
   },
-  hiddenToggleTxt: { ...ff(500), fontSize: 13 },
+  hiddenToggleTxt: { ...type_.bodyReg },
   unhideContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,
-    gap: 10,
+    gap: spacing.smd,
   },
-  unhideSub: { ...ff(400), fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  unhideFooter: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  unhideSub: { ...type_.body, textAlign: 'center', lineHeight: 20 },
+  unhideFooter: { flexDirection: 'row', gap: spacing.smd, marginTop: spacing.sm },
   unhideBtn: { flex: 1, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   unhideBtnTxt: { ...type_.btnSm },
 });

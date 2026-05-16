@@ -25,26 +25,26 @@
  * the navigation stack.
  */
 
+import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated as RNAnimated,
   Dimensions,
   Modal,
+  Animated as RNAnimated,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 
 import { releaseWelcome, resetWelcomeBridgeForUser } from '@/lib/welcomeBridge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ff } from '@/lib/typography';
 import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
+import { glass, layout, radius, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
 
 // ── Store key ─────────────────────────────────────────────────────────────────
 
@@ -282,7 +282,7 @@ function SlideView({
   return (
     <View style={[s.slide, { width: SCREEN_W, paddingTop: insets.top + 72 }]}>
       {/* Icon */}
-      <View style={[s.iconWrap, { backgroundColor: 'rgba(163,230,53,0.12)', borderColor: 'rgba(163,230,53,0.25)' }]}>
+      <View style={[s.iconWrap, { backgroundColor: glass.badge, borderColor: glass.borderLimeStrong }]}>
         <Ionicons name={slide.icon} size={44} color={colors.lime} />
         {slide.accentIcon && (
           <View style={[s.accentIconWrap, { backgroundColor: colors.darkGreenMid }]}>
@@ -293,7 +293,7 @@ function SlideView({
 
       {/* Text */}
       <Text style={[s.slideTitle, { color: colors.lime }]}>{slide.title}</Text>
-      <Text style={[s.slideBody, { color: 'rgba(255,255,255,0.72)' }]}>{slide.body}</Text>
+      <Text style={[s.slideBody, { color: glass.textDim }]}>{slide.body}</Text>
 
       {/* Bullets */}
       {slide.bullets && (
@@ -301,7 +301,7 @@ function SlideView({
           {slide.bullets.map((b) => (
             <View key={b} style={s.bulletRow}>
               <Ionicons name="checkmark-circle" size={16} color={colors.lime} style={s.bulletIcon} />
-              <Text style={[s.bulletTxt, { color: 'rgba(255,255,255,0.82)' }]}>{b}</Text>
+              <Text style={[s.bulletTxt, { color: glass.textFaint }]}>{b}</Text>
             </View>
           ))}
         </View>
@@ -322,8 +322,7 @@ const s = StyleSheet.create({
     zIndex: 10,
   },
   skipTxt: {
-    ...ff(600),
-    fontSize: 14,
+    ...type_.body,
     letterSpacing: 0.2,
   },
   scroller: {
@@ -350,23 +349,21 @@ const s = StyleSheet.create({
     position: 'absolute',
     bottom: 2,
     right: 2,
-    width: 28,
-    height: 28,
+    width: spacing.xxl + spacing.xs,
+    height: spacing.xxl + spacing.xs,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   slideTitle: {
-    ...ff(800),
-    fontSize: 26,
+    ...type_.initials,
     letterSpacing: -0.5,
+    lineHeight: 32,
     textAlign: 'center',
     marginBottom: spacing.lg,
-    lineHeight: 32,
   },
   slideBody: {
-    ...ff(400),
-    fontSize: 15,
+    ...type_.bodyReg,
     lineHeight: 24,
     textAlign: 'center',
     marginBottom: spacing.xxl,
@@ -384,8 +381,7 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
   bulletTxt: {
-    ...ff(500),
-    fontSize: 14,
+    ...type_.body,
     lineHeight: 20,
     flex: 1,
   },
@@ -393,24 +389,24 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.xxs + spacing.xxs,
     paddingVertical: spacing.lg,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: spacing.xxs + spacing.xxs,
+    height: spacing.xxs + spacing.xxs,
+    borderRadius: spacing.xxs,
   },
   dotActive: {
-    width: 20,
-    borderRadius: 10,
+    width: spacing.xl,
+    borderRadius: spacing.smd,
   },
   footer: {
     paddingHorizontal: spacing.xxl,
     paddingTop: spacing.sm,
   },
   nextBtn: {
-    height: 52,
+    height: layout.btnHeight,
     borderRadius: radius.sm,
     flexDirection: 'row',
     alignItems: 'center',
@@ -418,8 +414,6 @@ const s = StyleSheet.create({
     gap: spacing.sm,
   },
   nextTxt: {
-    ...ff(700),
-    fontSize: 16,
-    letterSpacing: -0.2,
+    ...type_.btnLg,
   },
 });

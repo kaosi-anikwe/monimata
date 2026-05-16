@@ -40,7 +40,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useTheme } from '@/lib/theme';
-import { layout, radius } from '@/lib/tokens';
+import { layout, radius, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -182,19 +182,19 @@ function resolveVariantStyle(
   switch (variant) {
     case 'lime':
       return {
-        container: { backgroundColor: colors.lime, height: 54 },
+        container: { backgroundColor: colors.lime, height: layout.btnHeightLg },
         text: { color: colors.darkGreen },
         loaderColor: colors.darkGreen,
       };
     case 'green':
       return {
-        container: { backgroundColor: colors.brand, height: 52 },
+        container: { backgroundColor: colors.brand, height: layout.btnHeight },
         text: { color: colors.white },
         loaderColor: colors.white,
       };
     case 'red':
       return {
-        container: { backgroundColor: colors.error, height: 52 },
+        container: { backgroundColor: colors.error, height: layout.btnHeight },
         text: { color: colors.white },
         loaderColor: colors.white,
       };
@@ -204,7 +204,7 @@ function resolveVariantStyle(
           backgroundColor: 'transparent',
           borderWidth: 1.5,
           borderColor: colors.overlayGhostMid,
-          height: 50,
+          height: layout.btnHeightSm,
         },
         text: { color: colors.textInverseHigh },
         loaderColor: colors.textInverseHigh,
@@ -215,7 +215,7 @@ function resolveVariantStyle(
           backgroundColor: 'transparent',
           borderWidth: 1.5,
           borderColor: colors.errorBorder,
-          height: 52,
+          height: layout.btnHeight,
         },
         text: { color: colors.error },
         loaderColor: colors.error,
@@ -230,7 +230,7 @@ const s = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
   },
   fullWidth: {
     width: '100%',
@@ -238,15 +238,15 @@ const s = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   iconSlot: {
     flexShrink: 0,
   },
   iconBtn: {
-    width: layout.rowMinHeight - 8, // 36pt
-    height: layout.rowMinHeight - 8,
-    borderRadius: 11,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

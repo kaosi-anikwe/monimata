@@ -20,7 +20,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { ff, type_ } from '@/lib/typography';
 
 interface Props {
   children: React.ReactNode;
@@ -123,13 +123,13 @@ const s = StyleSheet.create({
 
   // Dark-green header — mirrors ScreenHeader / profile header
   header: {
-    paddingTop: 80,
+    paddingTop: spacing.xxxl + spacing.xl + spacing.lg,
     paddingBottom: spacing.xxxl,
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
     gap: spacing.md,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
   },
   iconBubble: {
     width: 60,
@@ -140,9 +140,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
-  iconText: { fontSize: 28, lineHeight: 34 },
-  heading: { fontSize: 22, letterSpacing: -0.3, textAlign: 'center' },
-  sub: { fontSize: 13, textAlign: 'center' },
+  iconText: { ...type_.emoji },
+  heading: { ...type_.h1, letterSpacing: -0.3, textAlign: 'center' },
+  sub: { ...type_.bodyReg, textAlign: 'center' },
 
   // Body
   body: {
@@ -157,14 +157,14 @@ const s = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.smd,
   },
-  errorLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8 },
-  errorMsg: { fontSize: 13, lineHeight: 20 },
+  errorLabel: { ...type_.label, letterSpacing: 0.8, textTransform: 'uppercase' },
+  errorMsg: { ...type_.bodyReg, lineHeight: 20 },
 
   // CTA button — lime/dark-green, matches primary buttons
   btn: {
     borderRadius: radius.sm,
-    paddingVertical: 15,
+    paddingVertical: spacing.mdn,
     alignItems: 'center',
   },
-  btnText: { fontSize: 15 },
+  btnText: { ...type_.btnLg },
 });

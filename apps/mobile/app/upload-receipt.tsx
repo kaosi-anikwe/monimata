@@ -49,8 +49,8 @@ import { useToast } from '@/components/Toast';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
+import { layout, radius, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
 import { uploadReceipt, type UploadReceiptFile } from '@/services/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -509,9 +509,9 @@ const ss = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -531,8 +531,8 @@ const ss = StyleSheet.create({
     borderWidth: 1.5,
   },
   pickerIconWrap: {
-    width: 44,
-    height: 44,
+    width: layout.rowMinHeight,
+    height: layout.rowMinHeight,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -552,14 +552,14 @@ const ss = StyleSheet.create({
     overflow: 'hidden',
   },
   previewImage: {
-    width: 72,
-    height: 72,
+    width: layout.avatarLg + spacing.lg,
+    height: layout.avatarLg + spacing.lg,
     borderRadius: radius.sm,
     flexShrink: 0,
   },
   pdfPreview: {
-    width: 72,
-    height: 72,
+    width: layout.avatarLg + spacing.lg,
+    height: layout.avatarLg + spacing.lg,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -575,14 +575,13 @@ const ss = StyleSheet.create({
   // Upload button
   uploadBtn: {
     marginTop: spacing.lg,
-    paddingVertical: 14,
+    paddingVertical: spacing.mdn,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   uploadBtnText: {
-    ...ff(700),
-    fontSize: 15,
+    ...type_.btnLg,
   },
 
   // Tip box

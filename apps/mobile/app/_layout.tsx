@@ -54,8 +54,8 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { getTheme, useTheme } from '@/lib/theme';
 import { ThemeProvider } from '@/lib/ThemeProvider';
-import { radius, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { layout, radius, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
 import { setLogoutHandler, uploadReceipt } from '@/services/api';
 import { store, type RootState } from '@/store';
 import { clearAuth, restoreSession } from '@/store/authSlice';
@@ -315,34 +315,31 @@ function makeNsStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
     },
     iconWrap: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+      width: layout.avatarLg + spacing.lg,
+      height: layout.avatarLg + spacing.lg,
+      borderRadius: radius.full,
       backgroundColor: colors.successSubtle,
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 18,
+      marginBottom: spacing.lg + spacing.xs,
     },
     title: {
-      fontSize: 20,
+      ...type_.h1,
       color: colors.textPrimary,
       textAlign: 'center',
       marginBottom: spacing.smd,
-      letterSpacing: -0.3,
-      ...ff(800),
     },
     body: {
-      fontSize: 14,
+      ...type_.body,
       color: colors.textMeta,
       textAlign: 'center',
       lineHeight: 22,
-      marginBottom: 18,
-      ...ff(400),
+      marginBottom: spacing.lg + spacing.xs,
     },
     bullets: { width: '100%', marginBottom: spacing.xxl, gap: spacing.smd },
     bullet: { flexDirection: 'row', alignItems: 'center' },
     bulletIcon: { marginRight: spacing.smd },
-    bulletText: { fontSize: 13, color: colors.textSecondary, flex: 1, ...ff(500) },
+    bulletText: { ...type_.bodyReg, color: colors.textSecondary, flex: 1 },
     allowBtn: {
       backgroundColor: colors.brand,
       borderRadius: radius.sm,
@@ -351,9 +348,9 @@ function makeNsStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       marginBottom: spacing.smd,
     },
-    allowBtnText: { color: colors.white, fontSize: 15, ...ff(700) },
+    allowBtnText: { ...type_.btnLg, color: colors.white },
     laterBtn: { paddingVertical: spacing.sm },
-    laterBtnText: { color: colors.textMeta, fontSize: 14, ...ff(500) },
+    laterBtnText: { ...type_.body, color: colors.textMeta },
   });
 }
 
@@ -407,11 +404,10 @@ function RootLayout() {
   if (dbError) {
     const c = getTheme(null);
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: c.background }}>
-        <Text style={{ ...ff(700), fontSize: 16, color: c.textPrimary, marginBottom: 8 }}>
-          Database failed to initialise
-        </Text>
-        <Text style={{ ...ff(400), fontSize: 13, color: c.textMeta, textAlign: 'center' }}>{dbError}</Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxxl, backgroundColor: c.background }}>        <Text style={{ ...ff(700), ...type_.h3, color: c.textPrimary, marginBottom: spacing.sm }}>
+        Database failed to initialise
+      </Text>
+        <Text style={{ ...type_.bodyReg, color: c.textMeta, textAlign: 'center' }}>{dbError}</Text>
       </View>
     );
   }
@@ -419,10 +415,10 @@ function RootLayout() {
   if (!fontsLoaded || !db) {
     const c = getTheme(null);
     return (
-      <View style={{ flex: 1, backgroundColor: c.darkGreen, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+      <View style={{ flex: 1, backgroundColor: c.darkGreen, alignItems: 'center', justifyContent: 'center', gap: spacing.lg }}>
         <ActivityIndicator size="large" color={c.lime} />
         {initTimeout && (
-          <Text style={{ ...ff(400), fontSize: 12, color: c.textInverseSecondary, textAlign: 'center', paddingHorizontal: 32 }}>
+          <Text style={{ ...type_.small, color: c.textInverseSecondary, textAlign: 'center', paddingHorizontal: spacing.xxxl }}>
             {!db ? 'Database is taking longer than expected…' : 'Loading fonts…'}
           </Text>
         )}

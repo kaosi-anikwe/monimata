@@ -33,6 +33,7 @@ import { z } from 'zod';
 
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
+import { spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
 import { clearError, login } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -94,7 +95,7 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          <View style={{ gap: 14 }}>
+          <View style={{ gap: spacing.mdn }}>
             {/* Email */}
             <Controller
               control={control}
@@ -132,7 +133,7 @@ export default function LoginScreen() {
               />
               {/* Forgot password */}
               <TouchableOpacity
-                style={{ alignSelf: 'flex-end', marginTop: 6 }}
+                style={{ alignSelf: 'flex-end', marginTop: spacing.xxs + spacing.xxs }}
                 onPress={() => router.push('/(auth)/forgot-password')}
               >
                 <Text style={[s.forgot, { color: colors.textMeta }]}>
@@ -149,7 +150,7 @@ export default function LoginScreen() {
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
             loading={loading}
-            style={{ marginTop: 8 }}
+            style={{ marginTop: spacing.sm }}
             accessibilityLabel="Log in to your account"
           >
             Log In

@@ -40,6 +40,7 @@ import React from 'react';
 import { StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
+import { radius } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -106,18 +107,18 @@ function resolveSize(size: BadgeSize): { pill: ViewStyle; txt: TextStyle } {
   switch (size) {
     case 'sm':
       return {
-        pill: { paddingVertical: 1, paddingHorizontal: 5, borderRadius: 5 },
+        pill: { paddingVertical: 1, paddingHorizontal: 5, borderRadius: radius.xxs },
         txt: { ...type_.labelSm, textTransform: 'none', letterSpacing: 0 },
       };
     case 'lg':
       return {
-        pill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8 },
-        txt: { ...type_.caption, fontSize: 12 },
+        pill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.xs },
+        txt: { ...type_.small },
       };
     case 'md':
     default:
       return {
-        pill: { paddingVertical: 2, paddingHorizontal: 7, borderRadius: 6 },
+        pill: { paddingVertical: 2, paddingHorizontal: 7, borderRadius: radius.xxs },
         txt: { ...type_.caption },
       };
   }

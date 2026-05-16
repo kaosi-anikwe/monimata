@@ -27,7 +27,7 @@ import { useCategoryGroups } from '@/hooks/useCategories';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useSplitTransaction, useTransaction } from '@/hooks/useTransactions';
 import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
+import { layout, radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { formatNaira } from '@/utils/money';
@@ -468,57 +468,57 @@ const ss = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.sm,
   },
-  heroLbl: { ...ff(600), fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 },
-  heroAmt: { ...ff(800), fontSize: 20, letterSpacing: -0.5 },
-  visualBar: { height: 10, borderRadius: 5, overflow: 'hidden', flexDirection: 'row', marginVertical: spacing.sm },
-  heroHint: { ...ff(600), fontSize: 12 },
+  heroLbl: { ...type_.caption, ...ff(600), textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing.xxs },
+  heroAmt: { ...type_.displaySm },
+  visualBar: { height: spacing.smd, borderRadius: spacing.xxs, overflow: 'hidden', flexDirection: 'row', marginVertical: spacing.sm },
+  heroHint: { ...type_.small, ...ff(600) },
 
   // Equal-split chips
   eqChips: { paddingVertical: spacing.smd, gap: spacing.sm },
-  eqChip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5 },
-  eqChipTxt: { ...ff(700), fontSize: 12 },
+  eqChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xxs + spacing.xxs, borderRadius: radius.full, borderWidth: 1.5 },
+  eqChipTxt: { ...type_.small, ...ff(700) },
 
   // Split row
   splitRow: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', padding: spacing.mdn },
   splitRowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  splitNumBadge: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  splitNumTxt: { ...ff(700), fontSize: 11 },
+  splitNumBadge: { width: 24, height: 24, borderRadius: radius.xxs, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  splitNumTxt: { ...type_.caption, ...ff(700) },
   splitCatPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 8,
+    borderRadius: radius.xs,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    gap: 4,
+    paddingVertical: spacing.xxs + spacing.xxs,
+    gap: spacing.xs,
   },
-  splitCatTxt: { ...ff(600), fontSize: 13, flex: 1 },
-  splitDel: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  splitCatTxt: { ...type_.bodyReg, ...ff(600), flex: 1 },
+  splitDel: { width: layout.iconBtnSize, height: layout.iconBtnSize, borderRadius: radius.smd, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   splitAmtRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   splitAmtWrap: {
     flex: 1,
     height: 38,
-    borderRadius: 10,
+    borderRadius: radius.smd,
     borderWidth: 1.5,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    gap: 4,
+    gap: spacing.xs,
   },
-  splitAmtSymbol: { ...ff(700), fontSize: 15 },
-  splitAmtInp: { flex: 1, ...ff(700), fontSize: 15, padding: 0 },
-  splitPct: { ...ff(600), fontSize: 12 },
+  splitAmtSymbol: { ...type_.mono },
+  splitAmtInp: { flex: 1, ...type_.mono, padding: 0 },
+  splitPct: { ...type_.small, ...ff(600) },
   splitFillBtn: {
     height: 38,
-    borderRadius: 9,
+    borderRadius: radius.smd,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     justifyContent: 'center',
   },
-  splitFillTxt: { ...ff(700), fontSize: 12 },
+  splitFillTxt: { ...type_.small, ...ff(700) },
   splitMemoRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm },
-  splitMemoInput: { ...ff(400), fontSize: 13, padding: 0 },
+  splitMemoInput: { ...type_.bodyReg, padding: 0 },
 
   // Add button
   addBtn: {
@@ -528,7 +528,7 @@ const ss = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderRadius: radius.md,
-    paddingVertical: 14,
+    paddingVertical: spacing.mdn,
   },
 
   // Sticky remaining pill
@@ -544,11 +544,11 @@ const ss = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  remLbl: { ...ff(600), fontSize: 12 },
-  remVal: { ...ff(800), fontSize: 18, letterSpacing: -0.5 },
+  remLbl: { ...type_.small, ...ff(600) },
+  remVal: { ...type_.displayXs },
 
   // Category picker
-  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: 7 },
+  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs + spacing.xs },
   pickRow: {
     flexDirection: 'row',
     alignItems: 'center',

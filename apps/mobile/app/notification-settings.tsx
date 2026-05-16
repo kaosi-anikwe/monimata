@@ -41,7 +41,7 @@ import { useToast } from '@/components/Toast';
 import { Button, ScreenHeader, SectionHeader } from '@/components/ui';
 import { useNudgeSettings, useRegisterDevice, useUpdateNudgeSettings } from '@/hooks/useNudges';
 import { lightColors, useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
+import { layout, radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import { Ionicons } from '@expo/vector-icons';
 import type { NudgeSettings } from '@monimata/shared-types';
@@ -458,7 +458,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: 14,
+      paddingVertical: spacing.mdn,
       paddingHorizontal: spacing.lg,
       borderBottomWidth: 1,
     },
@@ -466,56 +466,56 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: 14,
+      paddingVertical: spacing.mdn,
       paddingHorizontal: spacing.lg,
     },
     settingLeft: { flex: 1, marginRight: spacing.md },
     // time input
     timeInput: {
       borderWidth: 1.5,
-      borderRadius: 10,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
+      borderRadius: radius.smd,
+      paddingVertical: spacing.xxs + spacing.xxs,
+      paddingHorizontal: spacing.smd,
+      ...type_.bodyReg,
       ...ff(700),
-      fontSize: 13,
       textAlign: 'center',
       minWidth: 72,
     },
     // stepper
     stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     stepBtn: {
-      width: 32,
-      height: 32,
+      width: layout.iconBtnSize,
+      height: layout.iconBtnSize,
       borderRadius: radius.xs,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    stepBtnText: { ...ff(700), fontSize: 18, lineHeight: 22 },
-    stepValue: { ...ff(700), fontSize: 18, minWidth: 24, textAlign: 'center' },
+    stepBtnText: { ...type_.subHead, lineHeight: 22 },
+    stepValue: { ...type_.subHead, minWidth: 24, textAlign: 'center' },
     // tone selector
     toneWrap: { gap: spacing.sm },
     toneOpt: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
-      paddingVertical: 11,
-      paddingHorizontal: 13,
+      gap: spacing.smd,
+      paddingVertical: spacing.smd,
+      paddingHorizontal: spacing.md,
       borderRadius: radius.md,
       borderWidth: 1.5,
     },
     toneRadio: {
       width: 18,
       height: 18,
-      borderRadius: 9,
+      borderRadius: spacing.smd,
       borderWidth: 2,
       flexShrink: 0,
       alignItems: 'center',
       justifyContent: 'center',
     },
     toneRadioInner: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+      width: spacing.sm,
+      height: spacing.sm,
+      borderRadius: spacing.xs,
     },
     // save button
     saveWrap: {
@@ -527,9 +527,9 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     permBtn: {
       borderRadius: radius.xs,
       borderWidth: 1.5,
-      paddingVertical: 6,
+      paddingVertical: spacing.xxs + spacing.xxs,
       paddingHorizontal: spacing.md,
     },
-    permBtnText: { ...ff(700), fontSize: 12 },
+    permBtnText: { ...type_.small },
   });
 }

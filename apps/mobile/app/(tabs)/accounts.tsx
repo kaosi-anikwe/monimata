@@ -55,7 +55,7 @@ import {
 } from '@/hooks/useAccounts';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useTheme } from '@/lib/theme';
-import { radius, shadow, spacing } from '@/lib/tokens';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import { StatementAccountNotFoundError, uploadStatement } from '@/services/api';
 import { formatNaira } from '@/utils/money';
@@ -144,7 +144,7 @@ function BankPickerSheet({ visible, onClose, onSelect }: BankPickerSheetProps) {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[type_.body, { color: colors.textPrimary }]}>{bank.name}</Text>
-                    <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: 2, flexWrap: 'wrap' }}>
+                    <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xxs - 1, flexWrap: 'wrap' }}>
                       {bank.channels.map((ch) => (
                         <View key={ch} style={[bps.chip, { backgroundColor: colors.surface }]}>
                           <Text style={[bps.chipTxt, { color: colors.brand }]}>{ch}</Text>
@@ -170,7 +170,7 @@ const bps = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    height: 40,
+    height: layout.avatarMd,
     borderRadius: radius.md,
     borderWidth: 1.5,
     paddingHorizontal: spacing.md,
@@ -179,8 +179,7 @@ const bps = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    ...ff(400),
-    fontSize: 14,
+    ...type_.body,
     padding: 0,
   },
   row: {
@@ -191,15 +190,14 @@ const bps = StyleSheet.create({
   },
   rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth },
   chip: {
-    paddingHorizontal: 5,
+    paddingHorizontal: spacing.xxs + spacing.xxs,
     paddingVertical: 1,
-    borderRadius: 4,
+    borderRadius: radius.xxs,
   },
   chipTxt: {
-    ...ff(600),
-    fontSize: 9,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    ...type_.labelSm,
+    textTransform: 'none',
+    letterSpacing: 0,
   },
 });
 
@@ -1088,9 +1086,9 @@ const ss = StyleSheet.create({
   },
   bankInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.smd },
   bankIc: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
+    width: layout.avatarMd - spacing.xs,
+    height: layout.avatarMd - spacing.xs,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -1101,7 +1099,7 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
-  badgeText: { ...ff(700), fontSize: 10 },
+  badgeText: { ...type_.labelSm },
 
   balanceAmt: {
     ...type_.displayMd,
@@ -1112,7 +1110,7 @@ const ss = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  syncDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  syncDot: { width: spacing.xxs + spacing.xs, height: spacing.xxs + spacing.xs, borderRadius: spacing.xs, flexShrink: 0 },
 
   // Card footer  — matches .acct-footer
   cardFooter: {
@@ -1131,13 +1129,13 @@ const ss = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.xs,
     paddingHorizontal: spacing.smd,
-    paddingVertical: 5,
+    paddingVertical: spacing.xxs + spacing.xs,
   },
   footerBtnDisabled: { opacity: 0.6 },
-  footerBtnTxt: { ...ff(700), fontSize: 11 },
+  footerBtnTxt: { ...type_.caption },
   footerBtnMore: {
-    width: 28,
-    height: 28,
+    width: layout.avatarSm - spacing.xs,
+    height: layout.avatarSm - spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1218,9 +1216,9 @@ const ss = StyleSheet.create({
     minHeight: 64,
   },
   stmtPickIc: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: layout.avatarMd - spacing.xs,
+    height: layout.avatarMd - spacing.xs,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
