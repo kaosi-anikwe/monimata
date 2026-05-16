@@ -26,7 +26,7 @@ import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme, type ThemeColors } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
+import { layout, radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 
 // ─── Carousel data ────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ function makeStyles(colors: ThemeColors) {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 28,
+      paddingHorizontal: spacing.xxxl,
       paddingBottom: spacing.xl,
       overflow: 'hidden',
       position: 'relative',
@@ -188,40 +188,33 @@ function makeStyles(colors: ThemeColors) {
       left: -60,
       width: 280,
       height: 280,
-      borderRadius: 140,
+      borderRadius: radius.full,
       backgroundColor: colors.limeGlow,
       pointerEvents: 'none',
     },
     logoTile: {
-      width: 72,
-      height: 72,
-      borderRadius: 22,
-      // backgroundColor: colors.lime,
+      width: layout.avatarLg + spacing.lg,
+      height: layout.avatarLg + spacing.lg,
+      borderRadius: radius.lg,
       alignItems: 'center',
       justifyContent: 'center',
-      // marginBottom: spacing.sm,
-      // shadowColor: colors.lime,
-      // shadowOffset: { width: 0, height: 8 },
-      // shadowOpacity: 0.35,
-      // shadowRadius: 20,
-      // elevation: 12,
     },
     logoImg: {
-      width: 48,
-      height: 48,
+      width: layout.avatarMd + spacing.sm,
+      height: layout.avatarMd + spacing.sm,
       resizeMode: 'contain',
     },
     wordmark: {
-      height: 36,
+      height: layout.iconXl + spacing.mdn,
       width: 160,
       resizeMode: 'contain',
-      marginBottom: 6,
+      marginBottom: spacing.xxs + spacing.xxs,
     },
     tagline: {
       ...type_.bodyReg,
       color: colors.textInverseFaint,
       letterSpacing: 0.5,
-      marginBottom: 36,
+      marginBottom: spacing.xxxl + spacing.xs,
     },
     // ── Carousel ──
     slideWrap: {
@@ -229,38 +222,38 @@ function makeStyles(colors: ThemeColors) {
       maxWidth: 300,
       alignItems: 'center',
       minHeight: 90,
-      marginBottom: 20,
+      marginBottom: spacing.xl,
     },
     slideIconWrap: {
-      marginBottom: 10,
+      marginBottom: spacing.smd,
     },
     slideText: {
+      ...type_.bodyLg,
       ...ff(500),
-      fontSize: 15,
+      lineHeight: 23,
       color: colors.textInverseSub,
       textAlign: 'center',
-      lineHeight: 23,
     },
     // ── Dots ──
     dots: {
       flexDirection: 'row',
-      gap: 6,
+      gap: spacing.xxs + spacing.xxs,
       alignItems: 'center',
     },
     dot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
+      width: spacing.xxs + spacing.xxs,
+      height: spacing.xxs + spacing.xxs,
+      borderRadius: spacing.xxs,
     },
     // ── Buttons ──
     btns: {
-      paddingHorizontal: 24,
+      paddingHorizontal: spacing.xxl,
       paddingTop: spacing.lg,
-      gap: 10,
+      gap: spacing.smd,
       flexDirection: 'column',
     },
     btnLime: {
-      height: 54,
+      height: layout.btnHeightLg,
       borderRadius: radius.lg,
       alignItems: 'center',
       justifyContent: 'center',
@@ -269,7 +262,7 @@ function makeStyles(colors: ThemeColors) {
       ...type_.btnLg,
     },
     btnGhost: {
-      height: 50,
+      height: layout.btnHeightSm,
       borderRadius: radius.lg,
       alignItems: 'center',
       justifyContent: 'center',

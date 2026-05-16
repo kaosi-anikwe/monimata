@@ -46,8 +46,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { useTheme, type ThemeColors } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { radius, shadow, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -357,10 +357,7 @@ function makeToastStyles(colors: ThemeColors) {
       // Elevated shadow (more prominent than shadow.md — toast must float above all content)
       ...Platform.select({
         ios: {
-          shadowColor: colors.darkGreen,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.14,
-          shadowRadius: 18,
+          ...shadow.lg,
         },
         android: { elevation: 10 },
         default: {},
@@ -376,8 +373,8 @@ function makeToastStyles(colors: ThemeColors) {
     },
     icon: { flexShrink: 0 },
     textWrap: { flex: 1 },
-    title: { fontSize: 14, lineHeight: 20, ...ff(700) },
-    message: { fontSize: 13, lineHeight: 18, marginTop: 2, ...ff(400) },
+    title: { ...type_.body, lineHeight: 20 },
+    message: { ...type_.bodyReg, lineHeight: 18, marginTop: 2 },
     dismiss: { flexShrink: 0, opacity: 0.55 },
   });
 }
@@ -402,29 +399,22 @@ function makeConfirmStyles(colors: ThemeColors) {
       maxWidth: 340,
       ...Platform.select({
         ios: {
-          shadowColor: colors.darkGreen,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.14,
-          shadowRadius: 24,
+          ...shadow.lg,
         },
         android: { elevation: 12 },
         default: {},
       }),
     },
     title: {
-      fontSize: 17,
-      lineHeight: 24,
+      ...type_.h2,
       color: colors.textPrimary,
       marginBottom: spacing.sm,
-      letterSpacing: -0.3,
-      ...ff(800),
     },
     message: {
-      fontSize: 14,
+      ...type_.body,
       color: colors.textMeta,
       lineHeight: 21,
       marginBottom: spacing.xl,
-      ...ff(400),
     },
     row: { flexDirection: 'row', gap: spacing.sm },
     cancelBtn: {
@@ -434,7 +424,7 @@ function makeConfirmStyles(colors: ThemeColors) {
       backgroundColor: colors.surface,
       alignItems: 'center',
     },
-    cancelText: { fontSize: 15, color: colors.textSecondary, ...ff(600) },
+    cancelText: { ...type_.btnLg, ...ff(600), color: colors.textSecondary },
     confirmBtn: {
       flex: 1,
       paddingVertical: spacing.md,
@@ -443,7 +433,7 @@ function makeConfirmStyles(colors: ThemeColors) {
       alignItems: 'center',
     },
     confirmBtnDestructive: { backgroundColor: colors.error },
-    confirmText: { fontSize: 15, color: colors.white, ...ff(700) },
+    confirmText: { ...type_.mono, color: colors.white },
     // confirmTextDestructive has the same colour — kept for API compat
     confirmTextDestructive: { color: colors.white },
   });
@@ -460,18 +450,17 @@ function makeSheetStyles(colors: ThemeColors) {
       backgroundColor: colors.cardBg,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
-      paddingBottom: 34,
+      paddingBottom: spacing.xxxl,
       overflow: 'hidden',
     },
     sheetTitle: {
-      fontSize: 13,
+      ...type_.bodyReg,
       color: colors.textMeta,
       textAlign: 'center',
       paddingVertical: spacing.mdn,
       paddingHorizontal: spacing.lg,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
-      ...ff(600),
     },
     option: {
       paddingVertical: spacing.lg,
@@ -482,18 +471,18 @@ function makeSheetStyles(colors: ThemeColors) {
       borderTopColor: colors.border,
     },
     optionText: {
-      fontSize: 16,
+      ...type_.h3,
+      ...ff(500),
       color: colors.textPrimary,
       textAlign: 'center',
-      ...ff(500),
     },
     optionDestructive: { color: colors.error },
     cancelOption: { marginTop: spacing.sm },
     cancelText: {
-      fontSize: 16,
+      ...type_.h3,
+      ...ff(600),
       color: colors.textMeta,
       textAlign: 'center',
-      ...ff(600),
     },
   });
 }

@@ -33,7 +33,7 @@ import React from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
-import { spacing } from '@/lib/tokens';
+import { layout, radius, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 import { Button } from './Button';
 
@@ -110,16 +110,14 @@ const s = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   iconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
+    width: layout.avatarLg + spacing.lg,
+    height: layout.avatarLg + spacing.lg,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
   },
-  emoji: {
-    fontSize: 36,
-  },
+  emoji: { ...type_.display },
   title: {
     ...type_.h2,
     textAlign: 'center',

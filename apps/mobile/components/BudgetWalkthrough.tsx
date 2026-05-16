@@ -25,8 +25,8 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -38,9 +38,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ff } from '@/lib/typography';
-import { radius, spacing } from '@/lib/tokens';
 import { useTheme, type ThemeColors } from '@/lib/theme';
+import { layout, radius, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
 
 // ── Persistence key ───────────────────────────────────────────────────────────
 
@@ -197,8 +197,8 @@ export function BudgetWalkthrough() {
                 style={[
                   ss.dot,
                   i === step
-                    ? { backgroundColor: colors.lime, width: 18, borderRadius: 3 }
-                    : { backgroundColor: colors.surfaceHigh, width: 6 },
+                    ? { backgroundColor: colors.lime, width: spacing.lg + spacing.xs, borderRadius: spacing.xxs }
+                    : { backgroundColor: colors.surfaceHigh, width: spacing.xxs + spacing.xxs },
                 ]}
               />
             ))}
@@ -243,13 +243,11 @@ function makeStyles(colors: ThemeColors) {
       alignItems: 'center',
     },
     stepCount: {
-      ...ff(500),
-      fontSize: 12,
+      ...type_.small,
       color: colors.textMeta,
     },
     skipTxt: {
-      ...ff(500),
-      fontSize: 14,
+      ...type_.body,
       color: colors.textMeta,
     },
     content: {
@@ -257,8 +255,8 @@ function makeStyles(colors: ThemeColors) {
       paddingVertical: spacing.lg,
     },
     iconWrap: {
-      width: 72,
-      height: 72,
+      width: layout.avatarLg + spacing.lg,
+      height: layout.avatarLg + spacing.lg,
       borderRadius: radius.lg,
       backgroundColor: colors.lime3,
       alignItems: 'center',
@@ -267,15 +265,13 @@ function makeStyles(colors: ThemeColors) {
     },
     title: {
       ...ff(700),
-      fontSize: 22,
+      ...type_.h1,
       color: colors.textPrimary,
       textAlign: 'center',
       marginBottom: spacing.md,
-      letterSpacing: -0.3,
     },
     body: {
-      ...ff(400),
-      fontSize: 15,
+      ...type_.bodyReg,
       color: colors.textSecondary,
       textAlign: 'center',
       lineHeight: 24,
@@ -283,24 +279,22 @@ function makeStyles(colors: ThemeColors) {
     },
     dots: {
       flexDirection: 'row',
-      gap: 6,
+      gap: spacing.xxs + spacing.xxs,
       alignItems: 'center',
       justifyContent: 'center',
     },
     dot: {
-      height: 6,
-      borderRadius: 3,
+      height: spacing.xxs + spacing.xxs,
+      borderRadius: spacing.xxs,
     },
     cta: {
-      height: 54,
+      height: layout.btnHeightLg,
       borderRadius: radius.lg,
       alignItems: 'center',
       justifyContent: 'center',
     },
     ctaTxt: {
-      ...ff(700),
-      fontSize: 16,
-      letterSpacing: -0.2,
+      ...type_.btnLg,
     },
   });
 }

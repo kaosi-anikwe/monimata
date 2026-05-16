@@ -152,7 +152,7 @@ export default function RegisterScreen() {
             </View>
           ) : null}
 
-          <View style={{ gap: 14 }}>
+          <View style={{ gap: spacing.mdn }}>
             <Controller
               control={control}
               name="username"
@@ -176,7 +176,7 @@ export default function RegisterScreen() {
                       autoCorrect={false}
                       error={errors.username?.message}
                     />
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, minHeight: 16, gap: spacing.xs }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs, minHeight: 16, gap: spacing.xs }}>
                       {usernameStatus === 'checking' && (
                         <ActivityIndicator size="small" color={colors.textMeta} />
                       )}
@@ -189,7 +189,7 @@ export default function RegisterScreen() {
               }}
             />
 
-            <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flexDirection: 'row', gap: spacing.smd }}>
               <Controller
                 control={control}
                 name="first_name"
@@ -293,7 +293,7 @@ export default function RegisterScreen() {
             onPress={handleSubmit(onSubmit)}
             disabled={loading || usernameStatus !== 'available'}
             loading={loading}
-            style={{ marginTop: 8 }}
+            style={{ marginTop: spacing.sm }}
             accessibilityLabel="Create account"
           >
             Create Account

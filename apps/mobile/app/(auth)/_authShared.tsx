@@ -35,7 +35,7 @@ import type { StyleProp, TextInputProps, TextStyle, ViewStyle } from 'react-nati
 import { Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { useTheme, type ThemeColors } from '@/lib/theme';
-import { glass, radius, spacing } from '@/lib/tokens';
+import { glass, layout, radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 
 // ─── AuthInput ────────────────────────────────────────────────────────────────
@@ -96,9 +96,8 @@ const authInputS = StyleSheet.create({
     overflow: 'hidden',
   },
   text: {
-    ...ff(400),
-    fontSize: 15,
-    paddingHorizontal: 14,
+    ...type_.btnLg,
+    paddingHorizontal: spacing.mdn,
     height: '100%',
   },
 });
@@ -164,68 +163,68 @@ export function AuthHdr({ children }: { children: ReactNode }) {
 export const s = StyleSheet.create({
   screen: { flex: 1 },
 
-  // Dark green curved header — matches .auth-hdr in mockup
+  // authHdr
   authHdr: {
-    paddingTop: 54,
+    paddingTop: layout.headerPaddingTop,
     paddingHorizontal: spacing.xxl,
-    paddingBottom: 28,
-    borderBottomLeftRadius: radius.xl,   // 28 pt — matches border-radius: 0 0 28px 28px
+    paddingBottom: spacing.xxxl,
+    borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
     overflow: 'hidden',
   },
   // .x-btn.dk — frosted-glass back button for dark-green auth headers
   xBtnDk: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     backgroundColor: glass.strong,
     borderWidth: 1,
     borderColor: glass.borderWhiteStrong,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: spacing.mdn,
   },
   // Legacy alias — kept so existing callers compile without changes
-  backBtn: { marginBottom: 14 },
-  authTitle: { ...type_.h1, marginBottom: 4 },
-  authSub: { ...ff(400), fontSize: 14, lineHeight: 21 },
+  backBtn: { marginBottom: spacing.mdn },
+  authTitle: { ...type_.h1, marginBottom: spacing.xs },
+  authSub: { ...type_.body, lineHeight: 21 },
 
   // Scrollable body below header
-  body: { padding: spacing.xxl, paddingBottom: 48 },
+  body: { padding: spacing.xxl, paddingBottom: spacing.xxxl + spacing.lg },
 
   // Form field row
-  field: { marginBottom: 14 },
-  fieldLbl: { ...ff(600), fontSize: 12, marginBottom: 5 },
-  fieldErr: { ...ff(400), fontSize: 12, marginTop: 4 },
+  field: { marginBottom: spacing.mdn },
+  fieldLbl: { ...type_.small, marginBottom: spacing.xxs },
+  fieldErr: { ...type_.small, marginTop: spacing.xs },
 
   // Error banner
-  errorBanner: { borderRadius: 10, padding: 12, marginBottom: 16 },
-  errorText: { ...ff(400), fontSize: 14 },
+  errorBanner: { borderRadius: radius.xs, padding: spacing.md, marginBottom: spacing.lg },
+  errorText: { ...type_.body },
 
   // btn-green: --gp bg, white text, height 52 — matches .btn-green in mockup
   btnGreen: {
-    height: 52,
+    height: layout.btnHeight,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   btnDisabled: { opacity: 0.5 },
-  btnText: { ...ff(700), fontSize: 15 },
+  btnText: { ...type_.btnLg },
 
   // Bottom nav link (e.g. "Already have an account?")
-  navLink: { marginTop: 14, alignItems: 'center' },
+  navLink: { marginTop: spacing.mdn, alignItems: 'center' },
   navLinkText: { ...type_.bodyReg },
 
   // Terms of service note — below submit button on register screen
-  tosWrap: { marginTop: 12, paddingHorizontal: 4, alignItems: 'center' },
-  tosText: { ...ff(400), fontSize: 11, textAlign: 'center', lineHeight: 17 },
+  tosWrap: { marginTop: spacing.md, paddingHorizontal: spacing.xs, alignItems: 'center' },
+  tosText: { ...type_.caption, textAlign: 'center', lineHeight: 17 },
   tosLink: { ...ff(600), textDecorationLine: 'underline' },
 
   // Password field helpers
   pwWrap: { position: 'relative' },
-  eyeBtn: { position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' },
-  forgot: { ...ff(400), fontSize: 12 },
+  eyeBtn: { position: 'absolute', right: spacing.mdn, top: 0, bottom: 0, justifyContent: 'center' },
+  forgot: { ...type_.small },
 });
 
 // ─── TrustCard ────────────────────────────────────────────────────────────────
@@ -248,14 +247,14 @@ export function TrustCard({ text, colors }: { text: string; colors: ThemeColors 
 const trustS = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.smd,
     borderWidth: 1,
     borderRadius: radius.md,
-    padding: 14,
-    marginBottom: 20,
+    padding: spacing.mdn,
+    marginBottom: spacing.xl,
     alignItems: 'flex-start',
   },
-  text: { ...ff(400), fontSize: 12, lineHeight: 19, flex: 1 },
+  text: { ...type_.small, lineHeight: 19, flex: 1 },
 });
 
 // Expo Router requires a default export from every file inside app/.

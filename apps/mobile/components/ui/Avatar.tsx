@@ -22,6 +22,7 @@ import React from 'react';
 import { Image, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
+import { ff } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export function Avatar({ name, uri, size = 'md', style }: AvatarProps) {
       ) : (
         <Text
           style={{
-            fontFamily: 'PlusJakartaSans_800ExtraBold',
+            ...ff(800),
             fontSize: font,
             lineHeight: font * 1.25,
             color: colors.lime,

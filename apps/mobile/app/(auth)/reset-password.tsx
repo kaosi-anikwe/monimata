@@ -35,6 +35,7 @@ import { z } from 'zod';
 
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
+import { spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
 import client from '@/services/api';
 import { AuthHdr, BackBtn, TrustCard, s } from './_authShared';
@@ -128,7 +129,7 @@ export default function ResetPasswordScreen() {
             </View>
           ) : null}
 
-          <View style={{ gap: 14 }}>
+          <View style={{ gap: spacing.mdn }}>
             <Controller
               control={control}
               name="new_password"
@@ -168,14 +169,14 @@ export default function ResetPasswordScreen() {
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
             loading={loading}
-            style={{ marginTop: 24 }}
+            style={{ marginTop: spacing.xxl }}
             accessibilityLabel="Set new password"
           >
             Set New Password
           </Button>
 
           <Text
-            style={[s.navLinkText, { color: colors.textMeta, textAlign: 'center', marginTop: 20 }]}
+            style={[s.navLinkText, { color: colors.textMeta, textAlign: 'center', marginTop: spacing.xl }]}
           >
             {'Remember your password? '}
             <Text

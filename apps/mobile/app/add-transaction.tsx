@@ -45,8 +45,8 @@ import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCreateRecurringRule } from '@/hooks/useRecurring';
 import { useCreateTransaction } from '@/hooks/useTransactions';
 import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
+import { layout, radius, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
 import { computeNextDue, nairaStringToKobo } from '@/utils/money';
@@ -438,7 +438,7 @@ export default function AddTransactionScreen() {
               onPress={() => { setDtPickerMode('date'); setShowDatePicker(true); }}
               accessibilityRole="button" accessibilityLabel="Select date and time"
             >
-              <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
+              <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
                 {formatDateTime(txDatetime)}
               </Text>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -454,7 +454,7 @@ export default function AddTransactionScreen() {
             >
               <Text
                 style={[
-                  { ...ff(selectedAccount ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                  { ...type_.small, lineHeight: 16 },
                   { color: selectedAccount ? colors.textPrimary : colors.textTertiary, flex: 1 },
                 ]}
                 numberOfLines={1}
@@ -475,7 +475,7 @@ export default function AddTransactionScreen() {
               accessibilityRole="button" accessibilityLabel="Select category"
             >
               <Text style={[
-                { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { ...type_.small, lineHeight: 16 },
                 { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Optional'}
@@ -503,7 +503,7 @@ export default function AddTransactionScreen() {
               accessibilityRole="button" accessibilityLabel="Select recurrence"
             >
               <Text style={[
-                { ...ff(recurrence ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { ...type_.small, lineHeight: 16 },
                 { color: recurrence ? colors.textPrimary : colors.textTertiary, flex: 1 },
               ]}>
                 {recurrence ? recurrence.label : 'Never'}
@@ -612,11 +612,11 @@ const ss = StyleSheet.create({
     paddingBottom: spacing.mdn,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  closeBtn: { width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  closeBtn: { width: layout.iconBtnSize, height: layout.iconBtnSize, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   typeToggleWrap: { paddingHorizontal: spacing.xl, paddingVertical: spacing.mdn, borderBottomWidth: StyleSheet.hairlineWidth },
-  typeToggle: { flexDirection: 'row', borderRadius: radius.sm + 1, padding: 3, overflow: 'hidden' },
-  typePill: { position: 'absolute', top: 3, bottom: 3, borderRadius: spacing.smd },
-  typeBtn: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  typeToggle: { flexDirection: 'row', borderRadius: radius.sm + 1, padding: spacing.xxs, overflow: 'hidden' },
+  typePill: { position: 'absolute', top: spacing.xxs, bottom: spacing.xxs, borderRadius: spacing.smd },
+  typeBtn: { flex: 1, height: layout.avatarSm + spacing.xxs, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   typeBtnText: { ...type_.btnSm },
   scroll: { flex: 1 },
   scrollContent: {
@@ -633,9 +633,9 @@ const ss = StyleSheet.create({
     alignItems: 'center',
   },
   amtRow: { flexDirection: 'row', alignItems: 'center' },
-  caret: { width: 3, height: 46, borderRadius: 1.5, marginLeft: 3 },
-  amtSym: { ...ff(800), fontSize: 20, lineHeight: 52, marginRight: 2 },
-  amtNum: { ...ff(800), fontSize: 48, letterSpacing: -2 },
+  caret: { width: spacing.xxs, height: layout.btnHeight, borderRadius: 1.5, marginLeft: spacing.xxs },
+  amtSym: { ...type_.h1, lineHeight: layout.btnHeight, marginRight: 2 },
+  amtNum: { ...type_.displayXl },
   formCard: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
   frow: {
     flexDirection: 'row',
@@ -643,19 +643,19 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: spacing.sm,
-    minHeight: 48,
+    minHeight: layout.rowMinHeight + spacing.xs,
   },
-  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  frowInput: { flex: 1, ...ff(600), fontSize: 13, padding: 0 },
+  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxs + spacing.xs },
+  frowInput: { flex: 1, ...type_.bodyReg, padding: 0 },
   frowValue: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   numpad: { marginHorizontal: 0, borderRadius: radius.md, overflow: 'hidden', gap: 1 },
   numRow: { flexDirection: 'row', gap: 1 },
-  numKey: { flex: 1, height: 50, alignItems: 'center', justifyContent: 'center' },
+  numKey: { flex: 1, height: layout.btnHeightSm, alignItems: 'center', justifyContent: 'center' },
   numKeyText: { ...type_.numpad },
   saveBar: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
-  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: 7 },
+  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs + spacing.xs },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  dtSheet: { paddingBottom: 24, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
-  dtDoneBtn: { margin: spacing.lg, paddingVertical: 14, borderRadius: radius.sm, alignItems: 'center' },
+  dtSheet: { paddingBottom: spacing.xxl, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
+  dtDoneBtn: { margin: spacing.lg, paddingVertical: spacing.mdn, borderRadius: radius.sm, alignItems: 'center' },
 });

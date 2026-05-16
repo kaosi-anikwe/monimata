@@ -151,14 +151,13 @@ const s = StyleSheet.create({
     marginVertical: spacing.sm,
   },
   symbol: {
+    ...type_.displayMd,
     ...ff(700),
-    fontSize: 24,
     marginRight: 6,
   },
   input: {
     flex: 1,
-    fontSize: 32,
-    ...ff(800),
+    ...type_.displayEntry,
     padding: 0,
   },
 });

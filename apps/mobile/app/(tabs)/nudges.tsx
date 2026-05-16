@@ -284,7 +284,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
           <Ionicons name={meta.icon} size={28} color={colors[meta.iconColor]} />
         </View>
         <View style={ss.sheetHeaderText}>
-          <Text style={[type_.caption, { color: colors.textMeta, marginBottom: 3 }]}>
+          <Text style={[type_.caption, { color: colors.textMeta, marginBottom: spacing.xxs }]}>
             {meta.label}
           </Text>
           <Text style={[type_.h3, { color: colors.textPrimary, lineHeight: 24 }]} numberOfLines={2}>
@@ -306,7 +306,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
           <Text
             style={[
               type_.labelSm,
-              { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+              { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing.smd },
             ]}
           >
             Why you got this
@@ -329,7 +329,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
           <Text
             style={[
               type_.labelSm,
-              { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+              { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing.smd },
             ]}
           >
             What you can do
@@ -538,30 +538,30 @@ const ss = StyleSheet.create({
   root: { flex: 1 },
   markAllBtn: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: radius.smd,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.xxs + spacing.xxs,
     flexShrink: 0,
   },
-  markAllText: { ...ff(600), fontSize: 12 },
+  markAllText: { ...type_.small },
   // body states
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
-    gap: 12,
+    paddingHorizontal: spacing.xxxl + spacing.sm,
+    gap: spacing.md,
   },
-  list: { paddingTop: 14, paddingHorizontal: 16 },
-  separator: { height: 9 },
+  list: { paddingTop: spacing.mdn, paddingHorizontal: spacing.lg },
+  separator: { height: spacing.smd },
   // card
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.md,
     borderRadius: radius.md,
-    padding: 14,
+    padding: spacing.mdn,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -569,15 +569,15 @@ const ss = StyleSheet.create({
   unreadBar: {
     position: 'absolute',
     left: 0,
-    top: 14,
-    bottom: 14,
-    width: 3,
+    top: spacing.mdn,
+    bottom: spacing.mdn,
+    width: spacing.xxs,
     borderRadius: 2,
   },
   iconBubble: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
+    width: layout.avatarMd + spacing.xs,
+    height: layout.avatarMd + spacing.xs,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -587,22 +587,22 @@ const ss = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 3,
+    marginBottom: spacing.xxs,
   },
-  cardTitle: { ...ff(700), fontSize: 13, flex: 1, marginRight: 8 },
-  cardMessage: { ...ff(400), fontSize: 12, lineHeight: 17 },
+  cardTitle: { ...type_.bodyReg, ...ff(700), flex: 1, marginRight: spacing.sm },
+  cardMessage: { ...type_.small, lineHeight: 17 },
   // detail sheet content (rendered inside BottomSheet's scroll area)
-  sheetHeaderRow: { flexDirection: 'row', gap: 14, marginBottom: 16 },
+  sheetHeaderRow: { flexDirection: 'row', gap: spacing.mdn, marginBottom: spacing.lg },
   sheetIconBubble: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
+    width: layout.avatarLg,
+    height: layout.avatarLg,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   sheetHeaderText: { flex: 1, justifyContent: 'center' },
-  sheetSection: { marginBottom: 20 },
-  whyCard: { flexDirection: 'row', gap: 10, padding: 12 },
+  sheetSection: { marginBottom: spacing.xl },
+  whyCard: { flexDirection: 'row', gap: spacing.smd, padding: spacing.md },
   whyText: { flex: 1, ...type_.body },
 });

@@ -40,7 +40,7 @@ import React from 'react';
 import { StyleProp, Text, TextStyle } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
-import { formatMoney, FormatMoneyOptions } from '@/lib/typography';
+import { ff, formatMoney, FormatMoneyOptions, type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,11 +64,11 @@ export interface AmountDisplayProps extends FormatMoneyOptions {
 // ─── Size presets ─────────────────────────────────────────────────────────────
 
 const SIZE_STYLES: Record<AmountSize, TextStyle> = {
-  display: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 36, letterSpacing: -1.5, lineHeight: 44 },
-  lg: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 24, letterSpacing: -0.5, lineHeight: 30 },
-  md: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 20, letterSpacing: -0.5, lineHeight: 26 },
-  sm: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, letterSpacing: -0.2, lineHeight: 20 },
-  xs: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 18 },
+  display: { ...type_.display },
+  lg: { ...type_.displayMd },
+  md: { ...type_.displaySm },
+  sm: { ...type_.mono },
+  xs: { ...type_.bodyReg, ...ff(600), lineHeight: 18 },
 };
 
 // ─── AmountDisplay ────────────────────────────────────────────────────────────

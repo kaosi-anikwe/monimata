@@ -38,7 +38,7 @@ import { z } from 'zod';
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
+import { type_ } from '@/lib/typography';
 import client from '@/services/api';
 import { AuthHdr, BackBtn, s } from './_authShared';
 
@@ -164,7 +164,7 @@ export default function VerifyResetCodeScreen() {
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
             loading={loading}
-            style={{ marginTop: 24 }}
+            style={{ marginTop: spacing.xxl }}
             accessibilityLabel="Verify reset code"
           >
             Verify Code
@@ -175,7 +175,7 @@ export default function VerifyResetCodeScreen() {
               {"Didn't receive it? "}
             </Text>
             <TouchableOpacity onPress={handleResend} disabled={resendLoading}>
-              <Text style={{ ...ff(700), color: colors.brand, fontSize: 13 }}>
+              <Text style={{ ...type_.bodyReg, color: colors.brand }}>
                 {resendLoading ? 'Sending…' : 'Resend code'}
               </Text>
             </TouchableOpacity>

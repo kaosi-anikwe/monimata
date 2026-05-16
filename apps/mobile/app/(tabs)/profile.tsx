@@ -38,7 +38,7 @@ import { Avatar, Badge, Button, ListRow, SectionHeader } from '@/components/ui';
 import { useBiometricLock } from '@/hooks/useBiometricLock';
 import { useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
 import { useTheme, useThemePreference } from '@/lib/theme';
-import { radius, shadow, spacing } from '@/lib/tokens';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import { logout } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -151,7 +151,7 @@ export default function ProfileScreen() {
           title="Account & Security"
           variant="group"
           paddingHorizontal={spacing.lg}
-          style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs + spacing.xxs }}
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           <ListRow
@@ -206,7 +206,7 @@ export default function ProfileScreen() {
           title="Learn & Reports"
           variant="group"
           paddingHorizontal={spacing.lg}
-          style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs + spacing.xxs }}
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           <ListRow
@@ -233,7 +233,7 @@ export default function ProfileScreen() {
           title="Preferences"
           variant="group"
           paddingHorizontal={spacing.lg}
-          style={{ paddingTop: spacing.mdn, marginBottom: 6 }}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs + spacing.xxs }}
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           {/* Dark Mode toggle */}
@@ -322,8 +322,8 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     header: {
       paddingHorizontal: spacing.xl,
       paddingBottom: spacing.xxl,
-      borderBottomLeftRadius: 26,
-      borderBottomRightRadius: 26,
+      borderBottomLeftRadius: radius.xl,
+      borderBottomRightRadius: radius.xl,
     },
     avWrap: {
       flexDirection: 'row',
@@ -337,9 +337,9 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       marginBottom: spacing.md,
     },
     backBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 12,
+      width: layout.iconBtnSize,
+      height: layout.iconBtnSize,
+      borderRadius: radius.sm,
       backgroundColor: 'rgba(255,255,255,0.15)',
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.2)',
@@ -347,7 +347,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       justifyContent: 'center',
       alignSelf: 'flex-start',
     },
-    profName: { ...ff(800), fontSize: 19, letterSpacing: -0.3 },
+    profName: { ...type_.h1Xs },
     profEmail: { ...type_.bodyReg, marginTop: 1 },
     badges: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
     // scroll
@@ -368,12 +368,10 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       borderWidth: 1,
     },
-    statNum: { fontSize: 22, letterSpacing: -0.5 },
+    statNum: { ...type_.h1, letterSpacing: -0.5 },
     statLbl: {
-      fontSize: 10,
+      ...type_.labelSm,
       marginTop: 2,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
     },
     menu: {
       borderRadius: radius.md,
@@ -383,13 +381,13 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     },
     langToggle: {
       flexDirection: 'row',
-      borderRadius: 10,
+      borderRadius: radius.smd,
       padding: 2,
       gap: 2,
     },
     langBtn: {
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: spacing.smd,
+      paddingVertical: spacing.xxs + spacing.xxs,
       borderRadius: radius.xs,
     },
     // log out

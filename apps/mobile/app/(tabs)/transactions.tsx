@@ -54,7 +54,7 @@ import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
 import { queryKeys } from '@/lib/queryKeys';
 import { useTheme } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
+import { type_ } from '@/lib/typography';
 import type { CategoryGroup } from '@/types/category';
 import type { BankAccount, Transaction } from '@monimata/shared-types';
 
@@ -607,9 +607,9 @@ const ss = StyleSheet.create({
   },
   hdrTitle: { ...type_.h1 },
   hdrIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -619,15 +619,14 @@ const ss = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    height: 42,
+    height: layout.rowMinHeight,
     borderRadius: radius.md,
     borderWidth: 1.5,
     paddingHorizontal: spacing.md,
   },
   searchInput: {
     flex: 1,
-    ...ff(400),
-    fontSize: 14,
+    ...type_.body,
     padding: 0,
   },
 
@@ -662,15 +661,15 @@ const ss = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.mdn,
-    paddingVertical: 11,
+    paddingVertical: spacing.smd,
     backgroundColor: 'transparent',
   },
   txRowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   txIcon: {
-    width: 38,
-    height: 38,
+    width: layout.avatarMd,
+    height: layout.avatarMd,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -680,42 +679,43 @@ const ss = StyleSheet.create({
   txMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 3,
+    gap: spacing.xxs + spacing.xxs,
+    marginTop: spacing.xxs,
     flexWrap: 'nowrap',
     overflow: 'hidden',
   },
   txCatChip: {
-    paddingHorizontal: 6,
+    paddingHorizontal: spacing.xxs + spacing.xxs,
     paddingVertical: 1,
-    borderRadius: 5,
+    borderRadius: radius.xxs,
   },
   txCatChipText: {
-    ...ff(700),
-    fontSize: 10,
+    ...type_.labelSm,
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   txAmt: { alignItems: 'flex-end', flexShrink: 0 },
-  txAmtNum: { ...ff(700), fontSize: 14 },
+  txAmtNum: { ...type_.body },
 
   // Manual badge
   manualBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: spacing.xxs + spacing.xxs,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: radius.xxs,
     marginTop: 2,
   },
-  manualBadgeText: { ...ff(700), fontSize: 9 },
+  manualBadgeText: { ...type_.micro },
 
   // Category picker sheet rows
   pickerGroupHeader: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: 7,
+    paddingVertical: spacing.xxs + spacing.xs,
   },
   pickerCatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
+    paddingVertical: spacing.mdn,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
 

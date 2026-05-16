@@ -39,8 +39,8 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme, type ThemeColors } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
+import { layout, radius, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -379,27 +379,24 @@ function makeStyles(colors: ThemeColors) {
     },
     stepDots: {
       flexDirection: 'row',
-      gap: 6,
-      marginBottom: 10,
+      gap: spacing.xxs + spacing.xxs,
+      marginBottom: spacing.smd,
     },
     stepDot: {
       flex: 1,
-      height: 6,
-      borderRadius: 3,
+      height: spacing.xxs + spacing.xxs,
+      borderRadius: spacing.xxs,
     },
     stepMeta: {
-      ...ff(400),
-      fontSize: 11,
+      ...type_.caption,
       color: colors.textInverseFaint,
-      marginBottom: 10,
+      marginBottom: spacing.smd,
     },
     question: {
-      ...ff(800),
-      fontSize: 20,
-      color: colors.white,
+      ...type_.displaySm,
       letterSpacing: -0.3,
-      lineHeight: 26,
-      marginBottom: 6,
+      color: colors.white,
+      marginBottom: spacing.xxs + spacing.xxs,
     },
     headerSub: {
       ...type_.bodyReg,
@@ -409,19 +406,19 @@ function makeStyles(colors: ThemeColors) {
     scrollContent: {
       padding: spacing.lg,
       paddingTop: spacing.md,
-      gap: 9,
+      gap: spacing.smd,
     },
     option: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: spacing.md,
       borderWidth: 1.5,
       borderRadius: radius.lg,
       padding: spacing.md,
     },
     optIcon: {
-      width: 44,
-      height: 44,
+      width: layout.rowMinHeight,
+      height: layout.rowMinHeight,
       borderRadius: radius.md,
       alignItems: 'center',
       justifyContent: 'center',
@@ -434,14 +431,13 @@ function makeStyles(colors: ThemeColors) {
       ...type_.btnSm,
     },
     optSub: {
-      ...ff(400),
-      fontSize: 12,
+      ...type_.small,
       marginTop: 2,
     },
     checkBox: {
-      width: 22,
-      height: 22,
-      borderRadius: 7,
+      width: layout.iconXl,
+      height: layout.iconXl,
+      borderRadius: radius.xxs,
       borderWidth: 2,
       flexShrink: 0,
       alignItems: 'center',
@@ -451,7 +447,7 @@ function makeStyles(colors: ThemeColors) {
     livePreview: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: spacing.smd,
       borderWidth: 1,
       borderRadius: radius.md,
       padding: spacing.sm + 2,
@@ -462,22 +458,20 @@ function makeStyles(colors: ThemeColors) {
       flex: 1,
     },
     reassure: {
-      ...ff(400),
-      fontSize: 11,
+      ...type_.caption,
       textAlign: 'center',
       paddingVertical: spacing.xs,
     },
     // ── CTAs ──
     continueBtn: {
-      height: 50,
+      height: layout.btnHeightSm,
       borderRadius: radius.full,
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: spacing.xs,
     },
     continueTxt: {
-      ...ff(700),
-      fontSize: 15,
+      ...type_.btnLg,
     },
     skipWrap: {
       alignItems: 'center',

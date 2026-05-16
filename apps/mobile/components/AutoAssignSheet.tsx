@@ -29,9 +29,9 @@
  * for the preview. The apply step writes to WatermelonDB and syncs in bg.
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Modal,
@@ -43,16 +43,16 @@ import {
   View,
 } from 'react-native';
 
-import { useTheme } from '@/lib/theme';
-import { radius, spacing } from '@/lib/tokens';
-import { ff, formatMoney } from '@/lib/typography';
-import type { BudgetResponse } from '@monimata/shared-types';
 import {
   useApplyAutoAssign,
   useAutoAssignPreviews,
   type AutoAssignItem,
   type AutoAssignStrategy,
 } from '@/hooks/useBudget';
+import { useTheme } from '@/lib/theme';
+import { layout, radius, spacing } from '@/lib/tokens';
+import { ff, formatMoney, type_ } from '@/lib/typography';
+import type { BudgetResponse } from '@monimata/shared-types';
 
 // ── Strategy metadata ─────────────────────────────────────────────────────────
 
@@ -329,12 +329,12 @@ const sp = StyleSheet.create({
     paddingTop: spacing.mdn,
     paddingBottom: spacing.md,
   },
-  title: { ...ff(700), fontSize: 17, letterSpacing: -0.3 },
-  subtitle: { ...ff(400), fontSize: 13, marginTop: 3 },
+  title: { ...type_.h2 },
+  subtitle: { ...type_.bodyReg, marginTop: spacing.xxs },
   xBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -343,26 +343,26 @@ const sp = StyleSheet.create({
   stratRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.md,
     paddingHorizontal: spacing.xl,
-    paddingVertical: 14,
+    paddingVertical: spacing.mdn,
   },
   iconBadge: {
-    width: 40,
-    height: 40,
+    width: layout.avatarMd,
+    height: layout.avatarMd,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   stratText: { flex: 1, minWidth: 0 },
-  stratLabel: { ...ff(600), fontSize: 14 },
-  stratDesc: { ...ff(400), fontSize: 12, marginTop: 2 },
+  stratLabel: { ...type_.body, ...ff(600) },
+  stratDesc: { ...type_.small, marginTop: 2 },
   stratRight: { alignItems: 'flex-end', flexShrink: 0 },
   stratCountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: "center", marginTop: spacing.xs, gap: 2 },
-  stratAmt: { ...ff(700), fontSize: 14, letterSpacing: -0.3 },
-  stratCnt: { ...ff(400), fontSize: 11, lineHeight: 14 },
-  noChange: { ...ff(500), fontSize: 12, lineHeight: 14 },
+  stratAmt: { ...type_.body, ...ff(700), letterSpacing: -0.3 },
+  stratCnt: { ...type_.caption, ...ff(400), lineHeight: 14 },
+  noChange: { ...type_.small, lineHeight: 14 },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 72 },
 });
 
@@ -605,16 +605,16 @@ const pv = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  title: { ...ff(700), fontSize: 17, letterSpacing: -0.3 },
-  subtitle: { ...ff(400), fontSize: 12 },
+  title: { ...type_.h2 },
+  subtitle: { ...type_.small },
   summaryBar: {
     flexDirection: 'row',
     marginHorizontal: spacing.xl,
@@ -626,35 +626,35 @@ const pv = StyleSheet.create({
   summaryCell: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: spacing.smd,
   },
   summaryLbl: {
+    ...type_.micro,
     ...ff(600),
-    fontSize: 9,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  summaryVal: { ...ff(700), fontSize: 15, letterSpacing: -0.3, marginTop: 3 },
+  summaryVal: { ...type_.mono, marginTop: spacing.xxs },
   summaryDiv: { width: 1 },
   warning: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 7,
+    gap: spacing.sm,
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,
     borderRadius: radius.sm,
     borderWidth: 1,
     padding: spacing.sm,
   },
-  warningTxt: { ...ff(400), fontSize: 13, flex: 1, lineHeight: 18 },
+  warningTxt: { ...type_.bodyReg, flex: 1, lineHeight: 18 },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 36,
     paddingHorizontal: spacing.xl,
     gap: 8,
   },
-  emptyTxt: { ...ff(600), fontSize: 15, textAlign: 'center' },
-  emptySub: { ...ff(400), fontSize: 13, textAlign: 'center' },
+  emptyTxt: { ...type_.btnLg, ...ff(600), textAlign: 'center' },
+  emptySub: { ...type_.bodyReg, textAlign: 'center' },
   list: { flexShrink: 1, maxHeight: 320 },
   listContent: {
     paddingHorizontal: spacing.xl,
@@ -664,25 +664,25 @@ const pv = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 11,
-    gap: 10,
+    paddingVertical: spacing.smd,
+    gap: spacing.smd,
   },
   rowLeft: { flex: 1, minWidth: 0 },
-  catName: { ...ff(600), fontSize: 14 },
-  catCurrent: { ...ff(400), fontSize: 12, marginTop: 2 },
+  catName: { ...type_.body, ...ff(600) },
+  catCurrent: { ...type_.small, marginTop: 2 },
   rowRight: { alignItems: 'flex-end', flexShrink: 0 },
-  proposed: { ...ff(700), fontSize: 14, letterSpacing: -0.3 },
+  proposed: { ...type_.btnSm, letterSpacing: -0.3 },
   deltaBadge: {
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: radius.xs,
     marginTop: 3,
   },
-  deltaTxt: { ...ff(600), fontSize: 11 },
+  deltaTxt: { ...type_.caption, ...ff(600) },
   divider: { height: StyleSheet.hairlineWidth },
   footer: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.smd,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.mdn,
   },
@@ -692,7 +692,7 @@ const pv = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footTxt: { ...ff(700), fontSize: 14 },
+  footTxt: { ...type_.btnSm },
 });
 
 // ── Shared sheet styles ───────────────────────────────────────────────────────
@@ -710,17 +710,17 @@ const as = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
     paddingBottom: 0, // individual steps control their own bottom padding
     maxHeight: '88%',
   },
   handle: {
-    width: 36,
-    height: 4,
+    width: layout.sheetHandle.width,
+    height: layout.sheetHandle.height,
     borderRadius: 2,
     alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
 });

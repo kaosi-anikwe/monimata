@@ -78,6 +78,61 @@ export const type_ = {
   } as TextStyle,
 
   /**
+   * Display hero — bank transaction hero amounts (38px, between display and displayLg).
+   * 38px / 800 / lh46 / -1.5px tracking
+   */
+  displayHero: {
+    ...ff(800),
+    fontSize: 38,
+    lineHeight: 46,
+    letterSpacing: -1.5,
+  } as TextStyle,
+
+  /**
+   * Display large — budget hero amounts.
+   * 40px / 800 / lh48 / -1.5px tracking
+   */
+  displayLg: {
+    ...ff(800),
+    fontSize: 40,
+    lineHeight: 48,
+    letterSpacing: -1.5,
+  } as TextStyle,
+
+  /**
+   * Display XL — large numpad amount entry.
+   * Matches amount input display: 48px / 800 / -2px tracking
+   */
+  displayXl: {
+    ...ff(800),
+    fontSize: 48,
+    lineHeight: 56,
+    letterSpacing: -2,
+  } as TextStyle,
+
+  /**
+   * Display entry — large text-input amount value.
+   * 32px / 800 / lh40 / -1px tracking
+   */
+  displayEntry: {
+    ...ff(800),
+    fontSize: 32,
+    lineHeight: 40,
+    letterSpacing: -1,
+  } as TextStyle,
+
+  /**
+   * Display number — large streak/counter numerals.
+   * 30px / 800 / lh34 / -1px tracking
+   */
+  displayNum: {
+    ...ff(800),
+    fontSize: 30,
+    lineHeight: 34,
+    letterSpacing: -1,
+  } as TextStyle,
+
+  /**
    * Display medium — large sub-totals (TBB value, big category amounts).
    * Matches .tbb-val: 24px / 800 / -0.5px
    */
@@ -85,6 +140,28 @@ export const type_ = {
     ...ff(800),
     fontSize: 24,
     lineHeight: 30,
+    letterSpacing: -0.5,
+  } as TextStyle,
+
+  /**
+   * Display small — hero amounts in cards and stat values.
+   * 20px / 800 / lh26 / -0.5px tracking
+   */
+  displaySm: {
+    ...ff(800),
+    fontSize: 20,
+    lineHeight: 26,
+    letterSpacing: -0.5,
+  } as TextStyle,
+
+  /**
+   * Display extra-small — amount symbols and compact figures.
+   * 18px / 800 / lh24 / -0.5px tracking
+   */
+  displayXs: {
+    ...ff(800),
+    fontSize: 18,
+    lineHeight: 24,
     letterSpacing: -0.5,
   } as TextStyle,
 
@@ -100,6 +177,28 @@ export const type_ = {
   } as TextStyle,
 
   /**
+   * H1 small — prominent hero copy, slightly below h1.
+   * 21px / 800 / lh27 / -0.3px tracking
+   */
+  h1Sm: {
+    ...ff(800),
+    fontSize: 21,
+    lineHeight: 27,
+    letterSpacing: -0.3,
+  } as TextStyle,
+
+  /**
+   * H1 extra-small — profile name, compact hero headings.
+   * 19px / 800 / lh25 / -0.3px tracking
+   */
+  h1Xs: {
+    ...ff(800),
+    fontSize: 19,
+    lineHeight: 25,
+    letterSpacing: -0.3,
+  } as TextStyle,
+
+  /**
    * H2 — modal/sheet titles.
    * Matches .sheet-title / .conf-h: 17–18px / 700–800 / -0.3px
    */
@@ -107,6 +206,17 @@ export const type_ = {
     ...ff(700),
     fontSize: 17,
     lineHeight: 22,
+    letterSpacing: -0.3,
+  } as TextStyle,
+
+  /**
+   * Sub-head — feature card titles, modal headings, lock screen name.
+   * 18px / 700 / lh24 / -0.3px tracking
+   */
+  subHead: {
+    ...ff(700),
+    fontSize: 18,
+    lineHeight: 24,
     letterSpacing: -0.3,
   } as TextStyle,
 
@@ -119,6 +229,26 @@ export const type_ = {
     fontSize: 16,
     lineHeight: 20,
     letterSpacing: -0.3,
+  } as TextStyle,
+
+  /**
+   * Body XL — large sentence/prompt text in forms.
+   * 20px / 600 / lh26
+   */
+  bodyXl: {
+    ...ff(600),
+    fontSize: 20,
+    lineHeight: 26,
+  } as TextStyle,
+
+  /**
+   * Body large — slightly prominent body text, date pickers, behavior labels.
+   * 15px / 600 / lh22
+   */
+  bodyLg: {
+    ...ff(600),
+    fontSize: 15,
+    lineHeight: 22,
   } as TextStyle,
 
   /**
@@ -186,8 +316,46 @@ export const type_ = {
   } as TextStyle,
 
   /**
-   * Mono — fixed-width numerals for amounts in budget rows.
-   * Same family as body but consistent character width for column alignment.
+   * Micro — tiny badge labels (manual entry, streak dots).
+   * 9px / 700 / lh11
+   */
+  micro: {
+    ...ff(700),
+    fontSize: 9,
+    lineHeight: 11,
+  } as TextStyle,
+
+  /**
+   * Badge — notification count bubble text.
+   * 8px / 800 / lh14
+   */
+  badge: {
+    ...ff(800),
+    fontSize: 8,
+    lineHeight: 14,
+  } as TextStyle,
+
+  /**
+   * Initials — avatar monogram / initial letters.
+   * 26px / 800 / lh30
+   */
+  initials: {
+    ...ff(800),
+    fontSize: 26,
+    lineHeight: 30,
+  } as TextStyle,
+
+  /**
+   * Emoji — large emoji in icon bubbles (error/warning illustrations).
+   * 28px / 400 / lh34
+   */
+  emoji: {
+    ...ff(400),
+    fontSize: 28,
+    lineHeight: 34,
+  } as TextStyle,
+
+  /**
    */
   mono: {
     ...ff(700),

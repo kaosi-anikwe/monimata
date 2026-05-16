@@ -44,8 +44,8 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme, type ThemeColors } from '@/lib/theme';
-import { radius, shadow, spacing } from '@/lib/tokens';
-import { ff, type_ } from '@/lib/typography';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
+import { type_ } from '@/lib/typography';
 import { markOnboarded } from '@/store/authSlice';
 import { useAppDispatch } from '@/store/hooks';
 import type { OnboardingAnswers } from './onboarding';
@@ -336,41 +336,40 @@ function makeStyles(colors: ThemeColors) {
     header: {
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.xl,
-      borderBottomLeftRadius: 28,
-      borderBottomRightRadius: 28,
+      borderBottomLeftRadius: radius.xl,
+      borderBottomRightRadius: radius.xl,
     },
     glowDecor: {
       position: 'absolute',
       top: -60,
       right: -60,
-      width: 220,
-      height: 220,
-      borderRadius: 110,
+      width: spacing.xxxl + spacing.xl + spacing.xxl + spacing.xxxl,
+      height: spacing.xxxl + spacing.xl + spacing.xxl + spacing.xxxl,
+      borderRadius: radius.full,
       backgroundColor: colors.limeGlow,
     },
     trophyWrap: {
       alignSelf: 'center',
-      marginBottom: 14,
+      marginBottom: spacing.mdn,
     },
     title: {
       ...type_.h1,
       color: colors.white,
       textAlign: 'center',
-      marginBottom: 8,
+      marginBottom: spacing.sm,
     },
     headerSub: {
-      ...ff(400),
-      fontSize: 14,
+      ...type_.body,
       color: colors.textInverseSecondary,
       lineHeight: 21,
       textAlign: 'center',
-      marginBottom: 20,
+      marginBottom: spacing.xl,
     },
     statsRow: {
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      gap: 20,
+      gap: spacing.xl,
     },
     stat: {
       alignItems: 'center',
@@ -380,14 +379,13 @@ function makeStyles(colors: ThemeColors) {
       color: colors.lime,
     },
     statLbl: {
-      ...ff(400),
-      fontSize: 11,
+      ...type_.caption,
       color: colors.textInverseFaint,
       marginTop: 1,
     },
     statDivider: {
       width: 1,
-      height: 28,
+      height: layout.avatarSm - spacing.xs,
       backgroundColor: colors.overlayGhostBorder,
     },
     // ── Scroll area ──
@@ -398,11 +396,10 @@ function makeStyles(colors: ThemeColors) {
       paddingBottom: spacing.xxxl,
     },
     listHint: {
-      ...ff(400),
-      fontSize: 12,
-      marginBottom: 10,
-      marginTop: 4,
-      paddingHorizontal: 4,
+      ...type_.small,
+      marginBottom: spacing.smd,
+      marginTop: spacing.xs,
+      paddingHorizontal: spacing.xs,
     },
     // ── Seed group card ──
     seedGroup: {
@@ -410,52 +407,49 @@ function makeStyles(colors: ThemeColors) {
       borderRadius: radius.lg,
       borderWidth: 1,
       overflow: 'hidden',
-      marginBottom: 10,
+      marginBottom: spacing.smd,
     },
     groupHdr: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: 12,
+      padding: spacing.md,
     },
     groupHdrLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: spacing.sm,
     },
     groupIconTile: {
-      width: 28,
-      height: 28,
-      borderRadius: 8,
+      width: layout.avatarSm - spacing.xs,
+      height: layout.avatarSm - spacing.xs,
+      borderRadius: radius.xs,
       alignItems: 'center',
       justifyContent: 'center',
     },
     groupName: {
-      ...ff(700),
-      fontSize: 11,
-      letterSpacing: 1.3,
+      ...type_.label,
     },
     groupHdrRight: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: spacing.xs,
     },
     groupCount: {
-      ...ff(400),
-      fontSize: 11,
+      ...type_.caption,
     },
     // ── Category rows ──
     catRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 11,
-      paddingHorizontal: 14,
-      gap: 10,
+      paddingVertical: spacing.smd,
+      paddingHorizontal: spacing.mdn,
+      gap: spacing.smd,
     },
     catDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+      width: spacing.sm,
+      height: spacing.sm,
+      borderRadius: spacing.xs,
       flexShrink: 0,
     },
     catName: {
@@ -465,43 +459,41 @@ function makeStyles(colors: ThemeColors) {
     targetBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
+      gap: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xxs,
+      borderRadius: radius.xxs,
     },
     targetBadgeTxt: {
-      ...ff(700),
-      fontSize: 10,
+      ...type_.labelSm,
     },
     // ── Footer ──
     footerHint: {
       ...type_.bodyReg,
       textAlign: 'center',
-      paddingVertical: 12,
+      paddingVertical: spacing.md,
       paddingHorizontal: spacing.md,
     },
     startBtn: {
-      height: 52,
+      height: layout.btnHeight,
       borderRadius: radius.full,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
-      marginBottom: 12,
+      gap: spacing.sm,
+      marginBottom: spacing.md,
     },
     startTxt: {
-      ...ff(700),
-      fontSize: 16,
+      ...type_.btnLg,
     },
     customiseBtn: {
-      height: 48,
+      height: layout.rowMinHeight + spacing.xs,
       borderRadius: radius.full,
       borderWidth: 1.5,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
+      gap: spacing.sm,
     },
     customiseTxt: {
       ...type_.body,

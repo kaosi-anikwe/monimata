@@ -24,11 +24,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 
 import { useTheme } from '@/lib/theme';
-import { spacing } from '@/lib/tokens';
-import { ff } from '@/lib/typography';
+import { layout, radius, spacing } from '@/lib/tokens';
+import { ff, type_ } from '@/lib/typography';
+import type { RootState } from '@/store';
 import { clearAuth, logout } from '@/store/authSlice';
 import { useAppDispatch } from '@/store/hooks';
-import type { RootState } from '@/store';
 
 type BiometricKind = 'fingerprint' | 'face' | 'unknown';
 
@@ -173,47 +173,46 @@ const s = StyleSheet.create({
     left: -60,
     width: 240,
     height: 240,
-    borderRadius: 120,
+    borderRadius: radius.full,
     pointerEvents: 'none',
   },
   logoTile: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
+    width: layout.avatarLg + spacing.lg,
+    height: layout.avatarLg + spacing.lg,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoImg: {
-    width: 48,
-    height: 48,
+    width: layout.avatarMd + spacing.sm,
+    height: layout.avatarMd + spacing.sm,
     resizeMode: 'contain',
   },
   wordmark: {
-    height: 36,
+    height: layout.iconXl + spacing.mdn,
     width: 160,
     resizeMode: 'contain',
     marginBottom: spacing.xl,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
+    width: layout.avatarLg + spacing.lg,
+    height: layout.avatarLg + spacing.lg,
+    borderRadius: radius.lg,
     borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  avatarText: { fontSize: 26, lineHeight: 30 },
+  avatarText: { ...type_.initials },
   name: {
-    fontSize: 18,
-    letterSpacing: -0.3,
+    ...type_.subHead,
     marginBottom: spacing.xxl,
   },
   biometricIconBtn: {
     marginBottom: spacing.md,
   },
   helperText: {
-    fontSize: 13,
+    ...type_.bodyReg,
     letterSpacing: 0.2,
     marginBottom: spacing.xxl,
   },
@@ -223,6 +222,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.md,
   },
-  footerLink: { fontSize: 14 },
-  footerDivider: { width: 1, height: 14 },
+  footerLink: { ...type_.body },
+  footerDivider: { width: 1, height: spacing.mdn },
 });

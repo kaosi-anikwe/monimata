@@ -37,6 +37,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useTheme } from '@/lib/theme';
+import { radius, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -130,14 +131,14 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   filter: {
-    paddingVertical: 7,
-    paddingHorizontal: 13,
-    borderRadius: 20,
+    paddingVertical: spacing.xs + 3,
+    paddingHorizontal: spacing.mdn,
+    borderRadius: radius.full,
   },
   qf: {
-    paddingVertical: 7,
-    paddingHorizontal: 13,
-    borderRadius: 20,
+    paddingVertical: spacing.xs + 3,
+    paddingHorizontal: spacing.mdn,
+    borderRadius: radius.full,
   },
   label: {
     ...type_.small,
