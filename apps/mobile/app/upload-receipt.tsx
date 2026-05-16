@@ -23,12 +23,12 @@
  * the file in a Celery task.  The new transaction appears via WebSocket
  * invalidation + push notification once processing completes.
  */
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useCallback, useState } from 'react';
 import {
   ScrollView,
@@ -264,10 +264,10 @@ export default function UploadReceiptScreen() {
   const uploadBtnBg = isDone ? colors.successSubtle : isUploading ? colors.surface : colors.brand;
   const uploadBtnTextColor = isDone ? colors.successText : isUploading ? colors.textMeta : colors.white;
 
+  useStatusBarStyle('dark');
+
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
-      <StatusBar style="dark" />
-
       {/* ── Header ── */}
       <View
         style={[

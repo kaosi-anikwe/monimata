@@ -34,6 +34,7 @@ import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -223,6 +224,7 @@ function RootNavigator() {
 
   return (
     <>
+      <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         {isAuthenticated && (user?.onboarded ?? false) ? (
           <Stack.Screen name="(tabs)" />
