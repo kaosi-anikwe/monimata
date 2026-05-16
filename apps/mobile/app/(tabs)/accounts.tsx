@@ -37,6 +37,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useToast } from '@/components/Toast';
 import { useTour, type TourStep } from '@/components/tour';
+import { AmountInput } from '@/components/ui/AmountInput';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { Divider } from '@/components/ui/Divider';
@@ -414,14 +415,12 @@ function UpdateBalanceSheet({ account, onClose }: UpdateBalanceSheetProps) {
             </Text>
           </Text>
         )}
-        <Input
-          label="New Balance (₦) *"
+        <AmountInput
+          label="New Balance *"
           value={amount}
-          onChangeText={setAmount}
-          placeholder="0.00"
-          keyboardType="decimal-pad"
+          onChange={setAmount}
+          allowDecimals
           autoFocus
-          accessibilityLabel="New balance"
         />
         <Input
           label="Note — optional"
