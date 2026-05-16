@@ -116,3 +116,44 @@ class ManualTransactionRequest(BaseModel):
         if v == 0:
             raise ValueError("Amount cannot be zero")
         return v
+
+
+# ── Phase 6 — clustering & review queue ──────────────────────────────────────
+
+
+class ClusterItem(BaseModel):
+    key: str  # representative cleaned_narration (most frequent member)
+    member_narrations: list[str]  # all narrations merged into this cluster
+    count: int  # total transaction count across all members
+    total_amount: int  # sum of ABS(amount) in kobo
+
+
+class ClustersResponse(BaseModel):
+    clusters: list[ClusterItem]
+    total_uncategorised: int  # total uncategorised transaction count for progress display
+
+
+class ClusterCategorizeRequest(BaseModel):
+    cluster_key: str
+    category_id: UUID
+
+
+class ClusterCategorizeResponse(BaseModel):
+    updated_count: int
+
+
+class CategorySuggestion(BaseModel):
+    category_id: UUID
+    category_name: str
+    confidence: int  # 0-100
+    source: str  # "exact_match" | "global_merchant" | "keyword" | "heuristic"
+
+
+class ReviewQueueItem(BaseModel):
+    transaction: TransactionResponse
+    suggestions: list[CategorySuggestion]
+    remaining_count: int  # uncategorised transactions still in the queue
+
+
+class ConfirmCategoryRequest(BaseModel):
+    category_id: UUID

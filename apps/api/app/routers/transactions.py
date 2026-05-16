@@ -34,7 +34,12 @@ from app.models.category import Category
 from app.models.transaction import Transaction, TransactionSource, TransactionSplit
 from app.models.user import User
 from app.schemas.transactions import (
+    ClusterCategorizeRequest,
+    ClusterCategorizeResponse,
+    ClustersResponse,
+    ConfirmCategoryRequest,
     ManualTransactionRequest,
+    ReviewQueueItem,
     TransactionListResponse,
     TransactionPatchRequest,
     TransactionResponse,
@@ -183,6 +188,205 @@ def list_transactions(
 
 
 # ── GET /transactions/{id} ────────────────────────────────────────────────────
+
+# ── GET /transactions/clusters ──────────────────────────────────────────
+# Must be defined before GET /{tx_id} so FastAPI does not interpret
+# the literal string ‘clusters’ as a tx_id path parameter.
+
+
+@router.get("/clusters", response_model=ClustersResponse)
+def list_clusters(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClustersResponse:
+    """Return Levenshtein-clustered merchant groups for all uncategorised transactions.
+
+    Use this during onboarding to present a card-stack of merchant groups so the
+    user can categorise hundreds of transactions in a handful of taps.
+    """
+    from sqlalchemy import text
+
+    from app.schemas.transactions import ClusterItem as ClusterItemSchema
+    from app.services.categorization.clustering import (  # type: ignore[attr-defined]
+        build_clusters,
+    )
+
+    # 6a: pre-aggregate via SQL GROUP BY to compress N tx rows → K unique narrations.
+    rows = db.execute(
+        text("""
+            SELECT cleaned_narration,
+                   COUNT(*)::int          AS cnt,
+                   SUM(ABS(amount))::int  AS total
+            FROM transactions
+            WHERE user_id       = :uid
+              AND category_id   IS NULL
+              AND cleaned_narration IS NOT NULL
+              AND cleaned_narration <> ''
+            GROUP BY cleaned_narration
+        """),
+        {"uid": str(current_user.id)},
+    ).fetchall()
+
+    total_uncategorised: int = (
+        db.execute(
+            text("SELECT COUNT(*) FROM transactions WHERE user_id = :uid AND category_id IS NULL"),
+            {"uid": str(current_user.id)},
+        ).scalar()
+        or 0
+    )
+
+    if not rows:
+        return ClustersResponse(clusters=[], total_uncategorised=total_uncategorised)
+
+    # 6b: in-memory Levenshtein clustering on the pre-aggregated candidates.
+    raw_tuples = [(r.cleaned_narration, r.cnt, r.total) for r in rows]
+    clusters = build_clusters(raw_tuples)
+
+    return ClustersResponse(
+        clusters=[
+            ClusterItemSchema(
+                key=c.key,
+                member_narrations=c.member_narrations,
+                count=c.count,
+                total_amount=c.total_amount,
+            )
+            for c in clusters
+        ],
+        total_uncategorised=total_uncategorised,
+    )
+
+
+# ── POST /transactions/clusters/categorize ──────────────────────────────────
+
+
+@router.post("/clusters/categorize", response_model=ClusterCategorizeResponse)
+def categorize_cluster(
+    body: ClusterCategorizeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClusterCategorizeResponse:
+    """Batch-assign a category to every uncategorised transaction in a cluster.
+
+    The server re-derives cluster membership by finding all unique
+    cleaned_narrations within Levenshtein threshold of ``cluster_key``, then
+    batch-updates the matching transactions and writes a UserCategoryRule.
+    """
+    from sqlalchemy import text
+
+    from app.services.categorization.clustering import find_cluster_members
+
+    cat = (
+        db.query(Category)
+        .filter(Category.id == str(body.category_id), Category.user_id == str(current_user.id))
+        .first()
+    )
+    if cat is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Category not found"
+        )
+
+    # Fetch unique uncategorised narrations to compare against cluster_key.
+    unique_narrations: list[str] = [
+        r[0]
+        for r in db.execute(
+            text("""
+                SELECT DISTINCT cleaned_narration
+                FROM transactions
+                WHERE user_id = :uid
+                  AND category_id IS NULL
+                  AND cleaned_narration IS NOT NULL
+                  AND cleaned_narration <> ''
+            """),
+            {"uid": str(current_user.id)},
+        ).fetchall()
+    ]
+
+    members = find_cluster_members(body.cluster_key, unique_narrations)
+    if not members:
+        return ClusterCategorizeResponse(updated_count=0)
+
+    # Fetch and update matching transactions.
+    txs = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == str(current_user.id),
+            Transaction.category_id.is_(None),
+            Transaction.cleaned_narration.in_(members),
+        )
+        .all()
+    )
+
+    from app.services.budget_logic import get_or_create_budget_month as _get_bm
+
+    for tx in txs:
+        month_str = tx.date.strftime("%Y-%m")
+        tx.category_id = str(body.category_id)
+        tx.categorization_source = "exact_match"
+        tx.category_confidence = 100
+        bm = _get_bm(db, str(current_user.id), str(body.category_id), month_str)
+        bm.activity += tx.amount
+
+    # Write UserCategoryRule for the cluster representative.
+    _upsert_narration_map(db, str(current_user.id), body.cluster_key, str(body.category_id))
+
+    db.commit()
+    return ClusterCategorizeResponse(updated_count=len(txs))
+
+
+# ── GET /transactions/review-queue ─────────────────────────────────────────
+# Must be defined before GET /{tx_id}.
+
+
+@router.get("/review-queue", response_model=ReviewQueueItem | None)
+def get_review_queue(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReviewQueueItem | None:
+    """Return the next uncategorised transaction with top-3 category suggestions.
+
+    Transactions are served oldest-first so the user works through history in
+    chronological order.  Returns null when the queue is empty.
+    """
+    from sqlalchemy import text
+
+    from app.schemas.transactions import CategorySuggestion
+    from app.services.categorization import get_category_suggestions
+
+    tx = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == str(current_user.id),
+            Transaction.category_id.is_(None),
+        )
+        .order_by(Transaction.date.asc())
+        .first()
+    )
+    if tx is None:
+        return None
+
+    remaining_count: int = (
+        db.execute(
+            text("SELECT COUNT(*) FROM transactions WHERE user_id = :uid AND category_id IS NULL"),
+            {"uid": str(current_user.id)},
+        ).scalar()
+        or 0
+    )
+
+    raw_suggestions = get_category_suggestions(db, tx, limit=3)
+
+    return ReviewQueueItem(
+        transaction=tx,  # type: ignore[arg-type]
+        suggestions=[
+            CategorySuggestion(
+                category_id=s["category_id"],
+                category_name=s["category_name"],
+                confidence=s["confidence"],
+                source=s["source"],
+            )
+            for s in raw_suggestions
+        ],
+        remaining_count=remaining_count,
+    )
 
 
 @router.get("/{tx_id}", response_model=TransactionResponse)
@@ -334,6 +538,57 @@ def patch_transaction(
 
 
 # ── POST /transactions/{id}/split ─────────────────────────────────────────────
+
+# ── POST /transactions/{id}/confirm-category ─────────────────────────────────
+
+
+@router.post("/{tx_id}/confirm-category", response_model=TransactionResponse)
+def confirm_category(
+    tx_id: UUID,
+    body: ConfirmCategoryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Transaction:
+    """Confirm or override a category suggestion for a transaction.
+
+    Upserts a UserCategoryRule so future transactions with the same
+    cleaned_narration are categorised immediately at Tier 1.
+    """
+    tx = _get_tx_or_404(db, str(tx_id), str(current_user.id))
+
+    cat = (
+        db.query(Category)
+        .filter(Category.id == str(body.category_id), Category.user_id == str(current_user.id))
+        .first()
+    )
+    if cat is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Category not found"
+        )
+
+    old_category_id = str(tx.category_id) if tx.category_id else None
+    old_month = tx.date.strftime("%Y-%m")
+    new_category_id = str(body.category_id)
+
+    # Adjust budget activity.
+    if old_category_id and old_category_id != new_category_id:
+        old_bm = get_or_create_budget_month(db, str(current_user.id), old_category_id, old_month)
+        old_bm.activity -= tx.amount
+    if not old_category_id or old_category_id != new_category_id:
+        new_bm = get_or_create_budget_month(db, str(current_user.id), new_category_id, old_month)
+        new_bm.activity += tx.amount
+
+    tx.category_id = new_category_id
+    tx.categorization_source = "manual"
+    tx.category_confidence = 100
+    tx.updated_at = datetime.now(UTC)
+
+    # Upsert Tier 1 cache so the same narration is auto-matched next time.
+    _upsert_narration_map(db, str(current_user.id), tx.narration, new_category_id)
+
+    db.commit()
+    db.refresh(tx)
+    return tx
 
 
 @router.post("/{tx_id}/split", response_model=TransactionResponse)

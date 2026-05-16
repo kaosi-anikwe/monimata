@@ -268,3 +268,96 @@ def categorize_transaction(db: Session, tx: Any) -> str | None:
     # Tier 4 (Phase 5): BYOK LLM fallback -- handled by run_llm_categorization Celery task.
     # categorize_transactions enqueues it for any transactions that reach this point.
     return None
+
+
+# -- Review-queue suggestions ------------------------------------------------
+
+
+def get_category_suggestions(
+    db: Session,
+    tx: Any,
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    """Return up to ``limit`` ranked category suggestions for an uncategorised transaction.
+
+    Each suggestion is a dict with keys: category_id, category_name, confidence, source.
+    Results are deduplicated by category_id and ordered by confidence descending.
+    Used by GET /transactions/review-queue.
+    """
+    from app.models.category import Category
+    from app.models.user_category_rule import UserCategoryRule
+    from app.services.categorization.scoring import HeuristicEngine
+
+    key = tx.cleaned_narration or clean_narration(tx.narration)
+    suggestions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def _add(cat_id: str, confidence: int, source: str) -> None:
+        if cat_id in seen:
+            return
+        cat = db.get(Category, cat_id)
+        if cat and not cat.is_hidden:
+            seen.add(cat_id)
+            suggestions.append(
+                {
+                    "category_id": cat_id,
+                    "category_name": cat.name,
+                    "confidence": confidence,
+                    "source": source,
+                }
+            )
+
+    if not key:
+        return []
+
+    # Tier 1: exact match
+    rule = (
+        db.query(UserCategoryRule)
+        .filter(
+            UserCategoryRule.user_id == tx.user_id,
+            UserCategoryRule.cleaned_narration == key,
+        )
+        .first()
+    )
+    if rule:
+        _add(str(rule.category_id), 100, "exact_match")
+
+    # Tier 2a: global merchant
+    for token, category_name in _MERCHANT_TOKENS.items():
+        if len(suggestions) >= limit:
+            break
+        if token in key:
+            cat_id = _find_category_by_name(db, tx.user_id, category_name)
+            if cat_id:
+                _add(cat_id, 90, "global_merchant")
+
+    # Tier 2b: keyword rules
+    for pattern, category_name in KEYWORD_RULES:
+        if len(suggestions) >= limit:
+            break
+        if pattern.search(key):
+            cat_id = _find_category_by_name(db, tx.user_id, category_name)
+            if cat_id:
+                _add(cat_id, 75, "keyword")
+
+    # Tier 3: heuristic engine candidates (scored, not just the winner)
+    if len(suggestions) < limit:
+        engine = HeuristicEngine()
+        candidates = engine._get_candidates(db, tx.user_id, key)  # noqa: SLF001
+        history = engine._get_history(db, tx.user_id)  # noqa: SLF001
+        from app.services.categorization.scoring import ScoringContext
+
+        context = ScoringContext(tx=tx, history=history)
+        scored = []
+        for candidate in candidates:
+            total = candidate.base_weight
+            for comp in engine.components:
+                total += comp.calculate_score(context, candidate)
+            scored.append((candidate.category_id, min(total, 100)))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        for cat_id, confidence in scored:
+            if len(suggestions) >= limit:
+                break
+            _add(cat_id, confidence, "heuristic")
+
+    return suggestions[:limit]
