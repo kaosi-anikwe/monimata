@@ -23,7 +23,12 @@ from app.core.deps import get_current_user
 from app.core.security import encrypt_api_key
 from app.models.user import User
 from app.models.user_ai_credential import UserAiCredential
-from app.schemas.ai import AiCredentialCreate, AiCredentialResponse, AiUsageResponse
+from app.schemas.ai import (
+    AiCredentialCreate,
+    AiCredentialResponse,
+    AiUsageResponse,
+    LlmCategorizeResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -108,6 +113,68 @@ def delete_credential(
 
 
 # ── GET /ai/usage ───────────────────────────────────────────────────────────
+
+
+# ── POST /ai/categorize ────────────────────────────────────────────────────
+
+
+@usage_router.post(
+    "/categorize", response_model=LlmCategorizeResponse, status_code=status.HTTP_202_ACCEPTED
+)
+def trigger_llm_categorization(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LlmCategorizeResponse:
+    """Manually trigger LLM categorisation for all uncategorised transactions.
+
+    Requires an active BYOK credential.  Returns 202 immediately; a push
+    notification is sent on completion (success or final failure).
+    Returns ``queued: 0`` if there are no uncategorised transactions.
+    """
+    from typing import cast
+
+    from app.models.transaction import Transaction
+    from app.models.user_ai_credential import UserAiCredential
+    from app.worker.celery_app import CeleryTask
+    from app.worker.tasks import run_llm_categorization
+
+    # Fail fast if no active credential — avoids silently queuing a no-op.
+    credential = (
+        db.query(UserAiCredential)
+        .filter(
+            UserAiCredential.user_id == current_user.id,
+            UserAiCredential.is_active.is_(True),
+        )
+        .first()
+    )
+    if credential is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No active AI credential configured. Add one at POST /ai/credentials.",
+        )
+
+    tx_ids: list[str] = [
+        str(row.id)
+        for row in db.query(Transaction.id)
+        .filter(
+            Transaction.user_id == current_user.id,
+            Transaction.category_id.is_(None),
+        )
+        .all()
+    ]
+
+    if not tx_ids:
+        return LlmCategorizeResponse(queued=0)
+
+    cast(CeleryTask, run_llm_categorization).delay(
+        str(current_user.id), tx_ids, notify_on_completion=True
+    )
+    logger.info(
+        "trigger_llm_categorization: queued %d transactions for user=%s",
+        len(tx_ids),
+        current_user.id,
+    )
+    return LlmCategorizeResponse(queued=len(tx_ids))
 
 
 @usage_router.get("/usage", response_model=AiUsageResponse)

@@ -25,6 +25,10 @@ class AiCredentialResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LlmCategorizeResponse(BaseModel):
+    queued: int  # number of uncategorised transactions dispatched to the LLM task
+
+
 class AiUsageResponse(BaseModel):
     """AI efficiency monitor panel data (spec §8.3)."""
 
