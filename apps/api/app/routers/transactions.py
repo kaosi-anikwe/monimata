@@ -212,9 +212,11 @@ def list_clusters(
     )
 
     # 6a: pre-aggregate via SQL GROUP BY to compress N tx rows → K unique narrations.
+    # Only cluster on transactions that have a cleaned_narration — all incoming
+    # transactions are guaranteed to have it from the ingestion pipeline.
     rows = db.execute(
         text("""
-            SELECT cleaned_narration,
+            SELECT cleaned_narration      AS narration_key,
                    COUNT(*)::int          AS cnt,
                    SUM(ABS(amount))::int  AS total
             FROM transactions
@@ -239,7 +241,7 @@ def list_clusters(
         return ClustersResponse(clusters=[], total_uncategorised=total_uncategorised)
 
     # 6b: in-memory Levenshtein clustering on the pre-aggregated candidates.
-    raw_tuples = [(r.cleaned_narration, r.cnt, r.total) for r in rows]
+    raw_tuples = [(r.narration_key, r.cnt, r.total) for r in rows]
     clusters = build_clusters(raw_tuples)
 
     return ClustersResponse(

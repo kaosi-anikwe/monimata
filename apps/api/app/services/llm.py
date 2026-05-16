@@ -171,6 +171,40 @@ class LlmHttpError(Exception):
         self.status_code = status_code
 
 
+def validate_api_key(provider: str, api_key: str) -> None:
+    """Make a lightweight, token-free request to verify the API key is accepted.
+
+    Raises ``LlmHttpError`` on HTTP errors, ``ValueError`` for unknown providers.
+    The key is never logged.
+    """
+    try:
+        if provider == "openai":
+            resp = httpx.get(
+                "https://api.openai.com/v1/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=10,
+            )
+        elif provider == "gemini":
+            resp = httpx.get(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash?key={api_key}",
+                timeout=10,
+            )
+        elif provider == "anthropic":
+            resp = httpx.get(
+                "https://api.anthropic.com/v1/models",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+                timeout=10,
+            )
+        else:
+            raise ValueError(f"Unsupported LLM provider: {provider!r}")
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise LlmHttpError(exc.response.status_code, str(exc)) from exc
+
+
 def call_llm(
     provider: str,
     api_key: str,
