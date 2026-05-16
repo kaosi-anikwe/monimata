@@ -24,6 +24,9 @@ from app.models.recurring_rule import RecurringRule
 from app.models.target import CategoryTarget
 from app.models.transaction import Transaction, TransactionSplit
 from app.models.user import User
+from app.models.user_ai_credential import UserAiCredential
+from app.models.user_ai_usage_log import UserAiUsageLog
+from app.models.user_category_rule import UserCategoryRule
 
 __all__ = [
     "User",
@@ -36,6 +39,9 @@ __all__ = [
     "BudgetMonth",
     "RecurringRule",
     "NarrationCategoryMap",
+    "UserCategoryRule",
+    "UserAiCredential",
+    "UserAiUsageLog",
     "Nudge",
     "Article",
 ]

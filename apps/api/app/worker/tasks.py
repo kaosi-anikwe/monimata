@@ -365,6 +365,8 @@ def process_bank_statement(
         inserted_txs: list[Transaction] = []
         updated_ids: list[str] = []
 
+        from app.services.categorization import clean_narration
+
         for txn in parsed_txns:
             signed_amount = -txn.amount_kobo if txn.transaction_type == "debit" else txn.amount_kobo
             narration = txn.narration or f"{bank_display} {txn.transaction_type.capitalize()}"
@@ -376,6 +378,7 @@ def process_bank_statement(
                 existing.date = tx_date
                 existing.amount = signed_amount
                 existing.narration = narration
+                existing.cleaned_narration = clean_narration(narration)
                 existing.type = txn.transaction_type
                 existing.balance_after = txn.balance_kobo
                 existing.source = TransactionSource.statement
@@ -389,6 +392,7 @@ def process_bank_statement(
             if manual_match is not None:
                 manual_match.date = tx_date
                 manual_match.narration = narration
+                manual_match.cleaned_narration = clean_narration(narration)
                 manual_match.balance_after = txn.balance_kobo
                 manual_match.source = TransactionSource.statement
                 manual_match.external_ref = txn.transaction_ref
@@ -404,6 +408,7 @@ def process_bank_statement(
                 date=tx_date,
                 amount=signed_amount,
                 narration=narration,
+                cleaned_narration=clean_narration(narration),
                 type=txn.transaction_type,
                 balance_after=txn.balance_kobo,
                 source=TransactionSource.statement,
@@ -686,12 +691,15 @@ def process_receipt(
         narration = parsed.narration or f"{bank_display} {parsed.transaction_type.capitalize()}"
         tx_date = parsed.transaction_date or datetime.now(UTC)
 
+        from app.services.categorization import clean_narration
+
         tx = Transaction(
             user_id=user_id,
             account_id=account_id,
             date=tx_date,
             amount=signed_amount,
             narration=narration,
+            cleaned_narration=clean_narration(narration),
             type=parsed.transaction_type,
             balance_after=parsed.balance_kobo,
             source=TransactionSource.receipt,

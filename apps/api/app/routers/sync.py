@@ -212,6 +212,8 @@ def _generate_recurring_transactions(db: Session, user_id: str, today: date) -> 
         .all()
     )
 
+    from app.services.categorization import clean_narration
+
     for rule in rules:
         current_due = rule.next_due
         while current_due <= today:
@@ -221,13 +223,15 @@ def _generate_recurring_transactions(db: Session, user_id: str, today: date) -> 
                 break
 
             tmpl = rule.template
+            recur_narration = tmpl.get("narration", "Recurring")
             tx = Transaction(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
                 account_id=tmpl["account_id"],
                 date=current_due,
                 amount=int(tmpl["amount"]),
-                narration=tmpl.get("narration", "Recurring"),
+                narration=recur_narration,
+                cleaned_narration=clean_narration(recur_narration),
                 type=tmpl.get("type", "debit"),
                 category_id=tmpl.get("category_id"),
                 memo=tmpl.get("memo"),
@@ -790,19 +794,23 @@ def push(
     # ── transactions ──────────────────────────────────────────────────────────
     tx_changes = changes.get("transactions", {})
 
+    from app.services.categorization import clean_narration
+
     for record in tx_changes.get("created", []):
         tx_existing = db.query(Transaction).filter(Transaction.id == record["id"]).first()
         if tx_existing:
             continue  # idempotent duplicate push
 
         tx_date = datetime.fromtimestamp(record["date"] / 1000, tz=UTC)
+        push_narration = record.get("narration", "Manual")
         new_tx = Transaction(
             id=record["id"],
             user_id=user_id,
             account_id=record["account_id"],
             date=tx_date,
             amount=int(record["amount"]),
-            narration=record.get("narration", "Manual"),
+            narration=push_narration,
+            cleaned_narration=clean_narration(push_narration),
             type=record.get("type", "debit"),
             category_id=record.get("category_id"),
             memo=record.get("memo"),

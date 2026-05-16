@@ -35,11 +35,85 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+# ── Narration cleaning pipeline ───────────────────────────────────────────────
+# Strips bank-specific protocol noise from raw narration strings so the
+# residual merchant footprint can be indexed and matched deterministically.
+
+# Leading protocol tokens (e.g. "TRF FROM", "NIP TRSF FRM", "POS PURCHASE AT")
+_CLEAN_LEADING_RE = re.compile(
+    r"^(?:TRF\s+(?:FROM\s+)?|TRANSFER\s+FROM\s+|NIP\s+(?:TRSF\s+FRM\s+)?|"
+    r"POS\s+PURCHASE\s+(?:AT\s+)?|ATM\s+WITHDRAWAL\s+(?:AT\s+)?|"
+    r"DEBIT\s+ALERT[:\s]*|CREDIT\s+ALERT[:\s]*|NIBSS\s+INSTANT\s+PMT\s*)",
+    re.IGNORECASE,
+)
+# Trailing channel/session noise (e.g. "VIA USSD", "VIA GTB MOBILE", "ON 12/05/2026")
+_CLEAN_TRAILING_RE = re.compile(
+    r"\s*(?:VIA\s+(?:USSD|INTERNET(?:\s+BANKING)?|MOBILE(?:\s+APP)?|APP|"
+    r"[A-Z]{2,5}\s+(?:MOBILE|APP|INTERNET))|ON\s+\d[\d:/\-\s]+)$",
+    re.IGNORECASE,
+)
+# Reference/session markers and their values (e.g. "REF:71625372", "SESN/ABC123")
+_CLEAN_REF_RE = re.compile(
+    r"\b(?:REF|SESN|TRAN|TXN|RRN|STAN|FT|FTN)[:/\s][\w/\-]+",
+    re.IGNORECASE,
+)
+# Inline "TO <digits>" and "FROM <digits>" account number fragments
+_CLEAN_ACCT_INLINE_RE = re.compile(r"\b(?:TO|FROM)\s+\d{6,}\b", re.IGNORECASE)
+# Long standalone numeric runs (≥7 digits) — account numbers, phone numbers, IDs
+_CLEAN_LONG_NUM_RE = re.compile(r"\b\d{7,}\b")
+# Date-like fragments (e.g. "12/05/26", "2026-05-12")
+_CLEAN_DATE_RE = re.compile(r"\b\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}\b")
+# Anything that is not alphanumeric, space, ampersand, hyphen, or apostrophe
+_CLEAN_SPECIAL_RE = re.compile(r"[^a-z0-9\s&'\-]", re.IGNORECASE)
+# Consecutive whitespace normaliser
+_CLEAN_SPACE_RE = re.compile(r"\s+")
+
+_MAX_CLEANED_LEN = 255
+
+
+def clean_narration(narration: str) -> str:
+    """Deterministic narration cleaning pipeline.
+
+    Strips protocol tokens, reference codes, account-number fragments, and
+    date strings from a raw bank narration, then returns a lowercase,
+    whitespace-normalised string suitable for indexing and cache lookups.
+
+    The output is stored as ``Transaction.cleaned_narration`` at ingestion
+    time so downstream categorisation tiers never need to re-run this work.
+    """
+    if not narration:
+        return ""
+
+    s = narration
+    # Strip leading protocol tokens first.
+    s = _CLEAN_LEADING_RE.sub("", s)
+    # Strip reference markers before checking trailing junk — this exposes
+    # trailing channel tokens (e.g. "VIA USSD") that were buried before "REF:".
+    s = _CLEAN_REF_RE.sub("", s)
+    # Strip trailing channel/session noise (now at the true end of string).
+    s = _CLEAN_TRAILING_RE.sub("", s)
+    # Strip inline "TO/FROM <account_number>" fragments.
+    s = _CLEAN_ACCT_INLINE_RE.sub("", s)
+    # Strip date-like patterns and long numeric runs.
+    s = _CLEAN_DATE_RE.sub("", s)
+    s = _CLEAN_LONG_NUM_RE.sub("", s)
+    # Second trailing pass catches residual tokens left after numeric removal
+    # (e.g. a dangling "ON" or "VIA" that was adjacent to a stripped number).
+    s = _CLEAN_TRAILING_RE.sub("", s)
+    # Replace non-meaningful characters with spaces.
+    s = _CLEAN_SPECIAL_RE.sub(" ", s)
+    # Lowercase and collapse whitespace.
+    s = s.lower()
+    s = _CLEAN_SPACE_RE.sub(" ", s).strip()
+    return s[:_MAX_CLEANED_LEN]
+
+
 # ── Global merchant dictionary ────────────────────────────────────────────────
 # Key: uppercase token to look for in narration. Value: category name.
 # This is a shared platform resource; curate it over time.
 MERCHANT_DICT: dict[str, str] = {
     "CHOPNOW": "Food & Dining",
+    "CHEESYBITE": "Food & Dining",
     "BOLT": "Transport",
     "UBER": "Transport",
     "INDRIVER": "Transport",
