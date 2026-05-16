@@ -24,7 +24,7 @@ import { useToast } from '@/components/Toast';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { useCategoryGroups } from '@/hooks/useCategories';
-import { useTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
+import { useSplitTransaction, useTransaction } from '@/hooks/useTransactions';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
@@ -240,7 +240,7 @@ export default function SplitTransactionScreen() {
 
   const { data: tx } = useTransaction(id);
   const { data: groups = [] } = useCategoryGroups();
-  const update = useUpdateTransaction();
+  const splitMutation = useSplitTransaction();
 
   const totalKobo = tx ? Math.abs(tx.amount) : 0;
 
@@ -272,18 +272,22 @@ export default function SplitTransactionScreen() {
 
   function handleSave() {
     if (!isBalanced) {
-      showError('Split amounts must add up to the total transaction amount.');
+      showError('Amounts must add up to the total transaction amount.');
       return;
     }
-    // Store the primary (first) split category & memo on the transaction itself,
-    // and attach split metadata. Adapt this as the API evolves.
-    update.mutate(
+    const uncategorised = lines.find((l) => !l.category);
+    if (uncategorised) {
+      showError('Every split line must have a category.');
+      return;
+    }
+    splitMutation.mutate(
       {
         txId: id,
-        body: {
-          category_id: lines[0]?.category?.id ?? null,
-          memo: lines.map((l) => `${l.category?.name ?? 'Uncategorised'}: ₦${(l.amount / 100).toFixed(2)}${l.memo ? ` — ${l.memo}` : ''}`).join(' | '),
-        },
+        splits: lines.map((l) => ({
+          category_id: l.category!.id,
+          amount: l.amount,
+          memo: l.memo || null,
+        })),
       },
       {
         onSuccess: () => {
@@ -409,8 +413,8 @@ export default function SplitTransactionScreen() {
         <Button
           variant="green"
           onPress={handleSave}
-          disabled={!isBalanced || update.isPending}
-          loading={update.isPending}
+          disabled={!isBalanced || splitMutation.isPending}
+          loading={splitMutation.isPending}
           accessibilityLabel="Save split"
         >
           Save Split

@@ -52,7 +52,9 @@ import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCreateRecurringRule, useDeactivateRecurringRule } from '@/hooks/useRecurring';
 import {
   useDeleteTransaction,
+  useRemoveSplit,
   useTransaction,
+  useTransactionSplits,
   useUpdateTransaction,
   type ManualTransactionBody,
 } from '@/hooks/useTransactions';
@@ -61,8 +63,8 @@ import { radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
-import { computeNextDue, nairaStringToKobo } from '@/utils/money';
-import type { BankAccount, Transaction } from '@monimata/shared-types';
+import { computeNextDue, formatNaira, nairaStringToKobo } from '@/utils/money';
+import type { BankAccount, Transaction, TransactionSplit } from '@monimata/shared-types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -251,6 +253,84 @@ function OptionPickerSheet<T>({
   );
 }
 
+// ─── Split breakdown card ──────────────────────────────────────────────────
+
+const SPLIT_COLORS = ['#4F6EF7', '#F77F4F', '#4FD1A7', '#F7C84F', '#A44FF7', '#F74F6E', '#4FB8F7', '#7CF74F'];
+
+function SplitBreakdownCard({
+  splits,
+  categoryMap,
+  onRemove,
+  isRemoving,
+}: {
+  splits: TransactionSplit[];
+  categoryMap: Map<string, CategoryItem>;
+  onRemove: () => void;
+  isRemoving: boolean;
+}) {
+  const colors = useTheme();
+  return (
+    <View style={[ss.splitCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
+      {/* Header */}
+      <View style={[ss.splitCardHdr, { borderBottomColor: colors.separator }]}>
+        <View style={[ss.splitCardHdrLeft]}>
+          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Path d="M16 3h5v5" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M8 3H3v5" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M21 3l-7 7-4-4-7 7" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+          <Text style={[type_.label, { color: colors.textPrimary }]}>Split Breakdown</Text>
+        </View>
+        <TouchableOpacity
+          onPress={onRemove}
+          disabled={isRemoving}
+          accessibilityRole="button"
+          accessibilityLabel="Remove split"
+          hitSlop={8}
+        >
+          {isRemoving ? (
+            <ActivityIndicator color={colors.error} size="small" />
+          ) : (
+            <Text style={[{ ...ff(600), fontSize: 12 }, { color: colors.error }]}>Remove</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Split lines */}
+      {splits.map((s, i) => {
+        const cat = s.category_id ? categoryMap.get(s.category_id) : null;
+        const isLast = i === splits.length - 1;
+        return (
+          <View
+            key={s.id}
+            style={[
+              ss.splitLineRow,
+              !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+            ]}
+          >
+            <View style={[ss.splitDot, { backgroundColor: SPLIT_COLORS[i % SPLIT_COLORS.length] }]} />
+            <View style={{ flex: 1 }}>
+              <View style={ss.splitLineMain}>
+                <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>
+                  {cat ? cat.name : 'Uncategorised'}
+                </Text>
+                <Text style={[{ ...ff(700), fontSize: 13 }, { color: colors.textPrimary }]}>
+                  {formatNaira(s.amount)}
+                </Text>
+              </View>
+              {s.memo ? (
+                <Text style={[{ ...ff(400), fontSize: 12 }, { color: colors.textMeta, marginTop: 2 }]}>
+                  {s.memo}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // ─── Bank transaction hero header ────────────────────────────────────────────
 function BankHeroHeader({
   tx,
@@ -370,21 +450,32 @@ function BankViewForm({
       {/* Editable section: category + memo */}
       <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
         <Frow label="Category">
-          <TouchableOpacity
-            style={ss.frowTouchable}
-            onPress={() => setShowCategoryPicker(true)}
-            accessibilityRole="button" accessibilityLabel="Select category"
-          >
-            <Text style={[
-              { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
-              { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
-            ]}>
-              {selectedCategory ? selectedCategory.name : 'Uncategorised'}
-            </Text>
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <Path d="M9 18l6-6-6-6" stroke={selectedCategory ? colors.brand : colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-          </TouchableOpacity>
+          {tx.is_split ? (
+            <View style={ss.frowTouchable}>
+              <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.info, flex: 1 }]}>
+                Split
+              </Text>
+              <Text style={[{ ...ff(400), fontSize: 11 }, { color: colors.textMeta }]}>
+                Remove split to change
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={ss.frowTouchable}
+              onPress={() => setShowCategoryPicker(true)}
+              accessibilityRole="button" accessibilityLabel="Select category"
+            >
+              <Text style={[
+                { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
+              ]}>
+                {selectedCategory ? selectedCategory.name : 'Uncategorised'}
+              </Text>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M9 18l6-6-6-6" stroke={selectedCategory ? colors.brand : colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </TouchableOpacity>
+          )}
         </Frow>
         <Frow label="Memo" isLast>
           <TextInput
@@ -638,21 +729,32 @@ function ManualEditForm({
           </TouchableOpacity>
         </Frow>
         <Frow label="Category">
-          <TouchableOpacity
-            style={ss.frowTouchable}
-            onPress={() => setShowCategoryPicker(true)}
-            accessibilityRole="button" accessibilityLabel="Select category"
-          >
-            <Text style={[
-              { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
-              { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
-            ]}>
-              {selectedCategory ? selectedCategory.name : 'Optional'}
-            </Text>
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <Path d="M9 18l6-6-6-6" stroke={selectedCategory ? colors.brand : colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-          </TouchableOpacity>
+          {tx.is_split ? (
+            <View style={ss.frowTouchable}>
+              <Text style={[{ ...ff(600), fontSize: 12, lineHeight: 16 }, { color: colors.info, flex: 1 }]}>
+                Split
+              </Text>
+              <Text style={[{ ...ff(400), fontSize: 11 }, { color: colors.textMeta }]}>
+                Remove split to change
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={ss.frowTouchable}
+              onPress={() => setShowCategoryPicker(true)}
+              accessibilityRole="button" accessibilityLabel="Select category"
+            >
+              <Text style={[
+                { ...ff(selectedCategory ? 600 : 400), fontSize: 12, lineHeight: 16 },
+                { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
+              ]}>
+                {selectedCategory ? selectedCategory.name : 'Optional'}
+              </Text>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M9 18l6-6-6-6" stroke={selectedCategory ? colors.brand : colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </TouchableOpacity>
+          )}
         </Frow>
         <Frow label="Memo">
           <TextInput
@@ -822,6 +924,8 @@ export default function TransactionDetailsScreen() {
   const { data: groups = [] } = useCategoryGroups();
   const update = useUpdateTransaction();
   const deleteTx = useDeleteTransaction();
+  const splits = useTransactionSplits(id, tx?.is_split ?? false);
+  const removeSplit = useRemoveSplit();
   const [showActions, setShowActions] = useState(false);
 
   const categoryMap = useMemo(() => {
@@ -942,6 +1046,14 @@ export default function TransactionDetailsScreen() {
             categoryMap={categoryMap}
             onSave={handleSave}
             isSaving={update.isPending}
+          />
+        )}
+        {tx.is_split && splits.data && splits.data.length > 0 && (
+          <SplitBreakdownCard
+            splits={splits.data}
+            categoryMap={categoryMap}
+            onRemove={() => removeSplit.mutate(id, { onSuccess: () => router.back() })}
+            isRemoving={removeSplit.isPending}
           />
         )}
       </ScrollView>
@@ -1130,4 +1242,24 @@ const ss = StyleSheet.create({
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   dtSheet: { paddingBottom: 24, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
   dtDoneBtn: { margin: spacing.lg, paddingVertical: 14, borderRadius: radius.sm, alignItems: 'center' },
+  // Split breakdown card
+  splitCard: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
+  splitCardHdr: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.mdn,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  splitCardHdrLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  splitLineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.mdn,
+  },
+  splitDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4, flexShrink: 0 },
+  splitLineMain: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });
