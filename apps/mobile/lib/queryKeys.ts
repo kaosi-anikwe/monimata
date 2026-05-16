@@ -45,6 +45,14 @@ export const queryKeys = {
   nudge: (id: string) => ['get', '/nudges/{nudge_id}', id] as const,
   nudgeSettings: () => ['get', '/nudges/settings'] as const,
 
+  // ── Categorization ────────────────────────────────────────────────────
+  clusters: () => ['get', '/transactions/clusters'] as const,
+  reviewQueue: () => ['get', '/transactions/review-queue'] as const,
+
+  // ── AI / BYOK ─────────────────────────────────────────────────────────
+  aiCredentials: () => ['get', '/ai/credentials'] as const,
+  aiUsage: () => ['get', '/ai/usage'] as const,
+
   // ── Billing (TBD: API or WatermelonDB) ────────────────────────────────
   billCategories: () => ['bill-categories'] as const,
   billers: (categoryId: string) => ['billers', categoryId] as const,
