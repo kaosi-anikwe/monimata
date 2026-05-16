@@ -86,7 +86,7 @@ export default function CategorizeBlitzScreen() {
   const [activeClusterKey, setActiveClusterKey] = useState<string | null>(null);
 
   // ── Derived lists ───────────────────────────────────────────────────────
-  const allClusters = data?.clusters ?? [];
+  const allClusters = useMemo(() => data?.clusters ?? [], [data]);
 
   const visibleClusters = useMemo(() => {
     const base = allClusters.filter((c) => !dismissedKeys.has(c.key));
@@ -220,23 +220,29 @@ export default function CategorizeBlitzScreen() {
             total={initialTotal}
           />
 
-          {/* Animated container: remaining cards spring upward when one exits. */}
-          <Animated.View layout={LinearTransition.springify().damping(20)}>
+          {/* Each card gets its own layout wrapper so LinearTransition's
+               transform never conflicts with the card's entering/exiting
+               transforms (Reanimated requires separate nodes for each). */}
+          <View>
             {visibleClusters.map((cluster) => (
-              <ClusterCard
+              <Animated.View
                 key={cluster.key}
-                cluster={cluster}
-                groups={groups}
-                onCategorize={handleCategorize}
-                onSkip={() => handleSkip(cluster.key)}
-                pendingCategoryId={pendingMap.get(cluster.key)}
-                onMorePress={() => {
-                  setActiveClusterKey(cluster.key);
-                  setSearchVisible(true);
-                }}
-              />
+                layout={LinearTransition.springify().damping(28)}
+              >
+                <ClusterCard
+                  cluster={cluster}
+                  groups={groups}
+                  onCategorize={handleCategorize}
+                  onSkip={() => handleSkip(cluster.key)}
+                  pendingCategoryId={pendingMap.get(cluster.key)}
+                  onMorePress={() => {
+                    setActiveClusterKey(cluster.key);
+                    setSearchVisible(true);
+                  }}
+                />
+              </Animated.View>
             ))}
-          </Animated.View>
+          </View>
         </ScrollView>
       )}
 

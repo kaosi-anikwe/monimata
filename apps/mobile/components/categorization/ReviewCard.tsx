@@ -44,7 +44,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   interpolateColor,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -127,7 +126,9 @@ export function ReviewCard({
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 
-  // ── JS-thread action dispatchers (called via runOnJS) ───────────────────
+  // ── Action handlers ────────────────────────────────────────────────────────────
+  // Gesture runs on the JS thread (.runOnJS(true) below) so these can be
+  // called directly without any runOnJS wrapper.
   function handleConfirmAction(categoryId: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onConfirm(tx.id, categoryId);
@@ -144,30 +145,41 @@ export function ReviewCard({
 
   // ── Pan gesture ─────────────────────────────────────────────────────────
   const topCategoryId = suggestions[0]?.category_id ?? '';
+  // When there are no suggestions right-swipe opens the search sheet rather
+  // than trying to confirm with an empty category id.
+  const hasSuggestion = suggestions.length > 0;
 
   const pan = Gesture.Pan()
+    .runOnJS(true)
     .onUpdate((e) => {
       translateX.value = e.translationX;
       translateY.value = e.translationY;
     })
     .onEnd((e) => {
       if (e.translationX > SWIPE_X) {
-        // Right — confirm with top suggestion
-        translateX.value = withSpring(600, { damping: 15 });
-        runOnJS(handleConfirmAction)(topCategoryId);
+        if (hasSuggestion) {
+          // Right — confirm with top suggestion
+          translateX.value = withTiming(600, { duration: 280 });
+          handleConfirmAction(topCategoryId);
+        } else {
+          // No suggestions — right swipe opens search instead
+          translateX.value = withSpring(0, { damping: 28 });
+          translateY.value = withSpring(0, { damping: 28 });
+          handleSearchAction();
+        }
       } else if (e.translationX < -SWIPE_X) {
         // Left — defer
-        translateX.value = withSpring(-600, { damping: 15 });
-        runOnJS(handleDeferAction)();
+        translateX.value = withTiming(-600, { duration: 280 });
+        handleDeferAction();
       } else if (e.translationY < -SWIPE_Y) {
         // Up — open search, spring back to center
-        translateX.value = withSpring(0, { damping: 18 });
-        translateY.value = withSpring(0, { damping: 18 });
-        runOnJS(handleSearchAction)();
+        translateX.value = withSpring(0, { damping: 28 });
+        translateY.value = withSpring(0, { damping: 28 });
+        handleSearchAction();
       } else {
         // No threshold reached — spring back
-        translateX.value = withSpring(0, { damping: 18 });
-        translateY.value = withSpring(0, { damping: 18 });
+        translateX.value = withSpring(0, { damping: 28 });
+        translateY.value = withSpring(0, { damping: 28 });
       }
     });
 
@@ -176,11 +188,11 @@ export function ReviewCard({
     // Determine background tint from drag direction.
     let bgColor: string;
     if (translateX.value > 0) {
-      // Right pull → green tint
+      // Right pull → green tint when confirming, info tint when no suggestion
       bgColor = interpolateColor(
         translateX.value,
         [0, SWIPE_X],
-        [colors.cardBg, colors.successSubtle],
+        [colors.cardBg, hasSuggestion ? colors.successSubtle : colors.infoSubtle],
       );
     } else if (translateX.value < 0) {
       // Left pull → neutral elevated tint
@@ -210,69 +222,74 @@ export function ReviewCard({
   });
 
   // ── Render ──────────────────────────────────────────────────────────────
+  // Two separate Animated.View nodes so Reanimated never has to drive both
+  // an entering animation and a useAnimatedStyle transform on the same node:
+  //   outer — owns `entering` (FadeInRight)
+  //   inner — owns `animStyle` (drag translateX/Y + background tint)
   return (
-    <GestureDetector gesture={pan}>
-      <Animated.View
-        entering={entering}
-        style={[ss.card, shadow.md, animStyle]}
-        accessibilityRole="button"
-        accessibilityLabel={`${tx.narration}, ${amountSign}${formatMoney(Math.abs(tx.amount))}`}
-        accessibilityHint="Swipe right to confirm, left to defer, up to search categories"
-      >
-        {/* ── Amount ── */}
-        <Text style={[type_.displayHero, { color: amountColor }]}>
-          {amountSign}{formatMoney(Math.abs(tx.amount))}
-        </Text>
-
-        {/* ── Narration ── */}
-        <Text
-          style={[type_.body, { color: colors.textPrimary, marginTop: spacing.xs }]}
-          numberOfLines={2}
+    <Animated.View entering={entering} style={[ss.shadowWrap, shadow.md, { backgroundColor: colors.cardBg }]}>
+      <GestureDetector gesture={pan}>
+        <Animated.View
+          style={[ss.card, animStyle]}
+          accessibilityRole="button"
+          accessibilityLabel={`${tx.narration}, ${amountSign}${formatMoney(Math.abs(tx.amount))}`}
+          accessibilityHint="Swipe right to confirm, left to defer, up to search categories"
         >
-          {tx.narration}
-        </Text>
+          {/* ── Amount ── */}
+          <Text style={[type_.displayHero, { color: amountColor }]}>
+            {amountSign}{formatMoney(Math.abs(tx.amount))}
+          </Text>
 
-        {/* ── Meta line (source + date) ── */}
-        <Text
-          style={[type_.caption, { color: colors.textMeta, marginTop: spacing.xs }]}
-          numberOfLines={1}
-        >
-          {sourceName(tx.source)} · {txDate(tx.date)}
-        </Text>
+          {/* ── Narration ── */}
+          <Text
+            style={[type_.subHead, { color: colors.textPrimary, marginTop: spacing.lg }]}
+            numberOfLines={2}
+          >
+            {tx.narration}
+          </Text>
 
-        {/* ── Existing categorization source badge (if auto-categorised) ── */}
-        {tx.categorization_source && (
-          <View style={ss.sourcePillRow}>
-            <Badge variant="lime" size="sm">
-              {sourceName(tx.categorization_source)}
-            </Badge>
-          </View>
-        )}
+          {/* ── Meta line (source + date) ── */}
+          <Text
+            style={[type_.body, { color: colors.textMeta, marginTop: spacing.sm }]}
+            numberOfLines={1}
+          >
+            {sourceName(tx.source)} · {txDate(tx.date)}
+          </Text>
 
-        {/* ── Category suggestion chips ── */}
-        {suggestions.length > 0 && (
-          <View style={ss.chipsSection}>
-            <Text
-              style={[type_.labelSm, { color: colors.textMeta, marginBottom: spacing.sm }]}
-            >
-              SUGGESTIONS
-            </Text>
-            <View style={ss.chipsRow}>
-              {suggestions.slice(0, MAX_SUGGESTION_CHIPS).map((s) => (
-                <SuggestionChip
-                  key={s.category_id}
-                  suggestion={s}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    onConfirm(tx.id, s.category_id);
-                  }}
-                />
-              ))}
+          {/* ── Existing categorization source badge (if auto-categorised) ── */}
+          {tx.categorization_source && (
+            <View style={ss.sourcePillRow}>
+              <Badge variant="lime" size="sm">
+                {sourceName(tx.categorization_source)}
+              </Badge>
             </View>
-          </View>
-        )}
-      </Animated.View>
-    </GestureDetector>
+          )}
+
+          {/* ── Category suggestion chips ── */}
+          {suggestions.length > 0 && (
+            <View style={ss.chipsSection}>
+              <Text
+                style={[type_.labelSm, { color: colors.textMeta, marginBottom: spacing.sm }]}
+              >
+                SUGGESTIONS
+              </Text>
+              <View style={ss.chipsRow}>
+                {suggestions.slice(0, MAX_SUGGESTION_CHIPS).map((s) => (
+                  <SuggestionChip
+                    key={s.category_id}
+                    suggestion={s}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      onConfirm(tx.id, s.category_id);
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+        </Animated.View>
+      </GestureDetector>
+    </Animated.View>
   );
 }
 
@@ -315,20 +332,25 @@ function SuggestionChip({ suggestion, onPress }: SuggestionChipProps) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const ss = StyleSheet.create({
+  // Outer wrapper: owns the shadow so it's never on the same node as a
+  // transform (avoids the elevation/borderRadius artefact on Android).
+  shadowWrap: {
+    marginHorizontal: spacing.xl,
+    borderRadius: radius.lg,
+  },
   card: {
     borderRadius: radius.lg,
-    padding: spacing.xl,
-    marginHorizontal: spacing.xl,
+    padding: spacing.xxl,
   },
   sourcePillRow: {
     flexDirection: 'row',
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
   },
   chipsSection: {
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
   },
   chipsRow: {
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   suggestionChipWrap: {
     flexDirection: 'row',

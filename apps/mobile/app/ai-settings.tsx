@@ -101,7 +101,7 @@ function formatCredDate(iso: string): string {
 export default function AiSettingsScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
-  const { confirm, success: showSuccess, error: showError } = useToast();
+  const { confirm, success: showSuccess } = useToast();
 
   const { data: credentials = [], isLoading: credsLoading } = useAiCredentials();
   const { data: usageData, isLoading: usageLoading } = useAiUsage();
@@ -225,7 +225,7 @@ export default function AiSettingsScreen() {
         {/* Add Provider button */}
         <View style={ss.addBtnWrap}>
           <Button
-            variant="ghost"
+            variant="green"
             onPress={() => setAddSheetVisible(true)}
             accessibilityLabel="Add AI provider"
           >

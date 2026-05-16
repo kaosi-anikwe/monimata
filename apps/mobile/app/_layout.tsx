@@ -243,8 +243,10 @@ function RootNavigator() {
         />
       )}
 
-      {/* Welcome walkthrough — shown once per account on first app entry */}
-      {isAuthenticated && (user?.onboarded ?? false) && user?.id && (
+      {/* Welcome walkthrough — shown once per account, immediately after sign-up
+           (before the onboarding questionnaire). AppWelcome guards itself via a
+           per-user SecureStore flag so it only ever renders once. */}
+      {isAuthenticated && user?.id && (
         <AppWelcome userId={user.id} />
       )}
 

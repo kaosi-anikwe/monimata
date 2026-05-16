@@ -41,8 +41,8 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FadeInRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -51,11 +51,15 @@ import { ReviewCard, ReviewCardSkeleton } from '@/components/categorization/Revi
 import { SwipeDirectionHint } from '@/components/categorization/SwipeDirectionHint';
 import { useToast } from '@/components/Toast';
 import { Badge, EmptyState, ScreenHeader } from '@/components/ui';
-import { useConfirmCategory, useReviewQueue } from '@/hooks/useCategorization';
+import { useConfirmCategory, useReviewQueue, useUncategorisedQueue } from '@/hooks/useCategorization';
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 import { Ionicons } from '@expo/vector-icons';
+import type { components } from '@monimata/shared-types';
+
+type TransactionResponse = components['schemas']['TransactionResponse'];
+type ReviewQueueItem = components['schemas']['ReviewQueueItem'];
 
 // ─── CategorizeQueueScreen ────────────────────────────────────────────────────
 
@@ -64,8 +68,55 @@ export default function CategorizeQueueScreen() {
   const insets = useSafeAreaInsets();
   const { error: showError } = useToast();
 
-  const { data, isLoading } = useReviewQueue();
+  // ── Data ──────────────────────────────────────────────────────────────────────────────
+  // Full list of uncategorised transactions — fetched once, managed locally.
+  const { data: txListData, isLoading } = useUncategorisedQueue();
+  // Review-queue endpoint is kept for AI suggestions only (matched by tx ID).
+  const { data: queueData } = useReviewQueue();
   const confirmMutation = useConfirmCategory();
+
+  // ── Local queue state ───────────────────────────────────────────────────────────────
+  // Array of TransactionResponse sorted oldest-first. Defer moves to back;
+  // confirm removes from front. No server refetch needed for queue advancement.
+  const [queue, setQueue] = useState<TransactionResponse[]>([]);
+  const [initialised, setInitialised] = useState(false);
+  // Ref mirrors queue state so callbacks can read latest value without
+  // being re-created on every queue change (avoids stale-closure bugs).
+  const queueRef = useRef<TransactionResponse[]>([]);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+
+  // Initialise the queue once from the fetched list (oldest-first).
+  useEffect(() => {
+    if (!initialised && txListData?.items) {
+      const sorted = [...txListData.items].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      );
+      setQueue(sorted);
+      setInitialised(true);
+    }
+  }, [txListData, initialised]);
+
+  // ── Derived current item ───────────────────────────────────────────────────────────
+  const currentTx = queue[0] ?? null;
+
+  // AI suggestions are available when the server’s “next oldest” matches the
+  // local queue head. After confirms they naturally align again; for deferred
+  // items that bubble up they may be absent (→ user falls back to “Assign →”).
+  const suggestions = useMemo(
+    () =>
+      queueData?.transaction?.id === currentTx?.id
+        ? (queueData?.suggestions ?? [])
+        : [],
+    [queueData, currentTx?.id],
+  );
+
+  const currentItem = useMemo<ReviewQueueItem | null>(
+    () =>
+      currentTx
+        ? { transaction: currentTx, suggestions, remaining_count: queue.length }
+        : null,
+    [currentTx, suggestions, queue.length],
+  );
 
   const [searchVisible, setSearchVisible] = useState(false);
 
@@ -74,6 +125,9 @@ export default function CategorizeQueueScreen() {
   const handleConfirm = useCallback(
     (txId: string, categoryId: string) => {
       if (!categoryId) return;
+      // Capture tx before removing for potential revert on API error.
+      const tx = queueRef.current.find((t) => t.id === txId);
+      setQueue((prev) => prev.filter((t) => t.id !== txId));
       confirmMutation.mutate(
         { params: { path: { tx_id: txId } }, body: { category_id: categoryId } },
         {
@@ -81,6 +135,8 @@ export default function CategorizeQueueScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
           onError: () => {
+            // Revert: put the transaction back at the front of the queue.
+            if (tx) setQueue((prev) => [tx, ...prev.filter((t) => t.id !== txId)]);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             showError('Error', 'Could not save category. Please try again.');
           },
@@ -91,40 +147,29 @@ export default function CategorizeQueueScreen() {
   );
 
   /**
-   * Defer: re-queue the transaction by confirming with an empty/no-op signal.
-   * The backend pushes the item to the end of the queue; the next item is
-   * returned on re-fetch of /transactions/review-queue.
-   *
-   * Implementation note: we simply invalidate the query (which happens inside
-   * useConfirmCategory's onSuccess) without sending a mutation — instead we
-   * trigger a manual re-fetch by calling the underlying hook's refetch, or
-   * we can POST the defer endpoint once the API supports it.
-   * For now: optimistically advance the queue by invalidating reviewQueue.
+   * Defer: move this transaction to the back of the local queue.
+   * No server call — the queue is managed entirely client-side.
    */
-  const handleDefer = useCallback(
-    (_txId: string) => {
-      // The ReviewQueue endpoint re-fetches automatically because
-      // useConfirmCategory's onSuccess invalidates it.
-      // For defer (no category assigned), we just trigger a re-fetch.
-      // This causes the same transaction to appear again next visit if
-      // it's the only remaining item — acceptable at this stage.
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    },
-    [],
-  );
+  const handleDefer = useCallback((txId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setQueue((prev) => {
+      const tx = prev.find((t) => t.id === txId);
+      if (!tx) return prev;
+      return [...prev.filter((t) => t.id !== txId), tx];
+    });
+  }, []);
 
   const handleSearchSelect = useCallback(
     (categoryId: string) => {
-      if (data?.transaction?.id) {
-        handleConfirm(data.transaction.id, categoryId);
-      }
+      const id = queueRef.current[0]?.id;
+      if (id) handleConfirm(id, categoryId);
     },
-    [data, handleConfirm],
+    [handleConfirm],
   );
 
   // ── Derived values ──────────────────────────────────────────────────────
-  const remainingCount = data?.remaining_count ?? 0;
-  const isEmpty = !isLoading && data == null;
+  const remainingCount = queue.length;
+  const isEmpty = !isLoading && initialised && queue.length === 0;
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -165,45 +210,100 @@ export default function CategorizeQueueScreen() {
       ) : (
         /* ── Card deck ── */
         <View style={[ss.deckContainer, { paddingBottom: insets.bottom + spacing.xl }]}>
-          {/* ── Peek cards (static depth layers) ── */}
-          {data && (
+          {currentItem && (
             <>
-              <View
+              {/* ── Prompt above deck ── */}
+              <Text
                 style={[
-                  ss.peekCard,
-                  ss.peekCard3,
-                  shadow.sm,
-                  { backgroundColor: colors.cardBg },
+                  type_.h2,
+                  { color: colors.textMeta, textAlign: 'center', marginBottom: spacing.xl },
                 ]}
-              />
-              <View
-                style={[
-                  ss.peekCard,
-                  ss.peekCard2,
-                  shadow.sm,
-                  { backgroundColor: colors.cardBg },
-                ]}
-              />
+              >
+                What category does this belong to?
+              </Text>
+
+              {/* ── Card stack: all three cards share the same wrapper so peek
+                   cards automatically match the active card’s bounds. Cards
+                   rendered earlier sit behind cards rendered later. ── */}
+              <View style={ss.stack}>
+                {/* Back card — peeks 16 px from the bottom edge */}
+                <View
+                  style={[
+                    ss.stackCard,
+                    shadow.sm,
+                    {
+                      backgroundColor: colors.cardBg,
+                      opacity: 0.45,
+                      transform: [{ translateY: 16 }, { scale: 0.92 }],
+                    },
+                  ]}
+                />
+                {/* Middle card — peeks 8 px from the bottom edge */}
+                <View
+                  style={[
+                    ss.stackCard,
+                    shadow.sm,
+                    {
+                      backgroundColor: colors.cardBg,
+                      opacity: 0.7,
+                      transform: [{ translateY: 8 }, { scale: 0.96 }],
+                    },
+                  ]}
+                />
+                {/* Active card — rendered last so it sits on top */}
+                <ReviewCard
+                  key={currentItem.transaction.id}
+                  item={currentItem}
+                  entering={FadeInRight.springify().damping(26)}
+                  onConfirm={handleConfirm}
+                  onDefer={handleDefer}
+                  onOpenSearch={() => setSearchVisible(true)}
+                />
+              </View>
             </>
           )}
 
-          {/* ── Active card ── */}
-          {data && (
-            <ReviewCard
-              key={data.transaction.id}
-              item={data}
-              entering={FadeInRight.springify().damping(18)}
-              onConfirm={handleConfirm}
-              onDefer={handleDefer}
-              onOpenSearch={() => setSearchVisible(true)}
-            />
-          )}
-
-          {/* ── Static gesture hint labels below the deck ── */}
+          {/* ── Action hint buttons below the deck ── */}
           <View style={ss.hintStrip}>
-            <Text style={[type_.small, { color: colors.textTertiary }]}>← Later</Text>
-            <Text style={[type_.small, { color: colors.textTertiary }]}>↑ Search</Text>
-            <Text style={[type_.small, { color: colors.textTertiary }]}>Confirm →</Text>
+            <TouchableOpacity
+              style={[ss.hintBtn, { borderColor: colors.brand }]}
+              onPress={() => currentItem && handleDefer(currentItem.transaction.id)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Defer transaction"
+            >
+              <Text style={[type_.small, { color: colors.brand }]}>← Later</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[ss.hintBtn, { borderColor: colors.brand }]}
+              onPress={() => setSearchVisible(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Search categories"
+            >
+              <Text style={[type_.small, { color: colors.brand }]}>↑ Search</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[ss.hintBtn, { borderColor: colors.brand }]}
+              onPress={() => {
+                if (!currentItem) return;
+                const top = currentItem.suggestions?.[0];
+                if (top) {
+                  handleConfirm(currentItem.transaction.id, top.category_id);
+                } else {
+                  setSearchVisible(true);
+                }
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`${(currentItem?.suggestions?.length ?? 0) > 0 ? 'Confirm' : 'Assign'} category`}
+            >
+              <Text style={[type_.small, { color: colors.brand }]}>
+                {(currentItem?.suggestions?.length ?? 0) > 0 ? 'Confirm →' : 'Assign →'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -237,28 +337,19 @@ const ss = StyleSheet.create({
     paddingTop: spacing.xl,
   },
 
-  // Peek cards sit behind the active ReviewCard.
-  // They use absolute positioning so they don't affect the layout of ReviewCard.
-  peekCard: {
+  // Stack wrapper — sized by the ReviewCard (normal flow). Peek cards fill
+  // this same area via absoluteFillObject and shift down with translateY so
+  // they peek from behind the active card's bottom edge.
+  stack: {
+    marginBottom: spacing.lg, // space for the deepest card's 16 px peek
+  },
+  stackCard: {
     position: 'absolute',
-    left: spacing.xl,
+    top: 0,
+    bottom: 0,
+    left: spacing.xl,  // matches ReviewCard's marginHorizontal
     right: spacing.xl,
-    // Approximate height — the actual ReviewCard height varies by content,
-    // but a fixed height gives a stable deck visual.
-    height: 280,
     borderRadius: radius.lg,
-  },
-  // Card 3 (furthest back): smaller scale, positioned higher (further behind).
-  peekCard3: {
-    top: spacing.xl + spacing.md,
-    transform: [{ scale: 0.92 }],
-    opacity: 0.45,
-  },
-  // Card 2 (middle): slightly larger, positioned between card 3 and front.
-  peekCard2: {
-    top: spacing.xl + spacing.sm,
-    transform: [{ scale: 0.96 }],
-    opacity: 0.7,
   },
 
   hintStrip: {
@@ -266,5 +357,11 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.xxxl,
     marginTop: spacing.xl,
+  },
+  hintBtn: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });

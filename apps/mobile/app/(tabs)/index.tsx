@@ -411,7 +411,7 @@ export default function HomeScreen() {
               <View>
                 <Animated.View style={{ transform: [{ scale: streakScale }] }}>
                   <Text style={[s.streakNum, { color: colors.white }]}>
-                    {user?.streak ?? 0}
+                    {user?.streak ?? 1}
                     <Text style={[s.streakNumSm, { color: colors.lime }]}> day streak</Text>
                   </Text>
                 </Animated.View>

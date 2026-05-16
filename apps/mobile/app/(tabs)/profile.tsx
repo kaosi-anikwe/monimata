@@ -139,7 +139,7 @@ export default function ProfileScreen() {
         {/* Gamification badge pills */}
         <View style={ss.badges}>
           <Animated.View style={{ transform: [{ scale: streakScale }] }}>
-            <Badge variant="lime">{(user?.streak ?? 0)}-day streak 🔥</Badge>
+            <Badge variant="lime">{(user?.streak ?? 1)}-day streak 🔥</Badge>
           </Animated.View>
         </View>
       </View>
