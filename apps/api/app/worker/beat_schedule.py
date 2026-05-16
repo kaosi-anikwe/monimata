@@ -22,19 +22,9 @@ from celery.schedules import crontab
 from app.worker.celery_app import celery_app
 
 celery_app.conf.beat_schedule = {
-    # Every day at 4:00 AM WAT — recompute budget activity from transactions
-    "reconcile-budget-activity": {
-        "task": "app.worker.tasks.reconcile_budget_activity",
-        "schedule": crontab(hour=4, minute=0),
-    },
-    # Every day at 7:05 AM WAT — deliver queued nudges
+    # Every day at 7:05 AM WAT — deliver nudges queued during quiet hours
     "deliver-queued-nudges": {
         "task": "app.worker.tasks.deliver_queued_nudges",
         "schedule": crontab(hour=7, minute=5),
-    },
-    # Every Friday at 5:00 PM WAT — weekly review nudges
-    "weekly-review-nudges": {
-        "task": "app.worker.tasks.weekly_review_nudges",
-        "schedule": crontab(hour=17, minute=0, day_of_week="friday"),
     },
 }

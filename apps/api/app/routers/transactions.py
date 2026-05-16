@@ -60,6 +60,16 @@ def _get_tx_or_404(db: Session, tx_id: str, user_id: str) -> Transaction:
     return tx
 
 
+def _enqueue_embed(rule_id: str) -> None:
+    """Fire-and-forget: enqueue embedding generation for a UserCategoryRule."""
+    from typing import cast
+
+    from app.worker.celery_app import CeleryTask
+    from app.worker.tasks import embed_category_rule
+
+    cast(CeleryTask, embed_category_rule).delay(rule_id)
+
+
 def _upsert_narration_map(db: Session, user_id: str, narration: str, category_id: str) -> None:
     """Store / update the user's narration→category mapping.
 
@@ -89,14 +99,17 @@ def _upsert_narration_map(db: Session, user_id: str, narration: str, category_id
         rule.category_id = category_id
         rule.hit_count += 1
         rule.last_triggered = datetime.now(UTC)
+        # Re-embed if the mapping changed (category re-assignment).
+        _enqueue_embed(rule.id)
     else:
-        db.add(
-            UserCategoryRule(
-                user_id=user_id,
-                cleaned_narration=cleaned_key,
-                category_id=category_id,
-            )
+        new_rule = UserCategoryRule(
+            user_id=user_id,
+            cleaned_narration=cleaned_key,
+            category_id=category_id,
         )
+        db.add(new_rule)
+        db.flush()  # populate new_rule.id before enqueue
+        _enqueue_embed(new_rule.id)
 
     # ── Retroactive back-fill ─────────────────────────────────────────────────
     uncategorized = (

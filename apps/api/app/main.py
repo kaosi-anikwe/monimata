@@ -45,6 +45,7 @@ if settings.SENTRY_DSN:
 
 from app.routers import (  # noqa: E402
     accounts,
+    ai,
     auth,
     budget,
     categories,
@@ -99,6 +100,7 @@ app.include_router(content.router, prefix="/content", tags=["content"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(recurring.router, prefix="/recurring-rules", tags=["recurring"])
 app.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
+app.include_router(ai.router, prefix="/ai/credentials", tags=["ai"])
 app.include_router(ws.router, tags=["websocket"])
 
 

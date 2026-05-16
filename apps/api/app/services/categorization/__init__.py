@@ -17,10 +17,11 @@
 """Transaction categorisation pipeline.
 
 Tier execution order (fastest / cheapest first):
-  1. UserCategoryRule exact match on cleaned_narration  -> source: exact_match    (100)
-  2a. Global merchant JSON substring match              -> source: global_merchant  (90)
-  2b. Regex keyword rules                               -> source: keyword          (75)
-  3. (Phase 3) Heuristic scoring engine                 -> source: heuristic
+  1. UserCategoryRule exact match on cleaned_narration  -> source: exact_match     (100)
+  2a. Global merchant JSON substring match              -> source: global_merchant   (90)
+  2b. Regex keyword rules                               -> source: keyword           (75)
+  2c. Vector similarity search (all-MiniLM-L6-v2)      -> source: vector         (70-95)
+  3. Heuristic scoring engine (rapidfuzz + rules)       -> source: heuristic
   4. (Phase 5) BYOK LLM fallback                        -> source: llm
   5. Leave NULL -- surface for manual review
 """
@@ -136,6 +137,66 @@ def _find_category_by_name(db: Session, user_id: str, name: str) -> str | None:
     return cat.id if cat else None
 
 
+# Cosine distance threshold for vector matches (0 = identical, 2 = opposite).
+# 0.25 corresponds to roughly cosine similarity ≥ 0.75.
+_VECTOR_DISTANCE_THRESHOLD = 0.25
+
+
+def _vector_lookup(db: Session, user_id: str, key: str) -> tuple[str, int] | None:
+    """Find the nearest UserCategoryRule embedding by cosine distance.
+
+    Returns (category_id, confidence 70-95) or None.
+    Only runs when sentence-transformers is available; silently skips otherwise
+    so the pipeline degrades gracefully if the worker hasn't embedded any rules yet.
+    """
+    from app.models.user_category_rule import UserCategoryRule
+
+    # Skip if no rules with embeddings exist yet.
+    has_embeddings = (
+        db.query(UserCategoryRule.id)
+        .filter(
+            UserCategoryRule.user_id == user_id,
+            UserCategoryRule.embedding.isnot(None),
+        )
+        .first()
+    )
+    if not has_embeddings:
+        return None
+
+    try:
+        from app.services.categorization.embeddings import encode
+
+        query_vec = encode(key)
+    except Exception:
+        logger.exception("Vector lookup: encode() failed — skipping vector tier")
+        return None
+
+    # pgvector cosine distance operator: <=>
+    from sqlalchemy import text
+
+    row = db.execute(
+        text(
+            """
+            SELECT category_id,
+                   (embedding <=> CAST(:vec AS vector)) AS distance
+            FROM user_category_rules
+            WHERE user_id = :uid
+              AND embedding IS NOT NULL
+            ORDER BY embedding <=> CAST(:vec AS vector)
+            LIMIT 1
+            """
+        ),
+        {"vec": str(query_vec), "uid": user_id},
+    ).fetchone()
+
+    if row is None or row.distance > _VECTOR_DISTANCE_THRESHOLD:
+        return None
+
+    # Scale distance [0, threshold] → confidence [95, 70]
+    confidence = int(95 - (row.distance / _VECTOR_DISTANCE_THRESHOLD) * 25)
+    return str(row.category_id), confidence
+
+
 # -- Main pipeline -----------------------------------------------------------
 
 
@@ -186,6 +247,24 @@ def categorize_transaction(db: Session, tx: Any) -> str | None:
                 tx.category_confidence = 75
                 return cat_id
 
-    # Tier 3 (Phase 3): heuristic scoring engine -- not yet implemented.
-    # Tier 4 (Phase 5): BYOK LLM fallback -- not yet implemented.
+    # Tier 2c: vector similarity search against UserCategoryRule embeddings
+    vec_result = _vector_lookup(db, tx.user_id, key)
+    if vec_result:
+        cat_id, confidence = vec_result
+        tx.categorization_source = "vector"
+        tx.category_confidence = confidence
+        return cat_id
+
+    # Tier 3: heuristic scoring engine (fuzzy candidate + multi-factor rules)
+    from app.services.categorization.scoring import HeuristicEngine
+
+    result = HeuristicEngine().run(db, tx, key)
+    if result:
+        cat_id, confidence = result
+        tx.categorization_source = "heuristic"
+        tx.category_confidence = confidence
+        return cat_id
+
+    # Tier 4 (Phase 5): BYOK LLM fallback -- handled by run_llm_categorization Celery task.
+    # categorize_transactions enqueues it for any transactions that reach this point.
     return None
