@@ -61,10 +61,17 @@ from app.routers import (  # noqa: E402
 
 _console = Console(stderr=True)
 
+_docs_url = None if settings.ENV == "production" else "/docs"
+_redoc_url = None if settings.ENV == "production" else "/redoc"
+_openapi_url = None if settings.ENV == "production" else "/openapi.json"
+
 app = FastAPI(
     title="MoniMata API",
     description="Zero-based budgeting for Nigerians — Every Kobo, Accounted For.",
     version="0.0.1",
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_url=_openapi_url,
 )
 
 app.state.limiter = limiter

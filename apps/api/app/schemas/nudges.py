@@ -31,6 +31,14 @@ class NudgeTriggerType(StrEnum):
     large_single_tx = "large_single_tx"
     pay_received = "pay_received"
     bill_payment = "bill_payment"
+    transaction_received = "transaction_received"
+    statement_received = "statement_received"
+    statement_processed = "statement_processed"
+    receipt_received = "receipt_received"
+    receipt_processed = "receipt_processed"
+    receipt_failed = "receipt_failed"
+    receipt_duplicate = "receipt_duplicate"
+    statement_failed = "statement_failed"
 
 
 class NudgeResponse(BaseModel):
