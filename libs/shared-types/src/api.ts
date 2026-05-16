@@ -119,7 +119,12 @@ export interface paths {
   "/accounts/{account_id}/balance": {
     /**
      * Update Manual Balance
-     * @description Update the balance of a manual account and append an audit entry.
+     * @description Update the balance of a manual account via an adjustment transaction.
+     *
+     * The delta between the current computed balance and the target is recorded
+     * as a credit (balance increase) or debit (balance decrease) transaction.
+     * This keeps TBB accurate and lets the user assign the adjustment to a
+     * category — particularly useful when updating from a zero balance.
      */
     patch: operations["update_manual_balance_accounts__account_id__balance_patch"];
   };
@@ -133,6 +138,37 @@ export interface paths {
   "/transactions": {
     /** List Transactions */
     get: operations["list_transactions_transactions_get"];
+  };
+  "/transactions/clusters": {
+    /**
+     * List Clusters
+     * @description Return Levenshtein-clustered merchant groups for all uncategorised transactions.
+     *
+     * Use this during onboarding to present a card-stack of merchant groups so the
+     * user can categorise hundreds of transactions in a handful of taps.
+     */
+    get: operations["list_clusters_transactions_clusters_get"];
+  };
+  "/transactions/clusters/categorize": {
+    /**
+     * Categorize Cluster
+     * @description Batch-assign a category to every uncategorised transaction in a cluster.
+     *
+     * The server re-derives cluster membership by finding all unique
+     * cleaned_narrations within Levenshtein threshold of ``cluster_key``, then
+     * batch-updates the matching transactions and writes a UserCategoryRule.
+     */
+    post: operations["categorize_cluster_transactions_clusters_categorize_post"];
+  };
+  "/transactions/review-queue": {
+    /**
+     * Get Review Queue
+     * @description Return the next uncategorised transaction with top-3 category suggestions.
+     *
+     * Transactions are served oldest-first so the user works through history in
+     * chronological order.  Returns null when the queue is empty.
+     */
+    get: operations["get_review_queue_transactions_review_queue_get"];
   };
   "/transactions/{tx_id}": {
     /** Get Transaction */
@@ -151,6 +187,16 @@ export interface paths {
      * type, date, and/or category change in the same request.
      */
     patch: operations["patch_transaction_transactions__tx_id__patch"];
+  };
+  "/transactions/{tx_id}/confirm-category": {
+    /**
+     * Confirm Category
+     * @description Confirm or override a category suggestion for a transaction.
+     *
+     * Upserts a UserCategoryRule so future transactions with the same
+     * cleaned_narration are categorised immediately at Tier 1.
+     */
+    post: operations["confirm_category_transactions__tx_id__confirm_category_post"];
   };
   "/transactions/{tx_id}/split": {
     /**
@@ -428,6 +474,37 @@ export interface paths {
      */
     post: operations["upload_statement_uploads_statement_post"];
   };
+  "/ai/credentials": {
+    /** List Credentials */
+    get: operations["list_credentials_ai_credentials_get"];
+    /** Create Credential */
+    post: operations["create_credential_ai_credentials_post"];
+  };
+  "/ai/credentials/{credential_id}": {
+    /** Delete Credential */
+    delete: operations["delete_credential_ai_credentials__credential_id__delete"];
+  };
+  "/ai/categorize": {
+    /**
+     * Trigger Llm Categorization
+     * @description Manually trigger LLM categorisation for all uncategorised transactions.
+     *
+     * Requires an active BYOK credential.  Returns 202 immediately; a push
+     * notification is sent on completion (success or final failure).
+     * Returns ``queued: 0`` if there are no uncategorised transactions.
+     */
+    post: operations["trigger_llm_categorization_ai_categorize_post"];
+  };
+  "/ai/usage": {
+    /**
+     * Get Ai Usage
+     * @description AI efficiency monitor panel — spec §8.3.
+     *
+     * Returns offline engine success rate, LLM-handled percentage, and
+     * current-month / lifetime token volumes from ``UserAiUsageLog``.
+     */
+    get: operations["get_ai_usage_ai_usage_get"];
+  };
   "/health": {
     /** Health Check */
     get: operations["health_check_health_get"];
@@ -475,6 +552,65 @@ export interface components {
        * @default 0
        */
       balance?: number;
+    };
+    /** AiCredentialCreate */
+    AiCredentialCreate: {
+      /**
+       * Provider
+       * @enum {string}
+       */
+      provider: "gemini" | "openai" | "anthropic";
+      /**
+       * Api Key
+       * @description Plaintext API key — encrypted at rest
+       */
+      api_key: string;
+    };
+    /** AiCredentialResponse */
+    AiCredentialResponse: {
+      /** Id */
+      id: string;
+      /** Provider */
+      provider: string;
+      /** Is Active */
+      is_active: boolean;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /**
+     * AiUsageResponse
+     * @description AI efficiency monitor panel data (spec §8.3).
+     */
+    AiUsageResponse: {
+      /** Total Categorised */
+      total_categorised: number;
+      /** Offline Categorised */
+      offline_categorised: number;
+      /** Llm Categorised */
+      llm_categorised: number;
+      /** Offline Success Rate */
+      offline_success_rate: number;
+      /** Llm Handled Pct */
+      llm_handled_pct: number;
+      /** Current Month Calls */
+      current_month_calls: number;
+      /** Current Month Prompt Tokens */
+      current_month_prompt_tokens: number;
+      /** Current Month Completion Tokens */
+      current_month_completion_tokens: number;
+      /** Current Month Total Tokens */
+      current_month_total_tokens: number;
+      /** Lifetime Calls */
+      lifetime_calls: number;
+      /** Lifetime Prompt Tokens */
+      lifetime_prompt_tokens: number;
+      /** Lifetime Completion Tokens */
+      lifetime_completion_tokens: number;
+      /** Lifetime Total Tokens */
+      lifetime_total_tokens: number;
     };
     /** AssignRequest */
     AssignRequest: {
@@ -692,6 +828,20 @@ export interface components {
        */
       created_at: string;
     };
+    /** CategorySuggestion */
+    CategorySuggestion: {
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string;
+      /** Category Name */
+      category_name: string;
+      /** Confidence */
+      confidence: number;
+      /** Source */
+      source: string;
+    };
     /** CategoryTargetResponse */
     CategoryTargetResponse: {
       /**
@@ -752,6 +902,47 @@ export interface components {
       /** Is Hidden */
       is_hidden?: boolean | null;
     };
+    /** ClusterCategorizeRequest */
+    ClusterCategorizeRequest: {
+      /** Cluster Key */
+      cluster_key: string;
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string;
+    };
+    /** ClusterCategorizeResponse */
+    ClusterCategorizeResponse: {
+      /** Updated Count */
+      updated_count: number;
+    };
+    /** ClusterItem */
+    ClusterItem: {
+      /** Key */
+      key: string;
+      /** Member Narrations */
+      member_narrations: string[];
+      /** Count */
+      count: number;
+      /** Total Amount */
+      total_amount: number;
+    };
+    /** ClustersResponse */
+    ClustersResponse: {
+      /** Clusters */
+      clusters: components["schemas"]["ClusterItem"][];
+      /** Total Uncategorised */
+      total_uncategorised: number;
+    };
+    /** ConfirmCategoryRequest */
+    ConfirmCategoryRequest: {
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string;
+    };
     /** ForgotPasswordRequest */
     ForgotPasswordRequest: {
       /**
@@ -764,6 +955,11 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
+    };
+    /** LlmCategorizeResponse */
+    LlmCategorizeResponse: {
+      /** Queued */
+      queued: number;
     };
     /** LoginRequest */
     LoginRequest: {
@@ -890,7 +1086,7 @@ export interface components {
      * NudgeTriggerType
      * @enum {string}
      */
-    NudgeTriggerType: "threshold_80" | "threshold_100" | "large_single_tx" | "pay_received" | "bill_payment";
+    NudgeTriggerType: "threshold_80" | "threshold_100" | "large_single_tx" | "pay_received" | "bill_payment" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed";
     /** RecurringRuleCreate */
     RecurringRuleCreate: {
       /**
@@ -1033,6 +1229,14 @@ export interface components {
       /** Reset Token */
       reset_token: string;
     };
+    /** ReviewQueueItem */
+    ReviewQueueItem: {
+      transaction: components["schemas"]["TransactionResponse"];
+      /** Suggestions */
+      suggestions: components["schemas"]["CategorySuggestion"][];
+      /** Remaining Count */
+      remaining_count: number;
+    };
     /** SupportedBankResponse */
     SupportedBankResponse: {
       /** Slug */
@@ -1154,6 +1358,10 @@ export interface components {
        * Format: date-time
        */
       updated_at: string;
+      /** Categorization Source */
+      categorization_source: ("exact_match" | "global_merchant" | "keyword" | "vector" | "heuristic" | "llm" | "manual") | null;
+      /** Category Confidence */
+      category_confidence: number;
     };
     /**
      * TransactionSource
@@ -1628,7 +1836,12 @@ export interface operations {
   };
   /**
    * Update Manual Balance
-   * @description Update the balance of a manual account and append an audit entry.
+   * @description Update the balance of a manual account via an adjustment transaction.
+   *
+   * The delta between the current computed balance and the target is recorded
+   * as a credit (balance increase) or debit (balance decrease) transaction.
+   * This keeps TBB accurate and lets the user assign the adjustment to a
+   * category — particularly useful when updating from a zero balance.
    */
   update_manual_balance_accounts__account_id__balance_patch: {
     parameters: {
@@ -1709,6 +1922,69 @@ export interface operations {
       };
     };
   };
+  /**
+   * List Clusters
+   * @description Return Levenshtein-clustered merchant groups for all uncategorised transactions.
+   *
+   * Use this during onboarding to present a card-stack of merchant groups so the
+   * user can categorise hundreds of transactions in a handful of taps.
+   */
+  list_clusters_transactions_clusters_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ClustersResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Categorize Cluster
+   * @description Batch-assign a category to every uncategorised transaction in a cluster.
+   *
+   * The server re-derives cluster membership by finding all unique
+   * cleaned_narrations within Levenshtein threshold of ``cluster_key``, then
+   * batch-updates the matching transactions and writes a UserCategoryRule.
+   */
+  categorize_cluster_transactions_clusters_categorize_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClusterCategorizeRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ClusterCategorizeResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Review Queue
+   * @description Return the next uncategorised transaction with top-3 category suggestions.
+   *
+   * Transactions are served oldest-first so the user works through history in
+   * chronological order.  Returns null when the queue is empty.
+   */
+  get_review_queue_transactions_review_queue_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ReviewQueueItem"] | null;
+        };
+      };
+    };
+  };
   /** Get Transaction */
   get_transaction_transactions__tx_id__get: {
     parameters: {
@@ -1771,6 +2047,39 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["TransactionPatchRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["TransactionResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Confirm Category
+   * @description Confirm or override a category suggestion for a transaction.
+   *
+   * Upserts a UserCategoryRule so future transactions with the same
+   * cleaned_narration are categorised immediately at Tier 1.
+   */
+  confirm_category_transactions__tx_id__confirm_category_post: {
+    parameters: {
+      path: {
+        tx_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ConfirmCategoryRequest"];
       };
     };
     responses: {
@@ -2840,6 +3149,94 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** List Credentials */
+  list_credentials_ai_credentials_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["AiCredentialResponse"][];
+        };
+      };
+    };
+  };
+  /** Create Credential */
+  create_credential_ai_credentials_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AiCredentialCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": components["schemas"]["AiCredentialResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete Credential */
+  delete_credential_ai_credentials__credential_id__delete: {
+    parameters: {
+      path: {
+        credential_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Trigger Llm Categorization
+   * @description Manually trigger LLM categorisation for all uncategorised transactions.
+   *
+   * Requires an active BYOK credential.  Returns 202 immediately; a push
+   * notification is sent on completion (success or final failure).
+   * Returns ``queued: 0`` if there are no uncategorised transactions.
+   */
+  trigger_llm_categorization_ai_categorize_post: {
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": components["schemas"]["LlmCategorizeResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Ai Usage
+   * @description AI efficiency monitor panel — spec §8.3.
+   *
+   * Returns offline engine success rate, LLM-handled percentage, and
+   * current-month / lifetime token volumes from ``UserAiUsageLog``.
+   */
+  get_ai_usage_ai_usage_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["AiUsageResponse"];
         };
       };
     };
