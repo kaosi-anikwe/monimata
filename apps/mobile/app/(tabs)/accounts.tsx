@@ -24,6 +24,7 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -36,7 +37,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useToast } from '@/components/Toast';
-import { useTour, type TourStep } from '@/components/tour';
+import { TourTarget, useTour, type TourStep } from '@/components/tour';
 import { AmountInput } from '@/components/ui/AmountInput';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
@@ -203,7 +204,31 @@ const bps = StyleSheet.create({
 
 // ── Tour definition ─────────────────────────────────────────────────────
 
-const ACCOUNTS_TOUR: TourStep[] = [];
+/** Knowledge Hub article that walks users through email-forwarding setup. */
+const HUB_EMAIL_SETUP_URL = 'https://moni-mata.ng/hub/email-setup';
+
+const ACCOUNTS_TOUR: TourStep[] = [
+  {
+    targetId: 'accounts-add-btn',
+    title: 'Add an account',
+    body: 'Tap here to manually add a bank account and start tracking your balances and transactions.',
+    tooltipSide: 'below',
+  },
+  {
+    targetId: 'accounts-total-card',
+    title: 'Total balance',
+    body: 'Your combined balance across all linked accounts — your full financial picture at a glance.',
+    tooltipSide: 'below',
+    fallbackFullscreen: true,
+  },
+  {
+    targetId: 'accounts-card-more',
+    title: 'Account actions',
+    body: 'Tap here to rename, update the balance, upload a bank statement, or remove the account.',
+    tooltipSide: 'above',
+    fallbackFullscreen: true,
+  },
+];
 
 
 // ─── Add Manual Account Sheet ─────────────────────────────────────────────────
@@ -761,9 +786,10 @@ function MoreActionsSheet({
 interface AccountCardProps {
   account: BankAccount;
   onMoreActions: () => void;
+  showTourTarget?: boolean;
 }
 
-function AccountCard({ account, onMoreActions }: AccountCardProps) {
+function AccountCard({ account, onMoreActions, showTourTarget }: AccountCardProps) {
   const colors = useTheme();
 
   return (
@@ -820,18 +846,20 @@ function AccountCard({ account, onMoreActions }: AccountCardProps) {
         ]}
       >
         <View style={ss.footerBtns}>
-          <TouchableOpacity
-            style={[ss.footerBtnMore, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-            onPress={onMoreActions}
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-          >
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <Circle cx={12} cy={5} r={1.5} fill={colors.textMeta} />
-              <Circle cx={12} cy={12} r={1.5} fill={colors.textMeta} />
-              <Circle cx={12} cy={19} r={1.5} fill={colors.textMeta} />
-            </Svg>
-          </TouchableOpacity>
+          <TourTarget id={showTourTarget ? 'accounts-card-more' : `card-more-${account.id}`}>
+            <TouchableOpacity
+              style={[ss.footerBtnMore, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              onPress={onMoreActions}
+              accessibilityRole="button"
+              accessibilityLabel="More options"
+            >
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Circle cx={12} cy={5} r={1.5} fill={colors.textMeta} />
+                <Circle cx={12} cy={12} r={1.5} fill={colors.textMeta} />
+                <Circle cx={12} cy={19} r={1.5} fill={colors.textMeta} />
+              </Svg>
+            </TouchableOpacity>
+          </TourTarget>
         </View>
       </View>
     </View>
@@ -918,17 +946,19 @@ export default function AccountsScreen() {
       >
         <Text style={[ss.headerTitle, { color: colors.textPrimary }]}>Accounts</Text>
         <View style={ss.headerActions}>
-          <TouchableOpacity
-            style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAddSheet(true); }}
-            accessibilityRole="button"
-            accessibilityLabel="Add manual account"
-          >
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <Path d="M12 5v14M5 12h14" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" />
-            </Svg>
-            <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Add Account</Text>
-          </TouchableOpacity>
+          <TourTarget id="accounts-add-btn">
+            <TouchableOpacity
+              style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAddSheet(true); }}
+              accessibilityRole="button"
+              accessibilityLabel="Add manual account"
+            >
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M12 5v14M5 12h14" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" />
+              </Svg>
+              <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Add Account</Text>
+            </TouchableOpacity>
+          </TourTarget>
         </View>
       </View>
 
@@ -955,23 +985,54 @@ export default function AccountsScreen() {
             <Button variant="green" onPress={() => setShowAddSheet(true)} accessibilityLabel="Add account manually">
               Add Account
             </Button>
+            <TouchableOpacity
+              style={ss.emailFwdBtn}
+              onPress={() => Linking.openURL(HUB_EMAIL_SETUP_URL)}
+              accessibilityRole="link"
+              accessibilityLabel="Set up email forwarding on our website"
+            >
+              <Ionicons name="mail-outline" size={14} color={colors.brand} />
+              <Text style={[ss.emailFwdBtnTxt, { color: colors.brand }]}>Set up email forwarding →</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
             {/* ── Total Balance Card ── */}
-            <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
-              <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
-              <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
-            </View>
+            <TourTarget id="accounts-total-card">
+              <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
+                <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
+                <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
+              </View>
+            </TourTarget>
 
             {/* ── Account cards ── */}
-            {accounts.map((account) => (
+            {accounts.map((account, i) => (
               <AccountCard
                 key={account.id}
                 account={account}
                 onMoreActions={() => setMoreAccount(account)}
+                showTourTarget={i === 0}
               />
             ))}
+
+            {/* ── Email forwarding promo ── */}
+            <TouchableOpacity
+              style={[ss.emailFwdCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              onPress={() => Linking.openURL(HUB_EMAIL_SETUP_URL)}
+              accessibilityRole="link"
+              accessibilityLabel="Set up email forwarding to auto-import transactions"
+            >
+              <View style={[ss.emailFwdIc, { backgroundColor: colors.surface }]}>
+                <Ionicons name="mail-outline" size={18} color={colors.brand} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[ss.emailFwdTitle, { color: colors.textPrimary }]}>Import via email alerts</Text>
+                <Text style={[ss.emailFwdSub, { color: colors.textMeta }]}>
+                  Forward bank alerts to auto-import transactions. Setup guide on our website.
+                </Text>
+              </View>
+              <Ionicons name="open-outline" size={14} color={colors.textTertiary} />
+            </TouchableOpacity>
 
             <View style={{ height: spacing.xxl + 60 }} />
           </>
@@ -1240,4 +1301,34 @@ const ss = StyleSheet.create({
   },
   errorText: { ...type_.h3, textAlign: 'center' },
   errorSub: { ...type_.bodyReg, textAlign: 'center' },
+
+  // Email forwarding entry points
+  emailFwdBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  emailFwdBtnTxt: { ...type_.body },
+  emailFwdCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smd,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.smd,
+  },
+  emailFwdIc: {
+    width: layout.avatarMd - spacing.xs,
+    height: layout.avatarMd - spacing.xs,
+    borderRadius: radius.smd,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  emailFwdTitle: { ...type_.body },
+  emailFwdSub: { ...type_.caption, lineHeight: 16, marginTop: 2 },
 });
