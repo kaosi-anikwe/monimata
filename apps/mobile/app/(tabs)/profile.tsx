@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
 import { Avatar, Badge, Button, ListRow, SectionHeader } from '@/components/ui';
 import { useBiometricLock } from '@/hooks/useBiometricLock';
+import { useAiCredentials } from '@/hooks/useCategorization';
 import { useNudgeSettings, useUpdateNudgeSettings } from '@/hooks/useNudges';
 import { useTheme, useThemePreference } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
@@ -69,6 +70,9 @@ export default function ProfileScreen() {
   const { data: nudgeSettings } = useNudgeSettings();
   const updateNudgeSettings = useUpdateNudgeSettings();
   const nudgeLang = nudgeSettings?.language ?? 'pidgin';
+
+  const { data: aiCredentials = [] } = useAiCredentials();
+  const activeAiCount = aiCredentials.filter((c) => c.is_active).length;
 
   function setNudgeLang(lang: 'pidgin' | 'formal') {
     updateNudgeSettings.mutate({ body: { language: lang } });
@@ -146,6 +150,32 @@ export default function ProfileScreen() {
         contentContainerStyle={ss.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Categorisation section ───────────────────────────────────── */}
+        <SectionHeader
+          title="Categorisation"
+          variant="group"
+          paddingHorizontal={spacing.lg}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs + spacing.xxs }}
+        />
+        <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
+          <ListRow
+            iconBg={colors.lime3}
+            leftIcon={<Ionicons name="sparkles-outline" size={17} color={colors.darkGreen} />}
+            title="AI Auto-Categorisation"
+            subtitle="Manage AI providers & usage"
+            onPress={() => router.push('/ai-settings' as never)}
+            showChevron
+            separator={false}
+            right={
+              activeAiCount > 0 ? (
+                <Badge variant="success" size="sm">{activeAiCount} active</Badge>
+              ) : (
+                <Text style={[type_.small, { color: colors.textTertiary }]}>Off</Text>
+              )
+            }
+          />
+        </View>
+
         {/* ── Account & Security section ───────────────────────────────── */}
         <SectionHeader
           title="Account & Security"

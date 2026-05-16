@@ -40,6 +40,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { SlideInDown, SlideOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 
@@ -50,6 +51,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { syncDatabase } from '@/database/sync';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategoryGroups } from '@/hooks/useCategories';
+import { useClusters } from '@/hooks/useCategorization';
 import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
 import { queryKeys } from '@/lib/queryKeys';
 import { useTheme } from '@/lib/theme';
@@ -339,6 +341,11 @@ export default function TransactionsScreen() {
   useFocusEffect(
     useCallback(() => { startTourIfUnseen('transactions', TRANSACTIONS_TOUR); }, [startTourIfUnseen]),
   );
+  useFocusEffect(
+    useCallback(() => {
+      qc.invalidateQueries({ queryKey: queryKeys.clusters() });
+    }, [qc]),
+  );
   useStatusBarStyle('dark');
 
   const {
@@ -353,6 +360,17 @@ export default function TransactionsScreen() {
   const { data: groups = [] } = useCategoryGroups();
   const { data: accounts = [] } = useAccounts();
   const recategorizeMutation = useRecategorize();
+  const { data: clustersData } = useClusters();
+  const showBanner = (clustersData?.total_uncategorised ?? 0) > 0;
+
+  function handleBannerPress() {
+    const clusters = clustersData?.clusters ?? [];
+    if (clusters.length > 0 && clusters.every((c) => c.count === 1)) {
+      router.push('/categorize-queue' as never);
+    } else {
+      router.push('/categorize-blitz' as never);
+    }
+  }
 
   const categoryMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -522,6 +540,29 @@ export default function TransactionsScreen() {
           ))}
         </ScrollView>
       </View>
+
+      {/* ── Uncategorised banner ── */}
+      {showBanner && (
+        <Animated.View
+          entering={SlideInDown.duration(280).springify()}
+          exiting={SlideOutUp.duration(220)}
+        >
+          <TouchableOpacity
+            style={[ss.uncatBanner, { backgroundColor: colors.lime }]}
+            onPress={handleBannerPress}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`${clustersData?.total_uncategorised} transactions need categories. Tap to categorise.`}
+          >
+            <Text style={[type_.label, { color: colors.darkGreen }]}>
+              ⚡ {clustersData?.total_uncategorised} transactions need categories
+            </Text>
+            <Text style={[type_.small, { color: colors.darkGreen }]}>
+              Tap to categorise them quickly →
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* ── List ── */}
       <FlashList
@@ -705,6 +746,16 @@ const ss = StyleSheet.create({
     marginTop: 2,
   },
   manualBadgeText: { ...type_.micro },
+
+  // Uncategorised banner
+  uncatBanner: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    gap: spacing.xs,
+  },
 
   // Category picker sheet rows
   pickerGroupHeader: {
