@@ -50,6 +50,13 @@ class TransactionResponse(BaseModel):
     splits: list[TransactionSplitResponse]
     created_at: datetime
     updated_at: datetime
+    # Categorisation telemetry — used by clients to surface manual-review prompts
+    # for low-confidence assignments.
+    categorization_source: (
+        Literal["exact_match", "global_merchant", "keyword", "vector", "heuristic", "llm", "manual"]
+        | None
+    )
+    category_confidence: int  # 0–100; 0 = unresolved / LLM failure
 
     model_config = ConfigDict(from_attributes=True)
 

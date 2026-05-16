@@ -3,6 +3,7 @@
 
   "chowdeck": "Food & Dining",
   "glovo": "Food & Dining",
+  "provision": "Food & Dining",
   "foodcourt": "Food & Dining",
   "chopnow": "Food & Dining",
   "cheesybite": "Food & Dining",
@@ -84,12 +85,16 @@
   "nedc": "Electricity",
   "jos electricity": "Electricity",
   "ibadan electricity": "Electricity",
+  "enugu_prepaid": "Electricity",
+  "enugu postpaid": "Electricity",
 
   "mtn": "Airtime & Data",
   "airtel": "Airtime & Data",
   "glo": "Airtime & Data",
   "9mobile": "Airtime & Data",
   "etisalat": "Airtime & Data",
+  "airtime": "Airtime & Data",
+  "data": "Airtime & Data",
 
   "cowrywise": "Savings & Investment",
   "piggyvest": "Savings & Investment",
@@ -116,6 +121,7 @@
 
   "lapo": "Loan Repayment",
   "fairmoney": "Loan Repayment",
+  "easemoni": "Loan Repayment",
   "carbon": "Loan Repayment",
   "branch": "Loan Repayment",
   "palmcredit": "Loan Repayment",
@@ -142,5 +148,8 @@
   "lawma": "Utilities & Bills",
   "waste management": "Utilities & Bills",
   "lcc": "Utilities & Bills",
-  "lagos water": "Utilities & Bills"
+  "lagos water": "Utilities & Bills",
+
+  "vat": "Taxes",
+  "stamp duty": "Taxes"
 }
