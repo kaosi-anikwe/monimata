@@ -254,32 +254,52 @@ def run_llm_categorization(
                 categories=category_names,
             )
         except LlmHttpError as exc:
-            if exc.status_code in (401, 402):
-                # Invalid or exhausted key — deactivate and notify the user.
-                credential.is_active = False
-                db.commit()
+            # Any 4xx except 429 is a permanent client error — do not retry.
+            is_permanent = 400 <= exc.status_code < 500 and exc.status_code != 429
+            if is_permanent:
                 from app.models.user import User
 
-                user_obj = db.get(User, user_id)
-                if user_obj:
-                    create_nudge(
-                        db=db,
-                        user=user_obj,
-                        trigger_type="ai_credential_invalid",
-                        title="AI tracking paused",
-                        message=(
-                            "Your AI API key is invalid or has run out of credit. Tap to restore."
-                        ),
-                        context={},
-                    )
+                if exc.status_code in (401, 402, 403):
+                    # Invalid / exhausted / forbidden key — deactivate.
+                    credential.is_active = False
                     db.commit()
+                    user_obj = db.get(User, user_id)
+                    if user_obj:
+                        create_nudge(
+                            db=db,
+                            user=user_obj,
+                            trigger_type="ai_credential_invalid",
+                            title="AI tracking paused",
+                            message=(
+                                "Your AI API key is invalid or has run out of credit."
+                                "Tap to restore."
+                            ),
+                            context={},
+                        )
+                        db.commit()
+                elif notify_on_completion:
+                    # 400 / other 4xx — bad request (e.g. malformed key).
+                    user_obj = db.get(User, user_id)
+                    if user_obj:
+                        create_nudge(
+                            db=db,
+                            user=user_obj,
+                            trigger_type="llm_categorization_failed",
+                            title="AI categorisation failed",
+                            message=(
+                                f"The AI provider rejected the request (HTTP {exc.status_code}). "
+                                "Please check your API key."
+                            ),
+                            context={},
+                        )
+                        db.commit()
                 logger.warning(
-                    "run_llm_categorization: credential deactivated (HTTP %s) user=%s",
+                    "run_llm_categorization: permanent error HTTP %s user=%s",
                     exc.status_code,
                     user_id,
                 )
                 return
-            # 429 / 503 — transient; retry with exponential backoff.
+            # 429 / 5xx — transient; retry with exponential backoff.
             countdown = 30 * (2**self.request.retries)
             raise self.retry(exc=exc, countdown=countdown)
 
@@ -356,6 +376,12 @@ def run_llm_categorization(
                 db.commit()
                 notify_user(user_id, ["transactions", "nudges"])
     except Exception as exc:
+        from celery.exceptions import Retry
+
+        if isinstance(exc, Retry):
+            # Already scheduled by the inner LlmHttpError handler — propagate
+            # without double-processing or double-nudging.
+            raise
         db.rollback()
         logger.exception("run_llm_categorization failed for user=%s", user_id)
         # On the final retry, send a failure nudge if manually triggered.

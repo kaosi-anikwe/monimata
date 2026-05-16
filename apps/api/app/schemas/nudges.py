@@ -43,7 +43,7 @@ class NudgeTriggerType(StrEnum):
 
 class NudgeResponse(BaseModel):
     id: str
-    trigger_type: NudgeTriggerType
+    trigger_type: NudgeTriggerType | str
     title: str | None
     message: str
     context: dict[str, Any] | None = None

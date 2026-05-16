@@ -29,10 +29,10 @@ Column layout A — debit before credit
   columns    : trans_time | value_date | description |
                debit | credit | balance_after | channel | transaction_ref
 
-Column layout B — credit before debit
+Column layout B — debit before credit (same order as A, narrower columns)
   col_edges  : [62, 130, 181, 248, 289, 334, 382, 436, 545]
   columns    : trans_time | value_date | description |
-               credit | debit | balance_after | channel | transaction_ref
+               debit | credit | balance_after | channel | transaction_ref
 
 Multi-line rows: description and transaction_ref sometimes wrap onto
 continuation lines.  Continuation rows (empty trans_time) are merged into
@@ -133,19 +133,30 @@ _LAYOUT_A: _Layout = {
     "transaction_ref": 7,
 }
 
-# Layout B: used for OWealth savings sub-account pages (Mobile x0 ≈ 396.75)
-# These rows are detected but skipped — only used to avoid misclassification.
+# Layout B: used for OWealth savings sub-account pages (Mobile x0 ≈ 396.75).
+# The OWealth table uses the same debit | credit column ORDER as Layout A,
+# just with narrower column edges (the "Mobile" channel word lands at x≈397
+# instead of ≈421, which is how we detect Layout B rows).
 _LAYOUT_B: _Layout = {
     "col_edges": [62, 130, 181, 248, 289, 334, 382, 436, 545],
     "trans_time": 0,
     "value_date": 1,
     "description": 2,
-    "credit": 3,
-    "debit": 4,
+    "debit": 3,
+    "credit": 4,
     "balance_after": 5,
     "channel": 6,
     "transaction_ref": 7,
 }
+
+# Narration prefixes that represent internal OPay wallet ↔ OWealth transfers.
+# These entries appear in both the Wallet and OWealth sections and cancel out;
+# importing them would inflate both sides of the ledger.
+# Also covers Spend & Save sub-account churn within OWealth.
+_OPAY_INTERNAL_RE = re.compile(
+    r"^(OWealth Withdrawal|Auto-save to OWealth|Spend & Save|OWealth Deposit)",
+    re.IGNORECASE,
+)
 
 # Crop boxes: (x0, y0, x1, y1) in PDF points (72 dpi)
 # Page 1 has a summary block above the data table; skip it.
@@ -355,10 +366,18 @@ class _OPayStatementParser:
     def parse(self, content: bytes, filename: str) -> list[ParsedTransaction]:
         """Parse an OPay wallet account statement PDF.
 
-        Layout A (main wallet) rows are collected first; Layout B (OWealth
-        savings sub-account) rows are then added for any transaction_ref not
-        already present.  Layout A takes precedence on conflicts.
-        Transactions without a ref are always included.
+        Strategy
+        --------
+        1. Collect all Layout A (Wallet) rows and all Layout B (OWealth) rows.
+        2. Strip internal OPay transfers from Layout A (OWealth Withdrawal
+           credits, Auto-save debits, Spend & Save Deposit debits) — these
+           are wallet ↔ OWealth shuffles, not real money flows.
+        3. From Layout B keep only rows whose ``transaction_ref`` has NOT
+           been seen in Layout A (i.e. entries unique to OWealth), and strip
+           internal OWealth sub-account churn (Spend & Save pairs, etc.).
+           This leaves only OWealth Interest Earned entries, which are
+           genuine income not visible in the wallet section.
+        4. Merge and sort oldest-first.
         """
         # Always extract account number from the PDF itself — the filename
         # can be modified in transit and must not be trusted.
@@ -386,10 +405,16 @@ class _OPayStatementParser:
                     else:
                         layout_a.append(txn)
 
-        # Merge: Layout A first; add Layout B rows whose ref is not in A.
+        # Step 2: strip internal wallet transfers from Layout A.
+        layout_a = [t for t in layout_a if not _OPAY_INTERNAL_RE.match(t.narration or "")]
+
+        # Step 3: add Layout B rows that are unique to OWealth and are not
+        # internal OWealth sub-account churn.
         seen_refs: set[str] = {t.transaction_ref for t in layout_a if t.transaction_ref}
         combined = list(layout_a)
         for txn in layout_b:
+            if _OPAY_INTERNAL_RE.match(txn.narration or ""):
+                continue
             if txn.transaction_ref is None or txn.transaction_ref not in seen_refs:
                 combined.append(txn)
 

@@ -268,7 +268,7 @@ def required_this_month(target, current_available: int, today: date) -> int | No
 DEFAULT_CATEGORIES: list[tuple[str, list[str]]] = [
     (
         "Monthly Bills",
-        ["Rent / Housing", "Electricity (NEPA)", "Internet", "Water", "Insurance"],
+        ["Rent / Housing", "Electricity", "Internet", "Water", "Insurance"],
     ),
     (
         "Everyday Expenses",
@@ -276,11 +276,11 @@ DEFAULT_CATEGORIES: list[tuple[str, list[str]]] = [
     ),
     (
         "Financial Goals",
-        ["Savings", "Emergency Fund", "Investments"],
+        ["Savings", "Emergency Fund", "Investments", "Loan Repayment"],
     ),
     (
         "Personal",
-        ["Health & Pharmacy", "Clothing", "Entertainment", "Subscriptions"],
+        ["Health & Pharmacy", "Clothing", "Entertainment", "Subscriptions", "Shopping"],
     ),
     (
         "Family & Giving",

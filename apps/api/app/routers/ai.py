@@ -71,6 +71,23 @@ def create_credential(
     if existing:
         existing.is_active = False
 
+    # Validate the key before storing — makes a lightweight, token-free API call.
+    from app.services.llm import LlmHttpError, validate_api_key
+
+    try:
+        validate_api_key(body.provider, body.api_key)
+    except LlmHttpError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"API key rejected by {body.provider} (HTTP {exc.status_code}). \
+            Check your key and try again.",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Could not reach {body.provider} to validate key: {exc}",
+        ) from exc
+
     try:
         encrypted = encrypt_api_key(body.api_key)
     except RuntimeError as exc:
