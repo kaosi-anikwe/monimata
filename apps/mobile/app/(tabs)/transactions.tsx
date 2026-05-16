@@ -214,27 +214,33 @@ function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLas
           {tx.narration}
         </Text>
         <View style={ss.txMeta}>
-          {/* Category chip */}
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation?.(); onCategoryPress(); }}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Change category"
-          >
-            <View style={[
-              ss.txCatChip,
-              tx.category_id
-                ? { backgroundColor: colors.surface }
-                : { backgroundColor: colors.warningSubtle },
-            ]}>
-              <Text style={[
-                ss.txCatChipText,
-                { color: tx.category_id ? colors.brand : colors.warningText },
-              ]}>
-                {categoryName ?? 'Uncategorised'}
-              </Text>
+          {/* Category chip — for split transactions show a distinct indicator */}
+          {tx.is_split ? (
+            <View style={[ss.txCatChip, { backgroundColor: colors.infoSubtle }]}>
+              <Text style={[ss.txCatChipText, { color: colors.info }]}>Split ✦</Text>
             </View>
-          </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={(e) => { e.stopPropagation?.(); onCategoryPress(); }}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Change category"
+            >
+              <View style={[
+                ss.txCatChip,
+                tx.category_id
+                  ? { backgroundColor: colors.surface }
+                  : { backgroundColor: colors.warningSubtle },
+              ]}>
+                <Text style={[
+                  ss.txCatChipText,
+                  { color: tx.category_id ? colors.brand : colors.warningText },
+                ]}>
+                  {categoryName ?? 'Uncategorised'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
           {/* Account · time */}
           {accountLabel && (
             <Text style={[type_.caption, { color: colors.textMeta }]}>{accountLabel} · {txTime(tx.date)}</Text>
@@ -397,7 +403,7 @@ export default function TransactionsScreen() {
       });
     }
     if (activeFilter === 'uncategorised') {
-      result = result.filter((tx) => !tx.category_id);
+      result = result.filter((tx) => !tx.category_id && !tx.is_split);
     } else if (activeFilter === 'debits') {
       result = result.filter((tx) => tx.type === 'debit');
     } else if (activeFilter === 'credits') {

@@ -22,8 +22,9 @@ import { getDatabase } from '@/database';
 import TransactionModel from '@/database/models/Transaction';
 import { syncDatabase } from '@/database/sync';
 import { queryKeys } from '@/lib/queryKeys';
+import client from '@/services/api';
 import { useAppSelector } from '@/store/hooks';
-import type { Transaction, TransactionListResponse as TransactionPage } from '@monimata/shared-types';
+import type { Transaction, TransactionListResponse as TransactionPage, TransactionSplit, TransactionSplitItem } from '@monimata/shared-types';
 
 export interface ManualTransactionBody {
   account_id: string;
@@ -184,6 +185,83 @@ export function useUpdateTransaction() {
       qc.invalidateQueries({ queryKey: ['budget'] });
     },
     onError: () => error('Error', 'Could not update transaction.'),
+  });
+}
+
+export function useSplitTransaction() {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: async ({ txId, splits }: { txId: string; splits: TransactionSplitItem[] }) => {
+      const { error: apiError } = await client.POST('/transactions/{tx_id}/split', {
+        params: { path: { tx_id: txId } },
+        body: { splits },
+      });
+      if (apiError) throw new Error('Split failed');
+
+      // Mark the transaction as split in the local DB so the UI reflects it
+      // immediately without waiting for the next full sync pull.
+      const db = getDatabase();
+      await db.write(async () => {
+        const tx = await db.get<TransactionModel>('transactions').find(txId);
+        await tx.update((t) => {
+          t.isSplit = true;
+          t.updatedAt = new Date();
+        });
+      });
+
+      // Pull fresh server state so splits array and budget activity are current.
+      syncDatabase().catch(console.warn);
+    },
+    onSuccess: (_data, { txId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.transactions() });
+      qc.invalidateQueries({ queryKey: ['transaction', txId] });
+      qc.invalidateQueries({ queryKey: ['budget'] });
+    },
+    onError: () => error('Error', 'Could not save split.'),
+  });
+}
+
+export function useTransactionSplits(txId: string, enabled: boolean) {
+  return useQuery<TransactionSplit[]>({
+    queryKey: ['transaction', txId, 'splits'],
+    queryFn: async () => {
+      const { data, error } = await client.GET('/transactions/{tx_id}', {
+        params: { path: { tx_id: txId } },
+      });
+      if (error) throw new Error('Could not load splits');
+      return data.splits;
+    },
+    enabled: Boolean(txId) && enabled,
+  });
+}
+
+export function useRemoveSplit() {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return useMutation({
+    mutationFn: async (txId: string) => {
+      const { error: apiError } = await client.DELETE('/transactions/{tx_id}/split', {
+        params: { path: { tx_id: txId } },
+      });
+      if (apiError) throw new Error('Could not remove split');
+      const db = getDatabase();
+      await db.write(async () => {
+        const tx = await db.get<TransactionModel>('transactions').find(txId);
+        await tx.update((t) => {
+          t.isSplit = false;
+          t.categoryId = null;
+          t.updatedAt = new Date();
+        });
+      });
+      syncDatabase().catch(console.warn);
+    },
+    onSuccess: (_data, txId) => {
+      qc.invalidateQueries({ queryKey: queryKeys.transactions() });
+      qc.invalidateQueries({ queryKey: ['transaction', txId] });
+      qc.invalidateQueries({ queryKey: ['budget'] });
+    },
+    onError: () => error('Error', 'Could not remove split.'),
   });
 }
 
