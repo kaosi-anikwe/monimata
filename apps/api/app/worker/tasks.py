@@ -183,7 +183,9 @@ def deliver_queued_nudges() -> None:
     bind=True,
     max_retries=3,
 )
-def run_llm_categorization(self, user_id: str, tx_ids: list[str]) -> None:  # type: ignore[misc]
+def run_llm_categorization(
+    self, user_id: str, tx_ids: list[str], notify_on_completion: bool = False
+) -> None:  # type: ignore[misc]
     """Batch-categorise transactions using the user's BYOK LLM credential.
 
     Called by categorize_transactions after Tiers 1-3 leave transactions
@@ -191,6 +193,9 @@ def run_llm_categorization(self, user_id: str, tx_ids: list[str]) -> None:  # ty
       - 429 / 503 → exponential backoff retry
       - 401 / 402 → deactivate credential + send push nudge, no retry
       - Persistent failure → leave category_id=None, set category_confidence=0
+
+    When ``notify_on_completion=True`` (manual trigger), a push nudge is sent
+    on success with categorisation stats, and on final retry failure.
     """
     from app.core.security import decrypt_api_key
     from app.models.category import Category
@@ -284,6 +289,7 @@ def run_llm_categorization(self, user_id: str, tx_ids: list[str]) -> None:  # ty
 
         # Apply results to transactions and log usage.
         tx_by_id = {tx.id: tx for tx in txs}
+        success_count = 0
         for item in results:
             tx_id = item.get("tx_id")
             cat_name = item.get("category")
@@ -298,6 +304,7 @@ def run_llm_categorization(self, user_id: str, tx_ids: list[str]) -> None:  # ty
                 tx.categorization_source = "llm"
                 tx.category_confidence = min(confidence, 100)
                 _update_budget_activity(db, tx)
+                success_count += 1
             else:
                 tx.categorization_source = "llm"
                 tx.category_confidence = 0
@@ -318,9 +325,62 @@ def run_llm_categorization(self, user_id: str, tx_ids: list[str]) -> None:  # ty
             len(txs),
             user_id,
         )
+
+        # Success nudge for manual triggers.
+        if notify_on_completion:
+            from app.models.user import User
+            from app.ws_manager import notify_user
+
+            user_obj = db.get(User, user_id)
+            if user_obj:
+                failed_count = len(txs) - success_count
+                body = (
+                    f"Categorised {success_count} of {len(txs)} transactions "
+                    f"using {credential.provider.title()}."
+                )
+                if failed_count:
+                    body += f" {failed_count} could not be matched and remain in your review queue."
+                create_nudge(
+                    db=db,
+                    user=user_obj,
+                    trigger_type="llm_categorization_complete",
+                    title="AI categorisation complete",
+                    message=body,
+                    context={
+                        "success_count": success_count,
+                        "failed_count": failed_count,
+                        "total": len(txs),
+                        "provider": credential.provider,
+                    },
+                )
+                db.commit()
+                notify_user(user_id, ["transactions", "nudges"])
     except Exception as exc:
         db.rollback()
         logger.exception("run_llm_categorization failed for user=%s", user_id)
+        # On the final retry, send a failure nudge if manually triggered.
+        if notify_on_completion and self.request.retries >= self.max_retries:
+            try:
+                from app.models.user import User
+                from app.services.nudge_engine import create_nudge as _cn
+
+                with SessionLocal() as nudge_db:
+                    user_obj = nudge_db.get(User, user_id)
+                    if user_obj:
+                        _cn(
+                            db=nudge_db,
+                            user=user_obj,
+                            trigger_type="llm_categorization_failed",
+                            title="AI categorisation failed",
+                            message=(
+                                "Automated categorisation failed after multiple retries. "
+                                "Transactions remain in your review queue."
+                            ),
+                            context={},
+                        )
+                        nudge_db.commit()
+            except Exception:
+                logger.exception("run_llm_categorization: failed to send failure nudge")
         raise self.retry(exc=exc, countdown=60 * (2**self.request.retries))
     finally:
         db.close()
