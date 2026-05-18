@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 export const schema = appSchema({
-  version: 4,
+  version: 5,
   tables: [
     tableSchema({
       name: 'category_groups',
@@ -54,6 +54,7 @@ export const schema = appSchema({
         { name: 'month', type: 'string' },
         { name: 'assigned', type: 'number' },
         { name: 'activity', type: 'number' },
+        { name: 'carried_over', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
     }),
