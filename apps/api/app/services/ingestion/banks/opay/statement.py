@@ -152,11 +152,45 @@ _LAYOUT_B: _Layout = {
 # Narration prefixes that represent internal OPay wallet ↔ OWealth transfers.
 # These entries appear in both the Wallet and OWealth sections and cancel out;
 # importing them would inflate both sides of the ledger.
-# Also covers Spend & Save sub-account churn within OWealth.
+# Also covers Spend & Save sub-account churn within OWealth, and orphaned
+# "(Transaction Payment)" continuation fragments that arise when a multi-line
+# OWealth Withdrawal row is split across a page boundary.
 _OPAY_INTERNAL_RE = re.compile(
-    r"^(OWealth Withdrawal|Auto-save to OWealth|Spend & Save|OWealth Deposit)",
+    r"^(OWealth Withdrawal|Auto-save to OWealth|Spend & Save|OWealth Deposit"
+    r"|\(Transaction Payment\))",
     re.IGNORECASE,
 )
+
+# OWealth (Savings Account) closing-balance extractor.
+# The per-section summary on the first OWealth page reads:
+#   Savings Account Period: ...
+#   Closing Balance  Total Credit  Credit Count
+#   ₦9,697.05  ...
+_OWEALTH_CLOSING_RE = re.compile(
+    r"Savings Account.*?Closing Balance[^\n]*\n(₦[\d,]+\.\d{2})",
+    re.DOTALL,
+)
+
+
+def _extract_owealth_closing_kobo(content: bytes) -> int | None:
+    """Return the OWealth (Savings Account) closing balance in kobo.
+
+    Scans every PDF page for the section summary block that contains
+    ``Savings Account ... Closing Balance`` and extracts the ₦-prefixed amount
+    on the following line.
+    """
+    try:
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text() or ""
+                m = _OWEALTH_CLOSING_RE.search(text)
+                if m:
+                    amount_str = m.group(1).replace("₦", "").replace(",", "")
+                    return _naira_to_kobo(amount_str)
+    except Exception:
+        pass
+    return None
+
 
 # Crop boxes: (x0, y0, x1, y1) in PDF points (72 dpi)
 # Page 1 has a summary block above the data table; skip it.
@@ -372,11 +406,17 @@ class _OPayStatementParser:
         2. Strip internal OPay transfers from Layout A (OWealth Withdrawal
            credits, Auto-save debits, Spend & Save Deposit debits) — these
            are wallet ↔ OWealth shuffles, not real money flows.
+           **Also clear balance_kobo on all wallet rows.**  The wallet settles
+           to ₦0 every night, so its running balance would anchor the account
+           balance to ₦0.  We want the anchor to be the OWealth closing
+           balance instead (carried by the most recent Interest Earned entry).
         3. From Layout B keep only rows whose ``transaction_ref`` has NOT
            been seen in Layout A (i.e. entries unique to OWealth), and strip
            internal OWealth sub-account churn (Spend & Save pairs, etc.).
            This leaves only OWealth Interest Earned entries, which are
-           genuine income not visible in the wallet section.
+           genuine income not visible in the wallet section.  Their
+           balance_after column holds the OWealth running balance; the
+           most recent one becomes the authoritative account balance anchor.
         4. Merge and sort oldest-first.
         """
         # Always extract account number from the PDF itself — the filename
@@ -420,6 +460,32 @@ class _OPayStatementParser:
 
         # Sort oldest-first by transaction_date (None dates go last)
         combined.sort(key=lambda t: t.transaction_date or datetime.max.replace(tzinfo=_WAT))
+
+        # Step 4: inject the OWealth closing balance as a sentinel transaction
+        # dated one second after the last real transaction.  This becomes the
+        # starting_balance anchor in process_bank_statement, ensuring that
+        # computed_balance == OWealth closing balance (the true net worth) and
+        # not the wallet's nightly-zero balance.
+        # The sentinel carries amount_kobo=0 so it has no ledger impact.
+        closing_kobo = _extract_owealth_closing_kobo(content)
+        if closing_kobo is not None:
+            last_date = next(
+                (t.transaction_date for t in reversed(combined) if t.transaction_date),
+                datetime.now(_WAT),
+            )
+            combined.append(
+                ParsedTransaction(
+                    transaction_type="credit",
+                    amount_kobo=0,
+                    account_last4=account_last4,
+                    balance_kobo=closing_kobo,
+                    narration="OWealth closing balance",
+                    sender_email=None,
+                    transaction_ref=f"opay-owealth-closing-{account_last4 or 'xxxx'}",
+                    transaction_date=last_date + timedelta(seconds=1),
+                )
+            )
+
         return combined
 
 
