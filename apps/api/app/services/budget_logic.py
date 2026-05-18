@@ -248,72 +248,80 @@ def get_or_create_budget_month(
 # ── required_this_month ───────────────────────────────────────────────────────
 
 
-def required_this_month(target, current_available: int, today: date) -> int | None:
+def required_this_month(target, bm: BudgetMonth | None, today: date) -> int | None:
     """
     Return the kobo amount that should be assigned this month to meet the target.
     Returns None if the target is unknown or inapplicable.
-    Values < 0 are clamped to 0 (category is already over-funded).
 
-    Uses the new frequency/behavior schema:
-      frequency: weekly | monthly | yearly | custom
-      behavior:  set_aside | refill | balance
+    Implements three behavior models (spec §7.1):
+      set_aside — fund fresh each period, ignoring carried-over rollover
+                  underfunded = max(0, amount - assigned_t)
+      refill    — top up counting both carry-forward and current assignment
+                  underfunded = max(0, amount - carried_over_t - assigned_t)
+      balance   — maintain live available balance at or above target
+                  underfunded = max(0, amount - available_t)
+
+    For weekly frequency the target_amount is first scaled by the exact number
+    of occurrences of target.day_of_week in the active month (spec §7.2).
+    For yearly/custom sinking funds, the behavior-aware underfunded amount is
+    spread evenly over the months remaining until target_date.
     """
     if target is None:
         return None
 
-    freq = target.frequency
-    behavior = target.behavior
-    amount = target.target_amount
+    freq: str = target.frequency
+    behavior: str = target.behavior
+    amount: int = target.target_amount
+
+    # Decompose the BudgetMonth into the three values the formulas need
+    assigned_t: int = bm.assigned if bm is not None else 0
+    carried_over_t: int = bm.carried_over if bm is not None else 0
+    available_t: int = bm.available if bm is not None else 0
+
+    def _needed(scaled_amount: int) -> int:
+        """Behavior-aware underfunded amount for a given (possibly scaled) target."""
+        if behavior == "set_aside":
+            return max(0, scaled_amount - assigned_t)
+        if behavior == "refill":
+            return max(0, scaled_amount - carried_over_t - assigned_t)
+        # balance
+        return max(0, scaled_amount - available_t)
 
     if freq == "monthly":
-        if behavior in ("set_aside", "refill", "balance"):
-            # For all monthly behaviors: assign enough so available reaches amount
-            needed = amount - current_available
-            return max(0, needed)
+        return _needed(amount)
 
-    elif freq == "weekly":
-        if behavior == "refill":
-            # Top up so available == amount this week; no per-week multiplication
-            return max(0, amount - current_available)
-        # set_aside: fund every remaining week in the month
+    if freq == "weekly":
+        # Scale target_amount by the exact number of occurrences of day_of_week
+        # in the active month (spec §7.2).
+        dow: int = target.day_of_week if target.day_of_week is not None else today.weekday()
         _, days_in_month = monthrange(today.year, today.month)
-        remaining_days = days_in_month - today.day + 1
-        remaining_weeks = ceil(remaining_days / 7)
-        total_needed = (amount * remaining_weeks) - current_available
-        return max(0, total_needed)
+        count = sum(
+            1
+            for d in range(1, days_in_month + 1)
+            if date(today.year, today.month, d).weekday() == dow
+        )
+        return _needed(amount * count)
 
-    elif freq == "yearly":
-        if behavior == "balance":
-            # Maintain a balance — just top up, no sinking-fund spread
-            return max(0, amount - current_available)
-        # set_aside / refill: sinking fund spread over months until target_date
-        target_dt = target.target_date
-        if not target_dt:
-            from datetime import date as _date
-
-            target_dt = _date(today.year, 12, 31)
-        if target_dt <= today:
-            return max(0, amount - current_available)
-        months_left = (target_dt.year - today.year) * 12 + (target_dt.month - today.month) + 1
-        total_needed = amount - current_available
+    if freq in ("yearly", "custom"):
+        total_needed = _needed(amount)
         if total_needed <= 0:
             return 0
-        return ceil(total_needed / max(1, months_left))
 
-    elif freq == "custom":
         if behavior == "balance":
-            # Maintain a balance — just top up
-            return max(0, amount - current_available)
-        # set_aside / refill: sinking fund
+            # Live cushion — no sinking-fund spread; just top up now
+            return total_needed
+
+        # set_aside / refill: sinking fund spread over remaining months
         target_dt = target.target_date
         if not target_dt:
-            return None
+            if freq == "custom":
+                return None  # no date → spread is undefined
+            target_dt = date(today.year, 12, 31)  # yearly fallback: end of year
+
         if target_dt <= today:
-            return max(0, amount - current_available)
+            return total_needed  # past due — assign the full shortfall now
+
         months_left = (target_dt.year - today.year) * 12 + (target_dt.month - today.month) + 1
-        total_needed = amount - current_available
-        if total_needed <= 0:
-            return 0
         return ceil(total_needed / max(1, months_left))
 
     return None
