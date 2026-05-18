@@ -279,6 +279,59 @@ function OptionPickerSheet<T>({
   );
 }
 
+// ─── Account picker sheet ─────────────────────────────────────────────────────
+
+function AccountPickerSheet({
+  visible, accounts, onSelect, onClose,
+}: {
+  visible: boolean;
+  accounts: BankAccount[];
+  onSelect: (a: BankAccount) => void;
+  onClose: () => void;
+}) {
+  const colors = useTheme();
+  const router = useRouter();
+  return (
+    <BottomSheet visible={visible} onClose={onClose} title="Select Account" scrollable={false}>
+      {accounts.length === 0 ? (
+        <View style={ss.pickerEmpty}>
+          <Text style={[type_.bodyReg, { color: colors.textMeta, textAlign: 'center' }]}>
+            You don&apos;t have any accounts yet.
+          </Text>
+          <TouchableOpacity
+            onPress={() => { onClose(); router.push('/(tabs)/accounts'); }}
+            accessibilityRole="link"
+            accessibilityLabel="Go to Accounts to add one"
+          >
+            <Text style={[type_.body, { color: colors.brand, textAlign: 'center', marginTop: spacing.sm }]}>
+              Add an account →
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView style={{ maxHeight: 360 }}>
+          {accounts.map((a, i) => (
+            <TouchableOpacity
+              key={a.id}
+              style={[
+                ss.pickRow,
+                i < accounts.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+              ]}
+              onPress={() => { onSelect(a); onClose(); }}
+              accessibilityRole="button"
+              accessibilityLabel={a.alias ?? `${a.institution} — ${a.account_name}`}
+            >
+              <Text style={[type_.body, { color: colors.textPrimary }]}>
+                {a.alias ?? `${a.institution} — ${a.account_name}`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+    </BottomSheet>
+  );
+}
+
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function AddTransactionScreen() {
@@ -320,10 +373,6 @@ export default function AddTransactionScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dtPickerMode, setDtPickerMode] = useState<'date' | 'time'>('date');
 
-  const accountOptions = useMemo(
-    () => accounts.map((a) => ({ value: a, label: a.alias ?? `${a.institution} — ${a.account_name}` })),
-    [accounts],
-  );
   const recurrenceOptions = useMemo(
     () => RECURRENCE_OPTIONS.map((o) => ({ value: o, label: o.label })),
     [],
@@ -575,10 +624,9 @@ export default function AddTransactionScreen() {
       )}
 
       {/* ── Pickers ── */}
-      <OptionPickerSheet
+      <AccountPickerSheet
         visible={showAccountPicker}
-        title="Select Account"
-        options={accountOptions}
+        accounts={accounts}
         onSelect={(a) => setSelectedAccount(a)}
         onClose={() => setShowAccountPicker(false)}
       />
@@ -655,6 +703,7 @@ const ss = StyleSheet.create({
   saveBar: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
   pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs + spacing.xs },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },
+  pickerEmpty: { paddingHorizontal: spacing.xl, paddingVertical: spacing.xxl, alignItems: 'center' },
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   dtSheet: { paddingBottom: spacing.xxl, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
   dtDoneBtn: { margin: spacing.lg, paddingVertical: spacing.mdn, borderRadius: radius.sm, alignItems: 'center' },

@@ -17,6 +17,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useToast } from '@/components/Toast';
+import { syncDatabase } from '@/database/sync';
 import { queryKeys } from '@/lib/queryKeys';
 import { $api } from '@/services/api';
 
@@ -89,6 +90,20 @@ export function useDeleteAccount() {
   return $api.useMutation('delete', '/accounts/{account_id}', {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
     onError: () => error('Error', 'Could not remove account. Try again.'),
+  });
+}
+
+export function useReconcile() {
+  const qc = useQueryClient();
+  const { success, error } = useToast();
+  return $api.useMutation('post', '/accounts/{account_id}/reconcile', {
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.accounts() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions() });
+      syncDatabase().catch(console.warn);
+      success('Account reconciled', 'Balance updated and adjustment recorded.');
+    },
+    onError: () => error('Error', 'Could not reconcile account. Try again.'),
   });
 }
 

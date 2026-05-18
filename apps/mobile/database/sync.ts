@@ -1,7 +1,7 @@
 import { synchronize } from '@nozbe/watermelondb/sync';
 
 import { showToast } from '../components/Toast';
-import { getAuthToken } from '../services/api';
+import { authFetch, getAuthToken } from '../services/api';
 import { getDatabase } from './index';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL;
@@ -38,9 +38,10 @@ export async function syncDatabase(): Promise<void> {
         const pullFrom = lastPulledAt !== null ? lastPulledAt : ninetyDaysAgo;
 
         const url = `${API_BASE}/sync/pull?last_pulled_at=${pullFrom}`
-        const response = await fetch(url, {
+        const response = await authFetch(url, {
           headers: { Authorization: `Bearer ${token}` },
         })
+        if (response.status === 401) throw Object.assign(new Error('Sync unauthenticated'), { silent: true });
         if (!response.ok) {
           const detail = await extractDetail(response);
           throw new Error(`Sync pull failed (${response.status})${detail ? ': ' + detail : ''}`)
@@ -50,7 +51,7 @@ export async function syncDatabase(): Promise<void> {
       },
 
       pushChanges: async ({ changes, lastPulledAt }) => {
-        const response = await fetch(`${API_BASE}/sync/push?last_pulled_at=${lastPulledAt}`, {
+        const response = await authFetch(`${API_BASE}/sync/push?last_pulled_at=${lastPulledAt}`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -58,6 +59,7 @@ export async function syncDatabase(): Promise<void> {
           },
           body: JSON.stringify({ changes, last_pulled_at: lastPulledAt }),
         })
+        if (response.status === 401) throw Object.assign(new Error('Sync unauthenticated'), { silent: true });
         if (!response.ok) {
           const detail = await extractDetail(response);
           throw new Error(`Sync push failed (${response.status})${detail ? ': ' + detail : ''}`)
@@ -65,8 +67,10 @@ export async function syncDatabase(): Promise<void> {
       },
 
       migrationsEnabledAtVersion: 1,
+      sendCreatedAsUpdated: true,
     })
   } catch (e) {
+    if ((e as any)?.silent) { throw e; } // 401 handled upstream — auth layer already triggered logout
     const message = e instanceof Error ? e.message : 'An unexpected error occurred';
     showToast({ title: 'Sync failed', message, variant: 'error' });
     throw e;

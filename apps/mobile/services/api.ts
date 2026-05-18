@@ -212,6 +212,7 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
 }
 
 // ── Typed clients ─────────────────────────────────────────────────────────────
+export { authFetch };
 const client = createClient<paths>({ baseUrl: BASE_URL, fetch: authFetch });
 
 /**

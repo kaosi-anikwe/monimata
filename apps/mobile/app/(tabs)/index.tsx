@@ -45,6 +45,7 @@ import { syncDatabase } from '@/database/sync';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBudget } from '@/hooks/useBudget';
 import { useDismissNudge, useNudgeUnreadCount, useNudges } from '@/hooks/useNudges';
+import { useMonthlyFlow } from '@/hooks/useTransactions';
 import { releasePrompt } from '@/lib/notifPromptBridge';
 import { useTheme } from '@/lib/theme';
 import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
@@ -101,7 +102,7 @@ function getGreeting(): string {
 
 function getCurrentMonth(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
 // ── Streak ───────────────────────────────────────────────────────────────────
@@ -157,10 +158,11 @@ export default function HomeScreen() {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const currentMonth = useMemo(getCurrentMonth, []);
-  const { data: accounts, isLoading: accountsLoading, error: accountsError, refetch: refetchAccounts } = useAccounts();
   const { data: budget, isLoading: budgetLoading, error: budgetError, refetch: refetchBudget } = useBudget(currentMonth);
-  const isLoading = accountsLoading || budgetLoading;
-  const fetchError = accountsError ?? budgetError;
+  const { data: monthlyFlow, refetch: refetchMonthlyFlow } = useMonthlyFlow(currentMonth);
+  const { data: accounts, refetch: refetchAccounts } = useAccounts();
+  const isLoading = budgetLoading;
+  const fetchError = budgetError;
   const { data: nudgesData, refetch: refetchNudges } = useNudges(false); // exclude dismissed
   const dismissNudge = useDismissNudge();
   const unreadCount = useNudgeUnreadCount();
@@ -169,17 +171,18 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try { await syncDatabase(); } catch (e) { console.warn('Sync error', e); }
-    await Promise.all([refetchAccounts(), refetchBudget(), refetchNudges()]);
+    await Promise.all([refetchBudget(), refetchNudges(), refetchMonthlyFlow(), refetchAccounts()]);
     setRefreshing(false);
-  }, [refetchAccounts, refetchBudget, refetchNudges]);
+  }, [refetchBudget, refetchNudges, refetchMonthlyFlow, refetchAccounts]);
 
   // ── Derivations ───────────────────────────────────────────────────────────
   const firstName = user?.first_name ?? 'there';
   const initials = [user?.first_name?.[0], user?.last_name?.[0]]
     .filter(Boolean).join('').toUpperCase() || '?';
 
+  // Net Worth = sum of server-computed account balances (starting_balance + all txs)
   const netWorth = useMemo(
-    () => (accounts ?? []).filter((a) => a.is_active).reduce((s, a) => s + a.balance, 0),
+    () => (accounts ?? []).reduce((s, a) => s + a.balance, 0),
     [accounts],
   );
 
@@ -188,17 +191,11 @@ export default function HomeScreen() {
     [budget],
   );
 
-  // Expenses = sum of all debit activity across categories this month
-  const totalExpenses = useMemo(
-    () => allCats.reduce((s, c) => s + Math.max(0, -c.activity), 0),
-    [allCats],
-  );
-
-  // Income = TBB + totalAssigned (fundamental ZBB identity)
-  const totalIncome = useMemo(() => {
-    const assigned = allCats.reduce((s, c) => s + c.assigned, 0);
-    return (budget?.tbb ?? 0) + assigned;
-  }, [allCats, budget]);
+  // Total In / Total Out derived from raw transactions per the authoritative formula:
+  // In  = sum of credits  with category_id IS NULL  (pure external inflow)
+  // Out = sum of |debits| with category_id IS NOT NULL (categorised spending)
+  const totalIncome = monthlyFlow?.totalIn ?? 0;
+  const totalExpenses = monthlyFlow?.totalOut ?? 0;
 
   // Categories with a custom (sinking fund / deadline) target → goals section
   const goals = useMemo(
@@ -211,7 +208,7 @@ export default function HomeScreen() {
 
   const bottomPad = layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.lg;
 
-  if (isLoading && !accounts && !budget) {
+  if (isLoading && !budget) {
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <ActivityIndicator style={{ flex: 1 }} color={colors.brand} />
@@ -219,7 +216,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (fetchError && !accounts && !budget) {
+  if (fetchError && !budget) {
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <ScrollView
