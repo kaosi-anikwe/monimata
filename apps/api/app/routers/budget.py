@@ -182,6 +182,24 @@ def set_assignment(
     db.commit()
     db.refresh(bm)
 
+    # Cascade carried_over recalculation to all subsequent months when a
+    # past-month assignment is edited
+    if month < date.today().strftime("%Y-%m"):
+        try:
+            from typing import cast
+
+            from app.worker.celery_app import CeleryTask
+            from app.worker.tasks import recalculate_carried_over_cascade as _cascade
+
+            cast(CeleryTask, _cascade).delay(user_id, str(category_id), month)
+        except Exception:
+            logger.warning(
+                "set_assignment: cascade enqueue failed user=%s category=%s month=%s",
+                user_id,
+                str(category_id),
+                month,
+            )
+
     available = bm.available
     target = db.query(CategoryTarget).filter(CategoryTarget.category_id == str(category_id)).first()
     req = required_this_month(target, bm, date.today())

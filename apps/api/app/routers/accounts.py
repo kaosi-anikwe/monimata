@@ -48,6 +48,8 @@ from app.models.user import User
 from app.schemas.accounts import (
     AddManualAccountRequest,
     BankAccountResponse,
+    ReconcileRequest,
+    ReconcileResponse,
     SupportedBankResponse,
     UpdateAliasRequest,
     UpdateManualBalanceRequest,
@@ -300,6 +302,62 @@ def delete_account(
     account = _get_live_account_or_404(db, account_id, current_user.id)
     account.deleted_at = datetime.now(UTC)
     db.commit()
+
+
+# ── POST /accounts/{id}/reconcile ──────────────────────────────────────────────
+
+
+@router.post("/{account_id}/reconcile", response_model=ReconcileResponse)
+def reconcile_account(
+    account_id: str,
+    payload: ReconcileRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReconcileResponse:
+    """Anchor the tracked balance to a verified real-world balance (spec §8.3).
+
+    Computes delta = true_actual_balance − tracked_balance.  If non-zero, a
+    synthetic MONIMATA_RECONCILIATION transaction is inserted with
+    category_id=None so the adjustment flows directly into (or out of) TBB.
+    """
+    account = _get_live_account_or_404(db, account_id, current_user.id)
+
+    tracked_balance: int = account.starting_balance + int(
+        db.query(func.sum(Transaction.amount)).filter(Transaction.account_id == account_id).scalar()
+        or 0
+    )
+    delta = payload.true_actual_balance - tracked_balance
+
+    if delta == 0:
+        return ReconcileResponse(
+            delta=0,
+            new_balance=tracked_balance,
+            transaction_id=None,
+        )
+
+    from app.services.categorization import clean_narration
+
+    tx = Transaction(
+        user_id=str(current_user.id),
+        account_id=account.id,
+        date=datetime.now(UTC),
+        amount=delta,
+        narration="Manual Reconciliation",
+        cleaned_narration=clean_narration("Manual Reconciliation"),
+        type="credit" if delta > 0 else "debit",
+        category_id=None,
+        source=TransactionSource.system,
+    )
+    db.add(tx)
+    db.commit()
+
+    notify_user(str(current_user.id), ["accounts", "transactions", "budget"])
+
+    return ReconcileResponse(
+        delta=delta,
+        new_balance=payload.true_actual_balance,
+        transaction_id=str(tx.id),
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
