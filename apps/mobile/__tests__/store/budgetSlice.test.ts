@@ -16,7 +16,7 @@ import budgetReducer, {
 
 describe('budgetSlice', () => {
   const monthOf = (y: number, m: number) =>
-    `${y}-${String(m).padStart(2, '0')}`;
+    `${y}-${String(m).padStart(2, '0')}-01`;
 
   // ── Initial state ─────────────────────────────────────────────────────────
 
@@ -30,44 +30,44 @@ describe('budgetSlice', () => {
   // ── setSelectedMonth ───────────────────────────────────────────────────────
 
   it('sets an arbitrary month', () => {
-    const state = budgetReducer({ selectedMonth: '2026-01' }, setSelectedMonth('2025-06'));
-    expect(state.selectedMonth).toBe('2025-06');
+    const state = budgetReducer({ selectedMonth: '2026-01-01' }, setSelectedMonth('2025-06-01'));
+    expect(state.selectedMonth).toBe('2025-06-01');
   });
 
   // ── prevMonth ─────────────────────────────────────────────────────────────
 
   it('goes back one month within a year', () => {
-    const s = budgetReducer({ selectedMonth: '2026-03' }, prevMonth());
-    expect(s.selectedMonth).toBe('2026-02');
+    const s = budgetReducer({ selectedMonth: '2026-03-01' }, prevMonth());
+    expect(s.selectedMonth).toBe('2026-02-01');
   });
 
   it('wraps from January back to December of the previous year', () => {
-    const s = budgetReducer({ selectedMonth: '2026-01' }, prevMonth());
-    expect(s.selectedMonth).toBe('2025-12');
+    const s = budgetReducer({ selectedMonth: '2026-01-01' }, prevMonth());
+    expect(s.selectedMonth).toBe('2025-12-01');
   });
 
   it('goes back multiple times correctly', () => {
-    let s = { selectedMonth: '2026-03' };
+    let s = { selectedMonth: '2026-03-01' };
     s = budgetReducer(s, prevMonth());
     s = budgetReducer(s, prevMonth());
     s = budgetReducer(s, prevMonth());
-    expect(s.selectedMonth).toBe('2025-12');
+    expect(s.selectedMonth).toBe('2025-12-01');
   });
 
   // ── nextMonth ─────────────────────────────────────────────────────────────
 
   it('advances one month within a year', () => {
-    const s = budgetReducer({ selectedMonth: '2026-03' }, nextMonth());
-    expect(s.selectedMonth).toBe('2026-04');
+    const s = budgetReducer({ selectedMonth: '2026-03-01' }, nextMonth());
+    expect(s.selectedMonth).toBe('2026-04-01');
   });
 
   it('wraps from December to January of the next year', () => {
-    const s = budgetReducer({ selectedMonth: '2025-12' }, nextMonth());
-    expect(s.selectedMonth).toBe('2026-01');
+    const s = budgetReducer({ selectedMonth: '2025-12-01' }, nextMonth());
+    expect(s.selectedMonth).toBe('2026-01-01');
   });
 
   it('prevMonth and nextMonth are inverses', () => {
-    const initial = '2026-06';
+    const initial = '2026-06-01';
     let s = { selectedMonth: initial };
     s = budgetReducer(s, nextMonth());
     s = budgetReducer(s, prevMonth());
@@ -85,7 +85,7 @@ describe('budgetSlice', () => {
   });
 
   it('does NOT advance a future month (user browsing ahead)', () => {
-    const future = '2099-12';
+    const future = '2099-12-01';
     const s = budgetReducer({ selectedMonth: future }, syncToCurrentMonth());
     expect(s.selectedMonth).toBe(future);
   });

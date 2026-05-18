@@ -49,3 +49,4 @@ app-example
 .env.local
 
 categorization*.md
+*plan.md

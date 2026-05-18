@@ -2,11 +2,11 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 
 function currentMonthStr(): string {
   const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
 export interface BudgetState {
-  selectedMonth: string // "YYYY-MM"
+  selectedMonth: string // "YYYY-MM-01"
 }
 
 const initialState: BudgetState = {
@@ -23,12 +23,12 @@ const budgetSlice = createSlice({
     prevMonth(state) {
       const [y, m] = state.selectedMonth.split('-').map(Number)
       const d = new Date(y, m - 2, 1)
-      state.selectedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      state.selectedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
     },
     nextMonth(state) {
       const [y, m] = state.selectedMonth.split('-').map(Number)
       const d = new Date(y, m, 1)
-      state.selectedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      state.selectedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
     },
     /**
      * Called when the app comes to the foreground. Advances selectedMonth to

@@ -31,10 +31,10 @@ import type { BudgetCategory, BudgetGroup, BudgetResponse } from '@monimata/shar
 
 // ── Budget logic (mirrors apps/api/app/services/budget_logic.py) ─────────────
 
-/** "YYYY-MM" → "YYYY-MM" for the previous calendar month */
+/** "YYYY-MM-01" → "YYYY-MM-01" for the previous calendar month */
 function prevMonth(month: string): string {
   const [y, m] = month.split('-').map(Number);
-  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  return m === 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, '0')}-01`;
 }
 
 /** "YYYY-MM" → UTC epoch-ms bounds [start, end) */
@@ -45,33 +45,50 @@ function monthBounds(month: string): { start: number; end: number } {
   return { start, end };
 }
 
-/** epoch-ms (UTC) → "YYYY-MM" */
+/** epoch-ms (UTC) → "YYYY-MM-01" */
 function epochToYearMonth(epochMs: number): string {
   const d = new Date(epochMs);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
 }
 
 /**
  * required_this_month — exact port of budget_logic.py::required_this_month().
  * Returns kobo needed this month to meet the target, or null if unknown.
+ *
+ * Behavior formulas (spec §7.1):
+ *   set_aside — ignores carry: max(0, targetAmount - assigned)
+ *   refill    — carry reduces need: max(0, targetAmount - carriedOver - assigned)
+ *   balance   — full available matters: max(0, targetAmount - available)
  */
 function requiredThisMonth(
   target: CategoryTargetModel,
+  assigned: number,
+  carriedOver: number,
   available: number,
   today: Date,
 ): number | null {
   const { frequency, behavior, targetAmount, targetDate } = target;
 
   if (frequency === 'monthly') {
-    return Math.max(0, targetAmount - available);
+    if (behavior === 'set_aside') return Math.max(0, targetAmount - assigned);
+    if (behavior === 'refill') return Math.max(0, targetAmount - carriedOver - assigned);
+    /* balance */                  return Math.max(0, targetAmount - available);
   }
 
   if (frequency === 'weekly') {
-    if (behavior === 'refill') return Math.max(0, targetAmount - available);
+    // Exact count of target.dayOfWeek occurrences in this calendar month (spec §7.2)
+    // day_of_week is stored in Python weekday convention (Monday=0 … Sunday=6).
+    // JS Date.getDay() uses Sunday=0 … Saturday=6, so convert before comparing.
     const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-    const remainingDays = daysInMonth - today.getDate() + 1;
-    const remainingWeeks = Math.ceil(remainingDays / 7);
-    return Math.max(0, targetAmount * remainingWeeks - available);
+    let weekCount = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const jsDay = new Date(today.getFullYear(), today.getMonth(), d).getDay();
+      const pyDay = (jsDay + 6) % 7; // Sunday(0)→Sun(6), Monday(1)→Mon(0), …
+      if (pyDay === target.dayOfWeek) weekCount++;
+    }
+    if (behavior === 'set_aside') return Math.max(0, targetAmount * weekCount - assigned);
+    if (behavior === 'refill') return Math.max(0, targetAmount - carriedOver - assigned);
+    /* balance */                  return Math.max(0, targetAmount - available);
   }
 
   if (frequency === 'yearly' || frequency === 'custom') {
@@ -88,14 +105,17 @@ function requiredThisMonth(
     } else {
       return null; // custom with no target_date
     }
-    if (tDate <= today) return Math.max(0, targetAmount - available);
+    // Behavior-aware base shortfall for sinking fund
+    const base = behavior === 'set_aside'
+      ? targetAmount - assigned
+      : targetAmount - carriedOver - assigned; // refill
+    if (tDate <= today) return Math.max(0, base);
     const monthsLeft =
       (tDate.getFullYear() - today.getFullYear()) * 12 +
       (tDate.getMonth() - today.getMonth()) +
       1;
-    const totalNeeded = targetAmount - available;
-    if (totalNeeded <= 0) return 0;
-    return Math.ceil(totalNeeded / Math.max(1, monthsLeft));
+    if (base <= 0) return 0;
+    return Math.ceil(base / Math.max(1, monthsLeft));
   }
 
   return null;
@@ -108,7 +128,6 @@ export function useBudget(month: string) {
     queryKey: queryKeys.budget(month),
     queryFn: async (): Promise<BudgetResponse> => {
       const db = getDatabase();
-      const prev = prevMonth(month);
 
       // Build up to 12 months of history for TBB carry-forward
       const tbbMonths: string[] = [month];
@@ -124,9 +143,8 @@ export function useBudget(month: string) {
         groups,
         categories,
         bmCurrent,
-        bmPrev,
         targets,
-        creditTxns,
+        nullCategoryTxns,
         bmHistorical,
         allMonthTxns,
       ] = await Promise.all([
@@ -139,21 +157,23 @@ export function useBudget(month: string) {
         db.get<BudgetMonthModel>('budget_months')
           .query(Q.where('month', month))
           .fetch(),
-        db.get<BudgetMonthModel>('budget_months')
-          .query(Q.where('month', prev))
-          .fetch(),
         db.get<CategoryTargetModel>('category_targets').query().fetch(),
+        // Net flow of null-category, non-statement transactions — mirrors
+        // backend _null_category_net_flow_in_month().
+        // Includes both credits (STARTING_BALANCE, manual income) and debits
+        // (MONIMATA_OVERSPEND_DEDUCTION, negative reconciliation). Statement
+        // rows are excluded regardless of category status.
         db.get<TransactionModel>('transactions').query(
-          Q.where('type', 'credit'),
+          Q.where('category_id', null),
+          Q.where('source', Q.notEq('statement')),
           Q.where('date', Q.gte(oldestBounds.start)),
           Q.where('date', Q.lt(currentBounds.end)),
         ).fetch(),
         db.get<BudgetMonthModel>('budget_months')
           .query(Q.where('month', Q.oneOf(tbbMonths)))
           .fetch(),
-        // All transactions this month — used for live per-category activity AND
-        // total_debit (all debits, categorised or not), so this mirrors the way
-        // creditTxns includes all credits regardless of category.
+        // All transactions this month — used for live per-category activity
+        // and total_debit (all debits, categorised or not).
         db.get<TransactionModel>('transactions').query(
           Q.where('date', Q.gte(currentBounds.start)),
           Q.where('date', Q.lt(currentBounds.end)),
@@ -161,7 +181,6 @@ export function useBudget(month: string) {
       ]);
 
       const bmCurrentMap = new Map(bmCurrent.map((b) => [b.categoryId, b]));
-      const bmPrevMap = new Map(bmPrev.map((b) => [b.categoryId, b]));
       const targetMap = new Map(targets.map((t) => [t.categoryId, t]));
 
       // Compute live activity from transactions — normalised by type so this works
@@ -176,11 +195,14 @@ export function useBudget(month: string) {
         activityByCategory.set(tx.categoryId, (activityByCategory.get(tx.categoryId) ?? 0) + contribution);
       });
 
-      // Income per month (credit transactions) for TBB
-      const incomeByMonth = new Map<string, number>();
-      creditTxns.forEach((tx) => {
+      // Net null-category flow per month for TBB. Normalise amounts by type
+      // because mobile stores amounts as unsigned (always positive) + a type
+      // field, matching the backend's net-flow calculation.
+      const netFlowByMonth = new Map<string, number>();
+      nullCategoryTxns.forEach((tx) => {
         const txMonth = epochToYearMonth(tx.date.getTime());
-        incomeByMonth.set(txMonth, (incomeByMonth.get(txMonth) ?? 0) + tx.amount);
+        const contribution = tx.type === 'credit' ? Math.abs(tx.amount) : -Math.abs(tx.amount);
+        netFlowByMonth.set(txMonth, (netFlowByMonth.get(txMonth) ?? 0) + contribution);
       });
 
       // Total assigned per month for TBB
@@ -193,13 +215,13 @@ export function useBudget(month: string) {
       let tbb = 0;
       for (let i = tbbMonths.length - 1; i >= 0; i--) {
         const mm = tbbMonths[i];
-        const income = incomeByMonth.get(mm) ?? 0;
+        const netFlow = netFlowByMonth.get(mm) ?? 0;
         const assigned = assignedByMonth.get(mm) ?? 0;
-        if (i < tbbMonths.length - 1 && income === 0 && assigned === 0) {
+        if (i < tbbMonths.length - 1 && netFlow === 0 && assigned === 0) {
           tbb = 0; // no data in this historical month — reset carry
           continue;
         }
-        tbb = income - assigned + Math.max(0, tbb);
+        tbb = netFlow - assigned + Math.max(0, tbb);
       }
 
       const today = new Date();
@@ -207,14 +229,12 @@ export function useBudget(month: string) {
         const cats = categories.filter((c) => c.groupId === g.id);
         const catRows: BudgetCategory[] = cats.map((cat) => {
           const bm = bmCurrentMap.get(cat.id);
-          const pb = bmPrevMap.get(cat.id);
           const assigned = bm?.assigned ?? 0;
           // Use live transaction-derived activity (always up to date pre-sync)
           const activity = activityByCategory.get(cat.id) ?? 0;
-          // One level of carry-forward (matches Python's compute_available)
-          const prevAvailable = pb ? pb.assigned + pb.activity : 0;
-          const carry = Math.max(0, prevAvailable);
-          const available = assigned + carry + activity;
+          // Read carry directly from the server-computed column (O(1))
+          const carry = bm?.carriedOver ?? 0;
+          const available = carry + assigned + activity;
           const target = targetMap.get(cat.id);
           return {
             id: cat.id,
@@ -224,7 +244,7 @@ export function useBudget(month: string) {
             assigned,
             activity,
             available,
-            required_this_month: target ? requiredThisMonth(target, available, today) : null,
+            required_this_month: target ? requiredThisMonth(target, assigned, carry, available, today) : null,
             target_amount: target?.targetAmount ?? null,
             target_frequency: (target?.frequency ?? null) as string | null,
             target_behavior: (target?.behavior ?? null) as string | null,
@@ -268,6 +288,7 @@ export function useAssignCategory(month: string) {
             bm.month = month;
             bm.assigned = assigned;
             bm.activity = 0;
+            bm.carriedOver = 0;
           });
         }
       });
@@ -540,6 +561,7 @@ export function useMoveMoney(month: string) {
             bm.month = month;
             bm.assigned = amount;
             bm.activity = 0;
+            bm.carriedOver = 0;
           });
         }
       });
@@ -868,6 +890,7 @@ export function useApplyAutoAssign(month: string) {
               bm.month = month;
               bm.assigned = item.proposedAssigned;
               bm.activity = 0;
+              bm.carriedOver = 0;
             });
           }
         }
