@@ -50,6 +50,7 @@ from app.services.budget_logic import (
     compute_tbb,
     get_or_create_budget_month,
     required_this_month,
+    str_to_month_date,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,7 @@ def get_budget(
                 .filter(
                     BudgetMonth.user_id == user_id,
                     BudgetMonth.category_id == str(cat.id),
-                    BudgetMonth.month == month,
+                    BudgetMonth.month == str_to_month_date(month),
                 )
                 .first()
             )
@@ -435,7 +436,11 @@ def auto_assign(
         prev1 = _prev_month(month)
         prev2 = _prev_month(prev1)
         prev3 = _prev_month(prev2)
-        hist_months = [prev1, prev2, prev3]
+        hist_months = [
+            str_to_month_date(prev1),
+            str_to_month_date(prev2),
+            str_to_month_date(prev3),
+        ]
 
         hist_bms = (
             db.query(BudgetMonth)
@@ -446,8 +451,8 @@ def auto_assign(
             .all()
         )
 
-        # Index: category_id → month → BudgetMonth
-        bm_index: dict[str, dict[str, BudgetMonth]] = {}
+        # Index: category_id → month (date) → BudgetMonth
+        bm_index: dict[str, dict[date, BudgetMonth]] = {}
         for bm in hist_bms:
             if bm.category_id not in bm_index:
                 bm_index[bm.category_id] = {}
@@ -459,11 +464,11 @@ def auto_assign(
             old_assigned = current_bm.assigned
 
             if strategy == AutoAssignStrategy.assigned_last_month:
-                prev_bm = cat_hist.get(prev1)
+                prev_bm = cat_hist.get(str_to_month_date(prev1))
                 proposed = prev_bm.assigned if prev_bm else 0
 
             elif strategy == AutoAssignStrategy.spent_last_month:
-                prev_bm = cat_hist.get(prev1)
+                prev_bm = cat_hist.get(str_to_month_date(prev1))
                 # activity is stored negative for debits; abs gives spend amount
                 proposed = abs(prev_bm.activity) if prev_bm else 0
 

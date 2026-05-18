@@ -459,13 +459,13 @@ def _update_budget_activity(db, tx) -> None:
     if tx.category_id is None:
         return
 
-    month_str = tx.date.strftime("%Y-%m")
+    month_date = tx.date.date().replace(day=1)  # first of the transaction's month
     bm = (
         db.query(BudgetMonth)
         .filter(
             BudgetMonth.user_id == tx.user_id,
             BudgetMonth.category_id == tx.category_id,
-            BudgetMonth.month == month_str,
+            BudgetMonth.month == month_date,
         )
         .first()
     )
@@ -474,9 +474,10 @@ def _update_budget_activity(db, tx) -> None:
         bm = BudgetMonth(
             user_id=tx.user_id,
             category_id=tx.category_id,
-            month=month_str,
+            month=month_date,
             assigned=0,
             activity=0,
+            carried_over=0,
         )
         db.add(bm)
 
