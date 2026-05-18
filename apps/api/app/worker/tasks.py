@@ -538,6 +538,15 @@ def process_bank_statement(
             if tx.external_ref is not None
         }
 
+        # Determine whether this is the account's first statement upload.
+        # Checked before the import loop so the flag reflects the pre-import
+        # state even though rows are about to be added.
+        from sqlalchemy import exists as _sa_exists
+
+        is_fresh_account: bool = not db.query(
+            _sa_exists().where(Transaction.account_id == account_id)
+        ).scalar()
+
         inserted_txs: list[Transaction] = []
         updated_ids: list[str] = []
 
@@ -618,6 +627,47 @@ def process_bank_statement(
             len(inserted_ids),
             len(updated_ids),
         )
+
+        # ── Synthetic MONIMATA_STARTING_BALANCE for first-time imports ─────
+        # On the first statement upload the closing balance is seeded as a
+        # NULL-category credit so it feeds the TBB pool directly (the "clean
+        # cut" starting point, spec §5.2).  Imported historical rows are
+        # categorised afterwards; once they carry a non-null category_id they
+        # bypass TBB entirely.
+        if is_fresh_account and inserted_txs:
+            anchor_for_sb = (
+                db.query(Transaction)
+                .filter(
+                    Transaction.account_id == account_id,
+                    Transaction.balance_after.isnot(None),
+                )
+                .order_by(Transaction.date.desc())
+                .first()
+            )
+            closing_balance: int | None = (
+                anchor_for_sb.balance_after if anchor_for_sb is not None else None
+            )
+            if closing_balance and closing_balance > 0:
+                db.add(
+                    Transaction(
+                        user_id=user_id,
+                        account_id=account_id,
+                        date=datetime.now(UTC),
+                        amount=closing_balance,
+                        narration="MoniMata Starting Balance",
+                        cleaned_narration="monimata starting balance",
+                        type="credit",
+                        category_id=None,
+                        source=TransactionSource.system,
+                    )
+                )
+                db.commit()
+                logger.info(
+                    "process_bank_statement: inserted MONIMATA_STARTING_BALANCE"
+                    " amount=%d account=%s",
+                    closing_balance,
+                    account_id,
+                )
 
         # ── Anchor starting_balance to the bank's closing balance ─────────
         # Find the most recent transaction that carries a balance_after value;
