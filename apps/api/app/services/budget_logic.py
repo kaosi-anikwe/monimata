@@ -71,10 +71,21 @@ def str_to_month_date(month: str) -> date:
 def _null_category_net_flow_in_month(db: Session, user_id: str, month: str) -> int:
     """Net flow of null-category transactions — the TBB inflow / deduction pool.
 
-    Positive null-category credits (salary, starting balance) increase TBB.
-    Negative system-generated deductions (overspend carry, reconciliation
-    adjustments) reduce TBB.  Categorised transactions are excluded — they
-    route through category activity instead.
+    Only non-statement sources contribute to TBB:
+      system  — MONIMATA_STARTING_BALANCE, MONIMATA_OVERSPEND_DEDUCTION, reconciliation
+      email   — real-time bank alert income (salary received via email)
+      manual  — manually entered cash income
+      receipt — receipt-captured income
+
+    Statement-imported transactions are intentionally excluded regardless of
+    category_id.  A historical statement import inserts a single
+    MONIMATA_STARTING_BALANCE (source=system) equal to the statement's closing
+    balance; the individual historical rows have source=statement and must not
+    also feed TBB — doing so causes past-month salary credits to compound
+    forward via max(0, TBB(prev)), inflating TBB far beyond the real balance.
+
+    Categorised transactions are excluded — they route through category
+    activity instead.
     """
     start, end = month_date_range(month)
     result = (
@@ -82,6 +93,7 @@ def _null_category_net_flow_in_month(db: Session, user_id: str, month: str) -> i
         .filter(
             Transaction.user_id == user_id,
             Transaction.category_id.is_(None),
+            Transaction.source != TransactionSource.statement,
             Transaction.date >= start,
             Transaction.date < end,
         )

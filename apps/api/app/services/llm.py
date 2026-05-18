@@ -108,7 +108,8 @@ def _call_gemini(
         "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
     }
     resp = httpx.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+        headers={"X-goog-api-key": api_key, "Content-Type": "application/json"},
         json=payload,
         timeout=60,
     )
@@ -134,7 +135,9 @@ def _call_anthropic(
     """
     user_msg = _build_prompt(transactions, categories)
     payload = {
-        "model": "claude-haiku-4-5",
+        "model": "claude-3-5-haiku-20241022",
+        "max_tokens": 2048,
+        "temperature": 0,
         "system": _SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": user_msg}],
     }
@@ -174,7 +177,10 @@ class LlmHttpError(Exception):
 def validate_api_key(provider: str, api_key: str) -> None:
     """Make a lightweight, token-free request to verify the API key is accepted.
 
-    Raises ``LlmHttpError`` on HTTP errors, ``ValueError`` for unknown providers.
+    Raises ``LlmHttpError`` on definitive auth failures (HTTP 401 / 403).
+    HTTP 429 (rate-limited) and 5xx (provider outage) are treated as "key
+    accepted" — they don't justify blocking storage.
+    ``ValueError`` is raised for unknown providers.
     The key is never logged.
     """
     try:
@@ -185,8 +191,11 @@ def validate_api_key(provider: str, api_key: str) -> None:
                 timeout=10,
             )
         elif provider == "gemini":
+            # List all models rather than a specific one — avoids breakage when
+            # individual model names are deprecated.
             resp = httpx.get(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash?key={api_key}",
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                headers={"X-goog-api-key": api_key},
                 timeout=10,
             )
         elif provider == "anthropic":
@@ -202,7 +211,18 @@ def validate_api_key(provider: str, api_key: str) -> None:
             raise ValueError(f"Unsupported LLM provider: {provider!r}")
         resp.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        raise LlmHttpError(exc.response.status_code, str(exc)) from exc
+        code = exc.response.status_code
+        if 400 <= code < 500 and code != 429:
+            # Any 4xx except 429 (rate-limited) is a definitive rejection.
+            # Google returns 400 for malformed keys; 401/403 for auth failures.
+            raise LlmHttpError(code, str(exc)) from exc
+        # 429 = rate-limited (key is valid, just busy).
+        # 5xx = provider outage (can't verify; don't penalise the user).
+        logger.warning(
+            "validate_api_key: HTTP %d from %s — treating key as valid",
+            code,
+            provider,
+        )
 
 
 def call_llm(
