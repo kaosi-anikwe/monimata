@@ -15,10 +15,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,8 +32,9 @@ if TYPE_CHECKING:
 class BudgetMonth(Base):
     """
     One row per (user, category, month).
-    `available` is NEVER stored — always computed as assigned - activity.
-    month is stored as 'YYYY-MM' string for simplicity.
+    month is stored as the first day of the month (Date) for B-Tree range performance.
+    carried_over holds the closing available from the previous month (pre-computed).
+    available is a derived property: carried_over + assigned + activity.
     """
 
     __tablename__ = "budget_months"
@@ -50,11 +51,12 @@ class BudgetMonth(Base):
     category_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), ForeignKey("categories.id"), nullable=False
     )
-    month: Mapped[str] = mapped_column(String(7), nullable=False)  # "YYYY-MM"
+    month: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     assigned: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)  # kobo
     activity: Mapped[int] = mapped_column(
         BigInteger, nullable=False, default=0
-    )  # kobo; sum of debits (negative)
+    )  # kobo; signed — negative for net spending
+    carried_over: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)  # kobo
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -70,3 +72,8 @@ class BudgetMonth(Base):
     # relationships
     user: Mapped["User"] = relationship(back_populates="budget_months")
     category: Mapped["Category"] = relationship(back_populates="budget_months")
+
+    @property
+    def available(self) -> int:
+        """Live available balance: carried_over + assigned + activity."""
+        return self.carried_over + self.assigned + self.activity

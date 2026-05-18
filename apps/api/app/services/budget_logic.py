@@ -58,6 +58,12 @@ def prev_month_str(month: str) -> str:
     return prev_last.strftime("%Y-%m")
 
 
+def str_to_month_date(month: str) -> date:
+    """Convert 'YYYY-MM' to a date object normalised to the 1st of the month."""
+    y, m = int(month[:4]), int(month[5:7])
+    return date(y, m, 1)
+
+
 # ── Core budget computations ──────────────────────────────────────────────────
 
 
@@ -83,7 +89,7 @@ def _assigned_in_month(db: Session, user_id: str, month: str) -> int:
         db.query(func.coalesce(func.sum(BudgetMonth.assigned), 0))
         .filter(
             BudgetMonth.user_id == user_id,
-            BudgetMonth.month == month,
+            BudgetMonth.month == str_to_month_date(month),
         )
         .scalar()
     )
@@ -132,45 +138,26 @@ def compute_available(db: Session, user_id: str, category_id: str, month: str) -
         .filter(
             BudgetMonth.user_id == user_id,
             BudgetMonth.category_id == category_id,
-            BudgetMonth.month == month,
+            BudgetMonth.month == str_to_month_date(month),
         )
         .first()
     )
-    assigned = bm.assigned if bm else 0
-    activity = bm.activity if bm else 0
-
-    # Carry-forward from previous month (one level only — don't recurse here to
-    # keep response time bounded).
-    prev = prev_month_str(month)
-    prev_bm = (
-        db.query(BudgetMonth)
-        .filter(
-            BudgetMonth.user_id == user_id,
-            BudgetMonth.category_id == category_id,
-            BudgetMonth.month == prev,
-        )
-        .first()
-    )
-    if prev_bm:
-        # activity is signed (negative = net spending), so available = assigned + activity
-        prev_available = prev_bm.assigned + prev_bm.activity
-        carry = max(0, prev_available)
-    else:
-        carry = 0
-
-    return assigned + carry + activity
+    if bm is None:
+        return 0
+    return bm.available
 
 
 def get_or_create_budget_month(
     db: Session, user_id: str, category_id: str, month: str
 ) -> BudgetMonth:
     """Fetch the BudgetMonth row, creating it (zeroed) if absent."""
+    month_date = str_to_month_date(month)
     bm = (
         db.query(BudgetMonth)
         .filter(
             BudgetMonth.user_id == user_id,
             BudgetMonth.category_id == category_id,
-            BudgetMonth.month == month,
+            BudgetMonth.month == month_date,
         )
         .first()
     )
@@ -178,9 +165,10 @@ def get_or_create_budget_month(
         bm = BudgetMonth(
             user_id=user_id,
             category_id=category_id,
-            month=month,
+            month=month_date,
             assigned=0,
             activity=0,
+            carried_over=0,
         )
         db.add(bm)
         db.flush()  # populate .id without committing
