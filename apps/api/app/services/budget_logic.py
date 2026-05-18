@@ -67,14 +67,20 @@ def str_to_month_date(month: str) -> date:
 # ── Core budget computations ──────────────────────────────────────────────────
 
 
-def _income_in_month(db: Session, user_id: str, month: str) -> int:
-    """Sum of all credit transaction amounts (positive kobo) for a user in a month."""
+def _null_category_income_in_month(db: Session, user_id: str, month: str) -> int:
+    """Sum of credit transactions with category_id IS NULL — the raw TBB inflow pool.
+
+    Type A income (salary, dividends, side hustles) arrives with category_id=None
+    and feeds TBB directly.  Type B inflows (refunds, reimbursements) are already
+    categorised and bypass TBB entirely.
+    """
     start, end = month_date_range(month)
     result = (
         db.query(func.coalesce(func.sum(Transaction.amount), 0))
         .filter(
             Transaction.user_id == user_id,
             Transaction.type == "credit",
+            Transaction.category_id.is_(None),
             Transaction.date >= start,
             Transaction.date < end,
         )
@@ -100,17 +106,21 @@ def compute_tbb(db: Session, user_id: str, month: str, _depth: int = 0) -> int:
     """
     Compute To Be Budgeted for a given month.
 
-    TBB(M) = income(M) - assigned(M) + max(0, TBB(M-1))
+    TBB(M) = null_category_income(M) - assigned(M) + max(0, TBB(M-1))
 
-    We recurse backwards to find the true carry-forward, stopping at whichever
-    comes first: 12 months back, or a month where there is no income AND no
-    assignments (genuinely no data → treat as 0).
+    Only credits with category_id IS NULL feed the TBB pool (Type A income:
+    salary, dividends, etc.).  Categorised credits (Type B: refunds,
+    reimbursements) flow straight into their category's activity and never
+    inflate TBB.
+
+    Recursion stops at MAX_DEPTH months back, or at the first month with no
+    data (income == 0 and assigned == 0 at depth > 0).
     """
     MAX_DEPTH = 12
     if _depth >= MAX_DEPTH:
         return 0
 
-    income = _income_in_month(db, user_id, month)
+    income = _null_category_income_in_month(db, user_id, month)
     assigned = _assigned_in_month(db, user_id, month)
 
     # Short-circuit: if there's no data at all for this month AND we've gone back
@@ -147,10 +157,69 @@ def compute_available(db: Session, user_id: str, category_id: str, month: str) -
     return bm.available
 
 
+def ensure_budget_month_initialized(db: Session, user_id: str, month: str) -> None:
+    """Lazily initialize BudgetMonth snapshot rows for the given month.
+
+    If any row already exists for (user_id, month) this is a no-op (cache hit).
+    Otherwise the previous month's rows are read and a new row is stamped for
+    each category with::
+
+        carried_over = max(0, prev.available)
+
+    Negative closing balances are clamped to zero per the ZBB liquid-cash rule
+    (spec §8.2).  Brand-new categories with no prior history are not touched
+    here; they are created on-demand with carried_over=0 by
+    get_or_create_budget_month().
+
+    Uses db.flush() — the caller controls transaction commit boundaries.
+    """
+    target_date = str_to_month_date(month)
+
+    # Cache hit: at least one snapshot row exists for this month
+    exists = (
+        db.query(BudgetMonth)
+        .filter(
+            BudgetMonth.user_id == user_id,
+            BudgetMonth.month == target_date,
+        )
+        .first()
+    )
+    if exists:
+        return
+
+    # Load previous month's closing snapshots
+    prev_date = (target_date - timedelta(days=1)).replace(day=1)
+    prev_snapshots = (
+        db.query(BudgetMonth)
+        .filter(
+            BudgetMonth.user_id == user_id,
+            BudgetMonth.month == prev_date,
+        )
+        .all()
+    )
+
+    for prev in prev_snapshots:
+        carried = max(0, prev.available)  # clamp: never roll over a deficit
+        db.add(
+            BudgetMonth(
+                user_id=user_id,
+                category_id=prev.category_id,
+                month=target_date,
+                assigned=0,
+                activity=0,
+                carried_over=carried,
+            )
+        )
+
+    if prev_snapshots:
+        db.flush()
+
+
 def get_or_create_budget_month(
     db: Session, user_id: str, category_id: str, month: str
 ) -> BudgetMonth:
-    """Fetch the BudgetMonth row, creating it (zeroed) if absent."""
+    """Ensure the month is initialized, then fetch or create this category's row."""
+    ensure_budget_month_initialized(db, user_id, month)
     month_date = str_to_month_date(month)
     bm = (
         db.query(BudgetMonth)
@@ -162,6 +231,7 @@ def get_or_create_budget_month(
         .first()
     )
     if bm is None:
+        # Brand-new category with no prior-month history — start fresh
         bm = BudgetMonth(
             user_id=user_id,
             category_id=category_id,
