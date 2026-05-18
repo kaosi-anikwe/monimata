@@ -33,8 +33,8 @@ from typing import cast
 
 import app.worker.beat_schedule as _beat_schedule  # noqa: F401 — registers beat schedule
 from app.core.database import SessionLocal
-from app.models.budget import BudgetMonth
 from app.models.transaction import Transaction
+from app.services.budget_logic import get_or_create_budget_month
 from app.worker.celery_app import CeleryTask, celery_app
 
 logger = logging.getLogger(__name__)
@@ -455,32 +455,16 @@ def embed_category_rule(self, rule_id: str) -> None:  # type: ignore[misc]
 
 
 def _update_budget_activity(db, tx) -> None:
-    """Increment/decrement budget_months.activity for the transaction's category and month."""
+    """Increment/decrement budget_months.activity for the transaction's category and month.
+
+    Delegates to get_or_create_budget_month which calls ensure_budget_month_initialized
+    first, so carried_over is always populated correctly before activity is written.
+    """
     if tx.category_id is None:
         return
 
-    month_date = tx.date.date().replace(day=1)  # first of the transaction's month
-    bm = (
-        db.query(BudgetMonth)
-        .filter(
-            BudgetMonth.user_id == tx.user_id,
-            BudgetMonth.category_id == tx.category_id,
-            BudgetMonth.month == month_date,
-        )
-        .first()
-    )
-
-    if not bm:
-        bm = BudgetMonth(
-            user_id=tx.user_id,
-            category_id=tx.category_id,
-            month=month_date,
-            assigned=0,
-            activity=0,
-            carried_over=0,
-        )
-        db.add(bm)
-
+    month_str = tx.date.strftime("%Y-%m")
+    bm = get_or_create_budget_month(db, tx.user_id, tx.category_id, month_str)
     bm.activity += tx.amount
 
 
