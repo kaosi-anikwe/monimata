@@ -53,6 +53,8 @@ function txModelToDto(m: TransactionModel): Transaction {
     source: m.source as 'bank_alert' | 'manual',
     recurrence_id: m.recurrenceId,
     splits: [],
+    categorization_source: null,
+    category_confidence: 0,
     created_at: m.createdAt.toISOString(),
     updated_at: m.updatedAt.toISOString(),
   };
@@ -103,10 +105,8 @@ export function useRecategorize() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      // Use the bare ['budget'] prefix key so TanStack Query invalidates every
-      // budget query regardless of month (e.g. ['budget', '2026-03']).
-      // queryKeys.budget('') = ['budget', ''] which does NOT match ['budget', '2026-03'].
       qc.invalidateQueries({ queryKey: ['budget'] });
+      qc.invalidateQueries({ queryKey: ['monthly-flow'] });
     },
     onError: () => error('Error', 'Could not update category.'),
   });
@@ -152,8 +152,9 @@ export function useCreateTransaction() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      // ['budget'] prefix invalidates all months — budget('')  would only match ['budget', ''].
       qc.invalidateQueries({ queryKey: ['budget'] });
+      qc.invalidateQueries({ queryKey: ['monthly-flow'] });
+      qc.invalidateQueries({ queryKey: queryKeys.netWorth() });
     },
     onError: () => error('Error', 'Could not create transaction.'),
   });
@@ -181,8 +182,9 @@ export function useUpdateTransaction() {
     },
     onSuccess: (_data, _vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      // ['budget'] prefix invalidates all months — budget('')  would only match ['budget', ''].
       qc.invalidateQueries({ queryKey: ['budget'] });
+      qc.invalidateQueries({ queryKey: ['monthly-flow'] });
+      qc.invalidateQueries({ queryKey: queryKeys.netWorth() });
     },
     onError: () => error('Error', 'Could not update transaction.'),
   });
@@ -217,6 +219,7 @@ export function useSplitTransaction() {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: ['transaction', txId] });
       qc.invalidateQueries({ queryKey: ['budget'] });
+      qc.invalidateQueries({ queryKey: ['monthly-flow'] });
     },
     onError: () => error('Error', 'Could not save split.'),
   });
@@ -260,8 +263,62 @@ export function useRemoveSplit() {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: ['transaction', txId] });
       qc.invalidateQueries({ queryKey: ['budget'] });
+      qc.invalidateQueries({ queryKey: ['monthly-flow'] });
     },
     onError: () => error('Error', 'Could not remove split.'),
+  });
+}
+
+
+// TODO: switch to local WatermelonDB table queries for these read operations,
+// with syncDatabase() calls in the mutations to keep the local cache up to date. 
+// This will give a much snappier UI experience and reduce load on the API, 
+// especially for the transactions list which is paginated but currently still 
+// makes an API call on every page.
+
+// export function useNetWorth() {
+//   const db = getDatabase();
+//   return useQuery({
+//     queryKey: queryKeys.netWorth(),
+//     queryFn: async () => {
+//       // Credits are positive, debits are negative — a plain sum gives the ledger balance.
+//       const txns = await db.get<TransactionModel>('transactions').query().fetch();
+//       return txns.reduce((s, t) => s + t.amount, 0);
+//     },
+//   });
+// }
+
+export function useMonthlyFlow(month: string) {
+  const db = getDatabase();
+  return useQuery({
+    queryKey: queryKeys.monthlyFlow(month),
+    queryFn: async () => {
+      const [year, monthNum] = month.split('-').map(Number);
+      const startMs = new Date(year, monthNum - 1, 1).getTime();
+      const endMs = new Date(year, monthNum, 1).getTime();
+
+      // Exclude synthetic 'system' entries (e.g. opening balance adjustments).
+      // Use signed amount as source of truth — positive = in, negative = out.
+      const monthlyTransactions = await db
+        .get<TransactionModel>('transactions')
+        .query(
+          Q.where('date', Q.gte(startMs)),
+          Q.where('date', Q.lt(endMs)),
+          Q.where('source', Q.notEq('system')),
+        )
+        .fetch();
+
+      let totalIn = 0;
+      let totalOut = 0;
+
+      for (const tx of monthlyTransactions) {
+        if (tx.amount > 0) totalIn += tx.amount;
+        else totalOut += Math.abs(tx.amount);
+      }
+
+      return { totalIn, totalOut };
+    },
+    enabled: Boolean(month),
   });
 }
 
@@ -279,8 +336,9 @@ export function useDeleteTransaction() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
-      // ['budget'] prefix invalidates all months — budget('')  would only match ['budget', ''].
       qc.invalidateQueries({ queryKey: ['budget'] });
+      qc.invalidateQueries({ queryKey: ['monthly-flow'] });
+      qc.invalidateQueries({ queryKey: queryKeys.netWorth() });
     },
     onError: () => error('Error', 'Could not delete transaction.'),
   });

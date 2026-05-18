@@ -119,6 +119,16 @@ const migrations = schemaMigrations({
         unsafeExecuteSql('CREATE INDEX "transactions_recurrence_id" ON "transactions" ("recurrence_id");'),
       ],
     },
+    {
+      // v4 → v5: add carried_over to budget_months (backend Phase 1 audit)
+      toVersion: 5,
+      steps: [
+        addColumns({
+          table: 'budget_months',
+          columns: [{ name: 'carried_over', type: 'number' }],
+        }),
+      ],
+    },
   ],
 })
 

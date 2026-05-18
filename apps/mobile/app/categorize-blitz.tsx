@@ -73,11 +73,12 @@ export default function CategorizeBlitzScreen() {
   const [pendingMap, setPendingMap] = useState<ReadonlyMap<string, string>>(new Map());
   const [skippedKeys, setSkippedKeys] = useState<ReadonlySet<string>>(new Set());
 
-  // Capture the initial total once so the progress denominator stays stable.
+  // Capture the initial total (multi-transaction clusters only) once so the
+  // progress denominator stays stable.
   const initialTotalRef = useRef<number | null>(null);
   useEffect(() => {
     if (data && initialTotalRef.current === null) {
-      initialTotalRef.current = data.clusters.length;
+      initialTotalRef.current = data.clusters.filter((c) => c.count > 1).length;
     }
   }, [data]);
 
@@ -89,7 +90,8 @@ export default function CategorizeBlitzScreen() {
   const allClusters = useMemo(() => data?.clusters ?? [], [data]);
 
   const visibleClusters = useMemo(() => {
-    const base = allClusters.filter((c) => !dismissedKeys.has(c.key));
+    // Only show clusters with more than one transaction — singletons are handled by the queue.
+    const base = allClusters.filter((c) => !dismissedKeys.has(c.key) && c.count > 1);
     // Non-skipped first, then skipped (moved to bottom on Skip tap).
     return [
       ...base.filter((c) => !skippedKeys.has(c.key)),
@@ -97,7 +99,17 @@ export default function CategorizeBlitzScreen() {
     ];
   }, [allClusters, dismissedKeys, skippedKeys]);
 
-  const initialTotal = initialTotalRef.current ?? allClusters.length;
+  const initialTotal = initialTotalRef.current ?? allClusters.filter((c) => c.count > 1).length;
+
+  // When data has loaded and no multi-clusters remain but singletons still exist,
+  // hand off to the queue screen automatically.
+  const noMultiClustersLeft = !isLoading && !isError && data !== undefined && visibleClusters.length === 0;
+  const allCategorised = noMultiClustersLeft && (data?.total_uncategorised ?? 0) === 0;
+  useEffect(() => {
+    if (noMultiClustersLeft && !allCategorised) {
+      router.replace('/categorize-queue');
+    }
+  }, [noMultiClustersLeft, allCategorised]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -158,8 +170,7 @@ export default function CategorizeBlitzScreen() {
   const isEmpty =
     !isLoading &&
     !isError &&
-    data !== undefined &&
-    (data.total_uncategorised === 0 || visibleClusters.length === 0);
+    allCategorised;
 
   return (
     <View style={[ss.root, { backgroundColor: colors.background }]}>

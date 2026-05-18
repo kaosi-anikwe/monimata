@@ -406,9 +406,10 @@ function RootLayout() {
   if (dbError) {
     const c = getTheme(null);
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxxl, backgroundColor: c.background }}>        <Text style={{ ...ff(700), ...type_.h3, color: c.textPrimary, marginBottom: spacing.sm }}>
-        Database failed to initialise
-      </Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxxl, backgroundColor: c.background }}>
+        <Text style={{ ...ff(700), ...type_.h3, color: c.textPrimary, marginBottom: spacing.sm }}>
+          Database failed to initialise
+        </Text>
         <Text style={{ ...type_.bodyReg, color: c.textMeta, textAlign: 'center' }}>{dbError}</Text>
       </View>
     );

@@ -41,7 +41,6 @@ import { TourTarget, useTour, type TourStep } from '@/components/tour';
 import { AmountInput } from '@/components/ui/AmountInput';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
-import { Divider } from '@/components/ui/Divider';
 import { Input } from '@/components/ui/Input';
 import { ListRow } from '@/components/ui/ListRow';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -49,6 +48,7 @@ import {
   useAccounts,
   useAddManualAccount,
   useDeleteAccount,
+  useReconcile,
   useSupportedBanks,
   useUpdateAlias,
   useUpdateBalance,
@@ -524,6 +524,78 @@ function RenameSheet({ account, onClose }: RenameSheetProps) {
   );
 }
 
+// ─── Reconcile Sheet ────────────────────────────────────────────────────────
+
+interface ReconcileSheetProps {
+  account: BankAccount | null;
+  onClose: () => void;
+}
+
+function ReconcileSheet({ account, onClose }: ReconcileSheetProps) {
+  const colors = useTheme();
+  const reconcileMutation = useReconcile();
+  const { error } = useToast();
+  const [amount, setAmount] = useState('');
+
+  function handleClose() {
+    setAmount('');
+    onClose();
+  }
+
+  function handleSubmit() {
+    if (!account) return;
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed) || parsed < 0) {
+      error('Invalid amount', 'Please enter a valid balance.');
+      return;
+    }
+    reconcileMutation.mutate(
+      {
+        params: { path: { account_id: account.id } },
+        body: { true_actual_balance: Math.round(parsed * 100) },
+      },
+      { onSuccess: handleClose },
+    );
+  }
+
+  return (
+    <BottomSheet visible={!!account} onClose={handleClose} title="Reconcile Account">
+      <View style={ss.sheetBody}>
+        {account && (
+          <Text style={[type_.bodyReg, { color: colors.textMeta, marginBottom: spacing.smd }]}>
+            {account.institution} · {account.alias ?? account.account_name}
+            {'  '}
+            <Text style={[{ color: colors.textPrimary }, ff(700)]}>
+              Recorded: {formatNaira(account.balance)}
+            </Text>
+          </Text>
+        )}
+        <AmountInput
+          label="Actual Balance *"
+          value={amount}
+          onChange={setAmount}
+          allowDecimals
+          autoFocus
+        />
+        <View style={[ss.stmtTip, { backgroundColor: colors.infoSubtle ?? colors.surface, borderColor: colors.infoBorder ?? colors.border }]}>
+          <Text style={[type_.caption, { color: colors.textMeta, lineHeight: 17 }]}>
+            If the actual balance differs from the recorded balance, a reconciliation adjustment transaction will be created automatically.
+          </Text>
+        </View>
+        <Button
+          variant="green"
+          onPress={handleSubmit}
+          disabled={reconcileMutation.isPending}
+          loading={reconcileMutation.isPending}
+          accessibilityLabel="Reconcile account"
+        >
+          Reconcile
+        </Button>
+      </View>
+    </BottomSheet>
+  );
+}
+
 // ─── Upload Statement Sheet ──────────────────────────────────────────────────
 
 type StatementUploadState = 'idle' | 'uploading' | 'done' | 'error';
@@ -692,6 +764,7 @@ interface MoreActionsSheetProps {
   onClose: () => void;
   onRename: () => void;
   onUpdateBalance: () => void;
+  onReconcile: () => void;
   onUploadStatement: () => void;
   onDelete: () => void;
 }
@@ -701,6 +774,7 @@ function MoreActionsSheet({
   onClose,
   onRename,
   onUpdateBalance,
+  onReconcile,
   onUploadStatement,
   onDelete,
 }: MoreActionsSheetProps) {
@@ -745,6 +819,21 @@ function MoreActionsSheet({
           showChevron
         />
 
+        {/* Reconcile */}
+        <ListRow
+          leftIcon={
+            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+              <Path d="M22 11.08V12a10 10 0 11-5.93-9.14" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M22 4L12 14.01l-3-3" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          }
+          iconBg={colors.surface}
+          title="Reconcile"
+          subtitle="Confirm actual balance and log adjustment"
+          onPress={() => action(onReconcile)}
+          showChevron
+        />
+
         {/* Upload Statement */}
         <ListRow
           leftIcon={
@@ -759,8 +848,6 @@ function MoreActionsSheet({
           onPress={() => action(onUploadStatement)}
           showChevron
         />
-
-        <Divider verticalMargin={spacing.xs} />
 
         {/* Delete */}
         <ListRow
@@ -881,6 +968,7 @@ export default function AccountsScreen() {
   const [renameAccount, setRenameAccount] = useState<BankAccount | null>(null);
   const [moreAccount, setMoreAccount] = useState<BankAccount | null>(null);
   const [statementAccount, setStatementAccount] = useState<BankAccount | null>(null);
+  const [reconcileAccount, setReconcileAccount] = useState<BankAccount | null>(null);
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
@@ -1053,11 +1141,16 @@ export default function AccountsScreen() {
         account={statementAccount}
         onClose={() => setStatementAccount(null)}
       />
+      <ReconcileSheet
+        account={reconcileAccount}
+        onClose={() => setReconcileAccount(null)}
+      />
       <MoreActionsSheet
         account={moreAccount}
         onClose={() => setMoreAccount(null)}
         onRename={() => { setMoreAccount(null); setRenameAccount(moreAccount); }}
         onUpdateBalance={() => { setMoreAccount(null); setBalanceAccount(moreAccount); }}
+        onReconcile={() => setReconcileAccount(moreAccount)}
         onUploadStatement={() => { setMoreAccount(null); setTimeout(() => setStatementAccount(moreAccount), 220); }}
         onDelete={() => moreAccount && handleDelete(moreAccount)}
       />
