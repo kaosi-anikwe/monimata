@@ -211,7 +211,7 @@ monimata/
 
 ### Backend
 
-The backend uses [uv](https://docs.astral.sh/uv/) for dependency management.
+The backend uses [uv](https://docs.astral.sh/uv/) for dependency management. For a full deep-dive into the ingestion pipeline, categorisation tiers, and budget engine, see [apps/api/README.md](apps/api/README.md).
 
 ```bash
 # 1. Install dependencies (creates .venv automatically)
@@ -415,6 +415,7 @@ For building a release APK without EAS or the Play Store, see [docs/LOCAL_APK_BU
 
 | Document                                               | Description                                                        |
 | ------------------------------------------------------ | ------------------------------------------------------------------ |
+| [apps/api/README.md](apps/api/README.md)               | Backend deep-dive: ingestion, categorisation, budget engine        |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)           | Full system architecture and all technical decisions               |
 | [docs/PRD.md](docs/PRD.md)                             | Product requirements and screen specifications for the design team |
 | [docs/BACKEND_SYNC_SPEC.md](docs/BACKEND_SYNC_SPEC.md) | WatermelonDB sync protocol and column mapping reference            |
