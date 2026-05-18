@@ -118,7 +118,7 @@ export function ClusterCard({
         {/* ── Header ── */}
         <View style={ss.headerRow}>
           <Text
-            style={[type_.h3, { color: colors.textPrimary, flex: 1 }]}
+            style={[type_.h1Sm, { color: colors.textPrimary, flex: 1 }]}
             numberOfLines={1}
           >
             {displayName}
@@ -131,7 +131,7 @@ export function ClusterCard({
         {/* ── Narration preview ── */}
         {narrationPreview.length > 0 && (
           <Text
-            style={[type_.caption, { color: colors.textMeta, marginBottom: spacing.md }]}
+            style={[type_.body, { color: colors.textMeta, marginBottom: spacing.xl }]}
             numberOfLines={2}
           >
             {narrationPreview}
@@ -202,17 +202,17 @@ const ss = StyleSheet.create({
     borderRadius: radius.lg,
     marginHorizontal: spacing.xl,
     marginBottom: spacing.lg,
-    padding: spacing.lg,
+    padding: spacing.xxl,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.lg,
   },
   skipBtn: {
     alignSelf: 'flex-end',
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
   },
