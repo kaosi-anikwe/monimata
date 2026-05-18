@@ -31,6 +31,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -132,6 +133,28 @@ function getVariants(colors: ThemeColors): Record<ToastVariant, VariantConfig> {
 }
 
 
+// ─── Standalone (non-React) emitter ─────────────────────────────────────────
+//
+// Allows non-React code (e.g. syncDatabase, background jobs) to fire toasts
+// without needing React context. ToastProvider registers itself on mount.
+
+type EmitFn = (config: ToastConfig) => void;
+let _globalEmit: EmitFn | null = null;
+
+/** @internal — called by ToastProvider */
+function _registerGlobalEmitter(fn: EmitFn): () => void {
+  _globalEmit = fn;
+  return () => { if (_globalEmit === fn) _globalEmit = null; };
+}
+
+/**
+ * Fire a toast from outside React (e.g. sync utilities, background tasks).
+ * Safe to call before the provider mounts — the call is a no-op in that case.
+ */
+export function showToast(config: ToastConfig): void {
+  _globalEmit?.(config);
+}
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -201,6 +224,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     (title: string, message?: string) => show({ title, message, variant: 'info' }),
     [show],
   );
+
+  // Register this provider as the global singleton emitter so non-React code
+  // (e.g. syncDatabase) can fire toasts without needing React context.
+  const showRef = useRef(show);
+  useEffect(() => { showRef.current = show; }, [show]);
+  useEffect(() => _registerGlobalEmitter((cfg) => showRef.current(cfg)), []);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
