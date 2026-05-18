@@ -31,9 +31,10 @@ from math import ceil
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.models.bank_account import BankAccount as _BankAccount
 from app.models.budget import BudgetMonth
 from app.models.category import Category, CategoryGroup
-from app.models.transaction import Transaction
+from app.models.transaction import Transaction, TransactionSource
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -67,19 +68,19 @@ def str_to_month_date(month: str) -> date:
 # ── Core budget computations ──────────────────────────────────────────────────
 
 
-def _null_category_income_in_month(db: Session, user_id: str, month: str) -> int:
-    """Sum of credit transactions with category_id IS NULL — the raw TBB inflow pool.
+def _null_category_net_flow_in_month(db: Session, user_id: str, month: str) -> int:
+    """Net flow of null-category transactions — the TBB inflow / deduction pool.
 
-    Type A income (salary, dividends, side hustles) arrives with category_id=None
-    and feeds TBB directly.  Type B inflows (refunds, reimbursements) are already
-    categorised and bypass TBB entirely.
+    Positive null-category credits (salary, starting balance) increase TBB.
+    Negative system-generated deductions (overspend carry, reconciliation
+    adjustments) reduce TBB.  Categorised transactions are excluded — they
+    route through category activity instead.
     """
     start, end = month_date_range(month)
     result = (
         db.query(func.coalesce(func.sum(Transaction.amount), 0))
         .filter(
             Transaction.user_id == user_id,
-            Transaction.type == "credit",
             Transaction.category_id.is_(None),
             Transaction.date >= start,
             Transaction.date < end,
@@ -106,32 +107,31 @@ def compute_tbb(db: Session, user_id: str, month: str, _depth: int = 0) -> int:
     """
     Compute To Be Budgeted for a given month.
 
-    TBB(M) = null_category_income(M) - assigned(M) + max(0, TBB(M-1))
+    TBB(M) = net_null_category_flow(M) - assigned(M) + max(0, TBB(M-1))
 
-    Only credits with category_id IS NULL feed the TBB pool (Type A income:
-    salary, dividends, etc.).  Categorised credits (Type B: refunds,
-    reimbursements) flow straight into their category's activity and never
-    inflate TBB.
+    Null-category credits (salary, starting balance, positive reconciliation
+    adjustments) increase TBB; null-category debits (overspend deductions,
+    negative reconciliation adjustments) reduce it.  Categorised transactions
+    route through category activity and never affect TBB.
 
     Recursion stops at MAX_DEPTH months back, or at the first month with no
-    data (income == 0 and assigned == 0 at depth > 0).
+    data (net_flow == 0 and assigned == 0 at depth > 0).
     """
     MAX_DEPTH = 12
     if _depth >= MAX_DEPTH:
         return 0
 
-    income = _null_category_income_in_month(db, user_id, month)
+    net_flow = _null_category_net_flow_in_month(db, user_id, month)
     assigned = _assigned_in_month(db, user_id, month)
 
-    # Short-circuit: if there's no data at all for this month AND we've gone back
-    # at least one step, stop the recursion to avoid querying forever.
-    if _depth > 0 and income == 0 and assigned == 0:
+    # Short-circuit: no data for this month and we've gone back at least one step.
+    if _depth > 0 and net_flow == 0 and assigned == 0:
         return 0
 
     prev = prev_month_str(month)
     prev_tbb = compute_tbb(db, user_id, prev, _depth + 1)
 
-    return income - assigned + max(0, prev_tbb)
+    return net_flow - assigned + max(0, prev_tbb)
 
 
 def compute_available(db: Session, user_id: str, category_id: str, month: str) -> int:
@@ -210,6 +210,37 @@ def ensure_budget_month_initialized(db: Session, user_id: str, month: str) -> No
                 carried_over=carried,
             )
         )
+
+    # ── Overspend carry: subtract liquid-cash deficits from TBB ─
+    # Sum all negative closing balances.  Each represents a category where the
+    # user overspent in the prior month.  The deficit is ejected from the next
+    # month's TBB pool as a system deduction transaction (category_id=None,
+    # negative amount) so TBB immediately reflects the real shortfall.
+    total_overspend: int = sum(-prev.available for prev in prev_snapshots if prev.available < 0)
+    if total_overspend > 0:
+        primary_account = (
+            db.query(_BankAccount)
+            .filter(
+                _BankAccount.user_id == user_id,
+                _BankAccount.deleted_at.is_(None),
+            )
+            .order_by(_BankAccount.created_at)
+            .first()
+        )
+        if primary_account is not None:
+            db.add(
+                Transaction(
+                    user_id=user_id,
+                    account_id=primary_account.id,
+                    date=datetime.now(UTC),
+                    amount=-total_overspend,
+                    narration="Overspend Deduction",
+                    cleaned_narration="overspend deduction",
+                    type="debit",
+                    category_id=None,
+                    source=TransactionSource.system,
+                )
+            )
 
     if prev_snapshots:
         db.flush()

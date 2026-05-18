@@ -28,7 +28,7 @@ from the request path or needs a scheduled trigger.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import cast
 
 import app.worker.beat_schedule as _beat_schedule  # noqa: F401 — registers beat schedule
@@ -451,6 +451,97 @@ def embed_category_rule(self, rule_id: str) -> None:  # type: ignore[misc]
         db.close()
 
 
+# ── recalculate_carried_over_cascade ─────────────────────────────────────────
+
+
+def _next_month_date(d: date) -> date:
+    """Return the first day of the month immediately after *d*."""
+    if d.month == 12:
+        return date(d.year + 1, 1, 1)
+    return date(d.year, d.month + 1, 1)
+
+
+@celery_app.task(
+    name="app.worker.tasks.recalculate_carried_over_cascade",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=30,
+    queue="default",
+)
+def recalculate_carried_over_cascade(  # type: ignore[misc]
+    self,
+    user_id: str,
+    category_id: str,
+    from_month: str,
+) -> None:
+    """Re-stamp BudgetMonth.carried_over for every month after from_month.
+
+    Triggered when a past assignment is changed via PATCH /budget/{category_id}.
+    Each subsequent BudgetMonth row's carried_over = max(0, prev.available),
+    so changing an old assigned value cascades correctly forward in time.
+    """
+    from app.models.budget import BudgetMonth
+    from app.services.budget_logic import str_to_month_date
+
+    db = SessionLocal()
+    try:
+        start_date = str_to_month_date(from_month)
+        now_month_date = date.today().replace(day=1)
+        current_date = _next_month_date(start_date)
+
+        updated = 0
+        while current_date <= now_month_date:
+            prev_date = (current_date - timedelta(days=1)).replace(day=1)
+
+            prev_bm = (
+                db.query(BudgetMonth)
+                .filter(
+                    BudgetMonth.user_id == user_id,
+                    BudgetMonth.category_id == category_id,
+                    BudgetMonth.month == prev_date,
+                )
+                .first()
+            )
+            current_bm = (
+                db.query(BudgetMonth)
+                .filter(
+                    BudgetMonth.user_id == user_id,
+                    BudgetMonth.category_id == category_id,
+                    BudgetMonth.month == current_date,
+                )
+                .first()
+            )
+
+            if current_bm is None:
+                break  # No snapshot for this month — cascade stops here
+
+            new_carried = max(0, prev_bm.available) if prev_bm is not None else 0
+            if current_bm.carried_over != new_carried:
+                current_bm.carried_over = new_carried
+                updated += 1
+
+            current_date = _next_month_date(current_date)
+
+        db.commit()
+        logger.info(
+            "recalculate_carried_over_cascade: user=%s category=%s from=%s updated=%d",
+            user_id,
+            category_id,
+            from_month,
+            updated,
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception(
+            "recalculate_carried_over_cascade failed user=%s category=%s",
+            user_id,
+            category_id,
+        )
+        raise self.retry(exc=exc)
+    finally:
+        db.close()
+
+
 # ── process_bank_statement ────────────────────────────────────────────────────
 
 
@@ -654,8 +745,8 @@ def process_bank_statement(
                         account_id=account_id,
                         date=datetime.now(UTC),
                         amount=closing_balance,
-                        narration="MoniMata Starting Balance",
-                        cleaned_narration="monimata starting balance",
+                        narration="Starting Balance",
+                        cleaned_narration="starting balance",
                         type="credit",
                         category_id=None,
                         source=TransactionSource.system,

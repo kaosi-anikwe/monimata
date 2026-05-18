@@ -40,6 +40,16 @@ class UpdateAliasRequest(BaseModel):
     alias: str
 
 
+class ReconcileRequest(BaseModel):
+    true_actual_balance: int = Field(description="Verified real-world balance in kobo")
+
+
+class ReconcileResponse(BaseModel):
+    delta: int  # kobo — positive = injected into TBB, negative = removed
+    new_balance: int  # kobo — verified balance after reconciliation
+    transaction_id: str | None = None  # None when delta == 0
+
+
 class SupportedBankResponse(BaseModel):
     slug: str
     name: str
