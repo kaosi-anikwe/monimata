@@ -46,7 +46,6 @@ from app.schemas.budget import (
     UnderfundedCategoryResponse,
 )
 from app.services.budget_logic import (
-    compute_available,
     compute_tbb,
     get_or_create_budget_month,
     required_this_month,
@@ -118,12 +117,12 @@ def get_budget(
             )
             assigned = bm.assigned if bm else 0
             activity = bm.activity if bm else 0
-            available = compute_available(db, user_id, str(cat.id), month)
+            available = bm.available if bm else 0
 
             target = (
                 db.query(CategoryTarget).filter(CategoryTarget.category_id == str(cat.id)).first()
             )
-            req = required_this_month(target, available, today)
+            req = required_this_month(target, bm, today)
 
             cat_responses.append(
                 BudgetCategoryResponse(
@@ -183,9 +182,9 @@ def set_assignment(
     db.commit()
     db.refresh(bm)
 
-    available = compute_available(db, user_id, str(category_id), month)
+    available = bm.available
     target = db.query(CategoryTarget).filter(CategoryTarget.category_id == str(category_id)).first()
-    req = required_this_month(target, available, date.today())
+    req = required_this_month(target, bm, date.today())
 
     return BudgetCategoryResponse(
         id=uuid.UUID(cat.id),
@@ -239,7 +238,7 @@ def move_money(
     from_bm = get_or_create_budget_month(db, user_id, str(body.from_category_id), body.month)
     to_bm = get_or_create_budget_month(db, user_id, str(body.to_category_id), body.month)
 
-    from_available = compute_available(db, user_id, str(body.from_category_id), body.month)
+    from_available = from_bm.available
     if from_available < body.amount:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -298,8 +297,17 @@ def list_underfunded(
         if target is None:
             continue
 
-        available = compute_available(db, user_id, str(cat.id), month)
-        req = required_this_month(target, available, today)
+        bm = (
+            db.query(BudgetMonth)
+            .filter(
+                BudgetMonth.user_id == user_id,
+                BudgetMonth.category_id == str(cat.id),
+                BudgetMonth.month == str_to_month_date(month),
+            )
+            .first()
+        )
+        available = bm.available if bm else 0
+        req = required_this_month(target, bm, today)
         if req is None or req <= 0:
             continue
 
@@ -379,8 +387,17 @@ def auto_assign(
             )
             if target is None:
                 continue
-            available = compute_available(db, user_id, str(cat.id), month)
-            req = required_this_month(target, available, today)
+            bm = (
+                db.query(BudgetMonth)
+                .filter(
+                    BudgetMonth.user_id == user_id,
+                    BudgetMonth.category_id == str(cat.id),
+                    BudgetMonth.month == str_to_month_date(month),
+                )
+                .first()
+            )
+            available = bm.available if bm else 0
+            req = required_this_month(target, bm, today)
             if req is None or req <= 0:
                 continue
             shortfall = req - available
