@@ -34,7 +34,9 @@ from typing import cast
 import app.worker.beat_schedule as _beat_schedule  # noqa: F401 — registers beat schedule
 from app.core.database import SessionLocal
 from app.models.transaction import Transaction
-from app.services.budget_logic import get_or_create_budget_month
+
+# Import registers SQLAlchemy event listeners on Transaction (insert/update/delete).
+from app.services import budget_events as _budget_events  # noqa: F401
 from app.worker.celery_app import CeleryTask, celery_app
 
 logger = logging.getLogger(__name__)
@@ -65,7 +67,6 @@ def categorize_transactions(self, transaction_ids: list[str]) -> None:
                 category_id = categorize_transaction(db, tx)
                 if category_id:
                     tx.category_id = category_id
-                    _update_budget_activity(db, tx)
                     db.flush()
                     try:
                         evaluate_transaction_nudges(db, tx)
@@ -323,7 +324,6 @@ def run_llm_categorization(
                 tx.category_id = matched_cat.id
                 tx.categorization_source = "llm"
                 tx.category_confidence = min(confidence, 100)
-                _update_budget_activity(db, tx)
                 success_count += 1
             else:
                 tx.categorization_source = "llm"
@@ -449,23 +449,6 @@ def embed_category_rule(self, rule_id: str) -> None:  # type: ignore[misc]
         raise self.retry(exc=exc)
     finally:
         db.close()
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-def _update_budget_activity(db, tx) -> None:
-    """Increment/decrement budget_months.activity for the transaction's category and month.
-
-    Delegates to get_or_create_budget_month which calls ensure_budget_month_initialized
-    first, so carried_over is always populated correctly before activity is written.
-    """
-    if tx.category_id is None:
-        return
-
-    month_str = tx.date.strftime("%Y-%m")
-    bm = get_or_create_budget_month(db, tx.user_id, tx.category_id, month_str)
-    bm.activity += tx.amount
 
 
 # ── process_bank_statement ────────────────────────────────────────────────────

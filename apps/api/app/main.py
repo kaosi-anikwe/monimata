@@ -25,6 +25,9 @@ from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.logging_config import configure_logging
 
+# Import registers SQLAlchemy event listeners on Transaction (insert/update/delete).
+from app.services import budget_events as _budget_events  # noqa: F401
+
 configure_logging(log_dir=settings.LOG_DIR, log_level=settings.LOG_LEVEL)
 
 # Initialise Sentry before importing routers so every module is instrumented.
