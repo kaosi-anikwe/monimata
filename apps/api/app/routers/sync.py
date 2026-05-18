@@ -59,7 +59,7 @@ from app.models.recurring_rule import RecurringRule
 from app.models.target import CategoryTarget
 from app.models.transaction import Transaction, TransactionSource
 from app.models.user import User
-from app.services.budget_logic import get_or_create_budget_month
+from app.services.budget_logic import get_or_create_budget_month, str_to_month_date
 from app.ws_manager import notify_user
 
 logger = logging.getLogger(__name__)
@@ -330,7 +330,9 @@ def pull(
 
     # ── Budget months — last 3 months ─────────────────────────────────────────
     today = date.today()
-    three_months_ago = (today.replace(day=1) - timedelta(days=90)).strftime("%Y-%m")
+    three_months_ago = str_to_month_date(
+        (today.replace(day=1) - timedelta(days=90)).strftime("%Y-%m")
+    )
     bms = (
         db.query(BudgetMonth)
         .filter(
@@ -614,7 +616,7 @@ def push(
                 .filter(
                     BudgetMonth.user_id == user_id,
                     BudgetMonth.category_id == record["category_id"],
-                    BudgetMonth.month == record["month"],
+                    BudgetMonth.month == str_to_month_date(str(record["month"])),
                 )
                 .first()
             )
@@ -627,7 +629,7 @@ def push(
                         id=record["id"],
                         user_id=user_id,
                         category_id=record["category_id"],
-                        month=record["month"],
+                        month=str_to_month_date(str(record["month"])),
                         assigned=int(record.get("assigned", 0)),
                         activity=0,  # activity is server-owned; never trust client
                         created_at=push_created_at,
