@@ -135,6 +135,17 @@ export interface paths {
      */
     delete: operations["delete_account_accounts__account_id__delete"];
   };
+  "/accounts/{account_id}/reconcile": {
+    /**
+     * Reconcile Account
+     * @description Anchor the tracked balance to a verified real-world balance (spec §8.3).
+     *
+     * Computes delta = true_actual_balance − tracked_balance.  If non-zero, a
+     * synthetic MONIMATA_RECONCILIATION transaction is inserted with
+     * category_id=None so the adjustment flows directly into (or out of) TBB.
+     */
+    post: operations["reconcile_account_accounts__account_id__reconcile_post"];
+  };
   "/transactions": {
     /** List Transactions */
     get: operations["list_transactions_transactions_get"];
@@ -1027,7 +1038,8 @@ export interface components {
     NudgeResponse: {
       /** Id */
       id: string;
-      trigger_type: components["schemas"]["NudgeTriggerType"];
+      /** Trigger Type */
+      trigger_type: components["schemas"]["NudgeTriggerType"] | string;
       /** Title */
       title: string | null;
       /** Message */
@@ -1087,6 +1099,23 @@ export interface components {
      * @enum {string}
      */
     NudgeTriggerType: "threshold_80" | "threshold_100" | "large_single_tx" | "pay_received" | "bill_payment" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed";
+    /** ReconcileRequest */
+    ReconcileRequest: {
+      /**
+       * True Actual Balance
+       * @description Verified real-world balance in kobo
+       */
+      true_actual_balance: number;
+    };
+    /** ReconcileResponse */
+    ReconcileResponse: {
+      /** Delta */
+      delta: number;
+      /** New Balance */
+      new_balance: number;
+      /** Transaction Id */
+      transaction_id?: string | null;
+    };
     /** RecurringRuleCreate */
     RecurringRuleCreate: {
       /**
@@ -1367,7 +1396,7 @@ export interface components {
      * TransactionSource
      * @enum {string}
      */
-    TransactionSource: "bank_alert" | "statement" | "receipt" | "manual";
+    TransactionSource: "bank_alert" | "statement" | "receipt" | "manual" | "system";
     /** TransactionSplitItem */
     TransactionSplitItem: {
       /**
@@ -1883,6 +1912,40 @@ export interface operations {
       /** @description Successful Response */
       204: {
         content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Reconcile Account
+   * @description Anchor the tracked balance to a verified real-world balance (spec §8.3).
+   *
+   * Computes delta = true_actual_balance − tracked_balance.  If non-zero, a
+   * synthetic MONIMATA_RECONCILIATION transaction is inserted with
+   * category_id=None so the adjustment flows directly into (or out of) TBB.
+   */
+  reconcile_account_accounts__account_id__reconcile_post: {
+    parameters: {
+      path: {
+        account_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ReconcileRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ReconcileResponse"];
+        };
       };
       /** @description Validation Error */
       422: {
