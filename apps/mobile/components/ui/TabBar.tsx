@@ -242,7 +242,7 @@ const s = StyleSheet.create({
 
   /** Drop-shadow layer — needs a background colour to cast shadow on iOS. */
   barSurface: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     ...shadow.sm,
   },
 
@@ -256,7 +256,7 @@ const s = StyleSheet.create({
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: spacing.xs,
+    // paddingHorizontal: spacing.xxs,
   },
 
   tabInner: {

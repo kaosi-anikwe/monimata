@@ -38,6 +38,7 @@
  * the component on transaction id and always get the entering animation).
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -259,9 +260,16 @@ export function ReviewCard({
           {/* ── Existing categorization source badge (if auto-categorised) ── */}
           {tx.categorization_source && (
             <View style={ss.sourcePillRow}>
-              <Badge variant="lime" size="sm">
-                {sourceName(tx.categorization_source)}
-              </Badge>
+              {tx.categorization_source === 'llm' ? (
+                <View style={[ss.llmChip, { backgroundColor: colors.successSubtle, borderColor: colors.successBorder }]}>
+                  <Ionicons name="sparkles" size={11} color={colors.success} />
+                  <Text style={[type_.labelSm, { color: colors.success }]}>AI</Text>
+                </View>
+              ) : (
+                <Badge variant="lime" size="sm">
+                  {sourceName(tx.categorization_source)}
+                </Badge>
+              )}
             </View>
           )}
 
@@ -345,6 +353,15 @@ const ss = StyleSheet.create({
   sourcePillRow: {
     flexDirection: 'row',
     marginTop: spacing.md,
+  },
+  llmChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    borderWidth: 1,
   },
   chipsSection: {
     marginTop: spacing.xl,

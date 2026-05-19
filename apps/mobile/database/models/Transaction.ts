@@ -16,6 +16,7 @@ export default class Transaction extends Model {
   @field('is_split') isSplit!: boolean
   @field('is_manual') isManual!: boolean
   @text('source') source!: string
+  @text('categorization_source') categorizationSource!: string | null
   @text('recurrence_id') recurrenceId!: string | null
   @readonly @date('created_at') createdAt!: Date
   @date('updated_at') updatedAt!: Date

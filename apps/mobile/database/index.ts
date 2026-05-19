@@ -129,6 +129,16 @@ const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // v5 → v6: add categorization_source to transactions
+      toVersion: 6,
+      steps: [
+        addColumns({
+          table: 'transactions',
+          columns: [{ name: 'categorization_source', type: 'string', isOptional: true }],
+        }),
+      ],
+    },
   ],
 })
 

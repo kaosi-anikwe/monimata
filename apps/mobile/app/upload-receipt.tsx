@@ -109,7 +109,7 @@ function PickerCard({ icon, title, subtitle, onPress, disabled }: PickerCardProp
         <Text style={[type_.body, { color: colors.textPrimary }]}>{title}</Text>
         <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2 }]}>{subtitle}</Text>
       </View>
-      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
         <Path
           d="M9 18l6-6-6-6"
           stroke={colors.textTertiary}
@@ -472,7 +472,7 @@ export default function UploadReceiptScreen() {
 
         {/* ── Tip ── */}
         <View style={[ss.tip, { backgroundColor: colors.infoSubtle, borderColor: colors.infoBorder }]}>
-          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" style={{ marginTop: 1 }}>
+          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none" style={{ marginTop: 1 }}>
             <Path
               d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"
               stroke={colors.info}

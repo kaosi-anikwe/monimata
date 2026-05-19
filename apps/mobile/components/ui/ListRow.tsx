@@ -146,7 +146,7 @@ export function ListRow({
       {showChevron && (
         <Ionicons
           name="chevron-forward"
-          size={16}
+          size={type_.bodyXl.fontSize}
           color={colors.textTertiary}
           style={s.chevron}
         />

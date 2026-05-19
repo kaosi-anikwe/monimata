@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 export const schema = appSchema({
-  version: 5,
+  version: 6,
   tables: [
     tableSchema({
       name: 'category_groups',
@@ -41,6 +41,7 @@ export const schema = appSchema({
         { name: 'is_split', type: 'boolean' },
         { name: 'is_manual', type: 'boolean' },
         { name: 'source', type: 'string' },
+        { name: 'categorization_source', type: 'string', isOptional: true },
         { name: 'recurrence_id', type: 'string', isIndexed: true, isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },

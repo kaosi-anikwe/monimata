@@ -356,7 +356,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 </Text>
               ) : null}
             </View>
-            <Ionicons name="close" size={16} color={v.iconColor} style={ts.dismiss} />
+            <Ionicons name="close" size={type_.bodyXl.fontSize} color={v.iconColor} style={ts.dismiss} />
           </TouchableOpacity>
         </Animated.View>
       )}

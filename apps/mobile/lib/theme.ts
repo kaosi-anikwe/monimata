@@ -260,7 +260,7 @@ export const lightColors: ThemeColors = {
   // Borders
   border: 'rgba(45, 106, 45, 0.12)',
   borderStrong: 'rgba(45, 106, 45, 0.25)',
-  separator: 'rgba(45, 106, 45, 0.08)',
+  separator: 'rgba(45, 106, 45, 0.20)',
 
   // Text
   textPrimary: '#0D1F0D',
@@ -368,7 +368,7 @@ export const darkColors: ThemeColors = {
   // Borders — lime-tinted, subtle
   border: 'rgba(168, 224, 99, 0.12)',
   borderStrong: 'rgba(168, 224, 99, 0.28)',
-  separator: 'rgba(168, 224, 99, 0.07)',
+  separator: 'rgba(168, 224, 99, 0.20)',
 
   // Text — white-tinted green hierarchy (not lime, which reads as an accent)
   textPrimary: '#E8F5E8',    // near-white with green tint — headings, body

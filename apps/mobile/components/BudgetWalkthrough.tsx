@@ -198,7 +198,7 @@ export function BudgetWalkthrough() {
                   ss.dot,
                   i === step
                     ? { backgroundColor: colors.lime, width: spacing.lg + spacing.xs, borderRadius: spacing.xxs }
-                    : { backgroundColor: colors.surfaceHigh, width: spacing.xxs + spacing.xxs },
+                    : { backgroundColor: colors.surfaceHigh, width: spacing.xxs },
                 ]}
               />
             ))}
@@ -279,12 +279,12 @@ function makeStyles(colors: ThemeColors) {
     },
     dots: {
       flexDirection: 'row',
-      gap: spacing.xxs + spacing.xxs,
+      gap: spacing.xxs,
       alignItems: 'center',
       justifyContent: 'center',
     },
     dot: {
-      height: spacing.xxs + spacing.xxs,
+      height: spacing.xxs,
       borderRadius: spacing.xxs,
     },
     cta: {

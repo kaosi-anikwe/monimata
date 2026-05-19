@@ -155,7 +155,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
           >
             <Ionicons
               name={secureVisible ? 'eye-off-outline' : 'eye-outline'}
-              size={18}
+              size={type_.bodyXl.fontSize}
               color={colors.textMeta}
             />
           </TouchableOpacity>

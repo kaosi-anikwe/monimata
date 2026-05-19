@@ -259,7 +259,7 @@ export function AppWelcome({ userId, onDismiss }: AppWelcomeProps) {
               {isLast ? "Let's go  🚀" : 'Next'}
             </Text>
             {!isLast && (
-              <Ionicons name="arrow-forward" size={18} color={colors.darkGreen} />
+              <Ionicons name="arrow-forward" size={type_.bodyXl.fontSize} color={colors.darkGreen} />
             )}
           </TouchableOpacity>
         </View>
@@ -286,7 +286,7 @@ function SlideView({
         <Ionicons name={slide.icon} size={44} color={colors.lime} />
         {slide.accentIcon && (
           <View style={[s.accentIconWrap, { backgroundColor: colors.darkGreenMid }]}>
-            <Ionicons name={slide.accentIcon} size={16} color={colors.lime} />
+            <Ionicons name={slide.accentIcon} size={type_.bodyXl.fontSize} color={colors.lime} />
           </View>
         )}
       </View>
@@ -300,7 +300,7 @@ function SlideView({
         <View style={s.bullets}>
           {slide.bullets.map((b) => (
             <View key={b} style={s.bulletRow}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.lime} style={s.bulletIcon} />
+              <Ionicons name="checkmark-circle" size={type_.bodyXl.fontSize} color={colors.lime} style={s.bulletIcon} />
               <Text style={[s.bulletTxt, { color: glass.textFaint }]}>{b}</Text>
             </View>
           ))}
@@ -389,12 +389,12 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.xxs + spacing.xxs,
+    gap: spacing.xxs,
     paddingVertical: spacing.lg,
   },
   dot: {
-    width: spacing.xxs + spacing.xxs,
-    height: spacing.xxs + spacing.xxs,
+    width: spacing.xxs,
+    height: spacing.xxs,
     borderRadius: spacing.xxs,
   },
   dotActive: {

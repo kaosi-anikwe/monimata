@@ -490,7 +490,7 @@ function CategoryEditRow({
             {category.name}
           </Text>
         </View>
-        <Ionicons name="eye-off-outline" size={16} color={colors.textMeta} />
+        <Ionicons name="eye-off-outline" size={type_.bodyXl.fontSize} color={colors.textMeta} />
       </TouchableOpacity>
     );
   }
@@ -500,7 +500,7 @@ function CategoryEditRow({
     <View style={[ss.catRow, { borderBottomColor: colors.separator }]}>
       {/* Drag handle — long-press to start drag */}
       <TouchableOpacity onLongPress={drag} hitSlop={10} style={ss.dragHandleHit} activeOpacity={0.6}>
-        <Ionicons name="reorder-three-outline" size={18} color={colors.textTertiary} />
+        <Ionicons name="reorder-three-outline" size={type_.bodyXl.fontSize} color={colors.textTertiary} />
       </TouchableOpacity>
 
       <TouchableOpacity style={ss.catNameBtn} onPress={onOptions} activeOpacity={0.6}>
@@ -570,7 +570,7 @@ function GroupEditHeader({
     <View style={[ss.groupHdr, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       {/* Drag handle — long-press to start group drag */}
       <TouchableOpacity onLongPress={drag} hitSlop={10} style={ss.dragHandleHit} activeOpacity={0.6}>
-        <Ionicons name="reorder-three-outline" size={18} color={colors.textTertiary} />
+        <Ionicons name="reorder-three-outline" size={type_.bodyXl.fontSize} color={colors.textTertiary} />
       </TouchableOpacity>
 
       <Text style={[ss.groupName, { color: colors.textSecondary }]} numberOfLines={1}>
@@ -595,7 +595,7 @@ function GroupEditHeader({
         hitSlop={10}
         activeOpacity={0.7}
       >
-        <Ionicons name="ellipsis-horizontal" size={14} color={colors.brand} />
+        <Ionicons name="ellipsis-horizontal" size={type_.bodyXl.fontSize} color={colors.brand} />
       </TouchableOpacity>
     </View>
   );
@@ -790,6 +790,7 @@ export default function BudgetEditScreen() {
     return (
       <ScaleDecorator activeScale={1.03}>
         <View
+          collapsable={false}
           style={[
             ss.grpBodyItem,
             {
@@ -865,7 +866,7 @@ export default function BudgetEditScreen() {
           }}
           renderItem={({ item: group, drag, isActive }: RenderItemParams<BudgetGroup>) => (
             <ScaleDecorator activeScale={1.02}>
-              <View style={ss.grpWrapper}>
+              <View style={ss.grpWrapper} collapsable={false}>
                 {/* Group header card */}
                 <View
                   style={[
@@ -938,7 +939,7 @@ export default function BudgetEditScreen() {
           onPress={() => setAddGroupOpen(true)}
           activeOpacity={0.7}
         >
-          <Ionicons name="add" size={16} color={colors.brand} />
+          <Ionicons name="add" size={type_.bodyXl.fontSize} color={colors.brand} />
           <Text style={[ss.addGroupText, { color: colors.brand }]}>Add Group</Text>
         </TouchableOpacity>
       </NestableScrollContainer>
@@ -1064,7 +1065,7 @@ const ss = StyleSheet.create({
     ...type_.label,
     marginBottom: spacing.xs,
   },
-  ctbmVal: { ...type_.h1 },
+  ctbmVal: { ...type_.displayNum },
   ctbmSuffix: { ...type_.body },
   ctbmSub: { ...type_.small, marginTop: spacing.xs },
 
@@ -1091,7 +1092,7 @@ const ss = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.mdn,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: spacing.sm,
   },
@@ -1109,8 +1110,8 @@ const ss = StyleSheet.create({
   },
   groupAddText: { ...type_.small },
   groupMoreBtn: {
-    width: layout.avatarSm - spacing.xs,
-    height: layout.avatarSm - spacing.xs,
+    width: layout.avatarSm,
+    height: layout.avatarSm,
     borderRadius: radius.xs,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1248,7 +1249,7 @@ const ss = StyleSheet.create({
   modalSaveText: { ...type_.btnLg, ...ff(600) },
 
   // ── Error state ──────────────────────────────────────────────────────────
-  errorContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xxl, gap: spacing.xxs + spacing.xxs },
+  errorContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xxl, gap: spacing.xxs },
   errorText: { ...type_.h3, textAlign: 'center' },
   errorSub: { ...type_.bodyReg, textAlign: 'center' },
 
@@ -1257,7 +1258,7 @@ const ss = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xxs + spacing.xxs,
+    gap: spacing.xxs,
     paddingVertical: spacing.mdn,
     marginTop: spacing.xs,
   },

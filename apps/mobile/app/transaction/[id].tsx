@@ -23,6 +23,7 @@
  *
  * Route: /transaction/[id]
  */
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -186,7 +187,7 @@ function CategoryPickerSheet({
         >
           <Text style={[type_.body, { color: colors.textMeta, fontStyle: 'italic' }]}>No category</Text>
           {!selected && (
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
             </Svg>
           )}
@@ -208,7 +209,7 @@ function CategoryPickerSheet({
               >
                 <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{cat.name}</Text>
                 {selected?.id === cat.id && (
-                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                     <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
                   </Svg>
                 )}
@@ -275,7 +276,7 @@ function SplitBreakdownCard({
       {/* Header */}
       <View style={[ss.splitCardHdr, { borderBottomColor: colors.separator }]}>
         <View style={[ss.splitCardHdrLeft]}>
-          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
             <Path d="M16 3h5v5" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             <Path d="M8 3H3v5" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             <Path d="M21 3l-7 7-4-4-7 7" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -368,7 +369,7 @@ function BankHeroHeader({
           accessibilityLabel="Go back"
           hitSlop={12}
         >
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
             <Path d="M19 12H5M12 5l-7 7 7 7" stroke={colors.textInverseHigh} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
           </Svg>
         </TouchableOpacity>
@@ -380,7 +381,7 @@ function BankHeroHeader({
           accessibilityLabel="More options"
           hitSlop={12}
         >
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
             <Circle cx={5} cy={12} r={1.2} fill={colors.textInverseHigh} />
             <Circle cx={12} cy={12} r={1.2} fill={colors.textInverseHigh} />
             <Circle cx={19} cy={12} r={1.2} fill={colors.textInverseHigh} />
@@ -404,6 +405,12 @@ function BankHeroHeader({
         {tx.source ? (
           <View style={[ss.heroChipGlass, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}>
             <Text style={[ss.heroChipGlassTxt, { color: colors.textInverseMid }]}>{tx.source}</Text>
+          </View>
+        ) : null}
+        {tx.categorization_source === 'llm' ? (
+          <View style={[ss.heroChipGlass, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+            <Ionicons name="sparkles" size={11} color={colors.textInverseMid} />
+            <Text style={[ss.heroChipGlassTxt, { color: colors.textInverseMid }]}>AI</Text>
           </View>
         ) : null}
       </View>
@@ -472,7 +479,7 @@ function BankViewForm({
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Uncategorised'}
               </Text>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M9 18l6-6-6-6" stroke={selectedCategory ? colors.brand : colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </TouchableOpacity>
@@ -583,6 +590,11 @@ function ManualEditForm({
   onDelete,
   isSaving,
   isDeleting,
+  amountStr,
+  txType,
+  onAmountChange: _onAmountChange,
+  onTypeChange: _onTypeChange,
+  saveRef,
 }: {
   tx: Transaction;
   accounts: BankAccount[];
@@ -592,6 +604,11 @@ function ManualEditForm({
   onDelete: () => void;
   isSaving: boolean;
   isDeleting: boolean;
+  amountStr: string;
+  txType: 'debit' | 'credit';
+  onAmountChange: (s: string) => void;
+  onTypeChange: (t: 'debit' | 'credit') => void;
+  saveRef: { current: () => void };
 }) {
   const colors = useTheme();
   const { data: groups = [] } = useCategoryGroups();
@@ -599,8 +616,6 @@ function ManualEditForm({
   const createRecurring = useCreateRecurringRule();
   const deactivateRecurring = useDeactivateRecurringRule();
 
-  const [txType, setTxType] = useState<'debit' | 'credit'>(tx.type as 'debit' | 'credit');
-  const [amountStr, setAmountStr] = useState(koboToNairaStr(tx.amount));
   const [narration, setNarration] = useState(tx.narration);
   const [txDatetime, setTxDatetime] = useState(() => new Date(tx.date));
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(
@@ -624,8 +639,6 @@ function ManualEditForm({
   );
 
   const isDebit = txType === 'debit';
-  const amountColor = isDebit ? colors.error : colors.success;
-  const amountBg = isDebit ? colors.errorSubtle : colors.successSubtle;
 
   function handleSave() {
     const koboAmount = nairaStringToKobo(amountStr);
@@ -667,19 +680,10 @@ function ManualEditForm({
     });
   }
 
+  saveRef.current = handleSave;
+
   return (
     <>
-      {/* Type toggle */}
-      <TypeToggle value={txType} onChange={setTxType} />
-
-      {/* Amount display */}
-      <View style={[ss.amtCard, { backgroundColor: amountBg, borderColor: colors.border }]}>
-        <View style={ss.amtRow}>
-          <Text style={[ss.amtSym, { color: amountColor }]}>₦</Text>
-          <Text style={[ss.amtNum, { color: amountColor }]}>{formatAmountDisplay(amountStr)}</Text>
-        </View>
-      </View>
-
       {/* Form card */}
       <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
         <Frow label="What for?">
@@ -702,7 +706,7 @@ function ManualEditForm({
             <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
               {formatTxDatetime(txDatetime.toISOString())}
             </Text>
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </TouchableOpacity>
@@ -724,7 +728,7 @@ function ManualEditForm({
                 ? (selectedAccount.alias ?? `${selectedAccount.institution} — ${selectedAccount.account_name}`)
                 : 'Select account'}
             </Text>
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </TouchableOpacity>
@@ -751,7 +755,7 @@ function ManualEditForm({
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Optional'}
               </Text>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M9 18l6-6-6-6" stroke={selectedCategory ? colors.brand : colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </TouchableOpacity>
@@ -772,7 +776,7 @@ function ManualEditForm({
         {/* Recurring section */}
         {tx.recurrence_id ? (
           <Frow label="Repeats" isLast>
-            <View style={[ss.recurBadge, { backgroundColor: colors.surface }]}>
+            <View style={[ss.recurBadge, { backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center' }]}>
               <Text style={[type_.small, { color: colors.brand }]}>↻ Recurring</Text>
             </View>
             <TouchableOpacity
@@ -804,27 +808,13 @@ function ManualEditForm({
               ]}>
                 {recurrence ? recurrence.label : 'Never'}
               </Text>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </TouchableOpacity>
           </Frow>
         )}
       </View>
-
-      {/* Numpad */}
-      <Numpad value={amountStr} onChange={setAmountStr} />
-
-      {/* Save + Delete buttons */}
-      <Button
-        variant="green"
-        onPress={handleSave}
-        disabled={nairaStringToKobo(amountStr) <= 0 || isSaving}
-        loading={isSaving}
-        accessibilityLabel="Save changes"
-      >
-        Save Changes
-      </Button>
 
       <TouchableOpacity
         style={[ss.deleteBtn, { borderColor: colors.error }, isDeleting && { opacity: 0.6 }]}
@@ -947,6 +937,44 @@ export default function TransactionDetailsScreen() {
     [accounts],
   );
 
+  // ── Manual edit overlay state ──
+  const [manualAmountStr, setManualAmountStr] = useState('0');
+  const [manualTxType, setManualTxType] = useState<'debit' | 'credit'>('debit');
+  const saveRef = useRef<() => void>(() => {});
+  const [numpadVisible, setNumpadVisible] = useState(false);
+  const [numpadHeight, setNumpadHeight] = useState(300);
+  const numpadAnim = useRef(new Animated.Value(0)).current;
+  const caretOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (tx && tx.source !== 'statement') {
+      setManualTxType(tx.type as 'debit' | 'credit');
+      setManualAmountStr(koboToNairaStr(tx.amount));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tx?.id]);
+
+  useEffect(() => {
+    if (!numpadVisible) { caretOpacity.setValue(1); return; }
+    const blink = Animated.loop(
+      Animated.sequence([
+        Animated.timing(caretOpacity, { toValue: 0, duration: 530, useNativeDriver: true }),
+        Animated.timing(caretOpacity, { toValue: 1, duration: 530, useNativeDriver: true }),
+      ])
+    );
+    blink.start();
+    return () => blink.stop();
+  }, [numpadVisible, caretOpacity]);
+
+  function showNumpad() {
+    setNumpadVisible(true);
+    Animated.spring(numpadAnim, { toValue: 1, useNativeDriver: true, tension: 220, friction: 26 }).start();
+  }
+  function dismissNumpad() {
+    setNumpadVisible(false);
+    Animated.spring(numpadAnim, { toValue: 0, useNativeDriver: true, tension: 220, friction: 26 }).start();
+  }
+
   function handleSave(patch: Parameters<typeof update.mutate>[0]['body']) {
     update.mutate({ txId: id, body: patch }, { onSuccess: () => router.back() });
   }
@@ -971,7 +999,7 @@ export default function TransactionDetailsScreen() {
             onPress={() => router.back()}
             accessibilityRole="button" accessibilityLabel="Go back"
           >
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M19 12H5M12 5l-7 7 7 7" stroke={colors.textSecondary} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </TouchableOpacity>
@@ -985,6 +1013,12 @@ export default function TransactionDetailsScreen() {
     );
   }
 
+  const isManual = tx.source !== 'statement';
+  const manualAmountColor = manualTxType === 'debit' ? colors.error : colors.success;
+  const fabRestBottom = insets.bottom + spacing.md;
+  const numpadTranslateY = numpadAnim.interpolate({ inputRange: [0, 1], outputRange: [numpadHeight, 0] });
+  const fabTranslateY = numpadAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -(numpadHeight + spacing.sm - fabRestBottom)] });
+
   return (
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
       <StatusBar style={tx.source !== 'statement' ? 'dark' : 'light'} />
@@ -996,7 +1030,7 @@ export default function TransactionDetailsScreen() {
             onPress={() => router.back()}
             accessibilityRole="button" accessibilityLabel="Go back"
           >
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M19 12H5M12 5l-7 7 7 7" stroke={colors.textSecondary} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </TouchableOpacity>
@@ -1008,7 +1042,7 @@ export default function TransactionDetailsScreen() {
             accessibilityLabel="More options"
             hitSlop={12}
           >
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Circle cx={5} cy={12} r={1.2} fill={colors.textSecondary} />
               <Circle cx={12} cy={12} r={1.2} fill={colors.textSecondary} />
               <Circle cx={19} cy={12} r={1.2} fill={colors.textSecondary} />
@@ -1024,12 +1058,41 @@ export default function TransactionDetailsScreen() {
         />
       )}
 
+      {/* ── Manual: sticky type toggle + amount ── */}
+      {isManual && (
+        <>
+          <View style={[ss.typeToggleWrap, { backgroundColor: colors.cardBg, borderBottomColor: colors.border }]}>
+            <TypeToggle value={manualTxType} onChange={setManualTxType} />
+          </View>
+          <TouchableOpacity
+            style={[ss.amtCard, { backgroundColor: manualTxType === 'debit' ? colors.errorSubtle : colors.successSubtle, borderColor: colors.border }]}
+            onPress={showNumpad}
+            activeOpacity={0.85}
+          >
+            <View style={ss.amtRow}>
+              <Text style={[ss.amtSym, { color: manualAmountColor }]}>₦</Text>
+              <Text style={[ss.amtNum, { color: manualAmountColor }]}>{formatAmountDisplay(manualAmountStr)}</Text>
+              {numpadVisible && (
+                <Animated.View style={[ss.caret, { backgroundColor: manualAmountColor, opacity: caretOpacity }]} />
+              )}
+            </View>
+            <Text style={[type_.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
+              {numpadVisible ? 'Tap elsewhere to dismiss' : 'Tap to edit amount'}
+            </Text>
+          </TouchableOpacity>
+        </>
+      )}
+
       {/* ── Content ── */}
       <ScrollView
         style={ss.scroll}
-        contentContainerStyle={ss.scrollContent}
+        contentContainerStyle={[
+          ss.scrollContent,
+          isManual ? { paddingBottom: numpadHeight + insets.bottom + layout.btnHeight + spacing.xl } : null,
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={isManual ? dismissNumpad : undefined}
       >
         {tx.source !== 'statement' ? (
           <ManualEditForm
@@ -1041,6 +1104,11 @@ export default function TransactionDetailsScreen() {
             onDelete={handleDelete}
             isSaving={update.isPending}
             isDeleting={deleteTx.isPending}
+            amountStr={manualAmountStr}
+            txType={manualTxType}
+            onAmountChange={setManualAmountStr}
+            onTypeChange={setManualTxType}
+            saveRef={saveRef}
           />
         ) : (
           <BankViewForm
@@ -1079,7 +1147,7 @@ export default function TransactionDetailsScreen() {
           accessibilityLabel="Split transaction"
         >
           <View style={[ss.ashIc, { backgroundColor: colors.infoSubtle }]}>
-            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M16 3h5v5" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M8 3H3v5" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M21 3l-7 7-4-4-7 7" stroke={colors.info} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -1089,11 +1157,38 @@ export default function TransactionDetailsScreen() {
             <Text style={[ss.ashName, { color: colors.textPrimary }]}>Split Transaction</Text>
             <Text style={[ss.ashDesc, { color: colors.textMeta }]}>Divide across multiple categories</Text>
           </View>
-          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
             <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
           </Svg>
         </TouchableOpacity>
       </BottomSheet>
+
+      {/* ── Manual: FAB Save + Numpad panel ── */}
+      {isManual && (
+        <>
+          <Animated.View
+            style={[ss.fabWrap, { bottom: fabRestBottom }, { transform: [{ translateY: fabTranslateY }] }]}
+          >
+            <Button
+              variant="green"
+              onPress={() => saveRef.current()}
+              disabled={nairaStringToKobo(manualAmountStr) <= 0 || update.isPending}
+              loading={update.isPending}
+              fullWidth={false}
+              style={{ opacity: 1, paddingHorizontal: spacing.xxl }}
+              accessibilityLabel="Save changes"
+            >
+              Save
+            </Button>
+          </Animated.View>
+          <Animated.View
+            style={[ss.numpadPanel, { backgroundColor: colors.cardBg, borderTopColor: colors.border, paddingBottom: insets.bottom }, { transform: [{ translateY: numpadTranslateY }] }]}
+            onLayout={(e) => setNumpadHeight(e.nativeEvent.layout.height)}
+          >
+            <Numpad value={manualAmountStr} onChange={setManualAmountStr} />
+          </Animated.View>
+        </>
+      )}
     </View>
   );
 }
@@ -1204,7 +1299,7 @@ const ss = StyleSheet.create({
     gap: spacing.sm,
     minHeight: layout.rowMinHeight + spacing.xs,
   },
-  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxs + spacing.xs },
+  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
   frowInput: { flex: 1, ...type_.bodyReg, padding: 0 },
   frowValue: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   // Type toggle
@@ -1219,6 +1314,9 @@ const ss = StyleSheet.create({
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   amtRow: { flexDirection: 'row', alignItems: 'flex-start' },
   amtSym: { ...type_.displaySm, lineHeight: layout.btnHeight, marginRight: 2 },
@@ -1233,13 +1331,17 @@ const ss = StyleSheet.create({
     paddingVertical: spacing.mdn,
     alignItems: 'center',
   },
+  caret: { width: 2, height: layout.btnHeight, borderRadius: 1, marginLeft: 2 },
+  typeToggleWrap: { paddingHorizontal: spacing.xl, paddingVertical: spacing.mdn, borderBottomWidth: StyleSheet.hairlineWidth },
+  fabWrap: { position: 'absolute', right: spacing.xl, zIndex: 20 },
+  numpadPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 10, paddingHorizontal: spacing.xl, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },
   // Numpad
   numpad: { borderRadius: radius.md, overflow: 'hidden', gap: 1 },
   numRow: { flexDirection: 'row', gap: 1 },
   numKey: { flex: 1, height: layout.btnHeightSm, alignItems: 'center', justifyContent: 'center' },
   numKeyText: { ...type_.numpad },
   // Pickers
-  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs + spacing.xs },
+  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },
   // DatePicker
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },

@@ -276,7 +276,7 @@ export default function HomeScreen() {
               unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
             }
           >
-            <Ionicons name="notifications-outline" size={18} color={colors.white} />
+            <Ionicons name="notifications-outline" size={type_.bodyXl.fontSize} color={colors.white} />
             {unreadCount > 0 && (
               <View style={[s.notifDot, { backgroundColor: colors.error, borderColor: colors.darkGreen }]} />
             )}
@@ -298,7 +298,7 @@ export default function HomeScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Go to budget"
               >
-                <Ionicons name="card-outline" size={14} color={colors.white} />
+                <Ionicons name="card-outline" size={type_.bodyXl.fontSize} color={colors.white} />
                 <Text style={[s.balBtnTxt, { color: colors.white }]}>Budget</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -308,7 +308,7 @@ export default function HomeScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Add transaction"
               >
-                <Ionicons name="add" size={14} color={colors.darkGreen} />
+                <Ionicons name="add" size={type_.bodyXl.fontSize} color={colors.darkGreen} />
                 <Text style={[s.balBtnTxt, { color: colors.darkGreen }]}>Add Tx</Text>
               </TouchableOpacity>
             </View>
@@ -394,7 +394,7 @@ export default function HomeScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Dismiss nudge"
                 >
-                  <Ionicons name="close-outline" size={18} color={colors.warning} />
+                  <Ionicons name="close-outline" size={type_.bodyXl.fontSize} color={colors.warning} />
                 </TouchableOpacity>
               </TouchableOpacity>
             </TourTarget>
@@ -509,7 +509,7 @@ export default function HomeScreen() {
                     accessibilityLabel={`Add to ${goal.name}`}
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   >
-                    <Ionicons name="add" size={14} color={colors.white} />
+                    <Ionicons name="add" size={type_.bodyXl.fontSize} color={colors.white} />
                   </TouchableOpacity>
                 </TouchableOpacity>
               );
@@ -564,8 +564,8 @@ const s = StyleSheet.create({
   greetTxt: { ...type_.small, color: glass.textDim },
   nameTxt: { ...type_.userName },
   notifBtn: {
-    width: layout.avatarMd - spacing.xs,
-    height: layout.avatarMd - spacing.xs,
+    width: layout.avatarMd,
+    height: layout.avatarMd,
     borderRadius: radius.sm,
     backgroundColor: glass.control,
     borderWidth: 1,
@@ -614,7 +614,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xxs + spacing.xs,
+    gap: spacing.xxs,
   },
   balBtnPrimary: {},
   balBtnTxt: { ...type_.bodyReg },
@@ -656,12 +656,12 @@ const s = StyleSheet.create({
   },
   statBadge: {
     borderRadius: radius.xxs,
-    paddingHorizontal: spacing.xxs + spacing.xs,
+    paddingHorizontal: spacing.xxs,
     paddingVertical: 2,
   },
   statBadgeTxt: { ...type_.labelSm },
   statLbl: { ...type_.caption },
-  statVal: { ...type_.displaySm, marginTop: spacing.xxs },
+  statVal: { ...type_.h2, marginTop: spacing.xxs },
 
   // Nudge pill
   nudgePill: {
@@ -697,10 +697,10 @@ const s = StyleSheet.create({
     borderColor: glass.borderLimeStrong,
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xxs + spacing.xxs,
+    paddingVertical: spacing.xxs,
   },
   streakBadgeTxt: { ...type_.small },
-  streakDays: { flexDirection: 'row', gap: spacing.xxs + spacing.xs },
+  streakDays: { flexDirection: 'row', gap: spacing.xxs },
   sd: {
     flex: 1,
     height: layout.avatarSm + spacing.xxs,
@@ -752,8 +752,8 @@ const s = StyleSheet.create({
   goalName: { ...type_.btnSm },
   goalAmt: { ...type_.small },
   goalAdd: {
-    width: layout.avatarSm - spacing.xs,
-    height: layout.avatarSm - spacing.xs,
+    width: layout.avatarSm,
+    height: layout.avatarSm,
     borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',

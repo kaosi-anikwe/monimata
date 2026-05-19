@@ -126,7 +126,7 @@ function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number;
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <Ionicons name="arrow-back" size={16} color={colors.brand} />
+          <Ionicons name="arrow-back" size={type_.bodyXl.fontSize} color={colors.brand} />
         </TouchableOpacity>
         <Text style={[ms.title, { color: colors.textPrimary }]}>Budget</Text>
         <TourTarget id="budget-edit-btn">
@@ -137,7 +137,7 @@ function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number;
             accessibilityRole="button"
             accessibilityLabel="Edit budget structure"
           >
-            <Feather name='edit' size={16} color={colors.brand} />
+            <Feather name='edit' size={type_.bodyXl.fontSize} color={colors.brand} />
           </TouchableOpacity>
         </TourTarget>
       </View>
@@ -151,7 +151,7 @@ function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number;
           accessibilityRole="button"
           accessibilityLabel="Previous month"
         >
-          <Ionicons name="chevron-back" size={14} color={colors.textSecondary} />
+          <Ionicons name="chevron-back" size={type_.bodyXl.fontSize} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text style={[ms.mnavLbl, { color: colors.textPrimary }]}>{label}</Text>
         <TouchableOpacity
@@ -161,7 +161,7 @@ function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number;
           accessibilityRole="button"
           accessibilityLabel="Next month"
         >
-          <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={type_.bodyXl.fontSize} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -169,7 +169,7 @@ function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number;
       {tbb !== 0 && (
         <TourTarget id="budget-tbb">
           <View style={[ms.tbbCard, { backgroundColor: tbb < 0 ? colors.darkRed : colors.darkGreen }]}>
-            <View>
+            <View style={{ gap: spacing.xxs }}>
               <Text style={ms.tbbLbl}>To Be Budgeted</Text>
               <Text style={[ms.tbbVal, { color: tbb < 0 ? colors.error : colors.lime }]}>
                 {formatMoney(tbb)}
@@ -226,8 +226,8 @@ const ms = StyleSheet.create({
     marginBottom: spacing.md,
   },
   mnavBtn: {
-    width: layout.avatarSm - spacing.xs,
-    height: layout.avatarSm - spacing.xs,
+    width: layout.avatarSm,
+    height: layout.avatarSm,
     borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
@@ -245,18 +245,18 @@ const ms = StyleSheet.create({
     ...type_.label,
     color: glass.labelDim,
   },
-  tbbVal: { ...type_.displayMd, marginTop: 1 },
+  tbbVal: { ...type_.displayNum, marginTop: 1 },
   tbbSub: { ...type_.caption, color: glass.textFaint, marginTop: 1 },
   aaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xxs + spacing.xs,
+    gap: spacing.xxs,
     backgroundColor: glass.badge,
     borderWidth: 1.5,
     borderColor: glass.borderLimeStrong,
     borderRadius: radius.smd,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xxs + spacing.xs,
+    paddingVertical: spacing.xxs,
   },
   aaBtnTxt: { ...type_.small },
 });
@@ -312,7 +312,7 @@ function CategoryRow({
           </Text>
           <Text style={[cr.assignedTxt, { color: colors.textMeta, marginTop: spacing.xxs }]}>Hidden</Text>
         </View>
-        <Ionicons name="eye-off-outline" size={16} color={colors.textMeta} />
+        <Ionicons name="eye-off-outline" size={type_.bodyXl.fontSize} color={colors.textMeta} />
       </TouchableOpacity>
     );
   }
@@ -522,7 +522,7 @@ function AssignSheet({
                   hitSlop={8}
                   accessibilityLabel="Close"
                 >
-                  <Ionicons name="close" size={14} color={colors.textSecondary} />
+                  <Ionicons name="close" size={type_.bodyXl.fontSize} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -648,7 +648,7 @@ function AssignSheet({
                   hitSlop={8}
                   accessibilityLabel="Back"
                 >
-                  <Ionicons name="arrow-back" size={14} color={colors.textSecondary} />
+                  <Ionicons name="arrow-back" size={type_.bodyXl.fontSize} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -770,8 +770,8 @@ const sh = StyleSheet.create({
   topTitle: { ...type_.h2 },
   topSub: { ...type_.bodyReg, marginTop: spacing.xxs },
   xBtn: {
-    width: layout.iconBtnSize - spacing.xs,
-    height: layout.iconBtnSize - spacing.xs,
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
     borderRadius: radius.smd,
     borderWidth: 1.5,
     alignItems: 'center',
@@ -787,9 +787,9 @@ const sh = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  statCell: { flex: 1, paddingVertical: spacing.smd, paddingHorizontal: spacing.md, alignItems: 'center' },
+  statCell: { flex: 1, paddingVertical: spacing.smd, paddingHorizontal: spacing.xxs, alignItems: 'center' },
   statLbl: { ...type_.label },
-  statVal: { ...ff(800), ...type_.h3, letterSpacing: -0.5, marginTop: spacing.xs },
+  statVal: { ...type_.body, ...ff(800), letterSpacing: -0.5, marginTop: spacing.xs },
   statDiv: { width: 1 },
   // .assign-amt
   amtCard: {
@@ -806,10 +806,10 @@ const sh = StyleSheet.create({
   amtNum: { ...type_.displayLg },
   // .quickfills
   qfScroll: { marginTop: spacing.mdn, flexGrow: 0 },
-  qfRow: { paddingHorizontal: spacing.xl, gap: spacing.xxs + spacing.xxs },
+  qfRow: { paddingHorizontal: spacing.xl, gap: spacing.xxs },
   qfChip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xxs + spacing.xxs,
+    paddingVertical: spacing.xxs,
     borderRadius: radius.full,
     borderWidth: 1,
     alignSelf: 'center',
@@ -1227,7 +1227,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xxl,
-    gap: spacing.xxs + spacing.xxs,
+    gap: spacing.xxs,
   },
   errorText: { ...type_.h3, textAlign: 'center' },
   errorSub: { ...type_.bodyReg, textAlign: 'center' },
@@ -1249,7 +1249,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xxs + spacing.xxs,
+    gap: spacing.xxs,
     paddingVertical: spacing.mdn,
     marginTop: spacing.xs,
   },
