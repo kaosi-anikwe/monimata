@@ -287,7 +287,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
           <Text style={[type_.caption, { color: colors.textMeta, marginBottom: spacing.xxs }]}>
             {meta.label}
           </Text>
-          <Text style={[type_.h3, { color: colors.textPrimary, lineHeight: 24 }]} numberOfLines={2}>
+          <Text style={[type_.h3, { color: colors.textPrimary, lineHeight: 27 }]} numberOfLines={2}>
             {nudge?.title ?? 'Nudge'}
           </Text>
         </View>
@@ -295,7 +295,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
 
       {/* Message */}
       <View style={ss.sheetSection}>
-        <Text style={[type_.body, { color: colors.textSecondary, lineHeight: 22 }]}>
+        <Text style={[type_.body, { color: colors.textSecondary, lineHeight: 25 }]}>
           {nudge?.message}
         </Text>
       </View>
@@ -569,9 +569,9 @@ const ss = StyleSheet.create({
   unreadBar: {
     position: 'absolute',
     left: 0,
-    top: spacing.mdn,
-    bottom: spacing.mdn,
-    width: spacing.xxs,
+    top: spacing.sm,
+    bottom: spacing.sm,
+    width: spacing.sm - spacing.xs,
     borderRadius: 2,
   },
   iconBubble: {
@@ -590,7 +590,7 @@ const ss = StyleSheet.create({
     marginBottom: spacing.xxs,
   },
   cardTitle: { ...type_.bodyReg, ...ff(700), flex: 1, marginRight: spacing.sm },
-  cardMessage: { ...type_.small, lineHeight: 17 },
+  cardMessage: { ...type_.small, lineHeight: 20 },
   // detail sheet content (rendered inside BottomSheet's scroll area)
   sheetHeaderRow: { flexDirection: 'row', gap: spacing.mdn, marginBottom: spacing.lg },
   sheetIconBubble: {

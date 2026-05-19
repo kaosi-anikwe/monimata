@@ -358,13 +358,13 @@ const s = StyleSheet.create({
   slideTitle: {
     ...type_.initials,
     letterSpacing: -0.5,
-    lineHeight: 32,
+    lineHeight: 35,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
   slideBody: {
     ...type_.bodyReg,
-    lineHeight: 24,
+    lineHeight: 27,
     textAlign: 'center',
     marginBottom: spacing.xxl,
   },
@@ -382,7 +382,7 @@ const s = StyleSheet.create({
   },
   bulletTxt: {
     ...type_.body,
-    lineHeight: 20,
+    lineHeight: 23,
     flex: 1,
   },
   dots: {

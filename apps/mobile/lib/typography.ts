@@ -73,7 +73,7 @@ export const type_ = {
   display: {
     ...ff(800),
     fontSize: 38,
-    lineHeight: 44,
+    lineHeight: 47,
     letterSpacing: -1.5,
   } as TextStyle,
 
@@ -84,7 +84,7 @@ export const type_ = {
   displayHero: {
     ...ff(800),
     fontSize: 40,
-    lineHeight: 46,
+    lineHeight: 49,
     letterSpacing: -1.5,
   } as TextStyle,
 
@@ -95,7 +95,7 @@ export const type_ = {
   displayLg: {
     ...ff(800),
     fontSize: 42,
-    lineHeight: 48,
+    lineHeight: 51,
     letterSpacing: -1.5,
   } as TextStyle,
 
@@ -106,7 +106,7 @@ export const type_ = {
   displayXl: {
     ...ff(800),
     fontSize: 50,
-    lineHeight: 56,
+    lineHeight: 59,
     letterSpacing: -2,
   } as TextStyle,
 
@@ -117,7 +117,7 @@ export const type_ = {
   displayEntry: {
     ...ff(800),
     fontSize: 34,
-    lineHeight: 40,
+    lineHeight: 43,
     letterSpacing: -1,
   } as TextStyle,
 
@@ -128,7 +128,7 @@ export const type_ = {
   displayNum: {
     ...ff(800),
     fontSize: 32,
-    lineHeight: 34,
+    lineHeight: 37,
     letterSpacing: -1,
   } as TextStyle,
 
@@ -139,7 +139,7 @@ export const type_ = {
   displayMd: {
     ...ff(800),
     fontSize: 26,
-    lineHeight: 30,
+    lineHeight: 33,
     letterSpacing: -0.5,
   } as TextStyle,
 
@@ -150,7 +150,7 @@ export const type_ = {
   displaySm: {
     ...ff(800),
     fontSize: 22,
-    lineHeight: 26,
+    lineHeight: 29,
     letterSpacing: -0.5,
   } as TextStyle,
 
@@ -161,7 +161,7 @@ export const type_ = {
   displayXs: {
     ...ff(800),
     fontSize: 20,
-    lineHeight: 24,
+    lineHeight: 27,
     letterSpacing: -0.5,
   } as TextStyle,
 
@@ -172,7 +172,7 @@ export const type_ = {
   h1: {
     ...ff(800),
     fontSize: 24,
-    lineHeight: 28,
+    lineHeight: 31,
     letterSpacing: -0.4,
   } as TextStyle,
 
@@ -183,7 +183,7 @@ export const type_ = {
   h1Sm: {
     ...ff(800),
     fontSize: 23,
-    lineHeight: 27,
+    lineHeight: 30,
     letterSpacing: -0.3,
   } as TextStyle,
 
@@ -194,7 +194,7 @@ export const type_ = {
   h1Xs: {
     ...ff(800),
     fontSize: 21,
-    lineHeight: 25,
+    lineHeight: 28,
     letterSpacing: -0.3,
   } as TextStyle,
 
@@ -205,7 +205,7 @@ export const type_ = {
   h2: {
     ...ff(700),
     fontSize: 19,
-    lineHeight: 22,
+    lineHeight: 25,
     letterSpacing: -0.3,
   } as TextStyle,
 
@@ -216,7 +216,7 @@ export const type_ = {
   subHead: {
     ...ff(700),
     fontSize: 20,
-    lineHeight: 24,
+    lineHeight: 27,
     letterSpacing: -0.3,
   } as TextStyle,
 
@@ -227,7 +227,7 @@ export const type_ = {
   h3: {
     ...ff(800),
     fontSize: 18,
-    lineHeight: 20,
+    lineHeight: 23,
     letterSpacing: -0.3,
   } as TextStyle,
 
@@ -238,7 +238,7 @@ export const type_ = {
   bodyXl: {
     ...ff(600),
     fontSize: 22,
-    lineHeight: 26,
+    lineHeight: 29,
   } as TextStyle,
 
   /**
@@ -248,7 +248,7 @@ export const type_ = {
   bodyLg: {
     ...ff(600),
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 25,
   } as TextStyle,
 
   /**
@@ -258,7 +258,7 @@ export const type_ = {
   body: {
     ...ff(600),
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 23,
   } as TextStyle,
 
   /**
@@ -268,7 +268,7 @@ export const type_ = {
   bodyReg: {
     ...ff(400),
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 23,
   } as TextStyle,
 
   /**
@@ -278,7 +278,7 @@ export const type_ = {
   small: {
     ...ff(500),
     fontSize: 14,
-    lineHeight: 16,
+    lineHeight: 19,
   } as TextStyle,
 
   /**
@@ -288,7 +288,7 @@ export const type_ = {
   caption: {
     ...ff(600),
     fontSize: 13,
-    lineHeight: 14,
+    lineHeight: 17,
   } as TextStyle,
 
   /**
@@ -298,7 +298,7 @@ export const type_ = {
   label: {
     ...ff(700),
     fontSize: 13,
-    lineHeight: 14,
+    lineHeight: 17,
     textTransform: 'uppercase',
     letterSpacing: 1.5,
   } as TextStyle,
@@ -310,7 +310,7 @@ export const type_ = {
   labelSm: {
     ...ff(700),
     fontSize: 12,
-    lineHeight: 13,
+    lineHeight: 16,
     textTransform: 'uppercase',
     letterSpacing: 1,
   } as TextStyle,
@@ -322,7 +322,7 @@ export const type_ = {
   micro: {
     ...ff(700),
     fontSize: 11,
-    lineHeight: 11,
+    lineHeight: 14,
   } as TextStyle,
 
   /**
@@ -332,7 +332,7 @@ export const type_ = {
   badge: {
     ...ff(800),
     fontSize: 10,
-    lineHeight: 14,
+    lineHeight: 17,
   } as TextStyle,
 
   /**
@@ -342,7 +342,7 @@ export const type_ = {
   initials: {
     ...ff(800),
     fontSize: 28,
-    lineHeight: 30,
+    lineHeight: 33,
   } as TextStyle,
 
   /**
@@ -352,7 +352,7 @@ export const type_ = {
   emoji: {
     ...ff(400),
     fontSize: 30,
-    lineHeight: 34,
+    lineHeight: 37,
   } as TextStyle,
 
   /**
@@ -360,7 +360,7 @@ export const type_ = {
   mono: {
     ...ff(700),
     fontSize: 17,
-    lineHeight: 20,
+    lineHeight: 23,
     letterSpacing: -0.2,
   } as TextStyle,
 
@@ -371,7 +371,7 @@ export const type_ = {
   btnLg: {
     ...ff(700),
     fontSize: 18,
-    lineHeight: 20,
+    lineHeight: 23,
     letterSpacing: -0.2,
   } as TextStyle,
 
@@ -382,7 +382,7 @@ export const type_ = {
   btnSm: {
     ...ff(700),
     fontSize: 16,
-    lineHeight: 18,
+    lineHeight: 21,
   } as TextStyle,
 
   /**
@@ -392,7 +392,7 @@ export const type_ = {
   navItem: {
     ...ff(500),
     fontSize: 12,
-    lineHeight: 13,
+    lineHeight: 16,
   } as TextStyle,
 
   /**
@@ -402,7 +402,7 @@ export const type_ = {
   userName: {
     ...ff(700),
     fontSize: 17,
-    lineHeight: 19,
+    lineHeight: 22,
   } as TextStyle,
 
   /**
@@ -412,7 +412,7 @@ export const type_ = {
   numpad: {
     ...ff(600),
     fontSize: 21,
-    lineHeight: 24,
+    lineHeight: 27,
   } as TextStyle,
 } as const;
 

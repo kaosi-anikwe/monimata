@@ -33,6 +33,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Modal,
   Platform,
   ScrollView,
@@ -65,24 +66,18 @@ import { layout, radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
-import { computeNextDue, formatNaira, nairaStringToKobo } from '@/utils/money';
+import { computeNextDue, formatNaira } from '@/utils/money';
 import type { BankAccount, Transaction, TransactionSplit } from '@monimata/shared-types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function koboToNairaStr(kobo: number): string {
-  return (Math.abs(kobo) / 100).toFixed(0);
+  return Math.abs(kobo).toString();
 }
 
 function formatAmountDisplay(s: string): string {
-  if (!s) return '0';
-  if (s.includes('.')) {
-    const [intPart, decPart] = s.split('.');
-    const int = parseInt(intPart || '0', 10);
-    return `${new Intl.NumberFormat('en-NG').format(int)}.${decPart}`;
-  }
-  const int = parseInt(s, 10);
-  return isNaN(int) ? '0' : new Intl.NumberFormat('en-NG').format(int);
+  const kobo = parseInt(s || '0', 10);
+  return new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(kobo / 100);
 }
 
 function formatTxDatetime(dateStr: string): string {
@@ -103,7 +98,6 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
   const K = (v: string) => (
     <TouchableOpacity key={v} style={keyStyle} onPress={() => {
       tap();
-      if (value === '0') { onChange(v); return; }
       onChange(value + v);
     }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel={v}>
       <Text style={[ss.numKeyText, { color: colors.textPrimary }]}>{v}</Text>
@@ -119,12 +113,11 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
       <View style={ss.numRow}>
         <TouchableOpacity style={[keyStyle, { flex: 2 }]} onPress={() => {
           tap();
-          if (value === '0') return;
           onChange(value + '0');
         }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="0">
           <Text style={[ss.numKeyText, { color: colors.textPrimary }]}>0</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={keyStyle} onPress={() => { tap(); onChange(value.slice(0, -1) || '0'); }}
+        <TouchableOpacity style={keyStyle} onPress={() => { tap(); onChange(value.slice(0, -1)); }}
           activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="Backspace">
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM18 9l-6 6M12 9l6 6"
@@ -158,7 +151,7 @@ function DetailRow({ label, value, isLast = false }: { label: string; value: str
       !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
     ]}>
       <Text style={[type_.small, { color: colors.textMeta }]}>{label}</Text>
-      <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.textPrimary, flex: 1, textAlign: 'right' }]} numberOfLines={2}>
+      <Text style={[{ ...type_.small, lineHeight: 19 }, { color: colors.textPrimary, flex: 1, textAlign: 'right' }]} numberOfLines={2}>
         {value}
       </Text>
     </View>
@@ -460,7 +453,7 @@ function BankViewForm({
         <Frow label="Category">
           {tx.is_split ? (
             <View style={ss.frowTouchable}>
-              <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.info, flex: 1 }]}>
+              <Text style={[{ ...type_.small, lineHeight: 19 }, { color: colors.info, flex: 1 }]}>
                 Split
               </Text>
               <Text style={[type_.caption, { color: colors.textMeta }]}>
@@ -474,7 +467,7 @@ function BankViewForm({
               accessibilityRole="button" accessibilityLabel="Select category"
             >
               <Text style={[
-                { ...ff(selectedCategory ? 600 : 400), ...type_.small, lineHeight: 16 },
+                { ...ff(selectedCategory ? 600 : 400), ...type_.small, lineHeight: 19 },
                 { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Uncategorised'}
@@ -641,7 +634,7 @@ function ManualEditForm({
   const isDebit = txType === 'debit';
 
   function handleSave() {
-    const koboAmount = nairaStringToKobo(amountStr);
+    const koboAmount = parseInt(amountStr || '0', 10);
     if (koboAmount <= 0) return;
     const signedAmount = isDebit ? -koboAmount : koboAmount;
     onSave({
@@ -703,7 +696,7 @@ function ManualEditForm({
             onPress={() => { setDtPickerMode('date'); setShowDatePicker(true); }}
             accessibilityRole="button" accessibilityLabel="Select date and time"
           >
-            <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
+            <Text style={[{ ...type_.small, lineHeight: 19 }, { color: colors.textPrimary, flex: 1 }]}>
               {formatTxDatetime(txDatetime.toISOString())}
             </Text>
             <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
@@ -719,7 +712,7 @@ function ManualEditForm({
           >
             <Text
               style={[
-                { ...ff(selectedAccount ? 600 : 400), ...type_.small, lineHeight: 16 },
+                { ...ff(selectedAccount ? 600 : 400), ...type_.small, lineHeight: 19 },
                 { color: selectedAccount ? colors.textPrimary : colors.textTertiary, flex: 1 },
               ]}
               numberOfLines={1}
@@ -736,7 +729,7 @@ function ManualEditForm({
         <Frow label="Category">
           {tx.is_split ? (
             <View style={ss.frowTouchable}>
-              <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.info, flex: 1 }]}>
+              <Text style={[{ ...type_.small, lineHeight: 19 }, { color: colors.info, flex: 1 }]}>
                 Split
               </Text>
               <Text style={[type_.caption, { color: colors.textMeta }]}>
@@ -750,7 +743,7 @@ function ManualEditForm({
               accessibilityRole="button" accessibilityLabel="Select category"
             >
               <Text style={[
-                { ...ff(selectedCategory ? 600 : 400), ...type_.small, lineHeight: 16 },
+                { ...ff(selectedCategory ? 600 : 400), ...type_.small, lineHeight: 19 },
                 { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Optional'}
@@ -803,7 +796,7 @@ function ManualEditForm({
               accessibilityRole="button" accessibilityLabel="Select recurrence"
             >
               <Text style={[
-                { ...ff(recurrence ? 600 : 400), ...type_.small, lineHeight: 16 },
+                { ...ff(recurrence ? 600 : 400), ...type_.small, lineHeight: 19 },
                 { color: recurrence ? colors.textPrimary : colors.textTertiary, flex: 1 },
               ]}>
                 {recurrence ? recurrence.label : 'Never'}
@@ -940,7 +933,7 @@ export default function TransactionDetailsScreen() {
   // ── Manual edit overlay state ──
   const [manualAmountStr, setManualAmountStr] = useState('0');
   const [manualTxType, setManualTxType] = useState<'debit' | 'credit'>('debit');
-  const saveRef = useRef<() => void>(() => {});
+  const saveRef = useRef<() => void>(() => { });
   const [numpadVisible, setNumpadVisible] = useState(false);
   const [numpadHeight, setNumpadHeight] = useState(300);
   const numpadAnim = useRef(new Animated.Value(0)).current;
@@ -951,7 +944,7 @@ export default function TransactionDetailsScreen() {
       setManualTxType(tx.type as 'debit' | 'credit');
       setManualAmountStr(koboToNairaStr(tx.amount));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tx?.id]);
 
   useEffect(() => {
@@ -965,6 +958,16 @@ export default function TransactionDetailsScreen() {
     blink.start();
     return () => blink.stop();
   }, [numpadVisible, caretOpacity]);
+
+  useEffect(() => {
+    if (!numpadVisible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      dismissNumpad();
+      return true;
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numpadVisible]);
 
   function showNumpad() {
     setNumpadVisible(true);
@@ -1027,7 +1030,7 @@ export default function TransactionDetailsScreen() {
         <View style={[ss.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
           <TouchableOpacity
             style={[ss.backBtn, { backgroundColor: colors.surface }]}
-            onPress={() => router.back()}
+            onPress={() => { if (numpadVisible) { dismissNumpad(); return; } router.back(); }}
             accessibilityRole="button" accessibilityLabel="Go back"
           >
             <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
@@ -1172,7 +1175,7 @@ export default function TransactionDetailsScreen() {
             <Button
               variant="green"
               onPress={() => saveRef.current()}
-              disabled={nairaStringToKobo(manualAmountStr) <= 0 || update.isPending}
+              disabled={parseInt(manualAmountStr || '0', 10) <= 0 || update.isPending}
               loading={update.isPending}
               fullWidth={false}
               style={{ opacity: 1, paddingHorizontal: spacing.xxl }}

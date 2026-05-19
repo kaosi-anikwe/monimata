@@ -158,16 +158,16 @@ function TourOverlay({ steps, stepIndex, rect, spotX, spotY, spotW, spotH, spotR
   const isLast = stepIndex === steps.length - 1;
   const sh = SCREEN.height;
 
+  // ── Tooltip position ──────────────────────────────────────────────────────
+  const insets = useSafeAreaInsets();
+  const TOOLTIP_MARGIN = 12;
+
   // Safety guard — stepIndex out of range (e.g. empty steps array slipped through).
   if (!step) return null;
 
   // A step is in "fallback" mode when it has fallbackFullscreen AND no rect
   // has arrived (target not currently rendered on screen).
   const isFallback = step.fallbackFullscreen === true && rect === null;
-
-  // ── Tooltip position ──────────────────────────────────────────────────────
-  const insets = useSafeAreaInsets();
-  const TOOLTIP_MARGIN = 12;
 
   let tooltipTop: number | undefined;
   let tooltipBottom: number | undefined;
@@ -522,7 +522,7 @@ const ts = StyleSheet.create({
   },
   body: {
     ...type_.body,
-    lineHeight: 22,
+    lineHeight: 25,
   },
   btnRow: {
     flexDirection: 'row',

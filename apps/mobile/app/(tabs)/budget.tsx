@@ -92,10 +92,9 @@ const BUDGET_TOUR: TourStep[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Parse a user-typed naira string like "5,000.50" → kobo. */
+/** Parse a raw kobo digit string like "150000" → kobo integer. */
 function parseNairaInput(raw: string): number {
-  const n = parseFloat(raw.replace(/,/g, ''));
-  return isNaN(n) ? 0 : Math.round(n * 100);
+  return parseInt(raw || '0', 10);
 }
 
 // ── Month navigator header (.bgt-hdr) ─────────────────────────────────────────
@@ -434,10 +433,10 @@ function AssignSheet({
   onClose: () => void;
 }) {
   const colors = useTheme();
-  const [assignStr, setAssignStr] = useState('0');
+  const [assignStr, setAssignStr] = useState('');
   const [showMove, setShowMove] = useState(false);
   const [moveTarget, setMoveTarget] = useState<BudgetCategory | null>(null);
-  const [moveStr, setMoveStr] = useState('0');
+  const [moveStr, setMoveStr] = useState('');
 
   const assign = useAssignCategory(month);
   const move = useMoveMoney(month);
@@ -446,25 +445,24 @@ function AssignSheet({
   const [lastId, setLastId] = useState<string | null>(null);
   if (category && category.id !== lastId) {
     setLastId(category.id);
-    setAssignStr(String(Math.round(category.assigned / 100)));
+    setAssignStr(String(category.assigned));
     setShowMove(false);
     setMoveTarget(null);
-    setMoveStr('0');
+    setMoveStr('');
   }
 
   if (!category) return null;
 
-  // Numpad input handler — integers only, shared between assign and move modes
+  // Numpad input handler — raw kobo digits, shared between assign and move modes
   const activeSet = showMove ? setMoveStr : setAssignStr;
   function handleNumKey(k: string) {
     activeSet((prev) => {
-      if (prev === '0') return k; // replace leading zero
-      if (prev.length >= 10) return prev; // cap at 10 digits
+      if (prev.length >= 13) return prev; // cap at 13 digits (₦99,999,999,999.99)
       return prev + k;
     });
   }
   function handleBackspace() {
-    activeSet((prev) => (prev.length <= 1 ? '0' : prev.slice(0, -1)));
+    activeSet((prev) => prev.slice(0, -1));
   }
 
   // Derived values
@@ -473,12 +471,10 @@ function AssignSheet({
   const moveKobo = parseNairaInput(moveStr);
   const otherCategories = allCategories.filter((c) => c.id !== category.id);
 
-  // Format raw numStr for display: "80000" → "80,000"
+  // Format raw kobo digit string for display: "12345" → "123.45"
   function fmtStr(s: string): string {
-    if (!s || s === '0') return '0';
-    const [int, dec] = s.split('.');
-    const formatted = parseInt(int || '0', 10).toLocaleString('en-NG');
-    return dec !== undefined ? `${formatted}.${dec}` : formatted;
+    const kobo = parseInt(s || '0', 10);
+    return new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(kobo / 100);
   }
 
   function handleSave() {
@@ -569,7 +565,7 @@ function AssignSheet({
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       const needed = Math.max(0, category.assigned + category.required_this_month! - category.available);
-                      setAssignStr(String(Math.round(needed / 100)));
+                      setAssignStr(String(needed));
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Fill to required amount"
@@ -579,7 +575,7 @@ function AssignSheet({
                 )}
                 <TouchableOpacity
                   style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAssignStr(String(Math.round(Math.max(0, tbb) / 100))); }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAssignStr(String(Math.max(0, tbb))); }}
                   accessibilityRole="button"
                   accessibilityLabel="Assign all available to budget"
                 >
@@ -587,7 +583,7 @@ function AssignSheet({
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAssignStr('0'); }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAssignStr(''); }}
                   accessibilityRole="button"
                   accessibilityLabel="Zero out assignment"
                 >
@@ -595,7 +591,7 @@ function AssignSheet({
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowMove(true); setMoveStr('0'); setMoveTarget(null); }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowMove(true); setMoveStr(''); setMoveTarget(null); }}
                   accessibilityRole="button"
                   accessibilityLabel="Move money to another category instead"
                 >
@@ -662,7 +658,7 @@ function AssignSheet({
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={sh.qfRow} style={sh.qfScroll}>
                 <TouchableOpacity
                   style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
-                  onPress={() => setMoveStr(String(Math.round(Math.max(0, category.available) / 100)))}
+                  onPress={() => setMoveStr(String(Math.max(0, category.available)))}
                 >
                   <Text style={[sh.qfTxt, { color: colors.textSecondary }]}>Move all available</Text>
                 </TouchableOpacity>
@@ -1009,7 +1005,7 @@ const uh = StyleSheet.create({
   },
   icon: { marginBottom: spacing.xs },
   title: { ...type_.h2 },
-  sub: { ...type_.body, textAlign: 'center', lineHeight: 20 },
+  sub: { ...type_.body, textAlign: 'center', lineHeight: 23 },
 });
 
 // ── Main screen ────────────────────────────────────────────────────────────────

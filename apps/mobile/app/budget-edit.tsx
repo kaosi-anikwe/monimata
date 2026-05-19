@@ -1269,7 +1269,7 @@ const ss = StyleSheet.create({
     paddingBottom: spacing.xl,
     gap: spacing.smd,
   },
-  unhideSub: { ...type_.body, textAlign: 'center', lineHeight: 20 },
+  unhideSub: { ...type_.body, textAlign: 'center', lineHeight: 23 },
   unhideFooter: { flexDirection: 'row', gap: spacing.smd, marginTop: spacing.sm },
   unhideBtn: { flex: 1, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   unhideBtnTxt: { ...type_.btnSm },

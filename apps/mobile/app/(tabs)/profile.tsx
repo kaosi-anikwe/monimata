@@ -19,6 +19,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { router, useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
@@ -337,6 +338,9 @@ export default function ProfileScreen() {
           >
             Log Out
           </Button>
+          <Text style={[type_.caption, { color: colors.textTertiary, textAlign: 'center', marginTop: spacing.lg }]}>
+            v{Constants.expoConfig?.version ?? '—'}
+          </Text>
         </View>
       </ScrollView>
     </View>

@@ -97,7 +97,11 @@ function cleanValue(text: string, allowDecimals: boolean): string {
   const stripped = text.replace(/[^0-9.]/g, '');
   const parts = stripped.split('.');
   // Collapse multiple dots: keep only one decimal point
-  return parts.length <= 2 ? stripped : `${parts[0]}.${parts.slice(1).join('')}`;
+  const joined = parts.length <= 2 ? stripped : `${parts[0]}.${parts.slice(1).join('')}`;
+  // Limit to 2 decimal places
+  const dotIdx = joined.indexOf('.');
+  if (dotIdx === -1) return joined;
+  return joined.slice(0, dotIdx + 3); // e.g. "1500.50"
 }
 
 // ─── AmountInput ─────────────────────────────────────────────────────────────

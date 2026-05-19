@@ -158,7 +158,7 @@ const s = StyleSheet.create({
     gap: spacing.smd,
   },
   errorLabel: { ...type_.label, letterSpacing: 0.8, textTransform: 'uppercase' },
-  errorMsg: { ...type_.bodyReg, lineHeight: 20 },
+  errorMsg: { ...type_.bodyReg, lineHeight: 23 },
 
   // CTA button — lime/dark-green, matches primary buttons
   btn: {
