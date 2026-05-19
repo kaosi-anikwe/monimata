@@ -39,6 +39,7 @@ arrays; a deletions log table will be added in Phase 2.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
@@ -59,6 +60,7 @@ from app.models.recurring_rule import RecurringRule
 from app.models.target import CategoryTarget
 from app.models.transaction import Transaction, TransactionSource
 from app.models.user import User
+from app.schemas.transactions import TransactionResponse
 from app.services.budget_logic import get_or_create_budget_month, str_to_month_date
 from app.ws_manager import notify_user
 
@@ -76,23 +78,16 @@ def _ts_ms(dt: datetime) -> int:
 
 
 def _serialize_transaction(tx: Transaction) -> dict[str, Any]:
-    return {
-        "id": str(tx.id),
-        "account_id": str(tx.account_id),
-        "user_id": str(tx.user_id),
-        "date": _ts_ms(tx.date) if tx.date else None,
-        "amount": tx.amount,
-        "narration": tx.narration,
-        "type": tx.type,
-        "balance_after": tx.balance_after,
-        "category_id": str(tx.category_id) if tx.category_id else None,
-        "memo": tx.memo,
-        "is_split": tx.is_split,
-        "source": tx.source.value if isinstance(tx.source, TransactionSource) else tx.source,
-        "recurrence_id": str(tx.recurrence_id) if tx.recurrence_id else None,
-        "created_at": _ts_ms(tx.created_at),
-        "updated_at": _ts_ms(tx.updated_at),
-    }
+    data = TransactionResponse.model_validate(tx).model_dump(mode="json")
+    # WatermelonDB expects integer ms timestamps, not ISO strings.
+    data["date"] = _ts_ms(tx.date) if tx.date else None
+    data["created_at"] = _ts_ms(tx.created_at)
+    data["updated_at"] = _ts_ms(tx.updated_at)
+    # user_id is required by WatermelonDB for scoping but absent from TransactionResponse.
+    data["user_id"] = str(tx.user_id)
+    # splits are not a flat WatermelonDB column — omit from the transaction row.
+    data.pop("splits", None)
+    return data
 
 
 def _serialize_category_group(g: CategoryGroup) -> dict[str, Any]:
@@ -223,6 +218,8 @@ def _generate_recurring_transactions(db: Session, user_id: str, today: date) -> 
                 break
 
             tmpl = rule.template
+            if isinstance(tmpl, str):
+                tmpl = json.loads(tmpl)
             recur_narration = tmpl.get("narration", "Recurring")
             tx = Transaction(
                 id=str(uuid.uuid4()),
@@ -759,7 +756,8 @@ def push(
                 rr_existing.ends_on = ends_on_val
             rr_existing.is_active = bool(record.get("is_active", rr_existing.is_active))
             if "template" in record:
-                rr_existing.template = record["template"]
+                _tmpl = record["template"]
+                rr_existing.template = json.loads(_tmpl) if isinstance(_tmpl, str) else _tmpl
             rr_existing.updated_at = datetime.now(UTC)
         else:
             if next_due_val is None:
@@ -779,7 +777,9 @@ def push(
                     next_due=next_due_val,
                     ends_on=ends_on_val,
                     is_active=bool(record.get("is_active", True)),
-                    template=record.get("template", {}),
+                    template=json.loads(_t)
+                    if isinstance(_t := record.get("template", {}), str)
+                    else _t,
                     created_at=push_created_at,
                 )
             )

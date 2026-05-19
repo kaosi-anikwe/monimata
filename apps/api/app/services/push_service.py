@@ -42,12 +42,13 @@ def send_push_notification(
     body: str,
     data: dict | None = None,
     channel_id: str = "default",
-) -> None:
+) -> bool:
     """
     Send a push notification via the Expo push API.
 
-    Never raises.  Failures are logged at WARNING level and swallowed so they
-    never break the caller's transaction or HTTP response.
+    Returns True if Expo reports DeviceNotRegistered — the caller should
+    clear the token from the database so we stop sending to dead endpoints.
+    Never raises; all other failures are logged and swallowed.
 
     Args:
         token:      Expo push token ("ExponentPushToken[...]").  No-op if None.
@@ -59,7 +60,7 @@ def send_push_notification(
                     for heads-up (banner) display.  Defaults to ``"default"``.
     """
     if not token:
-        return
+        return False
 
     payload: dict = {
         "to": token,
@@ -87,6 +88,13 @@ def send_push_notification(
             if isinstance(ticket, list):
                 ticket = ticket[0] if ticket else {}
             if ticket.get("status") == "error":
+                err = (ticket.get("details") or {}).get("error", "")
+                if err == "DeviceNotRegistered":
+                    logger.warning(
+                        "push_service: DeviceNotRegistered — token=%s...",
+                        token[:30],
+                    )
+                    return True
                 logger.warning(
                     "push_service: Expo delivery error — %s",
                     ticket.get("message"),
@@ -97,3 +105,4 @@ def send_push_notification(
             token[:30],
             exc_info=True,
         )
+    return False

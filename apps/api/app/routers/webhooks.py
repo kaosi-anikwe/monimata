@@ -447,6 +447,7 @@ async def bank_alert_webhook(
 
         send_transaction_received_push(
             user=user,
+            db=db,
             amount_kobo=alert.amount_kobo,
             transaction_type=alert.transaction_type,
             narration=narration,
