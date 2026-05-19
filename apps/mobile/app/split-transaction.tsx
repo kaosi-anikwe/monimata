@@ -74,7 +74,7 @@ function CategoryPickerSheet({
           No category
         </Text>
         {!selected && (
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
             <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
           </Svg>
         )}
@@ -102,7 +102,7 @@ function CategoryPickerSheet({
             >
               <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{cat.name}</Text>
               {selected?.id === cat.id && (
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                   <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
                 </Svg>
               )}
@@ -163,7 +163,7 @@ function SplitLineRow({
           >
             {line.category?.name ?? 'Tap to choose…'}
           </Text>
-          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
             <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
           </Svg>
         </TouchableOpacity>
@@ -175,7 +175,7 @@ function SplitLineRow({
             accessibilityRole="button"
             accessibilityLabel="Remove split"
           >
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M18 6L6 18M6 6l12 12" stroke={colors.error} strokeWidth={2.2} strokeLinecap="round" />
             </Svg>
           </TouchableOpacity>
@@ -395,7 +395,7 @@ export default function SplitTransactionScreen() {
           accessibilityRole="button"
           accessibilityLabel="Add split"
         >
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
             <Path d="M12 5v14M5 12h14" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
           </Svg>
           <Text style={[type_.label, { color: colors.brand, marginLeft: 6 }]}>Add split</Text>
@@ -475,7 +475,7 @@ const ss = StyleSheet.create({
 
   // Equal-split chips
   eqChips: { paddingVertical: spacing.smd, gap: spacing.sm },
-  eqChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xxs + spacing.xxs, borderRadius: radius.full, borderWidth: 1.5 },
+  eqChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xxs, borderRadius: radius.full, borderWidth: 1.5 },
   eqChipTxt: { ...type_.small, ...ff(700) },
 
   // Split row
@@ -490,7 +490,7 @@ const ss = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: radius.xs,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs + spacing.xxs,
+    paddingVertical: spacing.xxs,
     gap: spacing.xs,
   },
   splitCatTxt: { ...type_.bodyReg, ...ff(600), flex: 1 },
@@ -548,7 +548,7 @@ const ss = StyleSheet.create({
   remVal: { ...type_.displayXs },
 
   // Category picker
-  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs + spacing.xs },
+  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs },
   pickRow: {
     flexDirection: 'row',
     alignItems: 'center',

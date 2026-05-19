@@ -208,7 +208,7 @@ function makeStyles(colors: ThemeColors) {
       height: layout.iconXl + spacing.mdn,
       width: 160,
       resizeMode: 'contain',
-      marginBottom: spacing.xxs + spacing.xxs,
+      marginBottom: spacing.xxs,
     },
     tagline: {
       ...type_.bodyReg,
@@ -237,12 +237,12 @@ function makeStyles(colors: ThemeColors) {
     // ── Dots ──
     dots: {
       flexDirection: 'row',
-      gap: spacing.xxs + spacing.xxs,
+      gap: spacing.xxs,
       alignItems: 'center',
     },
     dot: {
-      width: spacing.xxs + spacing.xxs,
-      height: spacing.xxs + spacing.xxs,
+      width: spacing.xxs,
+      height: spacing.xxs,
       borderRadius: spacing.xxs,
     },
     // ── Buttons ──

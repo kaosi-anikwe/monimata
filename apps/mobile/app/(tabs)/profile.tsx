@@ -131,7 +131,7 @@ export default function ProfileScreen() {
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <Ionicons name="arrow-back" size={18} color={colors.white} />
+              <Ionicons name="arrow-back" size={type_.bodyXl.fontSize} color={colors.white} />
             </TouchableOpacity>
           )}
         </View>
@@ -155,7 +155,7 @@ export default function ProfileScreen() {
           title="Categorisation"
           variant="group"
           paddingHorizontal={spacing.lg}
-          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs + spacing.xxs }}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs }}
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           <ListRow
@@ -181,7 +181,7 @@ export default function ProfileScreen() {
           title="Account & Security"
           variant="group"
           paddingHorizontal={spacing.lg}
-          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs + spacing.xxs }}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs }}
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           <ListRow
@@ -236,7 +236,7 @@ export default function ProfileScreen() {
           title="Learn & Reports"
           variant="group"
           paddingHorizontal={spacing.lg}
-          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs + spacing.xxs }}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs }}
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           <ListRow
@@ -263,7 +263,7 @@ export default function ProfileScreen() {
           title="Preferences"
           variant="group"
           paddingHorizontal={spacing.lg}
-          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs + spacing.xxs }}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs }}
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           {/* Dark Mode toggle */}
@@ -417,7 +417,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     },
     langBtn: {
       paddingHorizontal: spacing.smd,
-      paddingVertical: spacing.xxs + spacing.xxs,
+      paddingVertical: spacing.xxs,
       borderRadius: radius.xs,
     },
     // log out

@@ -245,7 +245,7 @@ function StrategyPickerStep({
           accessibilityLabel="Close"
           accessibilityRole="button"
         >
-          <Ionicons name="close" size={14} color={colors.textSecondary} />
+          <Ionicons name="close" size={type_.bodyXl.fontSize} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -271,7 +271,7 @@ function StrategyPickerStep({
               >
                 {/* Icon badge */}
                 <View style={[sp.iconBadge, { backgroundColor: colors.surface }]}>
-                  <Ionicons name={s.icon} size={18} color={accentColor} />
+                  <Ionicons name={s.icon} size={type_.bodyXl.fontSize} color={accentColor} />
                 </View>
 
                 {/* Labels */}
@@ -293,7 +293,7 @@ function StrategyPickerStep({
                       <Text style={[sp.noChange, { color: colors.textTertiary }]}>
                         No change
                       </Text>
-                      <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+                      <Ionicons name="chevron-forward" size={type_.bodyXl.fontSize} color={colors.textTertiary} />
                     </View>
                   ) : (
                     <>
@@ -304,7 +304,7 @@ function StrategyPickerStep({
                         <Text style={[sp.stratCnt, { color: colors.textMeta }]}>
                           {count} cat{count === 1 ? '' : 's'}
                         </Text>
-                        <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+                        <Ionicons name="chevron-forward" size={type_.bodyXl.fontSize} color={colors.textTertiary} />
                       </View>
                     </>
                   )}
@@ -403,7 +403,7 @@ function PreviewStep({
           accessibilityRole="button"
           accessibilityLabel="Back to strategy picker"
         >
-          <Ionicons name="arrow-back" size={14} color={colors.textSecondary} />
+          <Ionicons name="arrow-back" size={type_.bodyXl.fontSize} color={colors.textSecondary} />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={[pv.title, { color: colors.textPrimary }]}>
@@ -420,7 +420,7 @@ function PreviewStep({
           accessibilityRole="button"
           accessibilityLabel="Close"
         >
-          <Ionicons name="close" size={14} color={colors.textSecondary} />
+          <Ionicons name="close" size={type_.bodyXl.fontSize} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 

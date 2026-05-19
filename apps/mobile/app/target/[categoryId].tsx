@@ -273,9 +273,9 @@ function DatePickerField({
         accessibilityRole="button"
         accessibilityLabel="Select date"
       >
-        <Ionicons name="calendar-outline" size={16} color={colors.brand} />
+        <Ionicons name="calendar-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
         <Text style={[ts.dateBtnTxt, { color: colors.textPrimary }]}>{displayDate}</Text>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMeta} />
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={type_.bodyXl.fontSize} color={colors.textMeta} />
       </TouchableOpacity>
 
       {open && (

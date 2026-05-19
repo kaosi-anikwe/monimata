@@ -123,7 +123,7 @@ export function ScreenHeader({
               onPress={onBack}
               accessibilityLabel="Go back"
             >
-              <Ionicons name="arrow-back" size={18} color={colors.white} />
+              <Ionicons name="arrow-back" size={type_.bodyXl.fontSize} color={colors.white} />
             </Button>
           ) : (
             <View style={s.iconPlaceholder} />
@@ -149,7 +149,7 @@ export function ScreenHeader({
               style={s.backBtnStack}
               accessibilityLabel="Go back"
             >
-              <Ionicons name="arrow-back" size={18} color={colors.white} />
+              <Ionicons name="arrow-back" size={type_.bodyXl.fontSize} color={colors.white} />
             </Button>
           )}
 

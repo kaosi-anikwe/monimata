@@ -106,7 +106,7 @@ function BankPickerSheet({ visible, onClose, onSelect }: BankPickerSheetProps) {
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
             </Svg>
           </TouchableOpacity>
@@ -141,7 +141,7 @@ function BankPickerSheet({ visible, onClose, onSelect }: BankPickerSheetProps) {
               >
                 <View style={ss.bankInfo}>
                   <View style={[ss.bankIc, { backgroundColor: colors.surface }]}>
-                    <Ionicons name="business-outline" size={16} color={colors.brand} />
+                    <Ionicons name="business-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[type_.body, { color: colors.textPrimary }]}>{bank.name}</Text>
@@ -154,7 +154,7 @@ function BankPickerSheet({ visible, onClose, onSelect }: BankPickerSheetProps) {
                     </View>
                   </View>
                 </View>
-                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                   <Path d="M9 18l6-6-6-6" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </Svg>
               </TouchableOpacity>
@@ -191,7 +191,7 @@ const bps = StyleSheet.create({
   },
   rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth },
   chip: {
-    paddingHorizontal: spacing.xxs + spacing.xxs,
+    paddingHorizontal: spacing.xxs,
     paddingVertical: 1,
     borderRadius: radius.xxs,
   },
@@ -309,14 +309,14 @@ function AddManualSheet({ visible, onClose }: AddManualSheetProps) {
               {selectedBank ? (
                 <View style={[ss.bankInfo, { flex: 1 }]}>
                   <View style={[ss.bankIc, { backgroundColor: colors.surface }]}>
-                    <Ionicons name="business-outline" size={16} color={colors.brand} />
+                    <Ionicons name="business-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
                   </View>
                   <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{selectedBank.name}</Text>
                 </View>
               ) : (
                 <Text style={[type_.body, { color: colors.textTertiary, flex: 1 }]}>Select a bank…</Text>
               )}
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M6 9l6 6 6-6" stroke={selectedBank ? colors.brand : colors.textTertiary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </TouchableOpacity>
@@ -673,7 +673,7 @@ function UploadStatementSheet({ account, onClose }: UploadStatementSheetProps) {
         {/* Context note */}
         {account && (
           <View style={[ss.stmtNote, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z" stroke={colors.brand} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M13 2v7h7" stroke={colors.brand} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
@@ -724,7 +724,7 @@ function UploadStatementSheet({ account, onClose }: UploadStatementSheetProps) {
               hitSlop={8}
               accessibilityLabel="Remove selected file"
             >
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
               </Svg>
             </TouchableOpacity>
@@ -793,7 +793,7 @@ function MoreActionsSheet({
         {/* Rename */}
         <ListRow
           leftIcon={
-            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
@@ -808,7 +808,7 @@ function MoreActionsSheet({
         {/* Update Balance */}
         <ListRow
           leftIcon={
-            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke={colors.warning} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           }
@@ -822,7 +822,7 @@ function MoreActionsSheet({
         {/* Reconcile */}
         <ListRow
           leftIcon={
-            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M22 11.08V12a10 10 0 11-5.93-9.14" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M22 4L12 14.01l-3-3" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
@@ -837,7 +837,7 @@ function MoreActionsSheet({
         {/* Upload Statement */}
         <ListRow
           leftIcon={
-            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3" stroke={colors.brand} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
@@ -852,7 +852,7 @@ function MoreActionsSheet({
         {/* Delete */}
         <ListRow
           leftIcon={
-            <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           }
@@ -940,7 +940,7 @@ function AccountCard({ account, onMoreActions, showTourTarget }: AccountCardProp
               accessibilityRole="button"
               accessibilityLabel="More options"
             >
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Circle cx={12} cy={5} r={1.5} fill={colors.textMeta} />
                 <Circle cx={12} cy={12} r={1.5} fill={colors.textMeta} />
                 <Circle cx={12} cy={19} r={1.5} fill={colors.textMeta} />
@@ -1041,7 +1041,7 @@ export default function AccountsScreen() {
               accessibilityRole="button"
               accessibilityLabel="Add manual account"
             >
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M12 5v14M5 12h14" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" />
               </Svg>
               <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Add Account</Text>
@@ -1079,7 +1079,7 @@ export default function AccountsScreen() {
               accessibilityRole="link"
               accessibilityLabel="Set up email forwarding on our website"
             >
-              <Ionicons name="mail-outline" size={14} color={colors.brand} />
+              <Ionicons name="mail-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
               <Text style={[ss.emailFwdBtnTxt, { color: colors.brand }]}>Set up email forwarding →</Text>
             </TouchableOpacity>
           </View>
@@ -1111,7 +1111,7 @@ export default function AccountsScreen() {
               accessibilityLabel="Set up email forwarding to auto-import transactions"
             >
               <View style={[ss.emailFwdIc, { backgroundColor: colors.surface }]}>
-                <Ionicons name="mail-outline" size={18} color={colors.brand} />
+                <Ionicons name="mail-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[ss.emailFwdTitle, { color: colors.textPrimary }]}>Import via email alerts</Text>
@@ -1119,7 +1119,7 @@ export default function AccountsScreen() {
                   Forward bank alerts to auto-import transactions. Setup guide on our website.
                 </Text>
               </View>
-              <Ionicons name="open-outline" size={14} color={colors.textTertiary} />
+              <Ionicons name="open-outline" size={type_.bodyXl.fontSize} color={colors.textTertiary} />
             </TouchableOpacity>
 
             <View style={{ height: spacing.xxl + 60 }} />
@@ -1229,7 +1229,8 @@ const ss = StyleSheet.create({
     marginTop: spacing.smd,
   },
   cardTop: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   cardRow: {
@@ -1240,8 +1241,8 @@ const ss = StyleSheet.create({
   },
   bankInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.smd },
   bankIc: {
-    width: layout.avatarMd - spacing.xs,
-    height: layout.avatarMd - spacing.xs,
+    width: layout.avatarMd,
+    height: layout.avatarMd,
     borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1264,7 +1265,7 @@ const ss = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  syncDot: { width: spacing.xxs + spacing.xs, height: spacing.xxs + spacing.xs, borderRadius: spacing.xs, flexShrink: 0 },
+  syncDot: { width: spacing.xxs, height: spacing.xxs, borderRadius: spacing.xs, flexShrink: 0 },
 
   // Card footer  — matches .acct-footer
   cardFooter: {
@@ -1283,13 +1284,13 @@ const ss = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.xs,
     paddingHorizontal: spacing.smd,
-    paddingVertical: spacing.xxs + spacing.xs,
+    paddingVertical: spacing.xxs,
   },
   footerBtnDisabled: { opacity: 0.6 },
   footerBtnTxt: { ...type_.caption },
   footerBtnMore: {
-    width: layout.avatarSm - spacing.xs,
-    height: layout.avatarSm - spacing.xs,
+    width: layout.avatarSm,
+    height: layout.avatarSm,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1370,8 +1371,8 @@ const ss = StyleSheet.create({
     minHeight: 64,
   },
   stmtPickIc: {
-    width: layout.avatarMd - spacing.xs,
-    height: layout.avatarMd - spacing.xs,
+    width: layout.avatarMd,
+    height: layout.avatarMd,
     borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1415,8 +1416,8 @@ const ss = StyleSheet.create({
     marginTop: spacing.smd,
   },
   emailFwdIc: {
-    width: layout.avatarMd - spacing.xs,
-    height: layout.avatarMd - spacing.xs,
+    width: layout.avatarMd,
+    height: layout.avatarMd,
     borderRadius: radius.smd,
     alignItems: 'center',
     justifyContent: 'center',

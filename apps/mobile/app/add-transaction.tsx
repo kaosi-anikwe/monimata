@@ -211,7 +211,7 @@ function CategoryPickerSheet({
         >
           <Text style={[type_.body, { color: colors.textMeta, fontStyle: 'italic' }]}>No category</Text>
           {!selected && (
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
             </Svg>
           )}
@@ -233,7 +233,7 @@ function CategoryPickerSheet({
               >
                 <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{cat.name}</Text>
                 {selected?.id === cat.id && (
-                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                     <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
                   </Svg>
                 )}
@@ -355,8 +355,25 @@ export default function AddTransactionScreen() {
   const [memo, setMemo] = useState('');
   const [recurrence, setRecurrence] = useState<typeof RECURRENCE_OPTIONS[number] | null>(null);
 
+  const [numpadVisible, setNumpadVisible] = useState(false);
+  const [numpadHeight, setNumpadHeight] = useState(300);
+  const numpadAnim = useRef(new Animated.Value(0)).current;
+
+  function showNumpad() {
+    setNumpadVisible(true);
+    Animated.spring(numpadAnim, { toValue: 1, useNativeDriver: true, tension: 220, friction: 26 }).start();
+  }
+  function dismissNumpad() {
+    setNumpadVisible(false);
+    Animated.spring(numpadAnim, { toValue: 0, useNativeDriver: true, tension: 220, friction: 26 }).start();
+  }
+
   const caretOpacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
+    if (!numpadVisible) {
+      caretOpacity.setValue(1);
+      return;
+    }
     const blink = Animated.loop(
       Animated.sequence([
         Animated.timing(caretOpacity, { toValue: 0, duration: 530, useNativeDriver: true }),
@@ -365,7 +382,7 @@ export default function AddTransactionScreen() {
     );
     blink.start();
     return () => blink.stop();
-  }, [caretOpacity]);
+  }, [numpadVisible, caretOpacity]);
 
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -420,6 +437,16 @@ export default function AddTransactionScreen() {
   const isDebit = txType === 'debit';
   const amountColor = isDebit ? colors.error : colors.success;
 
+  const fabRestBottom = insets.bottom + spacing.md;
+  const numpadTranslateY = numpadAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [numpadHeight, 0],
+  });
+  const fabTranslateY = numpadAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -(numpadHeight + spacing.sm - fabRestBottom)],
+  });
+
   useStatusBarStyle('light');
 
   return (
@@ -435,7 +462,7 @@ export default function AddTransactionScreen() {
             onPress={() => router.push('/upload-receipt' as never)}
             accessibilityLabel="Upload receipt"
           >
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={colors.white} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M14 2v6h6" stroke={colors.white} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M12 12v6M9 15l3-3 3 3" stroke={colors.white} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -449,24 +476,32 @@ export default function AddTransactionScreen() {
         <TypeToggle value={txType} onChange={setTxType} />
       </View>
 
+      {/* ── Sticky amount display ── */}
+      <TouchableOpacity
+        style={[ss.amtCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+        onPress={showNumpad}
+        activeOpacity={0.85}
+      >
+        <View style={ss.amtRow}>
+          <Text style={[ss.amtSym, { color: amountColor }]}>₦</Text>
+          <Text style={[ss.amtNum, { color: amountColor }]}>{formatAmountDisplay(amountStr)}</Text>
+          {numpadVisible && (
+            <Animated.View style={[ss.caret, { backgroundColor: amountColor, opacity: caretOpacity }]} />
+          )}
+        </View>
+        <Text style={[type_.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
+          {numpadVisible ? 'Tap elsewhere to dismiss' : 'Tap to enter amount'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* ── Scrollable form ── */}
       <ScrollView
         style={ss.scroll}
-        contentContainerStyle={ss.scrollContent}
+        contentContainerStyle={[ss.scrollContent, { paddingBottom: numpadHeight + insets.bottom + layout.btnHeight + spacing.xl }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={dismissNumpad}
       >
-        {/* ── Amount display ── */}
-        <View style={[ss.amtCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <View style={ss.amtRow}>
-            <Text style={[ss.amtSym, { color: amountColor }]}>₦</Text>
-            <Text style={[ss.amtNum, { color: amountColor }]}>{formatAmountDisplay(amountStr)}</Text>
-            <Animated.View style={[ss.caret, { backgroundColor: amountColor, opacity: caretOpacity }]} />
-          </View>
-          <Text style={[type_.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
-            Enter amount using keypad below
-          </Text>
-        </View>
-
         {/* ── Form card ── */}
         <View style={[ss.formCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
           <Frow label="What for?">
@@ -484,13 +519,13 @@ export default function AddTransactionScreen() {
           <Frow label="Date & Time">
             <TouchableOpacity
               style={ss.frowTouchable}
-              onPress={() => { setDtPickerMode('date'); setShowDatePicker(true); }}
+              onPress={() => { dismissNumpad(); setDtPickerMode('date'); setShowDatePicker(true); }}
               accessibilityRole="button" accessibilityLabel="Select date and time"
             >
               <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
                 {formatDateTime(txDatetime)}
               </Text>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </TouchableOpacity>
@@ -498,7 +533,7 @@ export default function AddTransactionScreen() {
           <Frow label="Account">
             <TouchableOpacity
               style={ss.frowTouchable}
-              onPress={() => setShowAccountPicker(true)}
+              onPress={() => { dismissNumpad(); setShowAccountPicker(true); }}
               accessibilityRole="button" accessibilityLabel="Select account"
             >
               <Text
@@ -512,7 +547,7 @@ export default function AddTransactionScreen() {
                   ? (selectedAccount.alias ?? `${selectedAccount.institution} — ${selectedAccount.account_name}`)
                   : 'Select account'}
               </Text>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </TouchableOpacity>
@@ -520,7 +555,7 @@ export default function AddTransactionScreen() {
           <Frow label="Category">
             <TouchableOpacity
               style={ss.frowTouchable}
-              onPress={() => setShowCategoryPicker(true)}
+              onPress={() => { dismissNumpad(); setShowCategoryPicker(true); }}
               accessibilityRole="button" accessibilityLabel="Select category"
             >
               <Text style={[
@@ -529,7 +564,7 @@ export default function AddTransactionScreen() {
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Optional'}
               </Text>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M9 18l6-6-6-6" stroke={selectedCategory ? colors.brand : colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </TouchableOpacity>
@@ -548,7 +583,7 @@ export default function AddTransactionScreen() {
           <Frow label="Repeats" isLast>
             <TouchableOpacity
               style={ss.frowTouchable}
-              onPress={() => setShowRecurrencePicker(true)}
+              onPress={() => { dismissNumpad(); setShowRecurrencePicker(true); }}
               accessibilityRole="button" accessibilityLabel="Select recurrence"
             >
               <Text style={[
@@ -557,27 +592,38 @@ export default function AddTransactionScreen() {
               ]}>
                 {recurrence ? recurrence.label : 'Never'}
               </Text>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </TouchableOpacity>
           </Frow>
         </View>
+      </ScrollView>
 
-        {/* ── Numpad ── */}
-        <Numpad value={amountStr} onChange={setAmountStr} />
-
-        {/* ── Save button ── */}
+      {/* ── FAB Save button ── */}
+      <Animated.View
+        style={[ss.fabWrap, { bottom: fabRestBottom }, { transform: [{ translateY: fabTranslateY }] }]}
+      >
         <Button
           variant="green"
           onPress={handleSave}
           disabled={!canSave || createTx.isPending}
           loading={createTx.isPending}
+          fullWidth={false}
+          style={{ opacity: 1, paddingHorizontal: spacing.xxl }}
           accessibilityLabel="Save transaction"
         >
-          Save Transaction
+          Save
         </Button>
-      </ScrollView>
+      </Animated.View>
+
+      {/* ── Numpad slide-up panel ── */}
+      <Animated.View
+        style={[ss.numpadPanel, { backgroundColor: colors.cardBg, borderTopColor: colors.border, paddingBottom: insets.bottom }, { transform: [{ translateY: numpadTranslateY }] }]}
+        onLayout={(e) => setNumpadHeight(e.nativeEvent.layout.height)}
+      >
+        <Numpad value={amountStr} onChange={setAmountStr} />
+      </Animated.View>
 
       {/* ── DateTimePicker ── */}
       {showDatePicker && (
@@ -669,8 +715,7 @@ const ss = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxxl + 16,
+    paddingTop: spacing.sm,
     gap: spacing.md,
   },
   amtCard: {
@@ -679,9 +724,12 @@ const ss = StyleSheet.create({
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   amtRow: { flexDirection: 'row', alignItems: 'center' },
-  caret: { width: spacing.xxs, height: layout.btnHeight, borderRadius: 1.5, marginLeft: spacing.xxs },
+  caret: { width: 2, height: layout.btnHeight, borderRadius: 1, marginLeft: 2 },
   amtSym: { ...type_.h1, lineHeight: layout.btnHeight, marginRight: 2 },
   amtNum: { ...type_.displayXl },
   formCard: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
@@ -693,7 +741,7 @@ const ss = StyleSheet.create({
     gap: spacing.sm,
     minHeight: layout.rowMinHeight + spacing.xs,
   },
-  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxs + spacing.xs },
+  frowTouchable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
   frowInput: { flex: 1, ...type_.bodyReg, padding: 0 },
   frowValue: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   numpad: { marginHorizontal: 0, borderRadius: radius.md, overflow: 'hidden', gap: 1 },
@@ -701,10 +749,27 @@ const ss = StyleSheet.create({
   numKey: { flex: 1, height: layout.btnHeightSm, alignItems: 'center', justifyContent: 'center' },
   numKeyText: { ...type_.numpad },
   saveBar: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
-  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs + spacing.xs },
+  pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },
   pickerEmpty: { paddingHorizontal: spacing.xl, paddingVertical: spacing.xxl, alignItems: 'center' },
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   dtSheet: { paddingBottom: spacing.xxl, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
   dtDoneBtn: { margin: spacing.lg, paddingVertical: spacing.mdn, borderRadius: radius.sm, alignItems: 'center' },
+  fabWrap: {
+    position: 'absolute',
+    right: spacing.xl,
+    zIndex: 20,
+  },
+  numpadPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
+  },
 });

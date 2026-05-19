@@ -474,7 +474,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     timeInput: {
       borderWidth: 1.5,
       borderRadius: radius.smd,
-      paddingVertical: spacing.xxs + spacing.xxs,
+      paddingVertical: spacing.xxs,
       paddingHorizontal: spacing.smd,
       ...type_.bodyReg,
       ...ff(700),
@@ -527,7 +527,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
     permBtn: {
       borderRadius: radius.xs,
       borderWidth: 1.5,
-      paddingVertical: spacing.xxs + spacing.xxs,
+      paddingVertical: spacing.xxs,
       paddingHorizontal: spacing.md,
     },
     permBtnText: { ...type_.small },

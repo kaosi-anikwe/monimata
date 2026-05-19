@@ -845,7 +845,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
     },
     chip: {
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xxs + spacing.xs,
+      paddingVertical: spacing.xxs,
       borderRadius: radius.full,
       borderWidth: 1.5,
     },
@@ -917,9 +917,9 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
     artContent: { flex: 1, minWidth: 0 },
     artTag: { ...type_.labelSm },
     artTitle: { ...type_.bodyReg, lineHeight: 18, marginTop: spacing.xxs },
-    artMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs + spacing.xs, marginTop: spacing.xxs + spacing.xs },
+    artMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs, marginTop: spacing.xxs },
     artMetaTxt: { ...type_.caption },
-    artXpBadge: { borderRadius: radius.xxs, paddingHorizontal: spacing.xxs + spacing.xs, paddingVertical: 2 },
+    artXpBadge: { borderRadius: radius.xxs, paddingHorizontal: spacing.xxs, paddingVertical: 2 },
     artXpTxt: { ...type_.caption },
     emptyWrap: { alignItems: 'center', paddingVertical: spacing.xxl },
     emptyTxt: { ...type_.body },
@@ -962,11 +962,11 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
     courseMiniInfo: { padding: spacing.smd },
     courseTag: { ...type_.labelSm },
     courseTitle: { ...type_.bodyReg, lineHeight: 18, marginTop: spacing.xxs },
-    courseMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs + spacing.xxs, marginTop: spacing.xxs + spacing.xs },
+    courseMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs, marginTop: spacing.xxs },
     courseLessons: { ...type_.labelSm },
-    courseXpBadge: { borderRadius: radius.xxs, paddingHorizontal: spacing.xxs + spacing.xxs, paddingVertical: 2 },
+    courseXpBadge: { borderRadius: radius.xxs, paddingHorizontal: spacing.xxs, paddingVertical: 2 },
     courseXpTxt: { ...type_.labelSm },
-    courseProg: { height: layout.progressSm, borderRadius: 2, marginTop: spacing.xxs + spacing.xs, overflow: 'hidden' },
+    courseProg: { height: layout.progressSm, borderRadius: 2, marginTop: spacing.xxs, overflow: 'hidden' },
     courseProgFill: { height: '100%', borderRadius: 2 },
 
     // ── Course list row (chal-c style) ────────────────────────────────────────
@@ -1002,7 +1002,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
     chXpBadge: { borderRadius: radius.xxs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xxs },
     chXpTxt: { ...type_.caption },
     chProgTxt: { ...type_.caption },
-    chBar: { height: layout.progressSm + 1, borderRadius: 2, marginTop: spacing.xxs + spacing.xs, overflow: 'hidden' },
+    chBar: { height: layout.progressSm + 1, borderRadius: 2, marginTop: spacing.xxs, overflow: 'hidden' },
     chFill: { height: '100%', borderRadius: 2 },
 
     // ── Daily quiz card ───────────────────────────────────────────────────────
@@ -1017,7 +1017,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
     },
     dailyEmoji: { ...type_.displayLg, marginBottom: spacing.md },
     dailyTitle: { ...type_.h3 },
-    dailySub: { ...type_.bodyReg, marginTop: spacing.xxs + spacing.xxs },
+    dailySub: { ...type_.bodyReg, marginTop: spacing.xxs },
     startBtn: {
       marginTop: spacing.lg,
       height: layout.fabSize,

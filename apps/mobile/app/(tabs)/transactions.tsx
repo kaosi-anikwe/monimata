@@ -56,7 +56,7 @@ import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
 import { queryKeys } from '@/lib/queryKeys';
 import { useTheme } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
-import { type_ } from '@/lib/typography';
+import { ff, type_ } from '@/lib/typography';
 import type { CategoryGroup } from '@/types/category';
 import type { BankAccount, Transaction } from '@monimata/shared-types';
 
@@ -132,7 +132,7 @@ function CategoryPickerSheet({ visible, groups, onSelect, onClose }: CategoryPic
           >
             <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{item.name}</Text>
             <View>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </View>
@@ -203,71 +203,74 @@ function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLas
     >
       {/* Icon bubble */}
       <View style={[ss.txIcon, { backgroundColor: iconBg }]}>
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+        <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
           {isDebit
             ? <Path d="M12 19V5M5 12l7-7 7 7" stroke={amountColor} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
             : <Path d="M12 5v14M5 12l7 7 7-7" stroke={amountColor} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />}
         </Svg>
       </View>
 
-      {/* Info column */}
+      {/* Content */}
       <View style={ss.txInfo}>
-        <Text style={[type_.small, { color: colors.textPrimary }]} numberOfLines={1}>
+        {/* Row 1: narration */}
+        <Text style={[type_.body, { color: colors.textPrimary, ...ff(500) }]} numberOfLines={2}>
           {tx.narration}
         </Text>
-        <View style={ss.txMeta}>
-          {/* Category chip — for split transactions show a distinct indicator */}
-          {tx.is_split ? (
-            <View style={[ss.txCatChip, { backgroundColor: colors.infoSubtle }]}>
-              <Text style={[ss.txCatChipText, { color: colors.info }]}>Split ✦</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              onPress={(e) => { e.stopPropagation?.(); onCategoryPress(); }}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel="Change category"
-            >
-              <View style={[
-                ss.txCatChip,
-                tx.category_id
-                  ? { backgroundColor: colors.surface }
-                  : { backgroundColor: colors.warningSubtle },
-              ]}>
-                <Text style={[
-                  ss.txCatChipText,
-                  { color: tx.category_id ? colors.brand : colors.warningText },
-                ]}>
-                  {categoryName ?? 'Uncategorised'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
-          {/* Account · time */}
-          {accountLabel && (
-            <Text style={[type_.caption, { color: colors.textMeta }]}>{accountLabel} · {txTime(tx.date)}</Text>
-          )}
-          {!accountLabel && (
-            <Text style={[type_.caption, { color: colors.textMeta }]}>{txTime(tx.date)}</Text>
-          )}
-          {/* Recurring badge */}
-          {tx.recurrence_id && (
-            <Text style={[type_.caption, { color: colors.textMeta }]}>↻ Recurring</Text>
-          )}
-        </View>
-      </View>
 
-      {/* Amount column */}
-      <View style={ss.txAmt}>
-        <Text style={[ss.txAmtNum, { color: amountColor }]}>
-          {sign}{formatNaira(Math.abs(tx.amount))}
-        </Text>
-        {/* <Text style={[type_.caption, { color: colors.textMeta }]}>{isDebit ? 'Debit' : 'Credit'}</Text> */}
-        {tx.source === 'manual' && (
-          <View style={[ss.manualBadge, { backgroundColor: colors.infoSubtle }]}>
-            <Text style={[ss.manualBadgeText, { color: colors.info }]}>MANUAL</Text>
+        {/* Row 2: meta col + amount */}
+        <View style={ss.txSecondRow}>
+          {/* Left column */}
+          <View style={ss.txMetaCol}>
+            {/* Tags row: category · manual · AI */}
+            <View style={ss.txTagsRow}>
+              {tx.is_split ? (
+                <View style={[ss.txCatChip, { backgroundColor: colors.infoSubtle }]}>
+                  <Text style={[ss.txCatChipText, { color: colors.info }]}>Split ✦</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={(e) => { e.stopPropagation?.(); onCategoryPress(); }}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change category"
+                >
+                  <View style={[
+                    ss.txCatChip,
+                    tx.category_id
+                      ? { backgroundColor: colors.surface }
+                      : { backgroundColor: colors.warningSubtle },
+                  ]}>
+                    <Text style={[
+                      ss.txCatChipText,
+                      { color: tx.category_id ? colors.brand : colors.warningText },
+                    ]}>
+                      {categoryName ?? (tx.type === 'credit' ? 'TBB' : 'Uncategorised')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              {tx.source === 'manual' && (
+                <View style={[ss.txBadge, { backgroundColor: colors.infoSubtle }]}>
+                  <Text style={[ss.txBadgeText, { color: colors.info }]}>MANUAL</Text>
+                </View>
+              )}
+              {tx.categorization_source === 'llm' && (
+                <Ionicons name="sparkles" size={11} color={colors.textMeta} />
+              )}
+            </View>
+            {/* Account · time row */}
+            <Text style={[type_.caption, { color: colors.textMeta, marginTop: spacing.xxs }]} numberOfLines={1}>
+              {[accountLabel, txTime(tx.date), tx.recurrence_id ? '↻' : null].filter(Boolean).join(' · ')}
+            </Text>
           </View>
-        )}
+
+          {/* Amount */}
+          <View style={ss.txAmt}>
+            <Text style={[ss.txAmtNum, { color: amountColor }]}>
+              {sign}{formatNaira(Math.abs(tx.amount))}
+            </Text>
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -485,7 +488,7 @@ export default function TransactionsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <Ionicons name="arrow-back" size={16} color={colors.brand} />
+            <Ionicons name="arrow-back" size={type_.bodyXl.fontSize} color={colors.brand} />
           </TouchableOpacity>
           <Text style={[ss.hdrTitle, { color: colors.textPrimary }]}>Transactions</Text>
           <TouchableOpacity
@@ -495,7 +498,7 @@ export default function TransactionsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Upload receipt"
           >
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M14 2v6h6" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M12 12v6M9 15l3-3 3 3" stroke={colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
@@ -506,7 +509,7 @@ export default function TransactionsScreen() {
         {/* Search bar */}
         <TourTarget id="tx-search">
           <View style={[ss.searchBar, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Circle cx={11} cy={11} r={8} stroke={colors.textTertiary} strokeWidth={2} />
               <Path d="M21 21l-4.35-4.35" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" />
             </Svg>
@@ -699,7 +702,7 @@ const ss = StyleSheet.create({
   // Tx row
   txRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
     paddingHorizontal: spacing.mdn,
     paddingVertical: spacing.smd,
@@ -717,16 +720,25 @@ const ss = StyleSheet.create({
     flexShrink: 0,
   },
   txInfo: { flex: 1, minWidth: 0 },
-  txMeta: {
+  txSecondRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+    gap: spacing.smd,
+  },
+  txMetaCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  txTagsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xxs + spacing.xxs,
-    marginTop: spacing.xxs,
-    flexWrap: 'nowrap',
-    overflow: 'hidden',
+    gap: spacing.xxs,
+    flexWrap: 'wrap',
   },
   txCatChip: {
-    paddingHorizontal: spacing.xxs + spacing.xxs,
+    paddingHorizontal: spacing.xxs,
     paddingVertical: 1,
     borderRadius: radius.xxs,
   },
@@ -738,14 +750,13 @@ const ss = StyleSheet.create({
   txAmt: { alignItems: 'flex-end', flexShrink: 0 },
   txAmtNum: { ...type_.body },
 
-  // Manual badge
-  manualBadge: {
-    paddingHorizontal: spacing.xxs + spacing.xxs,
-    paddingVertical: 2,
+  // Inline badges (manual, AI, etc.)
+  txBadge: {
+    paddingHorizontal: spacing.xxs,
+    paddingVertical: 1,
     borderRadius: radius.xxs,
-    marginTop: 2,
   },
-  manualBadgeText: { ...type_.micro },
+  txBadgeText: { ...type_.micro },
 
   // Uncategorised banner
   uncatBanner: {
@@ -761,7 +772,7 @@ const ss = StyleSheet.create({
   // Category picker sheet rows
   pickerGroupHeader: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xxs + spacing.xs,
+    paddingVertical: spacing.xxs,
   },
   pickerCatRow: {
     flexDirection: 'row',

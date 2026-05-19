@@ -278,7 +278,7 @@ function RootNavigator() {
                 ['bulb-outline', 'Smart tips based on your spending patterns'],
               ] as const).map(([icon, label]) => (
                 <View key={label} style={ns.bullet}>
-                  <Ionicons name={icon} size={16} color={colors.brand} style={ns.bulletIcon} />
+                  <Ionicons name={icon} size={type_.bodyXl.fontSize} color={colors.brand} style={ns.bulletIcon} />
                   <Text style={ns.bulletText}>{label}</Text>
                 </View>
               ))}

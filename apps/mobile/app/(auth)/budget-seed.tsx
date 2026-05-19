@@ -231,7 +231,7 @@ export default function BudgetSeedScreen() {
                   <View
                     style={[ss.groupIconTile, { backgroundColor: colors.surfaceElevated }]}
                   >
-                    <Ionicons name={group.icon} size={16} color={colors.brand} />
+                    <Ionicons name={group.icon} size={type_.bodyXl.fontSize} color={colors.brand} />
                   </View>
                   <Text style={[ss.groupName, { color: colors.textSecondary }]}>
                     {group.label.toUpperCase()}
@@ -243,7 +243,7 @@ export default function BudgetSeedScreen() {
                   </Text>
                   <Ionicons
                     name={isOpen ? 'chevron-down' : 'chevron-forward'}
-                    size={14}
+                    size={type_.bodyXl.fontSize}
                     color={colors.textTertiary}
                   />
                 </View>
@@ -300,7 +300,7 @@ export default function BudgetSeedScreen() {
           <Text style={[ss.startTxt, { color: colors.darkGreen }]}>
             Let&apos;s start budgeting!
           </Text>
-          <Ionicons name="rocket-outline" size={18} color={colors.darkGreen} />
+          <Ionicons name="rocket-outline" size={type_.bodyXl.fontSize} color={colors.darkGreen} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -316,7 +316,7 @@ export default function BudgetSeedScreen() {
           }}
           activeOpacity={0.75}
         >
-          <Ionicons name="settings-outline" size={16} color={colors.brand} />
+          <Ionicons name="settings-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
           <Text style={[ss.customiseTxt, { color: colors.brand }]}>Customise my categories</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -385,7 +385,7 @@ function makeStyles(colors: ThemeColors) {
     },
     statDivider: {
       width: 1,
-      height: layout.avatarSm - spacing.xs,
+      height: layout.avatarSm,
       backgroundColor: colors.overlayGhostBorder,
     },
     // ── Scroll area ──
@@ -421,8 +421,8 @@ function makeStyles(colors: ThemeColors) {
       gap: spacing.sm,
     },
     groupIconTile: {
-      width: layout.avatarSm - spacing.xs,
-      height: layout.avatarSm - spacing.xs,
+      width: layout.avatarSm,
+      height: layout.avatarSm,
       borderRadius: radius.xs,
       alignItems: 'center',
       justifyContent: 'center',

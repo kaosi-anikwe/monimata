@@ -53,7 +53,7 @@ function txModelToDto(m: TransactionModel): Transaction {
     source: m.source as 'bank_alert' | 'manual',
     recurrence_id: m.recurrenceId,
     splits: [],
-    categorization_source: null,
+    categorization_source: m.categorizationSource as unknown as Transaction['categorization_source'],
     category_confidence: 0,
     created_at: m.createdAt.toISOString(),
     updated_at: m.updatedAt.toISOString(),

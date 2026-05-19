@@ -123,7 +123,7 @@ export function Button({
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       >
         {loading
-          ? <ActivityIndicator size={14} color={isDark ? colors.white : colors.textSecondary} />
+          ? <ActivityIndicator size={type_.bodyXl.fontSize} color={isDark ? colors.white : colors.textSecondary} />
           : children}
       </AnimatedTouchable>
     );
@@ -151,7 +151,7 @@ export function Button({
       accessibilityHint={accessibilityHint}
     >
       {loading ? (
-        <ActivityIndicator size={18} color={variantStyle.loaderColor} />
+        <ActivityIndicator size={type_.bodyXl.fontSize} color={variantStyle.loaderColor} />
       ) : (
         <View style={s.inner}>
           {icon && <View style={s.iconSlot}>{icon}</View>}

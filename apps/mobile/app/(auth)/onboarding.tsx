@@ -323,7 +323,7 @@ export default function OnboardingScreen() {
               { backgroundColor: colors.surface, borderColor: colors.borderBrand },
             ]}
           >
-            <Ionicons name="sparkles-outline" size={16} color={colors.brand} />
+            <Ionicons name="sparkles-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
             <Text style={[ss.previewTxt, { color: colors.textSecondary }]}>
               We&apos;re adding categories to match your situation…
             </Text>
@@ -379,12 +379,12 @@ function makeStyles(colors: ThemeColors) {
     },
     stepDots: {
       flexDirection: 'row',
-      gap: spacing.xxs + spacing.xxs,
+      gap: spacing.xxs,
       marginBottom: spacing.smd,
     },
     stepDot: {
       flex: 1,
-      height: spacing.xxs + spacing.xxs,
+      height: spacing.xxs,
       borderRadius: spacing.xxs,
     },
     stepMeta: {
@@ -396,7 +396,7 @@ function makeStyles(colors: ThemeColors) {
       ...type_.displaySm,
       letterSpacing: -0.3,
       color: colors.white,
-      marginBottom: spacing.xxs + spacing.xxs,
+      marginBottom: spacing.xxs,
     },
     headerSub: {
       ...type_.bodyReg,

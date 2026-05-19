@@ -138,7 +138,7 @@ export function BackArrow() {
 // ─── EyeIcon ─────────────────────────────────────────────────────────────────
 
 export function EyeIcon({ open, color }: { open: boolean; color: string }) {
-  return <Ionicons name={open ? 'eye-off-outline' : 'eye-outline'} size={18} color={color} />;
+  return <Ionicons name={open ? 'eye-off-outline' : 'eye-outline'} size={type_.bodyXl.fontSize} color={color} />;
 }
 
 // ─── AuthHdr ──────────────────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ export function TrustCard({ text, colors }: { text: string; colors: ThemeColors 
         { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
     >
-      <Ionicons name="shield-checkmark-outline" size={18} color={colors.brand} style={{ marginTop: 1 }} />
+      <Ionicons name="shield-checkmark-outline" size={type_.bodyXl.fontSize} color={colors.brand} style={{ marginTop: 1 }} />
       <Text style={[trustS.text, { color: colors.textSecondary }]}>{text}</Text>
     </View>
   );

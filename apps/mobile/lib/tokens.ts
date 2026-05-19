@@ -66,26 +66,26 @@ export const radius = {
 // 4-pt base grid matching the mockup's padding/gap values.
 
 export const spacing = {
-  /** 3 pt — tight gaps (sidebar items) */
-  xxs: 3,
+  /** 3 pt — tight gaps (sidebar items) -- has been increased by 5 */
+  xxs: 3 + 5,
   /** 4 pt */
-  xs: 4,
+  xs: 4 + 5,
   /** 8 pt */
-  sm: 8,
+  sm: 8 + 5,
   /** 10 pt */
-  smd: 10,
+  smd: 10 + 5,
   /** 12 pt */
-  md: 12,
+  md: 12 + 5,
   /** 14 pt */
-  mdn: 14,
+  mdn: 14 + 5,
   /** 16 pt */
-  lg: 16,
+  lg: 16 + 5,
   /** 20 pt */
-  xl: 20,
+  xl: 20 + 5,
   /** 24 pt */
-  xxl: 24,
+  xxl: 24 + 5,
   /** 32 pt */
-  xxxl: 32,
+  xxxl: 32 + 5,
 } as const;
 
 // ─── Shadows ─────────────────────────────────────────────────────────────────
@@ -170,7 +170,7 @@ export const layout = {
   fabTabOverlap: 22,
 
   /** Standard list row minimum tap height (accessibility). */
-  rowMinHeight: 44,
+  rowMinHeight: 50,
 
   /** Primary CTA button height — lime variant. */
   btnHeightLg: 54,

@@ -314,7 +314,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
           <View style={[ss.whyCard, { backgroundColor: colors.surface, borderRadius: radius.sm }]}>
             <Ionicons
               name="information-circle-outline"
-              size={18}
+              size={type_.bodyXl.fontSize}
               color={colors.textMeta}
               style={{ marginTop: 1 }}
             />
@@ -420,7 +420,7 @@ function NudgeCard({ nudge, onPress }: NudgeCardProps) {
         </Text>
       </View>
 
-      <Ionicons name="chevron-forward" size={16} color={colors.textMeta} />
+      <Ionicons name="chevron-forward" size={type_.bodyXl.fontSize} color={colors.textMeta} />
     </TouchableOpacity>
   );
 }
@@ -540,7 +540,7 @@ const ss = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.smd,
     paddingHorizontal: spacing.smd,
-    paddingVertical: spacing.xxs + spacing.xxs,
+    paddingVertical: spacing.xxs,
     flexShrink: 0,
   },
   markAllText: { ...type_.small },

@@ -16,12 +16,12 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getDatabase } from '@/database';
-import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/Toast';
-import { syncDatabase } from '@/database/sync';
-import { useAppSelector } from '@/store/hooks';
+import { getDatabase } from '@/database';
 import RecurringRuleModel from '@/database/models/RecurringRule';
+import { syncDatabase } from '@/database/sync';
+import { queryKeys } from '@/lib/queryKeys';
+import { useAppSelector } from '@/store/hooks';
 import type { RecurringFrequency, RecurringRule, RecurringTemplate } from '@monimata/shared-types';
 
 export interface RecurringRuleBody {
@@ -93,6 +93,7 @@ export function useCreateRecurringRule() {
           r.endsOn = body.ends_on ?? null;
           r.isActive = true;
           r.template = JSON.stringify(body.template);
+          r.updatedAt = new Date();
         });
       });
       syncDatabase().catch(console.warn);
