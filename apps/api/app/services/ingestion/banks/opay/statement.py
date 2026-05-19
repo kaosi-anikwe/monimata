@@ -157,7 +157,8 @@ _LAYOUT_B: _Layout = {
 # OWealth Withdrawal row is split across a page boundary.
 _OPAY_INTERNAL_RE = re.compile(
     r"^(OWealth Withdrawal|Auto-save to OWealth|Spend & Save|OWealth Deposit"
-    r"|\(Transaction Payment\))",
+    r"|\(Transaction Payment\)"
+    r"|Balance)",  # OWealth auto-deposit mirrored from wallet, labeled "Balance" by OPay
     re.IGNORECASE,
 )
 

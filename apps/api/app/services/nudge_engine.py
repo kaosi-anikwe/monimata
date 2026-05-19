@@ -161,6 +161,25 @@ RECEIPT_FAILED_MESSAGES: dict[str, str] = {
     ),
 }
 
+# Maps operational trigger_type → navigation screen.
+# Used only for statement/receipt/transaction notifications — not for nudges
+# (those always go to the nudges screen via trigger_type="nudge").
+# Valid screen values the app must handle:
+#   "transactions"  – transaction list (account feed)
+#   "transaction"   – single transaction detail (requires data.transaction_id)
+#   "accounts"      – accounts / linked-banks screen
+#   "nudges"        – in-app notifications list
+PUSH_SCREEN: dict[str, str] = {
+    "transaction_received": "transactions",
+    "statement_received": "accounts",
+    "statement_processed": "transactions",
+    "statement_failed": "accounts",
+    "receipt_received": "transactions",
+    "receipt_processed": "transaction",
+    "receipt_duplicate": "transaction",
+    "receipt_failed": "nudges",
+}
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -271,6 +290,7 @@ def create_nudge(
     category_id: str | None = None,
     *,
     send_push: bool = True,
+    transaction_id: str | None = None,
     push_data: dict | None = None,
 ) -> Nudge:
     """
@@ -301,15 +321,28 @@ def create_nudge(
     db.flush()  # populate nudge.id without committing the outer transaction
 
     if send_push and not quiet and user.expo_push_token:
-        _push_data = {"nudge_id": nudge.id, "trigger_type": trigger_type}
+        nudge_type = nudge.context.get("nudge_type") or trigger_type if nudge.context else ""
+        _push_data = {
+            "trigger_type": trigger_type,
+            "nudge_id": nudge.id,
+            "nudge_type": nudge_type,
+            "screen": PUSH_SCREEN.get(trigger_type, "nudges"),
+        }
+        if nudge.category_id:
+            _push_data["category_id"] = nudge.category_id
+        if transaction_id:
+            _push_data["transaction_id"] = transaction_id
         if push_data:
             _push_data.update(push_data)
-        send_push_notification(
+        expired = send_push_notification(
             token=user.expo_push_token,
             title=title,
             body=message,
             data=_push_data,
         )
+        if expired:
+            user.expo_push_token = None
+            db.flush()
 
     logger.info(
         "Nudge created: type=%s user=%s category=%s queued=%s",
@@ -326,6 +359,7 @@ def create_nudge(
 
 def send_transaction_received_push(
     user: User,
+    db: Session,
     amount_kobo: int,
     transaction_type: str,
     narration: str,
@@ -368,12 +402,19 @@ def send_transaction_received_push(
         balance_naira=balance_str,
     )
 
-    send_push_notification(
+    expired = send_push_notification(
         token=user.expo_push_token,
         title=title,
         body=message,
-        data={"trigger_type": "transaction_received", "amount_kobo": abs(amount_kobo)},
+        data={
+            "trigger_type": "transaction_received",
+            "screen": "transactions",
+            "amount_kobo": abs(amount_kobo),
+        },
     )
+    if expired:
+        user.expo_push_token = None
+        db.flush()
     logger.debug(
         "send_transaction_received_push: sent to user=%s amount=%d type=%s",
         user.id,
@@ -468,7 +509,7 @@ def send_receipt_processed_push(
             "direction": direction,
             "transaction_id": transaction_id,
         },
-        push_data={"transaction_id": transaction_id},
+        transaction_id=transaction_id,
     )
     db.commit()
 
@@ -498,7 +539,7 @@ def send_receipt_duplicate_push(
             "amount_naira": amount_naira,
             "transaction_id": transaction_id,
         },
-        push_data={"transaction_id": transaction_id},
+        transaction_id=transaction_id,
     )
     db.commit()
 
@@ -648,6 +689,7 @@ def evaluate_transaction_nudges(db: Session, tx: Transaction) -> None:
                 "tx_id": tx.id,
             },
             category_id=tx.category_id,
+            transaction_id=tx.id,
         )
 
     # ── threshold_100: budget exhausted / overspent ───────────────────────────

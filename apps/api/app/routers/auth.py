@@ -116,6 +116,7 @@ async def register(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
     seed_default_categories(db, user)
+    _update_streak(user)
     db.commit()
 
     access_token = create_access_token(subject=user.id)
@@ -144,6 +145,7 @@ async def login(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     user.last_login = datetime.now(UTC)
+    _update_streak(user)
     db.commit()
 
     access_token = create_access_token(subject=user.id)

@@ -159,12 +159,14 @@ def deliver_queued_nudges() -> None:
             nudge.delivered_at = now
             user: User | None = db.get(User, nudge.user_id)
             if user and user.expo_push_token:
-                send_push_notification(
+                expired = send_push_notification(
                     token=user.expo_push_token,
                     title=nudge.title or "MoniMata",
                     body=nudge.message,
                     data={"nudge_id": nudge.id, "trigger_type": nudge.trigger_type},
                 )
+                if expired:
+                    user.expo_push_token = None
             notified_users.add(str(nudge.user_id))
 
         db.commit()
