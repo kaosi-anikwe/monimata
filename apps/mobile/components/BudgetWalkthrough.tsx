@@ -274,7 +274,7 @@ function makeStyles(colors: ThemeColors) {
       ...type_.bodyReg,
       color: colors.textSecondary,
       textAlign: 'center',
-      lineHeight: 24,
+      lineHeight: 27,
       maxWidth: 320,
     },
     dots: {

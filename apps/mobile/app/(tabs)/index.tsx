@@ -673,7 +673,7 @@ const s = StyleSheet.create({
     padding: spacing.md,
     paddingHorizontal: spacing.mdn,
   },
-  nudgeTxt: { ...type_.small, lineHeight: 18 },
+  nudgeTxt: { ...type_.small, lineHeight: 21 },
 
   // Streak card
   streakCard: {
@@ -726,7 +726,7 @@ const s = StyleSheet.create({
   // Goals
   emptyGoals: {
     ...type_.body,
-    lineHeight: 22,
+    lineHeight: 25,
     textAlign: 'center',
     paddingVertical: spacing.xl,
   },

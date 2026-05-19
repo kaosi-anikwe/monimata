@@ -250,7 +250,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     height: layout.tabBarHeight,
     alignItems: 'flex-start',
-    paddingTop: spacing.xl,
+    paddingVertical: spacing.smd,
   },
 
   tabItem: {

@@ -187,7 +187,7 @@ export const s = StyleSheet.create({
   // Legacy alias — kept so existing callers compile without changes
   backBtn: { marginBottom: spacing.mdn },
   authTitle: { ...type_.h1, marginBottom: spacing.xs },
-  authSub: { ...type_.body, lineHeight: 21 },
+  authSub: { ...type_.body, lineHeight: 24 },
 
   // Scrollable body below header
   body: { padding: spacing.xxl, paddingBottom: spacing.xxxl + spacing.lg },
@@ -218,7 +218,7 @@ export const s = StyleSheet.create({
 
   // Terms of service note — below submit button on register screen
   tosWrap: { marginTop: spacing.md, paddingHorizontal: spacing.xs, alignItems: 'center' },
-  tosText: { ...type_.caption, textAlign: 'center', lineHeight: 17 },
+  tosText: { ...type_.caption, textAlign: 'center', lineHeight: 20 },
   tosLink: { ...ff(600), textDecorationLine: 'underline' },
 
   // Password field helpers
@@ -254,7 +254,7 @@ const trustS = StyleSheet.create({
     marginBottom: spacing.xl,
     alignItems: 'flex-start',
   },
-  text: { ...type_.small, lineHeight: 19, flex: 1 },
+  text: { ...type_.small, lineHeight: 22, flex: 1 },
 });
 
 // Expo Router requires a default export from every file inside app/.

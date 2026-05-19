@@ -126,7 +126,7 @@ const s = StyleSheet.create({
   body: {
     ...type_.bodyReg,
     textAlign: 'center',
-    lineHeight: 21,
+    lineHeight: 24,
   },
   actionWrap: {
     marginTop: spacing.xl,

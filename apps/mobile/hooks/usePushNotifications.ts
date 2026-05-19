@@ -82,6 +82,36 @@ export function usePushNotifications(): PushNotificationConsent {
 
   const handleNotificationTap = useCallback(async (data: Record<string, unknown> | null) => {
     const triggerType = data?.trigger_type;
+
+    if (triggerType === 'nudge') {
+      switch (data?.screen) {
+        case 'transaction':
+          if (typeof data?.transaction_id === 'string') {
+            try {
+              await getDatabase().get('transactions').find(data.transaction_id);
+              router.push(`/transaction/${data.transaction_id}` as never);
+            } catch {
+              router.push('/(tabs)/nudges');
+            }
+          } else {
+            router.push('/(tabs)/nudges');
+          }
+          break;
+        case 'budget':
+          router.push('/(tabs)/budget');
+          break;
+        case 'transactions':
+          router.push('/(tabs)/transactions');
+          break;
+        case 'accounts':
+          router.push('/(tabs)/accounts');
+          break;
+        default:
+          router.push('/(tabs)/nudges');
+      }
+      return;
+    }
+
     if (
       (triggerType === 'receipt_processed' || triggerType === 'receipt_duplicate') &&
       typeof data?.transaction_id === 'string'
@@ -93,9 +123,12 @@ export function usePushNotifications(): PushNotificationConsent {
         router.push('/(tabs)/transactions');
       }
     } else if (
+      triggerType === 'transaction_received' ||
       triggerType === 'receipt_received' ||
+      triggerType === 'receipt_failed' ||
+      triggerType === 'statement_received' ||
       triggerType === 'statement_processed' ||
-      triggerType === 'statement_received'
+      triggerType === 'statement_failed'
     ) {
       router.push('/(tabs)/transactions');
     } else {
@@ -163,12 +196,13 @@ export function usePushNotifications(): PushNotificationConsent {
       Notifications.addNotificationReceivedListener((notification: Notifications.Notification) => {
         const { title, body } = notification.request.content;
         if (title && body) {
+          const data = notification.request.content.data as Record<string, unknown> | null;
           confirm({
             title,
             message: body,
             confirmText: 'View',
             cancelText: 'Dismiss',
-            onConfirm: () => router.push('/(tabs)/nudges'),
+            onConfirm: () => handleNotificationTap(data),
           });
         }
       });

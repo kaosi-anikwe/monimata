@@ -335,7 +335,7 @@ function makeNsStyles(colors: ReturnType<typeof useTheme>) {
       ...type_.body,
       color: colors.textMeta,
       textAlign: 'center',
-      lineHeight: 22,
+      lineHeight: 25,
       marginBottom: spacing.lg + spacing.xs,
     },
     bullets: { width: '100%', marginBottom: spacing.xxl, gap: spacing.smd },

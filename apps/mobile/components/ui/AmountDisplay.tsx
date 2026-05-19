@@ -68,7 +68,7 @@ const SIZE_STYLES: Record<AmountSize, TextStyle> = {
   lg: { ...type_.displayMd },
   md: { ...type_.displaySm },
   sm: { ...type_.mono },
-  xs: { ...type_.bodyReg, ...ff(600), lineHeight: 18 },
+  xs: { ...type_.bodyReg, ...ff(600), lineHeight: 21 },
 };
 
 // ─── AmountDisplay ────────────────────────────────────────────────────────────

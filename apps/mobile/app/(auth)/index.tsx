@@ -230,7 +230,7 @@ function makeStyles(colors: ThemeColors) {
     slideText: {
       ...type_.bodyLg,
       ...ff(500),
-      lineHeight: 23,
+      lineHeight: 26,
       color: colors.textInverseSub,
       textAlign: 'center',
     },

@@ -402,8 +402,8 @@ function makeToastStyles(colors: ThemeColors) {
     },
     icon: { flexShrink: 0 },
     textWrap: { flex: 1 },
-    title: { ...type_.body, lineHeight: 20 },
-    message: { ...type_.bodyReg, lineHeight: 18, marginTop: 2 },
+    title: { ...type_.body, lineHeight: 23 },
+    message: { ...type_.bodyReg, lineHeight: 21, marginTop: 2 },
     dismiss: { flexShrink: 0, opacity: 0.55 },
   });
 }
@@ -442,7 +442,7 @@ function makeConfirmStyles(colors: ThemeColors) {
     message: {
       ...type_.body,
       color: colors.textMeta,
-      lineHeight: 21,
+      lineHeight: 24,
       marginBottom: spacing.xl,
     },
     row: { flexDirection: 'row', gap: spacing.sm },

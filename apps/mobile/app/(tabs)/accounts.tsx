@@ -578,7 +578,7 @@ function ReconcileSheet({ account, onClose }: ReconcileSheetProps) {
           autoFocus
         />
         <View style={[ss.stmtTip, { backgroundColor: colors.infoSubtle ?? colors.surface, borderColor: colors.infoBorder ?? colors.border }]}>
-          <Text style={[type_.caption, { color: colors.textMeta, lineHeight: 17 }]}>
+          <Text style={[type_.caption, { color: colors.textMeta, lineHeight: 20 }]}>
             If the actual balance differs from the recorded balance, a reconciliation adjustment transaction will be created automatically.
           </Text>
         </View>
@@ -677,7 +677,7 @@ function UploadStatementSheet({ account, onClose }: UploadStatementSheetProps) {
               <Path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z" stroke={colors.brand} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M13 2v7h7" stroke={colors.brand} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-            <Text style={[type_.small, { color: colors.textMeta, flex: 1, lineHeight: 17 }]}>
+            <Text style={[type_.small, { color: colors.textMeta, flex: 1, lineHeight: 20 }]}>
               The PDF will be matched to your{' '}
               <Text style={[{ color: colors.textPrimary }, ff(600)]}>{account.institution}</Text>{' '}
               account automatically.
@@ -748,7 +748,7 @@ function UploadStatementSheet({ account, onClose }: UploadStatementSheetProps) {
 
         {/* Tip */}
         <View style={[ss.stmtTip, { backgroundColor: colors.infoSubtle ?? colors.surface, borderColor: colors.infoBorder ?? colors.border }]}>
-          <Text style={[type_.caption, { color: colors.textMeta, lineHeight: 17 }]}>
+          <Text style={[type_.caption, { color: colors.textMeta, lineHeight: 20 }]}>
             PDF only · max 5 MB. Parsed in the background — transactions appear within a few minutes.
           </Text>
         </View>
@@ -1424,5 +1424,5 @@ const ss = StyleSheet.create({
     flexShrink: 0,
   },
   emailFwdTitle: { ...type_.body },
-  emailFwdSub: { ...type_.caption, lineHeight: 16, marginTop: 2 },
+  emailFwdSub: { ...type_.caption, lineHeight: 19, marginTop: 2 },
 });

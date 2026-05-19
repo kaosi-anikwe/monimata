@@ -361,7 +361,7 @@ function makeStyles(colors: ThemeColors) {
     headerSub: {
       ...type_.body,
       color: colors.textInverseSecondary,
-      lineHeight: 21,
+      lineHeight: 24,
       textAlign: 'center',
       marginBottom: spacing.xl,
     },

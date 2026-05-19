@@ -361,8 +361,8 @@ const sp = StyleSheet.create({
   stratRight: { alignItems: 'flex-end', flexShrink: 0 },
   stratCountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: "center", marginTop: spacing.xs, gap: 2 },
   stratAmt: { ...type_.body, ...ff(700), letterSpacing: -0.3 },
-  stratCnt: { ...type_.caption, ...ff(400), lineHeight: 14 },
-  noChange: { ...type_.small, lineHeight: 14 },
+  stratCnt: { ...type_.caption, ...ff(400), lineHeight: 17 },
+  noChange: { ...type_.small, lineHeight: 17 },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 72 },
 });
 
@@ -646,7 +646,7 @@ const pv = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.sm,
   },
-  warningTxt: { ...type_.bodyReg, flex: 1, lineHeight: 18 },
+  warningTxt: { ...type_.bodyReg, flex: 1, lineHeight: 21 },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 36,

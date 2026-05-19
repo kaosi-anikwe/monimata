@@ -490,7 +490,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    stepBtnText: { ...type_.subHead, lineHeight: 22 },
+    stepBtnText: { ...type_.subHead, lineHeight: 25 },
     stepValue: { ...type_.subHead, minWidth: 24, textAlign: 'center' },
     // tone selector
     toneWrap: { gap: spacing.sm },

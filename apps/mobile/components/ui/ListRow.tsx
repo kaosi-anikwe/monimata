@@ -223,7 +223,7 @@ const s = StyleSheet.create({
   },
   subtitle: {
     ...type_.small,
-    lineHeight: 17,
+    lineHeight: 20,
   },
   rightSlot: {
     flexShrink: 0,

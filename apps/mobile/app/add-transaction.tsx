@@ -26,6 +26,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  BackHandler,
   Modal,
   Platform,
   ScrollView,
@@ -49,7 +50,7 @@ import { layout, radius, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
 import type { CategoryGroup, CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
-import { computeNextDue, nairaStringToKobo } from '@/utils/money';
+import { computeNextDue } from '@/utils/money';
 import type { BankAccount } from '@monimata/shared-types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -63,14 +64,8 @@ function formatDateTime(d: Date): string {
 }
 
 function formatAmountDisplay(s: string): string {
-  if (!s) return '0';
-  if (s.includes('.')) {
-    const [intPart, decPart] = s.split('.');
-    const int = parseInt(intPart || '0', 10);
-    return `${new Intl.NumberFormat('en-NG').format(int)}.${decPart}`;
-  }
-  const int = parseInt(s, 10);
-  return isNaN(int) ? '0' : new Intl.NumberFormat('en-NG').format(int);
+  const kobo = parseInt(s || '0', 10);
+  return new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(kobo / 100);
 }
 
 // ─── TypeToggle (animated debit/credit pill) ───────────────────────────────
@@ -141,7 +136,6 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
   const K = (v: string) => (
     <TouchableOpacity key={v} style={keyStyle} onPress={() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      if (value === '0') { onChange(v); return; }
       onChange(value + v);
     }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel={v}>
       <Text style={[ss.numKeyText, { color: colors.textPrimary }]}>{v}</Text>
@@ -157,14 +151,13 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
       <View style={ss.numRow}>
         <TouchableOpacity style={[keyStyle, { flex: 2 }]} onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          if (value === '0') return;
           onChange(value + '0');
         }} activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="0">
           <Text style={[ss.numKeyText, { color: colors.textPrimary }]}>0</Text>
         </TouchableOpacity>
         <TouchableOpacity style={keyStyle} onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onChange(value.slice(0, -1) || '0')
+          onChange(value.slice(0, -1))
         }}
           activeOpacity={0.5} accessibilityRole="button" accessibilityLabel="Backspace">
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
@@ -384,6 +377,15 @@ export default function AddTransactionScreen() {
     return () => blink.stop();
   }, [numpadVisible, caretOpacity]);
 
+  useEffect(() => {
+    if (!numpadVisible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      dismissNumpad();
+      return true;
+    });
+    return () => sub.remove();
+  }, [numpadVisible]);
+
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showRecurrencePicker, setShowRecurrencePicker] = useState(false);
@@ -395,7 +397,7 @@ export default function AddTransactionScreen() {
     [],
   );
 
-  const koboAmount = nairaStringToKobo(amountStr);
+  const koboAmount = parseInt(amountStr || '0', 10);
   const canSave = koboAmount > 0 && narration.trim().length > 0 && selectedAccount !== null;
 
   function handleSave() {
@@ -453,7 +455,7 @@ export default function AddTransactionScreen() {
     <View style={[ss.safe, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title="Add Transaction"
-        onBack={() => router.back()}
+        onBack={() => { if (numpadVisible) { dismissNumpad(); return; } router.back(); }}
         paddingTop={insets.top + 10}
         rightSlot={
           <Button
@@ -522,7 +524,7 @@ export default function AddTransactionScreen() {
               onPress={() => { dismissNumpad(); setDtPickerMode('date'); setShowDatePicker(true); }}
               accessibilityRole="button" accessibilityLabel="Select date and time"
             >
-              <Text style={[{ ...type_.small, lineHeight: 16 }, { color: colors.textPrimary, flex: 1 }]}>
+              <Text style={[{ ...type_.small, lineHeight: 19 }, { color: colors.textPrimary, flex: 1 }]}>
                 {formatDateTime(txDatetime)}
               </Text>
               <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
@@ -538,7 +540,7 @@ export default function AddTransactionScreen() {
             >
               <Text
                 style={[
-                  { ...type_.small, lineHeight: 16 },
+                  { ...type_.small, lineHeight: 19 },
                   { color: selectedAccount ? colors.textPrimary : colors.textTertiary, flex: 1 },
                 ]}
                 numberOfLines={1}
@@ -559,7 +561,7 @@ export default function AddTransactionScreen() {
               accessibilityRole="button" accessibilityLabel="Select category"
             >
               <Text style={[
-                { ...type_.small, lineHeight: 16 },
+                { ...type_.small, lineHeight: 19 },
                 { color: selectedCategory ? colors.brand : colors.textTertiary, flex: 1 },
               ]}>
                 {selectedCategory ? selectedCategory.name : 'Optional'}
@@ -587,7 +589,7 @@ export default function AddTransactionScreen() {
               accessibilityRole="button" accessibilityLabel="Select recurrence"
             >
               <Text style={[
-                { ...type_.small, lineHeight: 16 },
+                { ...type_.small, lineHeight: 19 },
                 { color: recurrence ? colors.textPrimary : colors.textTertiary, flex: 1 },
               ]}>
                 {recurrence ? recurrence.label : 'Never'}

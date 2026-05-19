@@ -269,6 +269,6 @@ const s = StyleSheet.create({
     ...type_.bodyReg,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xs,
-    lineHeight: 20,
+    lineHeight: 23,
   },
 });

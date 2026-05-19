@@ -55,7 +55,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function koboToNaira(kobo: number): string {
-  return (kobo / 100).toFixed(0);
+  return (kobo / 100).toFixed(2);
 }
 
 // ─── Behavior picker ─────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ function WeeklyTab({
   return (
     <ScrollView contentContainerStyle={ts.tabContent}>
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>I need</Text>
-      <AmountInput value={amount} onChange={setAmount} />
+      <AmountInput value={amount} onChange={setAmount} allowDecimals />
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>every week</Text>
 
       <View style={ts.section}>
@@ -174,7 +174,7 @@ function WeeklyTab({
       <BehaviorPicker value={behavior} onChange={setBehavior} frequency="weekly" amount={amount} />
 
       <Text style={[ts.hint, { color: colors.textMeta }]}>
-        MoniMata will remind you to assign ₦{Number(amount || '0').toLocaleString('en-NG')} by each {WEEKDAYS[dayOfWeek]}.
+        MoniMata will remind you to assign {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(parseFloat(amount.replace(/,/g, '') || '0'))} by each {WEEKDAYS[dayOfWeek]}.
       </Text>
     </ScrollView>
   );
@@ -193,7 +193,7 @@ function MonthlyTab({
   return (
     <ScrollView contentContainerStyle={ts.tabContent}>
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>I need</Text>
-      <AmountInput value={amount} onChange={setAmount} />
+      <AmountInput value={amount} onChange={setAmount} allowDecimals />
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>every month</Text>
 
       <View style={ts.section}>
@@ -329,7 +329,7 @@ function YearlyTab({
   return (
     <ScrollView contentContainerStyle={ts.tabContent}>
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>I need to save</Text>
-      <AmountInput value={amount} onChange={setAmount} />
+      <AmountInput value={amount} onChange={setAmount} allowDecimals />
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>by</Text>
 
       <View style={ts.section}>
@@ -359,7 +359,7 @@ function CustomTab({
   return (
     <ScrollView contentContainerStyle={ts.tabContent}>
       <Text style={[ts.sentence, { color: colors.textSecondary }]}>Amount</Text>
-      <AmountInput value={amount} onChange={setAmount} />
+      <AmountInput value={amount} onChange={setAmount} allowDecimals />
 
       <View style={ts.section}>
         <Text style={[ts.sectionLabel, { color: colors.textMeta }]}>Due on</Text>
@@ -684,7 +684,7 @@ const ts = StyleSheet.create({
   // ── Repeats toggle ────────────────────────────────────────────────────────
   repeatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
-  hint: { ...type_.bodyReg, marginTop: spacing.smd, lineHeight: 18 },
+  hint: { ...type_.bodyReg, marginTop: spacing.smd, lineHeight: 21 },
 
   // ── Behavior picker ───────────────────────────────────────────────────────
   behaviorRow: {
