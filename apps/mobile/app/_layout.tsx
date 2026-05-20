@@ -162,9 +162,17 @@ function RootNavigator() {
 
   const postLockReturnPath = useRef<string | null>(null);
 
-  // When isAuthenticated flips false → true and we have a saved path, restore it.
+  // React to isAuthenticated transitions.
   const prevAuthenticated = useRef(isAuthenticated);
   useEffect(() => {
+    // true → false: user logged out. Navigate to auth root AFTER React has
+    // committed the render that registers (auth) in the Stack, so router.replace
+    // is guaranteed to find the route.
+    if (prevAuthenticated.current && !isAuthenticated && isInitialised) {
+      router.replace('/(auth)');
+    }
+
+    // false → true: restore deep path after a password-fallback biometric re-login.
     if (!prevAuthenticated.current && isAuthenticated && postLockReturnPath.current) {
       const path = postLockReturnPath.current;
       postLockReturnPath.current = null;
@@ -181,7 +189,7 @@ function RootNavigator() {
       return () => { cancelled = true; cancelAnimationFrame(id); };
     }
     prevAuthenticated.current = isAuthenticated;
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isInitialised, router]);
 
   useEffect(() => {
     dispatch(restoreSession());
