@@ -254,6 +254,8 @@ git commit -m "chore: regenerate shared types"
 
 ### Mobile
 
+For the full mobile setup guide (prerequisites, environment variables, EAS build profiles, architecture notes), see [apps/mobile/README.md](apps/mobile/README.md).
+
 ```bash
 # 1. Install dependencies
 cd apps/mobile
@@ -413,16 +415,13 @@ For building a release APK without EAS or the Play Store, see [docs/LOCAL_APK_BU
 
 ## Documentation
 
-| Document                                               | Description                                                        |
-| ------------------------------------------------------ | ------------------------------------------------------------------ |
-| [apps/api/README.md](apps/api/README.md)               | Backend deep-dive: ingestion, categorisation, budget engine        |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)           | Full system architecture and all technical decisions               |
-| [docs/PRD.md](docs/PRD.md)                             | Product requirements and screen specifications for the design team |
-| [docs/BACKEND_SYNC_SPEC.md](docs/BACKEND_SYNC_SPEC.md) | WatermelonDB sync protocol and column mapping reference            |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)               | Ubuntu server setup and production deployment guide                |
-| [docs/LOCAL_APK_BUILD.md](docs/LOCAL_APK_BUILD.md)     | Building and signing a local release APK                           |
-| [docs/AUDIT_ACTION_PLAN.md](docs/AUDIT_ACTION_PLAN.md) | Security and quality audit findings and fixes applied              |
-| [docs/UI_MIGRATION_PLAN.md](docs/UI_MIGRATION_PLAN.md) | Screen-by-screen UI migration plan and design token reference      |
+| Document                                           | Description                                                  |
+| -------------------------------------------------- | ------------------------------------------------------------ |
+| [apps/api/README.md](apps/api/README.md)           | Backend deep-dive: ingestion, categorisation, budget engine  |
+| [apps/mobile/README.md](apps/mobile/README.md)     | Mobile app setup, architecture notes, push payload reference |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Full system architecture and all technical decisions         |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Ubuntu server setup and production deployment guide          |
+| [docs/LOCAL_APK_BUILD.md](docs/LOCAL_APK_BUILD.md) | Building and signing a local release APK                     |
 
 ---
 
