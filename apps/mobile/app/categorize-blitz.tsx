@@ -37,7 +37,6 @@
 
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
@@ -50,6 +49,7 @@ import { useToast } from '@/components/Toast';
 import { EmptyState, ScreenHeader } from '@/components/ui';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useCategorizeCluster, useClusters } from '@/hooks/useCategorization';
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { Ionicons } from '@expo/vector-icons';
@@ -172,9 +172,10 @@ export default function CategorizeBlitzScreen() {
     !isError &&
     allCategorised;
 
+  useStatusBarStyle('light');
+
   return (
     <View style={[ss.root, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" />
 
       <ScreenHeader
         title="Categorise Transactions"

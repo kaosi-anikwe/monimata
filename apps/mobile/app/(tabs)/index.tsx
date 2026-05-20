@@ -576,8 +576,8 @@ const s = StyleSheet.create({
   },
   notifDot: {
     position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
+    top: spacing.xxs,
+    right: spacing.xxs,
     width: spacing.sm,
     height: spacing.sm,
     borderRadius: spacing.xs,
