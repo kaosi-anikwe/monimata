@@ -341,111 +341,117 @@ export const lightColors: ThemeColors = {
 };
 
 // ─── Dark theme ──────────────────────────────────────────────────────────────
-// Dark mode uses deep forest greens as the surface stack. Lime (#A8E063) is
-// the primary CTA/accent; brand is a distinct medium green so that the
-// brand→lime gradient remains visible. Text hierarchy is white-tinted greens
-// rather than lime, giving proper contrast without looking washed-out.
+// Truly-dark surfaces with a barely-perceptible green undertone. The green
+// identity shines through lime/brand accents and tinted borders rather than
+// saturated surface colours. Surface hierarchy is tight (4-8 pts of lightness
+// per step) so cards "float" without needing heavy shadows.
+//
+// Contrast targets (on #080C08 background):
+//   textPrimary  #E4EDE4  ≈ 14 : 1   (AAA)
+//   textSecondary #9BB09B ≈  6.5 : 1  (AA)
+//   textMeta     #6B856B  ≈  3.5 : 1  (AA-large / meta)
+//   textTertiary #4D654D  ≈  2.2 : 1  (disabled / placeholder)
 
 export const darkColors: ThemeColors = {
-  // Brand greens
+  // Brand greens — kept vivid so they pop off the near-black background
   darkGreen: '#0D1F0D',
   darkGreenMid: '#1A3A1A',
-  darkRed: '#2E1010',
-  brand: '#6DC05E',          // medium bright green — CTA buttons, active icons, links
-  brandBright: '#85CF78',    // lighter indicator green — progress dots, fills
-  lime: '#A8E063',           // lime-yellow — primary CTA button, active tab indicator
+  darkRed: '#1A0A0A',
+  brand: '#5CB85C',            // slightly desaturated — CTAs, active icons, links
+  brandBright: '#78D178',      // brighter indicator green — progress dots, fills
+  lime: '#A8E063',             // unchanged — primary CTA, active tab indicator
   lime2: '#C5F07A',
-  lime3: '#E0FAB8',
+  lime3: '#1A2810',            // dark lime tint — replaces bright light-mode value
 
-  // Surfaces — graduated dark-green stack
-  background: '#0D1F0D',
-  surface: '#1A3A1A',        // card / row / chip background
-  surfaceElevated: '#2B4E2B', // progress bar track, selected chip bg
-  surfaceHigh: '#3A6A3A',    // group headers, stronger-contrast surface
+  // Surfaces — near-black with faint green cast
+  background: '#080C08',       // near-black, barely perceptible green
+  surface: '#101610',          // card / row / chip — subtle lift
+  surfaceElevated: '#182018',  // progress track, selected chip bg
+  surfaceHigh: '#222E22',      // group headers, stronger-contrast surface
   white: '#FFFFFF',
-  cardBg: '#1F3A1F',         // card/sheet/field surfaces — elevated above background
+  cardBg: '#121812',           // card / sheet / field — sits between bg and surface
 
-  // Borders — lime-tinted, subtle
-  border: 'rgba(168, 224, 99, 0.12)',
-  borderStrong: 'rgba(168, 224, 99, 0.28)',
-  separator: 'rgba(168, 224, 99, 0.20)',
+  // Borders — lime-tinted at low opacity; visible on dark without glowing
+  border: 'rgba(168, 224, 99, 0.08)',
+  borderStrong: 'rgba(168, 224, 99, 0.20)',
+  separator: 'rgba(168, 224, 99, 0.10)',
 
-  // Text — white-tinted green hierarchy (not lime, which reads as an accent)
-  textPrimary: '#E8F5E8',    // near-white with green tint — headings, body
-  textSecondary: '#AECBAE',  // muted green-white — sub-labels, secondary copy
-  textMeta: '#7A9A7A',       // medium green — captions, timestamps
-  textTertiary: '#688A68',   // placeholder / disabled (bumped from #4A6A4A, was ~2:1)
-  textInverse: '#0D1F0D',
+  // Text — cool white-green hierarchy
+  textPrimary: '#E4EDE4',      // near-white with green tint — headings, body
+  textSecondary: '#9BB09B',    // muted green — sub-labels, secondary copy
+  textMeta: '#6B856B',         // medium green — captions, timestamps
+  textTertiary: '#4D654D',     // dim green — placeholder, disabled
+  textInverse: '#080C08',      // dark text on lime/light buttons
 
-  // Error
-  error: '#F07272',
-  errorSubtle: '#2E1010',
+  // Error — softer red for comfortable dark-bg reading
+  error: '#EF6B6B',
+  errorSubtle: '#1F0D0D',
 
-  // Warning
-  warning: '#FFBF47',
-  warningSubtle: '#261A06',
-  warningText: '#FFBF47',    // warm amber — legible on #261A06
+  // Warning — warm amber
+  warning: '#F5B731',
+  warningSubtle: '#1F1808',
+  warningText: '#F5B731',      // amber on dark — legible on #1F1808
 
   // Success — distinct from lime/brand
-  success: '#68C96D',        // Material-style green 400
-  successSubtle: '#1B4A22',  // saturated dark green — visually distinct from cardBg
-  successText: '#82D487',    // lighter green — legible on #1B4A22
+  success: '#5EC464',          // bright green, not lime-yellow
+  successSubtle: '#0F2812',    // saturated dark green, distinct from cardBg
+  successText: '#7AD680',      // lighter green — legible on #0F2812
 
   // Info
   info: '#5BAAF8',
-  infoSubtle: '#0E2244',
+  infoSubtle: '#0B1A30',
 
   // Purple
   purple: '#A78BFA',
-  purpleSubtle: '#201245',
+  purpleSubtle: '#170E35',
 
   // Teal
   teal: '#26C6DA',
-  tealSubtle: '#082C38',
+  tealSubtle: '#061E25',
 
-  // Semantic borders — keyed to updated dark accent colours
-  borderBrand: 'rgba(109,192,94,0.25)',    // brand (#6DC05E) at 25%
-  purpleBorder: 'rgba(167,139,250,0.2)',
-  warningBorder: 'rgba(255,191,71,0.3)',   // #FFBF47 at 30%
-  successBorder: 'rgba(104,201,109,0.3)',  // #68C96D at 30%
-  errorBorder: 'rgba(240,114,114,0.3)',    // #F07272 at 30%
-  infoBorder: 'rgba(91,170,248,0.3)',      // #5BAAF8 at 30%
+  // Semantic borders — keyed to dark-mode accent colours
+  borderBrand: 'rgba(92,184,92,0.20)',     // brand (#5CB85C) at 20%
+  purpleBorder: 'rgba(167,139,250,0.18)',
+  warningBorder: 'rgba(245,183,49,0.25)',  // #F5B731 at 25%
+  successBorder: 'rgba(94,196,100,0.25)',  // #5EC464 at 25%
+  errorBorder: 'rgba(239,107,107,0.25)',   // #EF6B6B at 25%
+  infoBorder: 'rgba(91,170,248,0.25)',     // #5BAAF8 at 25%
 
-  // On-dark text (always relative to darkGreen card surfaces — same in both modes)
-  textInverseFaint: 'rgba(255,255,255,0.4)',
-  textInverseSecondary: 'rgba(255,255,255,0.5)',
+  // On-dark text (on darkGreen header/gradient surfaces — same logic both modes)
+  textInverseFaint: 'rgba(255,255,255,0.35)',
+  textInverseSecondary: 'rgba(255,255,255,0.50)',
 
   // Glow overlay
-  limeGlow: 'rgba(168,224,99,0.2)',
+  limeGlow: 'rgba(168,224,99,0.15)',
 
   // Ghost elements on dark-green surfaces
-  overlayGhost: 'rgba(255,255,255,0.10)',
-  overlayGhostBorder: 'rgba(255,255,255,0.12)',
-  textInverseMid: 'rgba(255,255,255,0.70)',
+  overlayGhost: 'rgba(255,255,255,0.06)',
+  overlayGhostBorder: 'rgba(255,255,255,0.10)',
+  textInverseMid: 'rgba(255,255,255,0.65)',
 
-  // Modal / sheet scrim overlays — heavier in dark mode for legible backdrops
-  overlayDark: 'rgba(13,31,13,0.72)',
-  overlayDarkMid: 'rgba(13,31,13,0.60)',
-  overlayDarkHeavy: 'rgba(13,31,13,0.80)',
-  overlayNeutral: 'rgba(0,0,0,0.65)',
-  overlayGhostMid: 'rgba(255,255,255,0.2)',
+  // Modal / sheet scrim overlays — heavy black for true-dark mode
+  overlayDark: 'rgba(0,0,0,0.72)',
+  overlayDarkMid: 'rgba(0,0,0,0.60)',
+  overlayDarkHeavy: 'rgba(0,0,0,0.82)',
+  overlayNeutral: 'rgba(0,0,0,0.70)',
+  overlayGhostMid: 'rgba(255,255,255,0.15)',
 
-  // Extended lime overlays (same in both modes)
-  limeBorder: 'rgba(168,224,99,0.3)',
-  limeBorderStrong: 'rgba(168,224,99,0.4)',
-  limeBadgeBg: 'rgba(168,224,99,0.12)',
+  // Extended lime overlays — slightly toned down so they don't over-glow
+  limeBorder: 'rgba(168,224,99,0.22)',
+  limeBorderStrong: 'rgba(168,224,99,0.35)',
+  limeBadgeBg: 'rgba(168,224,99,0.10)',
 
-  // Extended inverse text scale (always on dark-green surfaces)
-  textInverseHigh: 'rgba(255,255,255,0.9)',
-  textInverseSub: 'rgba(255,255,255,0.55)',
-  separatorInverse: 'rgba(255,255,255,0.06)',
+  // Extended inverse text scale (on dark-green header surfaces)
+  textInverseHigh: 'rgba(255,255,255,0.90)',
+  textInverseSub: 'rgba(255,255,255,0.50)',
+  separatorInverse: 'rgba(255,255,255,0.05)',
 
   // Extended warning
-  warningBorderLight: 'rgba(255,191,71,0.2)',
+  warningBorderLight: 'rgba(245,183,49,0.15)',
 
   // Error badge (on darkRed surfaces)
-  errorBadgeBg: 'rgba(240,114,114,0.18)',
-  errorBadgeBorder: 'rgba(240,114,114,0.45)',
+  errorBadgeBg: 'rgba(239,107,107,0.15)',
+  errorBadgeBorder: 'rgba(239,107,107,0.40)',
 };
 
 // ─── Gradient presets ─────────────────────────────────────────────────────────
