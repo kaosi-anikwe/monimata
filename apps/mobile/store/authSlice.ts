@@ -174,16 +174,21 @@ export const login = createAsyncThunk(
 );
 
 export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
-    try {
-        await client.POST('/auth/logout', {});
-    } finally {
-        // Wipe local DB on logout so the next user (or same user re-logging in
-        // after a longer gap) starts with a clean, server-authoritative state.
-        await clearDatabase();
-        await clearTokens();
-        await clearLastUserId();
-        dispatch(authSlice.actions.clearAuth());
-    }
+    // Clear local auth state immediately — this triggers the navigation transition
+    // without waiting on network or disk I/O, so the UI responds instantly.
+    dispatch(authSlice.actions.clearAuth());
+
+    // Fire the server-side logout without awaiting it so a slow or unreachable
+    // server never blocks the user from leaving the app.
+    client.POST('/auth/logout', {}).catch(() => { });
+
+    // Wipe local data in parallel. clearDatabase() failure is non-fatal — the
+    // next login will re-sync from the server anyway.
+    await Promise.all([
+        clearDatabase().catch(console.warn),
+        clearTokens(),
+        clearLastUserId(),
+    ]);
 });
 
 export const restoreSession = createAsyncThunk('auth/restoreSession', async (_, { rejectWithValue }) => {

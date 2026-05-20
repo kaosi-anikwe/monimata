@@ -119,8 +119,8 @@ function TabItem({ config, isActive, badge, onPress, colors }: TabItemProps) {
             color={iconColor}
           />
           {badge != null && badge > 0 && (
-            <View style={[s.badge, { backgroundColor: colors.error, borderColor: colors.white }]}>
-              <Text style={[s.badgeText, { color: colors.textInverse }]}>
+            <View style={[s.badge, { backgroundColor: colors.error, borderColor: colors.background }]}>
+              <Text style={[s.badgeText, { color: colors.textInverse, }]}>
                 {badge > 99 ? '99+' : String(badge)}
               </Text>
             </View>
@@ -291,5 +291,7 @@ const s = StyleSheet.create({
     ...type_.badge,
     includeFontPadding: false,
     textAlignVertical: 'center',
+    lineHeight: 12,
+    textAlign: 'center',
   },
 });

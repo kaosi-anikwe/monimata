@@ -160,8 +160,8 @@ export default function ProfileScreen() {
         />
         <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
           <ListRow
-            iconBg={colors.lime3}
-            leftIcon={<Ionicons name="sparkles-outline" size={17} color={colors.darkGreen} />}
+            iconBg={colors.surface}
+            leftIcon={<Ionicons name="sparkles-outline" size={17} color={colors.brand} />}
             title="AI Auto-Categorisation"
             subtitle="Manage AI providers & usage"
             onPress={() => router.push('/ai-settings' as never)}
@@ -325,6 +325,25 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
             }
+            separator={false}
+          />
+        </View>
+
+        {/* ── About section ────────────────────────────────────────────── */}
+        <SectionHeader
+          title="About"
+          variant="group"
+          paddingHorizontal={spacing.lg}
+          style={{ paddingTop: spacing.mdn, marginBottom: spacing.xxs }}
+        />
+        <View style={[ss.menu, { backgroundColor: colors.cardBg, borderColor: colors.border, ...shadow.sm }]}>
+          <ListRow
+            iconBg={colors.successSubtle}
+            leftIcon={<Ionicons name="information-circle-outline" size={17} color={colors.successText} />}
+            title="About MoniMata"
+            subtitle="Version, open source & licence"
+            onPress={() => router.push('/about')}
+            showChevron
             separator={false}
           />
         </View>
