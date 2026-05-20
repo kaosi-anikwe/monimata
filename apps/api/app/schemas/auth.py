@@ -85,22 +85,6 @@ class UpdateProfileRequest(BaseModel):
     phone: str | None = None
     email: EmailStr | None = None
     onboarded: bool | None = None
-    username: str | None = None
-
-    @field_validator("username")
-    @classmethod
-    def validate_username(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        import re
-
-        v = v.lower().strip()
-        if not re.match(r"^[a-z0-9_-]{3,30}$", v):
-            raise ValueError(
-                "Username must be 3–30 characters and contain only lowercase letters, "
-                "digits, hyphens, and underscores"
-            )
-        return v
 
 
 # ── Response schemas ──────────────────────────────────────────────────────────
