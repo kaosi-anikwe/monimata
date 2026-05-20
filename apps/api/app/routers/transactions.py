@@ -222,6 +222,7 @@ def list_clusters(
             FROM transactions
             WHERE user_id       = :uid
               AND category_id   IS NULL
+              AND type          = 'debit'
               AND cleaned_narration IS NOT NULL
               AND cleaned_narration <> ''
             GROUP BY cleaned_narration
@@ -231,7 +232,10 @@ def list_clusters(
 
     total_uncategorised: int = (
         db.execute(
-            text("SELECT COUNT(*) FROM transactions WHERE user_id = :uid AND category_id IS NULL"),
+            text(
+                "SELECT COUNT(*) FROM transactions"
+                " WHERE user_id = :uid AND category_id IS NULL AND type = 'debit'"
+            ),
             {"uid": str(current_user.id)},
         ).scalar()
         or 0
@@ -359,6 +363,7 @@ def get_review_queue(
         .filter(
             Transaction.user_id == str(current_user.id),
             Transaction.category_id.is_(None),
+            Transaction.type == "debit",
         )
         .order_by(Transaction.date.asc())
         .first()
@@ -368,7 +373,10 @@ def get_review_queue(
 
     remaining_count: int = (
         db.execute(
-            text("SELECT COUNT(*) FROM transactions WHERE user_id = :uid AND category_id IS NULL"),
+            text(
+                "SELECT COUNT(*) FROM transactions"
+                " WHERE user_id = :uid AND category_id IS NULL AND type = 'debit'"
+            ),
             {"uid": str(current_user.id)},
         ).scalar()
         or 0
