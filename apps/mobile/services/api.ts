@@ -200,6 +200,12 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     const response = await fetch(url, { ...origInit, headers });
     if (response.status !== 401) return response;
 
+    // If we had no token to send the server wasn't talking about an expired
+    // session — it's a genuine auth failure (e.g. wrong password on /auth/login).
+    // Return the 401 as-is; attempting a refresh would only trigger a spurious
+    // logout and navigate the user away from the form.
+    if (!token) return response;
+
     // 401 — attempt silent refresh via shared doTokenRefresh() ────────────────
     try {
         const newToken = await doTokenRefresh();

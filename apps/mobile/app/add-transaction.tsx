@@ -414,12 +414,13 @@ export default function AddTransactionScreen() {
         memo: memo.trim() || null,
       },
       {
-        onSuccess: () => {
+        onSuccess: (txId) => {
           if (recurrence) {
             createRecurring.mutate({
               frequency: recurrence.value,
               interval: recurrence.interval,
               next_due: computeNextDue(txDatetime, recurrence.value, recurrence.interval),
+              parent_transaction_id: txId,
               template: {
                 account_id: selectedAccount!.id,
                 amount: signedAmount,

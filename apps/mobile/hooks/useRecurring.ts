@@ -19,6 +19,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/Toast';
 import { getDatabase } from '@/database';
 import RecurringRuleModel from '@/database/models/RecurringRule';
+import TransactionModel from '@/database/models/Transaction';
 import { syncDatabase } from '@/database/sync';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAppSelector } from '@/store/hooks';
@@ -33,6 +34,8 @@ export interface RecurringRuleBody {
   next_due: string;
   ends_on?: string | null;
   template: RecurringTemplate;
+  /** If provided, this transaction's recurrence_id is set to the new rule's ID. */
+  parent_transaction_id?: string;
 }
 
 function ruleModelToDto(m: RecurringRuleModel): RecurringRule {
@@ -83,7 +86,7 @@ export function useCreateRecurringRule() {
     mutationFn: async (body: RecurringRuleBody) => {
       const db = getDatabase();
       await db.write(async () => {
-        await db.get<RecurringRuleModel>('recurring_rules').create(r => {
+        const rule = await db.get<RecurringRuleModel>('recurring_rules').create(r => {
           r.userId = userId;
           r.frequency = body.frequency;
           r.interval = body.interval;
@@ -95,6 +98,13 @@ export function useCreateRecurringRule() {
           r.template = JSON.stringify(body.template);
           r.updatedAt = new Date();
         });
+        if (body.parent_transaction_id) {
+          const tx = await db.get<TransactionModel>('transactions').find(body.parent_transaction_id);
+          await tx.update(t => {
+            t.recurrenceId = rule.id;
+            t.updatedAt = new Date();
+          });
+        }
       });
       syncDatabase().catch(console.warn);
     },

@@ -20,7 +20,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useRef, useState } from 'react';
 import {
   StyleProp,
   StyleSheet,
@@ -80,6 +80,19 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   const colors = useTheme();
   const focused = useSharedValue(0); // 0 = blurred, 1 = focused
   const [secureVisible, setSecureVisible] = useState(false);
+  const wasFocused = useRef(false);
+  // Captured in onPressIn (before onBlur fires) so onPress still knows
+  // whether the field was active when the eye icon was tapped.
+  const toggleWasFocused = useRef(false);
+
+  // Internal ref so the toggle button can re-focus the field after toggling.
+  // Merged with the forwarded ref so callers still get direct TextInput access.
+  const innerRef = useRef<TextInput>(null);
+  const mergedRef = (node: TextInput | null) => {
+    innerRef.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  };
 
   const isSecure = secureTextEntry && !secureVisible;
 
@@ -104,10 +117,12 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   });
 
   function handleFocus(e: Parameters<NonNullable<TextInputProps['onFocus']>>[0]) {
+    wasFocused.current = true;
     focused.value = withTiming(1, { duration: 150 });
     onFocus?.(e);
   }
   function handleBlur(e: Parameters<NonNullable<TextInputProps['onBlur']>>[0]) {
+    wasFocused.current = false;
     focused.value = withTiming(0, { duration: 150 });
     onBlur?.(e);
   }
@@ -131,7 +146,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         {leftSlot && <View style={s.leftSlot}>{leftSlot}</View>}
 
         <TextInput
-          ref={ref}
+          ref={mergedRef}
           placeholderTextColor={colors.textTertiary}
           style={[
             s.field,
@@ -149,9 +164,17 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         {secureTextEntry ? (
           <TouchableOpacity
             style={s.rightSlot}
-            onPress={() => setSecureVisible((v) => !v)}
+            onPressIn={() => { toggleWasFocused.current = wasFocused.current; }}
+            onPress={() => {
+              setSecureVisible((v) => !v);
+              // Always re-focus after toggling:
+              //   • If the field was active the keyboard stays open.
+              //   • If the field was unfocused (e.g. auto-filled), Android needs
+              //     a focus event to actually refresh the secureTextEntry display.
+              setTimeout(() => innerRef.current?.focus(), 0);
+            }}
             accessibilityLabel={secureVisible ? 'Hide password' : 'Show password'}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <Ionicons
               name={secureVisible ? 'eye-off-outline' : 'eye-outline'}

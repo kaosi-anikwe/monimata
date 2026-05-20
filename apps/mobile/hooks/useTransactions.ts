@@ -131,8 +131,8 @@ export function useCreateTransaction() {
   return useMutation({
     mutationFn: async (body: ManualTransactionBody) => {
       const db = getDatabase();
-      await db.write(async () => {
-        await db.get<TransactionModel>('transactions').create(tx => {
+      const created = await db.write(async () =>
+        db.get<TransactionModel>('transactions').create(tx => {
           tx.userId = userId;
           tx.accountId = body.account_id;
           tx.date = new Date(body.date);
@@ -146,9 +146,10 @@ export function useCreateTransaction() {
           tx.source = 'manual';
           tx.balanceAfter = null;
           tx.recurrenceId = null;
-        });
-      });
+        }),
+      );
       syncDatabase().catch(console.warn);
+      return created.id;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });

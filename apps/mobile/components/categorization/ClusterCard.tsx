@@ -119,7 +119,6 @@ export function ClusterCard({
         <View style={ss.headerRow}>
           <Text
             style={[type_.h1Sm, { color: colors.textPrimary, flex: 1 }]}
-            numberOfLines={1}
           >
             {displayName}
           </Text>
@@ -206,7 +205,7 @@ const ss = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },

@@ -44,7 +44,7 @@ const CAROUSEL: { icon: IoniconName; text: string }[] = [
   },
   {
     icon: 'chatbubbles-outline',
-    text: 'AI nudges in Pidgin — like a knowledgeable friend watching your money',
+    text: 'AI nudges in Pidgin like a smart friend watching your money',
   },
 ];
 

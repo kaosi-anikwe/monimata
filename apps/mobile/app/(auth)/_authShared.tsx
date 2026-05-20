@@ -167,7 +167,7 @@ export const s = StyleSheet.create({
   authHdr: {
     paddingTop: layout.headerPaddingTop,
     paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxl,
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
     overflow: 'hidden',
