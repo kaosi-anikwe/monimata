@@ -16,15 +16,22 @@
 
 from __future__ import annotations
 
+import enum
 import uuid
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+
+class UserRole(enum.StrEnum):
+    user = "user"
+    admin = "admin"
+
 
 if TYPE_CHECKING:
     from app.models.bank_account import BankAccount
@@ -75,6 +82,9 @@ class User(Base):
     )  # Expo push token ("ExponentPushToken[...]"); NULL = notifications not granted
     streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_streak_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="userrole"), nullable=False, default=UserRole.user
+    )
 
     # relationships
     bank_accounts: Mapped[list[BankAccount]] = relationship(

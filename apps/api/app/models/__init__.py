@@ -20,6 +20,7 @@ from app.models.budget import BudgetMonth
 from app.models.category import Category, CategoryGroup
 from app.models.narration_map import NarrationCategoryMap
 from app.models.nudge import Nudge
+from app.models.nudge_rule import NudgeRule
 from app.models.recurring_rule import RecurringRule
 from app.models.target import CategoryTarget
 from app.models.transaction import Transaction, TransactionSplit
@@ -43,5 +44,6 @@ __all__ = [
     "UserAiCredential",
     "UserAiUsageLog",
     "Nudge",
+    "NudgeRule",
     "Article",
 ]
