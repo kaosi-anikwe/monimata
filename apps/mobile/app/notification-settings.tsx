@@ -20,18 +20,19 @@
  * Persisted to API: enabled, quiet_hours_start, quiet_hours_end, fatigue_limit, language.
  */
 
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   AppState,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -149,6 +150,21 @@ export default function NotificationSettingsScreen() {
 
   const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+  function timeStringToDate(time: string): Date {
+    const [h, m] = time.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h ?? 0, m ?? 0, 0, 0);
+    return d;
+  }
+  function dateToTimeString(date: Date): string {
+    return [
+      date.getHours().toString().padStart(2, '0'),
+      date.getMinutes().toString().padStart(2, '0'),
+    ].join(':');
+  }
+
+  const [activeTimePicker, setActiveTimePicker] = useState<'start' | 'end' | null>(null);
+
   function handleSave() {
     if (!timeRegex.test(draft.quiet_hours_start) || !timeRegex.test(draft.quiet_hours_end)) {
       showError('Invalid time', 'Please use HH:MM format (e.g. 23:00).');
@@ -251,24 +267,16 @@ export default function NotificationSettingsScreen() {
                 No nudges during this window (WAT)
               </Text>
             </View>
-            <TextInput
-              style={[
-                ss.timeInput,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: colors.background,
-                  color: colors.textPrimary,
-                  ...ff(700),
-                },
-              ]}
-              value={draft.quiet_hours_start}
-              onChangeText={(t) => setDraft((d) => ({ ...d, quiet_hours_start: t }))}
-              placeholder="23:00"
-              placeholderTextColor={colors.textTertiary}
-              maxLength={5}
-              keyboardType="numbers-and-punctuation"
+            <TouchableOpacity
+              style={[ss.timePill, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => setActiveTimePicker('start')}
+              accessibilityRole="button"
               accessibilityLabel="Quiet hours start time"
-            />
+            >
+              <Text style={[ss.timePillText, { color: colors.textPrimary }]}>
+                {draft.quiet_hours_start}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Quiet Hours: To */}
@@ -278,24 +286,16 @@ export default function NotificationSettingsScreen() {
                 Quiet Hours: To
               </Text>
             </View>
-            <TextInput
-              style={[
-                ss.timeInput,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: colors.background,
-                  color: colors.textPrimary,
-                  ...ff(700),
-                },
-              ]}
-              value={draft.quiet_hours_end}
-              onChangeText={(t) => setDraft((d) => ({ ...d, quiet_hours_end: t }))}
-              placeholder="07:00"
-              placeholderTextColor={colors.textTertiary}
-              maxLength={5}
-              keyboardType="numbers-and-punctuation"
+            <TouchableOpacity
+              style={[ss.timePill, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => setActiveTimePicker('end')}
+              accessibilityRole="button"
               accessibilityLabel="Quiet hours end time"
-            />
+            >
+              <Text style={[ss.timePillText, { color: colors.textPrimary }]}>
+                {draft.quiet_hours_end}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Daily nudge limit */}
@@ -434,6 +434,55 @@ export default function NotificationSettingsScreen() {
           </Button>
         </View>
       </ScrollView>
+
+      {/* ── Time picker — iOS spinner modal ──────────────────────────────── */}
+      {activeTimePicker !== null && Platform.OS === 'ios' && (
+        <Modal visible transparent animationType="fade">
+          <TouchableOpacity
+            style={[ss.dtBackdrop, { backgroundColor: colors.overlayNeutral }]}
+            activeOpacity={1}
+            onPress={() => setActiveTimePicker(null)}
+          />
+          <View style={[ss.dtSheet, { backgroundColor: colors.cardBg }]}>
+            <DateTimePicker
+              value={timeStringToDate(
+                activeTimePicker === 'start' ? draft.quiet_hours_start : draft.quiet_hours_end,
+              )}
+              mode="time"
+              display="spinner"
+              onChange={(_e: DateTimePickerEvent, d?: Date) => {
+                if (!d) return;
+                const key = activeTimePicker === 'start' ? 'quiet_hours_start' : 'quiet_hours_end';
+                setDraft((prev) => ({ ...prev, [key]: dateToTimeString(d) }));
+              }}
+              style={{ alignSelf: 'stretch' }}
+            />
+            <TouchableOpacity
+              style={[ss.dtDoneBtn, { backgroundColor: colors.brand }]}
+              onPress={() => setActiveTimePicker(null)}
+            >
+              <Text style={[type_.label, { color: colors.white }]}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      )}
+
+      {/* ── Time picker — Android native clock dialog ─────────────────── */}
+      {activeTimePicker !== null && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={timeStringToDate(
+            activeTimePicker === 'start' ? draft.quiet_hours_start : draft.quiet_hours_end,
+          )}
+          mode="time"
+          display="default"
+          onChange={(e: DateTimePickerEvent, selected?: Date) => {
+            setActiveTimePicker(null);
+            if (e.type !== 'set' || !selected) return;
+            const key = activeTimePicker === 'start' ? 'quiet_hours_start' : 'quiet_hours_end';
+            setDraft((prev) => ({ ...prev, [key]: dateToTimeString(selected) }));
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -470,16 +519,41 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       paddingHorizontal: spacing.lg,
     },
     settingLeft: { flex: 1, marginRight: spacing.md },
-    // time input
-    timeInput: {
+    // time pill
+    timePill: {
       borderWidth: 1.5,
       borderRadius: radius.smd,
       paddingVertical: spacing.xxs,
       paddingHorizontal: spacing.smd,
+      minWidth: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    timePillText: {
       ...type_.bodyReg,
       ...ff(700),
-      textAlign: 'center',
-      minWidth: 72,
+      textAlign: 'center' as const,
+    },
+    // date picker sheet (iOS)
+    dtBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    dtSheet: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingBottom: spacing.xxxl,
+      paddingHorizontal: spacing.lg,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+    },
+    dtDoneBtn: {
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.sm,
+      borderRadius: radius.md,
+      paddingVertical: spacing.smd,
+      alignItems: 'center',
     },
     // stepper
     stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

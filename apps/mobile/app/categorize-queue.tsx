@@ -40,7 +40,6 @@
 
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FadeInRight } from 'react-native-reanimated';
@@ -52,6 +51,7 @@ import { SwipeDirectionHint } from '@/components/categorization/SwipeDirectionHi
 import { useToast } from '@/components/Toast';
 import { Badge, EmptyState, ScreenHeader } from '@/components/ui';
 import { useConfirmCategory, useReviewQueue, useUncategorisedQueue } from '@/hooks/useCategorization';
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useTheme } from '@/lib/theme';
 import { radius, shadow, spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
@@ -171,10 +171,11 @@ export default function CategorizeQueueScreen() {
   const remainingCount = queue.length;
   const isEmpty = !isLoading && initialised && queue.length === 0;
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  useStatusBarStyle('light');
+
+  // ── Render ────────────────────────────────────────────────────────
   return (
     <View style={[ss.root, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" />
 
       <ScreenHeader
         title="Review Transactions"
