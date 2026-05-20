@@ -798,7 +798,7 @@ function ManualEditForm({
               <Text style={[type_.small, { color: colors.brand }]}>↻ Recurring</Text>
             </View>
             <TouchableOpacity
-              style={[ss.stopBtn, { borderColor: colors.error }]}
+              style={[ss.stopBtn, { borderColor: colors.error, marginLeft: spacing.sm }]}
               onPress={() => {
                 confirm({
                   title: 'Stop repeating?',

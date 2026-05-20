@@ -186,7 +186,7 @@ export interface paths {
     get: operations["get_transaction_transactions__tx_id__get"];
     /**
      * Delete Transaction
-     * @description Delete a transaction.
+     * @description Delete a transaction. Pass cancel_rule=true to also stop the associated recurring rule.
      */
     delete: operations["delete_transaction_transactions__tx_id__delete"];
     /**
@@ -1140,6 +1140,8 @@ export interface components {
       /** Ends On */
       ends_on?: string | null;
       template: components["schemas"]["RecurringTemplate"];
+      /** Source Transaction Id */
+      source_transaction_id?: string | null;
     };
     /** RecurringRuleResponse */
     RecurringRuleResponse: {
@@ -1471,8 +1473,6 @@ export interface components {
       email?: string | null;
       /** Onboarded */
       onboarded?: boolean | null;
-      /** Username */
-      username?: string | null;
     };
     /** UserResponse */
     UserResponse: {
@@ -2072,10 +2072,14 @@ export interface operations {
   };
   /**
    * Delete Transaction
-   * @description Delete a transaction.
+   * @description Delete a transaction. Pass cancel_rule=true to also stop the associated recurring rule.
    */
   delete_transaction_transactions__tx_id__delete: {
     parameters: {
+      query?: {
+        /** @description When true and the transaction has a recurrence_id, also deactivate the recurring rule so no further instances are generated. */
+        cancel_rule?: boolean;
+      };
       path: {
         tx_id: string;
       };
