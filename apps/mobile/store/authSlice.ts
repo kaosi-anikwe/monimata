@@ -229,6 +229,9 @@ const authSlice = createSlice({
         clearError(state) {
             state.error = null;
         },
+        setUser(state, action: PayloadAction<User>) {
+            state.user = action.payload;
+        },
     },
     extraReducers: (builder) => {
         const setLoading = (state: AuthState) => { state.loading = true; state.error = null; };
@@ -266,6 +269,6 @@ const authSlice = createSlice({
     },
 });
 
-export const { clearAuth, clearError } = authSlice.actions;
+export const { clearAuth, clearError, setUser } = authSlice.actions;
 export const markOnboarded = markOnboardedThunk;
 export default authSlice.reducer;

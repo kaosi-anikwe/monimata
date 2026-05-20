@@ -190,7 +190,7 @@ export default function ProfileScreen() {
             leftIcon={<Ionicons name="business-outline" size={17} color={colors.brand} />}
             title="Accounts"
             subtitle="Connected bank accounts"
-            onPress={() => router.push('/(tabs)/accounts')}
+            onPress={() => router.push('/bank-accounts')}
             showChevron
           />
           <ListRow
@@ -198,7 +198,7 @@ export default function ProfileScreen() {
             leftIcon={<Ionicons name="person-outline" size={17} color={colors.brand} />}
             title="Edit Profile"
             subtitle="Name, email, avatar"
-            onPress={() => comingSoon('Edit Profile')}
+            onPress={() => router.push('/edit-profile')}
             showChevron
           />
           <ListRow

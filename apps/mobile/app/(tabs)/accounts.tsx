@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -955,7 +956,7 @@ function AccountCard({ account, onMoreActions, showTourTarget }: AccountCardProp
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
-export default function AccountsScreen() {
+export default function AccountsScreen({ showBackButton = false }: { showBackButton?: boolean }) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { confirm } = useToast();
@@ -1032,11 +1033,25 @@ export default function AccountsScreen() {
           },
         ]}
       >
+        {showBackButton ? (
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[ss.hdrIconBtn, { backgroundColor: colors.surface }]}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={type_.bodyXl.fontSize} color={colors.brand} />
+          </TouchableOpacity>
+        ) : null}
         <Text style={[ss.headerTitle, { color: colors.textPrimary }]}>Accounts</Text>
         <View style={ss.headerActions}>
           <TourTarget id="accounts-add-btn">
             <TouchableOpacity
-              style={[ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]}
+              style={showBackButton
+                ? [ss.hdrIconBtn, { backgroundColor: colors.brand }]
+                : [ss.headerBtn, { backgroundColor: colors.brand, borderColor: colors.brand }]
+              }
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAddSheet(true); }}
               accessibilityRole="button"
               accessibilityLabel="Add manual account"
@@ -1044,7 +1059,9 @@ export default function AccountsScreen() {
               <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
                 <Path d="M12 5v14M5 12h14" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" />
               </Svg>
-              <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Add Account</Text>
+              {!showBackButton && (
+                <Text style={[ss.headerBtnTxt, { color: colors.white }]}>Add Account</Text>
+              )}
             </TouchableOpacity>
           </TourTarget>
         </View>
@@ -1176,6 +1193,14 @@ const ss = StyleSheet.create({
     ...type_.h1,
   },
   headerActions: { flexDirection: 'row', gap: spacing.sm },
+  backBtn: { padding: spacing.xs, marginLeft: -spacing.xs, marginRight: spacing.xs },
+  hdrIconBtn: {
+    width: layout.iconBtnSize,
+    height: layout.iconBtnSize,
+    borderRadius: radius.smd,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
