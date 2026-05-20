@@ -30,6 +30,33 @@ from app.services import budget_events as _budget_events  # noqa: F401
 
 configure_logging(log_dir=settings.LOG_DIR, log_level=settings.LOG_LEVEL)
 
+import logging  # noqa: E402 — after configure_logging
+from contextlib import asynccontextmanager  # noqa: E402
+
+_startup_logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):  # type: ignore[type-arg]
+    """Warm caches and run any pre-flight setup before the server starts accepting requests."""
+    from app.core.database import SessionLocal
+    from app.core.redis_client import warm_nudge_rule_cache
+
+    db = SessionLocal()
+    try:
+        warm_nudge_rule_cache(db)
+    except Exception:
+        _startup_logger.warning(
+            "warm_nudge_rule_cache failed at startup — workers will rebuild on first miss",
+            exc_info=True,
+        )
+    finally:
+        db.close()
+
+    yield
+    # Shutdown — nothing to clean up
+
+
 # Initialise Sentry before importing routers so every module is instrumented.
 if settings.SENTRY_DSN:
     import sentry_sdk
@@ -76,6 +103,7 @@ app = FastAPI(
     docs_url=_docs_url,
     redoc_url=_redoc_url,
     openapi_url=_openapi_url,
+    lifespan=_lifespan,
 )
 
 app.state.limiter = limiter
