@@ -261,14 +261,6 @@ async def update_profile(
         current_user.phone = payload.phone
     if payload.onboarded is not None:
         current_user.onboarded = payload.onboarded
-    if payload.username is not None:
-        existing = db.query(User).filter(User.username == payload.username).first()
-        if existing and existing.id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Username already taken",
-            )
-        current_user.username = payload.username
     if payload.email is not None:
         new_email = payload.email.lower()
         if new_email != current_user.email:
