@@ -42,6 +42,9 @@ class RecurringRuleCreate(BaseModel):
     next_due: date
     ends_on: date | None = None
     template: RecurringTemplate
+    # When the rule is created from an existing transaction, supply its ID so
+    # the server can back-fill recurrence_id on that transaction.
+    source_transaction_id: UUID | None = None
 
     @field_validator("interval")
     @classmethod
