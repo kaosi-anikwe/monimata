@@ -83,7 +83,7 @@ const queryClient = new QueryClient({
 
 function RootNavigator() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, loading, isInitialised, user } = useAppSelector((s: RootState) => s.auth);
+  const { isAuthenticated, isInitialised, user } = useAppSelector((s: RootState) => s.auth);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const router = useRouter();
 
@@ -188,12 +188,12 @@ function RootNavigator() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (!loading) {
+    if (isInitialised) {
       // Primary hideAsync is in RootLayout; this is a safety call for the case
       // where the splash was somehow still visible when RootNavigator mounts.
       SplashScreen.hideAsync();
     }
-  }, [loading]);
+  }, [isInitialised]);
 
   // Sync WatermelonDB whenever app comes to the foreground
   useEffect(() => {

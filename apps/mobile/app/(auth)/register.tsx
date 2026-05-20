@@ -18,8 +18,8 @@
  * Register screen — email, password, first/last name, phone.
  * On success → navigates to onboarding questionnaire.
  */
-import { clearError, register } from '@/store/authSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { register } from '@/store/authSlice';
+import { useAppDispatch } from '@/store/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -71,7 +71,8 @@ type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
 export default function RegisterScreen() {
   const dispatch = useAppDispatch();
-  const { loading, error } = useAppSelector((s) => s.auth);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const colors = useTheme();
 
   // ── Username availability ─────────────────────────────────────────────
@@ -102,18 +103,47 @@ export default function RegisterScreen() {
   const {
     control,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, touchedFields, isSubmitted },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onChange',
     defaultValues: {
       username: '', first_name: '', last_name: '', email: '',
       phone: '', password: '', confirm_password: '',
     },
   });
 
+  // Show constraint message in neutral while untouched; switch to red on blur with invalid input.
+  const revealed = (name: keyof FormValues) => touchedFields[name] || isSubmitted;
+  function fieldError(name: keyof FormValues) {
+    return revealed(name) ? errors[name]?.message : undefined;
+  }
+  function fieldHint(name: keyof FormValues) {
+    return !revealed(name) ? errors[name]?.message : undefined;
+  }
+
   async function onSubmit(data: FormValues) {
-    if (usernameStatus !== 'available') return;
-    dispatch(clearError());
+    if (usernameStatus === 'idle') {
+      // Username was never checked (e.g. auto-filled without triggering onChange).
+      // Kick off the check so the next tap will have a result.
+      checkUsername(data.username);
+      setError('Checking username availability — please try again in a moment');
+      return;
+    }
+    if (usernameStatus === 'checking') {
+      setError('Still checking username availability — please try again in a moment');
+      return;
+    }
+    if (usernameStatus === 'taken') {
+      setError('That username is already taken — choose a different one above');
+      return;
+    }
+    if (usernameStatus === 'invalid') {
+      setError('Username is invalid — fix it above before continuing');
+      return;
+    }
+    setError(null);
+    setLoading(true);
     try {
       await dispatch(
         register({
@@ -126,8 +156,10 @@ export default function RegisterScreen() {
         }),
       ).unwrap();
       router.replace('/(auth)/onboarding');
-    } catch {
-      // error is already written to Redux state by the rejected handler in authSlice
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -138,7 +170,7 @@ export default function RegisterScreen() {
       <AuthHdr>
         <BackBtn onPress={() => router.back()} />
         <Text style={[s.authTitle, { color: colors.white }]}>Create your account</Text>
-        <Text style={[s.authSub, { color: colors.textInverseSecondary }]}>3 quick fields, then you&apos;re in</Text>
+        <Text style={[s.authSub, { color: colors.textInverseSecondary }]}>4 quick fields, then you&apos;re in</Text>
       </AuthHdr>
 
       <KeyboardAvoidingView
@@ -169,12 +201,13 @@ export default function RegisterScreen() {
                     <Input
                       label="Username"
                       value={value}
-                      onChangeText={(v) => { onChange(v.toLowerCase()); checkUsername(v.toLowerCase()); }}
-                      onBlur={onBlur}
+                      onChangeText={(v) => { const cleaned = v.toLowerCase().trim(); onChange(cleaned); checkUsername(cleaned); }}
+                      onBlur={() => { onBlur(); checkUsername(value); }}
                       placeholder="e.g. emeka_okafor"
                       autoCapitalize="none"
                       autoCorrect={false}
-                      error={errors.username?.message}
+                      error={fieldError('username')}
+                      hint={fieldHint('username')}
                     />
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs, minHeight: 16, gap: spacing.xs }}>
                       {usernameStatus === 'checking' && (
@@ -200,7 +233,8 @@ export default function RegisterScreen() {
                     onChangeText={onChange}
                     onBlur={onBlur}
                     placeholder="Emeka"
-                    error={errors.first_name?.message}
+                    error={fieldError('first_name')}
+                    hint={fieldHint('first_name')}
                     containerStyle={{ flex: 1 }}
                   />
                 )}
@@ -215,7 +249,8 @@ export default function RegisterScreen() {
                     onChangeText={onChange}
                     onBlur={onBlur}
                     placeholder="Okafor"
-                    error={errors.last_name?.message}
+                    error={fieldError('last_name')}
+                    hint={fieldHint('last_name')}
                     containerStyle={{ flex: 1 }}
                   />
                 )}
@@ -234,7 +269,8 @@ export default function RegisterScreen() {
                   placeholder="emeka@example.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  error={errors.email?.message}
+                  error={fieldError('email')}
+                  hint={fieldHint('email')}
                 />
               )}
             />
@@ -250,7 +286,8 @@ export default function RegisterScreen() {
                   onBlur={onBlur}
                   placeholder="08012345678"
                   keyboardType="phone-pad"
-                  error={errors.phone?.message}
+                  error={fieldError('phone')}
+                  hint={fieldHint('phone')}
                 />
               )}
             />
@@ -266,7 +303,8 @@ export default function RegisterScreen() {
                   onBlur={onBlur}
                   placeholder="Min. 8 characters"
                   secureTextEntry
-                  error={errors.password?.message}
+                  error={fieldError('password')}
+                  hint={fieldHint('password')}
                 />
               )}
             />
@@ -282,7 +320,8 @@ export default function RegisterScreen() {
                   onBlur={onBlur}
                   placeholder="Repeat password"
                   secureTextEntry
-                  error={errors.confirm_password?.message}
+                  error={fieldError('confirm_password')}
+                  hint={fieldHint('confirm_password')}
                 />
               )}
             />
@@ -291,7 +330,7 @@ export default function RegisterScreen() {
           <Button
             variant="green"
             onPress={handleSubmit(onSubmit)}
-            disabled={loading || usernameStatus !== 'available'}
+            disabled={loading}
             loading={loading}
             style={{ marginTop: spacing.sm }}
             accessibilityLabel="Create account"

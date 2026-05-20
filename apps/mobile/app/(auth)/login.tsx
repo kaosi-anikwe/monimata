@@ -20,6 +20,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   KeyboardAvoidingView,
@@ -35,8 +36,8 @@ import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
-import { clearError, login } from '@/store/authSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { login } from '@/store/authSlice';
+import { useAppDispatch } from '@/store/hooks';
 import { AuthHdr, BackBtn, s } from './_authShared';
 
 const schema = z.object({
@@ -48,7 +49,8 @@ type FormValues = z.infer<typeof schema>;
 
 export default function LoginScreen() {
   const dispatch = useAppDispatch();
-  const { loading, error } = useAppSelector((st) => st.auth);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const colors = useTheme();
   const { prefillEmail } = useLocalSearchParams<{ prefillEmail?: string }>();
 
@@ -62,7 +64,8 @@ export default function LoginScreen() {
   });
 
   async function onSubmit(data: FormValues) {
-    dispatch(clearError());
+    setError(null);
+    setLoading(true);
     try {
       const user = await dispatch(login({ email: data.email, password: data.password })).unwrap();
       if (user.onboarded) {
@@ -72,8 +75,10 @@ export default function LoginScreen() {
       }
       // Non-onboarded: stay in auth stack and lead user through the setup flow.
       router.replace('/(auth)/onboarding');
-    } catch {
-      // error is already written to Redux state by the rejected handler in authSlice
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
     }
   }
 

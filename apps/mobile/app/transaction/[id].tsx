@@ -605,7 +605,7 @@ function ManualEditForm({
 }) {
   const colors = useTheme();
   const { data: groups = [] } = useCategoryGroups();
-  const { confirm } = useToast();
+  const { confirm, actionSheet } = useToast();
   const createRecurring = useCreateRecurringRule();
   const deactivateRecurring = useDeactivateRecurringRule();
 
@@ -651,6 +651,7 @@ function ManualEditForm({
         frequency: recurrence.value,
         interval: recurrence.interval,
         next_due: computeNextDue(txDatetime, recurrence.value, recurrence.interval),
+        parent_transaction_id: tx.id,
         template: {
           account_id: selectedAccount?.id ?? tx.account_id,
           amount: signedAmount,
@@ -664,13 +665,37 @@ function ManualEditForm({
   }
 
   function handleDelete() {
-    confirm({
-      title: 'Delete Transaction',
-      message: 'This will permanently remove this transaction and its budget impact.',
-      confirmText: 'Delete',
-      confirmStyle: 'destructive',
-      onConfirm: onDelete,
-    });
+    if (tx.recurrence_id) {
+      actionSheet({
+        title: 'Delete this transaction?',
+        options: [
+          {
+            label: 'Delete transaction only',
+            style: 'destructive',
+            onPress: onDelete,
+          },
+          {
+            label: 'Delete and stop recurring',
+            style: 'destructive',
+            onPress: () => {
+              // Deactivate the rule first (local write + queued sync),
+              // then delete the transaction (local write + queued sync).
+              // The sync queue coalesces both into one push pass.
+              deactivateRecurring.mutate(tx.recurrence_id!);
+              onDelete();
+            },
+          },
+        ],
+      });
+    } else {
+      confirm({
+        title: 'Delete Transaction',
+        message: 'This will permanently remove this transaction and its budget impact.',
+        confirmText: 'Delete',
+        confirmStyle: 'destructive',
+        onConfirm: onDelete,
+      });
+    }
   }
 
   saveRef.current = handleSave;
