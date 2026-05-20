@@ -22,9 +22,13 @@ from celery.schedules import crontab
 from app.worker.celery_app import celery_app
 
 celery_app.conf.beat_schedule = {
-    # Every day at 7:05 AM WAT — deliver nudges queued during quiet hours
+    # Every 10 minutes, all day.
+    # The task checks per-user quiet hours before delivering each nudge, so
+    # runs during a user's quiet window are safe no-ops.  Running every 10
+    # minutes means delivery happens within 10 minutes of quiet time ending,
+    # regardless of what time the window closes.
     "deliver-queued-nudges": {
         "task": "app.worker.tasks.deliver_queued_nudges",
-        "schedule": crontab(hour=7, minute=5),
+        "schedule": crontab(minute="*/10"),
     },
 }

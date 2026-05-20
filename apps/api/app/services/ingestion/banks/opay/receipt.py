@@ -103,9 +103,6 @@ _PIPE_PHONE_RE = re.compile(r"[|lI1]\s*(\d[\d *]+\d)")
 # Stop capturing the sender section at the transaction reference lines
 _SECTION_END_RE = re.compile(r"Transaction\s+No\.|Session\s+ID", re.IGNORECASE)
 
-# ALL-CAPS name sequence (person or business name)
-_NAME_RE = re.compile(r"([A-Z][A-Z ]{4,})")
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -197,17 +194,21 @@ def _extract_green_amount(image_bytes: bytes) -> str | None:
 
 
 def _extract_name_from_section(section_text: str) -> str | None:
-    """Find the ALL-CAPS person/business name inside a Recipient or Sender section.
+    """Find the counterparty name inside a Recipient or Sender section.
 
-    Strips phone-carrier lines ("OPay | ...", "MONIE POINT | ...") before
-    scanning so that bank names are not returned instead of the account holder.
-    Uses a literal pipe to avoid the [lI1] aliases accidentally matching
-    uppercase letters inside the name itself (e.g. the 'I' in "CHEESYBITE").
+    Strips lines containing a pipe ("OPay | ...", "MONIE POINT | ...",
+    "| 101****813") so only the name line(s) remain, then returns the
+    first non-blank line.
+
+    Handles ALL-CAPS names ("ACCOUNT NAME"), mixed-case
+    names ("Mixed", "Case"), and compound names with hyphens
+    ("POS Transfer-MERCHANT NAME").
     """
-    cleaned = re.sub(r"[^\n]*\|[^\n]*\n", "", section_text)
-    names = _NAME_RE.findall(cleaned)
-    if names:
-        return names[0].strip()
+    cleaned = re.sub(r"[^\n]*\|[^\n]*\n?", "", section_text)
+    for line in cleaned.splitlines():
+        name = line.strip()
+        if name:
+            return name
     return None
 
 

@@ -139,6 +139,7 @@ def deliver_queued_nudges() -> None:
     """Deliver all nudges that were queued during quiet hours."""
     from app.models.nudge import Nudge
     from app.models.user import User
+    from app.services.nudge_engine import PUSH_SCREEN, _is_quiet_hours
     from app.services.push_service import send_push_notification
     from app.ws_manager import notify_user
 
@@ -155,22 +156,41 @@ def deliver_queued_nudges() -> None:
         )
 
         notified_users: set[str] = set()
+        delivered_count = 0
         for nudge in queued:
-            nudge.delivered_at = now
             user: User | None = db.get(User, nudge.user_id)
-            if user and user.expo_push_token:
+            if user is None:
+                continue
+
+            # Respect per-user quiet hours — skip if the user's window hasn't ended yet.
+            if _is_quiet_hours(user.nudge_settings or {}):
+                continue
+
+            nudge.delivered_at = now
+            delivered_count += 1
+
+            if user.expo_push_token:
+                nudge_type = (nudge.context or {}).get("nudge_type") or nudge.trigger_type
+                push_data: dict = {
+                    "trigger_type": nudge.trigger_type,
+                    "nudge_id": nudge.id,
+                    "nudge_type": nudge_type,
+                    "screen": PUSH_SCREEN.get(nudge.trigger_type, "nudges"),
+                }
+                if nudge.category_id:
+                    push_data["category_id"] = nudge.category_id
                 expired = send_push_notification(
                     token=user.expo_push_token,
                     title=nudge.title or "MoniMata",
                     body=nudge.message,
-                    data={"nudge_id": nudge.id, "trigger_type": nudge.trigger_type},
+                    data=push_data,
                 )
                 if expired:
                     user.expo_push_token = None
             notified_users.add(str(nudge.user_id))
 
         db.commit()
-        logger.info("deliver_queued_nudges: delivered %d nudges", len(queued))
+        logger.info("deliver_queued_nudges: delivered %d nudges", delivered_count)
 
         for uid in notified_users:
             notify_user(uid, ["nudges"])

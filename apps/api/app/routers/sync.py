@@ -757,7 +757,11 @@ def push(
             rr_existing.is_active = bool(record.get("is_active", rr_existing.is_active))
             if "template" in record:
                 _tmpl = record["template"]
-                rr_existing.template = json.loads(_tmpl) if isinstance(_tmpl, str) else _tmpl
+                if isinstance(_tmpl, str):
+                    _tmpl = _tmpl.strip()
+                    rr_existing.template = json.loads(_tmpl) if _tmpl else rr_existing.template
+                else:
+                    rr_existing.template = _tmpl
             rr_existing.updated_at = datetime.now(UTC)
         else:
             if next_due_val is None:

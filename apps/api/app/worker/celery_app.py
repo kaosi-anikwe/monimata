@@ -53,6 +53,21 @@ celery_app.conf.update(
 )
 
 
+# ── Worker logging ────────────────────────────────────────────────────────────
+# Hook into Celery's setup_logging signal so worker processes write to the
+# same logs/app.log + logs/error.log files that uvicorn uses.  Without this,
+# all task output goes only to the tmux terminal and is lost on restart.
+from celery.signals import setup_logging  # noqa: E402
+
+
+@setup_logging.connect
+def _configure_worker_logging(**kwargs: Any) -> None:
+    from app.core.config import settings
+    from app.core.logging_config import configure_logging
+
+    configure_logging(log_level=settings.LOG_LEVEL)
+
+
 # ── Embedding model boot signal ─────────────────────────────────────────────────────────
 # Load the SentenceTransformer model once per worker process so it is warm
 # before any embed_category_rule task arrives.  This prevents every task from

@@ -351,6 +351,28 @@ def create_nudge(
         category_id,
         quiet,
     )
+    if quiet:
+        # Calculate the next delivery window using the user's own quiet_hours_end
+        # (not a hardcoded time), so the log is accurate for custom schedules.
+        ns_log = user.nudge_settings or {}
+        qe_str: str = ns_log.get("quiet_hours_end", "07:00")
+        try:
+            eh, em = map(int, qe_str.split(":"))
+        except (ValueError, AttributeError):
+            eh, em = 7, 0
+        now_wat = datetime.now(WAT)
+        next_delivery = now_wat.replace(hour=eh, minute=em, second=0, microsecond=0)
+        if now_wat >= next_delivery:
+            next_delivery += timedelta(days=1)
+        logger.info(
+            "Nudge queued (quiet hours active): type=%s nudge_id=%s user=%s — "
+            "will be delivered at %s WAT (quiet_hours_end=%s)",
+            trigger_type,
+            nudge.id,
+            user.id,
+            next_delivery.strftime("%Y-%m-%d %H:%M"),
+            qe_str,
+        )
     return nudge
 
 
@@ -383,6 +405,11 @@ def send_transaction_received_push(
 
     ns = user.nudge_settings or {}
     if _is_quiet_hours(ns):
+        logger.info(
+            "send_transaction_received_push: suppressed for user=%s — quiet hours active "
+            "(push is not queued; transaction_received pushes are fire-and-forget)",
+            user.id,
+        )
         return
 
     amount_str = _kobo_to_naira_str(abs(amount_kobo))
