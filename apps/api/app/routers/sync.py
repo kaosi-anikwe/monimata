@@ -917,6 +917,9 @@ def push(
         if "memo" in record:
             tx.memo = record["memo"]
 
+        if "recurrence_id" in record:
+            tx.recurrence_id = record["recurrence_id"]
+
         if old_category_id != new_category_id:
             tx_month = tx.date.strftime("%Y-%m")
             if old_category_id:

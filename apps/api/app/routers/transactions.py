@@ -798,11 +798,33 @@ def create_manual_transaction(
 @router.delete("/{tx_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_transaction(
     tx_id: UUID,
+    cancel_rule: bool = Query(
+        False,
+        description=(
+            "When true and the transaction has a recurrence_id, "
+            "also deactivate the recurring rule so no further instances are generated."
+        ),
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
-    """Delete a transaction."""
+    """Delete a transaction. Pass cancel_rule=true to also stop the associated recurring rule."""
+    from app.models.recurring_rule import RecurringRule
+
     tx = _get_tx_or_404(db, str(tx_id), str(current_user.id))
+
+    # Optionally deactivate the recurring rule before deleting the transaction.
+    if cancel_rule and tx.recurrence_id:
+        rule = (
+            db.query(RecurringRule)
+            .filter(
+                RecurringRule.id == tx.recurrence_id,
+                RecurringRule.user_id == str(current_user.id),
+            )
+            .first()
+        )
+        if rule:
+            rule.is_active = False
 
     # Undo budget activity
     if tx.category_id:

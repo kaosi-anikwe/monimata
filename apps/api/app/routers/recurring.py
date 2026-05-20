@@ -105,6 +105,8 @@ def create_rule(
     db: Session = Depends(get_db),
 ) -> RecurringRule:
     """Create a new recurring rule. The first occurrence is generated lazily on the next sync."""
+    from app.models.transaction import Transaction
+
     rule = RecurringRule(
         user_id=str(current_user.id),
         frequency=body.frequency,
@@ -117,6 +119,24 @@ def create_rule(
         template=body.template,
     )
     db.add(rule)
+    db.flush()  # populate rule.id before using it below
+
+    if body.source_transaction_id is not None:
+        parent_tx = (
+            db.query(Transaction)
+            .filter(
+                Transaction.id == str(body.source_transaction_id),
+                Transaction.user_id == str(current_user.id),
+            )
+            .first()
+        )
+        if parent_tx is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Source transaction not found",
+            )
+        parent_tx.recurrence_id = str(rule.id)
+
     db.commit()
     db.refresh(rule)
     return rule
