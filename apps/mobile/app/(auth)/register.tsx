@@ -28,6 +28,7 @@ import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   Text,
@@ -341,9 +342,9 @@ export default function RegisterScreen() {
           <View style={s.tosWrap}>
             <Text style={[s.tosText, { color: colors.textMeta }]}>
               By creating an account, you agree to our{' '}
-              <Text style={[s.tosLink, { color: colors.textSecondary }]}>Terms of Service</Text>
+              <Text style={[s.tosLink, { color: colors.textSecondary }]} onPress={() => Linking.openURL('https://moni-mata.ng/terms-of-service')}>Terms of Service</Text>
               {' '}and{' '}
-              <Text style={[s.tosLink, { color: colors.textSecondary }]}>Privacy Policy</Text>.
+              <Text style={[s.tosLink, { color: colors.textSecondary }]} onPress={() => Linking.openURL('https://moni-mata.ng/privacy-policy')}>Privacy Policy</Text>.
             </Text>
           </View>
 

@@ -25,6 +25,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
 import {
   Animated,
+  Linking,
   ScrollView,
   StyleSheet,
   Switch,
@@ -343,6 +344,20 @@ export default function ProfileScreen() {
             title="About MoniMata"
             subtitle="Version, open source & licence"
             onPress={() => router.push('/about')}
+            showChevron
+          />
+          <ListRow
+            iconBg={colors.infoSubtle}
+            leftIcon={<Ionicons name="document-text-outline" size={17} color={colors.info} />}
+            title="Terms of Service"
+            onPress={() => Linking.openURL('https://moni-mata.ng/terms-of-service')}
+            showChevron
+          />
+          <ListRow
+            iconBg={colors.purpleSubtle}
+            leftIcon={<Ionicons name="shield-checkmark-outline" size={17} color={colors.purple} />}
+            title="Privacy Policy"
+            onPress={() => Linking.openURL('https://moni-mata.ng/privacy-policy')}
             showChevron
             separator={false}
           />

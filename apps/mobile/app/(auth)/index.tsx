@@ -87,13 +87,25 @@ export default function WelcomeScreen() {
 
       {/* ── Hero area ── */}
       <LinearGradient
-        colors={[colors.darkGreen, colors.darkGreenMid]}
+        colors={[colors.darkGreen, colors.darkGreenMid, colors.darkGreen]}
+        locations={[0, 0.5, 1]}
         style={[ss.hero, { paddingTop: insets.top + 40 }]}
-        start={{ x: 0.3, y: 0 }}
-        end={{ x: 0.7, y: 1 }}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
         {/* Radial glow decoration (top-left) */}
-        <View style={ss.glowTL} />
+        <LinearGradient
+          colors={[
+            'rgba(168,224,99,0.25)',
+            'rgba(168,224,99,0.10)',
+            'rgba(168,224,99,0.005)',
+            'transparent',
+          ]}
+          locations={[0, 0.3, 0.6, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={ss.glowTL}
+        />
 
         {/* Logo tile */}
         <View style={ss.logoTile}>
@@ -184,12 +196,11 @@ function makeStyles(colors: ThemeColors) {
     },
     glowTL: {
       position: 'absolute',
-      top: -80,
+      top: -60,
       left: -60,
       width: 280,
       height: 280,
       borderRadius: radius.full,
-      backgroundColor: colors.limeGlow,
       pointerEvents: 'none',
     },
     logoTile: {
