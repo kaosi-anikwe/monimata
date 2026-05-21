@@ -209,13 +209,14 @@ def create_nudge(
     db.flush()  # populate nudge.id without committing the outer transaction
 
     if send_push and not quiet and user.expo_push_token:
-        nudge_type = nudge.context.get("nudge_type") or trigger_type if nudge.context else ""
-        _push_data = {
-            "trigger_type": trigger_type,
-            "nudge_id": nudge.id,
-            "nudge_type": nudge_type,
-            "screen": PUSH_SCREEN.get(trigger_type, "nudges"),
-        }
+        ctx = nudge.context or {}
+        # Start with the full context so the client has everything on arrival,
+        # then overlay the canonical push fields to guarantee they're present.
+        _push_data = {**ctx}
+        _push_data["trigger_type"] = trigger_type
+        _push_data["nudge_id"] = nudge.id
+        _push_data["nudge_type"] = ctx.get("nudge_type") or trigger_type
+        _push_data["screen"] = ctx.get("screen") or PUSH_SCREEN.get(trigger_type, "nudges")
         if nudge.category_id:
             _push_data["category_id"] = nudge.category_id
         if transaction_id:
@@ -346,7 +347,11 @@ def send_statement_received_push(db: Session, user: User, bank_name: str) -> Non
         "statement_received",
         TITLES["statement_received"],
         random.choice(MESSAGES["statement_received"]).format(bank_name=bank_name),
-        context={"bank_name": bank_name},
+        context={
+            "nudge_type": "statement_received",
+            "screen": PUSH_SCREEN["statement_received"],
+            "bank_name": bank_name,
+        },
     )
     db.commit()
 
@@ -363,7 +368,13 @@ def send_statement_processed_push(
         random.choice(MESSAGES["statement_processed"]).format(
             bank_name=bank_name, imported=imported, updated=updated
         ),
-        context={"bank_name": bank_name, "imported": imported, "updated": updated},
+        context={
+            "nudge_type": "statement_processed",
+            "screen": PUSH_SCREEN["statement_processed"],
+            "bank_name": bank_name,
+            "imported": imported,
+            "updated": updated,
+        },
     )
     db.commit()
 
@@ -376,7 +387,11 @@ def send_receipt_received_push(db: Session, user: User, bank_name: str) -> None:
         "receipt_received",
         TITLES["receipt_received"],
         random.choice(MESSAGES["receipt_received"]).format(bank_name=bank_name),
-        context={"bank_name": bank_name},
+        context={
+            "nudge_type": "receipt_received",
+            "screen": PUSH_SCREEN["receipt_received"],
+            "bank_name": bank_name,
+        },
     )
     db.commit()
 
@@ -410,6 +425,8 @@ def send_receipt_processed_push(
             bank_name=bank_name, amount_naira=amount_naira, direction=direction
         ),
         context={
+            "nudge_type": "receipt_processed",
+            "screen": PUSH_SCREEN["receipt_processed"],
             "bank_name": bank_name,
             "amount_kobo": amount_kobo,
             "amount_naira": amount_naira,
@@ -439,6 +456,8 @@ def send_receipt_duplicate_push(
             bank_name=bank_name, amount_naira=amount_naira
         ),
         context={
+            "nudge_type": "receipt_duplicate",
+            "screen": PUSH_SCREEN["receipt_duplicate"],
             "bank_name": bank_name,
             "amount_kobo": amount_kobo,
             "amount_naira": amount_naira,
@@ -475,7 +494,12 @@ def send_receipt_failed_push(
         "receipt_failed",
         TITLES["receipt_failed"],
         body,
-        context={"reason": reason, "bank_name": bank_name},
+        context={
+            "nudge_type": "receipt_failed",
+            "screen": PUSH_SCREEN["receipt_failed"],
+            "reason": reason,
+            "bank_name": bank_name,
+        },
     )
     db.commit()
 
@@ -493,7 +517,11 @@ def send_statement_failed_push(db: Session, user: User, bank_name: str) -> None:
         "statement_failed",
         TITLES["statement_failed"],
         random.choice(MESSAGES["statement_failed"]).format(bank_name=bank_name),
-        context={"bank_name": bank_name},
+        context={
+            "nudge_type": "statement_failed",
+            "screen": PUSH_SCREEN["statement_failed"],
+            "bank_name": bank_name,
+        },
     )
     db.commit()
 
@@ -580,13 +608,35 @@ def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
             )
             continue
 
+        # Build enriched context for the nudge detail view and push payload.
+        screen = rule.get("action", {}).get("screen", "nudges")
+        nudge_context: dict = {
+            "nudge_type": slug,
+            "slug": slug,
+            "gid": rule["gid"],
+            "evt_type": evt_type,
+            "screen": screen,
+            "transaction_id": tx.id,
+            "category_id": cid,
+            "category_name": context["cat"].name if context["cat"].name else None,
+            "amount_kobo": tx.amount,
+            "match_count": match_count,
+        }
+        # Budget context (when available)
+        if context["cat"].spend_pct is not None:
+            nudge_context["spend_pct"] = round(context["cat"].spend_pct, 4)
+        if context["cat"].amt is not None:
+            nudge_context["budget_amount_kobo"] = int(context["cat"].amt)
+        if context["cat"].rem is not None:
+            nudge_context["budget_remaining_kobo"] = int(context["cat"].rem)
+
         create_nudge(
             db,
             user,
-            slug,
+            "nudge",
             title,
             message,
-            context={"slug": slug, "gid": rule["gid"], "evt_type": evt_type},
+            context=nudge_context,
             category_id=cid,
             rule_id=rule["id"],
             transaction_id=tx.id,

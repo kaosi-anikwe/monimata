@@ -170,15 +170,19 @@ def deliver_queued_nudges() -> None:
             delivered_count += 1
 
             if user.expo_push_token:
-                nudge_type = (nudge.context or {}).get("nudge_type") or nudge.trigger_type
-                push_data: dict = {
-                    "trigger_type": nudge.trigger_type,
-                    "nudge_id": nudge.id,
-                    "nudge_type": nudge_type,
-                    "screen": PUSH_SCREEN.get(nudge.trigger_type, "nudges"),
-                }
+                ctx = nudge.context or {}
+                # Include full context so the client has everything on arrival.
+                push_data: dict = {**ctx}
+                push_data["trigger_type"] = nudge.trigger_type
+                push_data["nudge_id"] = nudge.id
+                push_data["nudge_type"] = ctx.get("nudge_type") or nudge.trigger_type
+                push_data["screen"] = ctx.get("screen") or PUSH_SCREEN.get(
+                    nudge.trigger_type, "nudges"
+                )
                 if nudge.category_id:
                     push_data["category_id"] = nudge.category_id
+                if ctx.get("transaction_id"):
+                    push_data["transaction_id"] = ctx["transaction_id"]
                 expired = send_push_notification(
                     token=user.expo_push_token,
                     title=nudge.title or "MoniMata",
