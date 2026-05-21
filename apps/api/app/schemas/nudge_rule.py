@@ -333,7 +333,7 @@ ConditionsBlock.model_rebuild()
 
 
 class ActionBlock(BaseModel):
-    """Output definition — a non-empty array of template strings."""
+    """Output definition — a non-empty array of message template strings."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -355,6 +355,19 @@ class ActionBlock(BaseModel):
 # ── API schemas ───────────────────────────────────────────────────────────────
 
 
+def _check_title_placeholders(title: str) -> str:
+    """Shared validator: reject unknown {placeholders} in a title string."""
+    if not title:
+        return title
+    unknown = set(_PLACEHOLDER_RE.findall(title)) - VALID_TEMPLATE_KEYS
+    if unknown:
+        raise ValueError(
+            f"title contains unknown placeholder(s): {sorted(unknown)}. "
+            f"Valid keys: {sorted(VALID_TEMPLATE_KEYS)}"
+        )
+    return title
+
+
 class NudgeRuleCreate(BaseModel):
     """Validated input for creating a new nudge rule."""
 
@@ -364,12 +377,18 @@ class NudgeRuleCreate(BaseModel):
         pattern=_SLUG_PATTERN,
         description="Unique rule identifier, e.g. 'threshold_80'",
     )
+    title: str = Field(default="", description="Push notification title (supports {placeholders})")
     gid: str = Field(pattern=_SLUG_PATTERN, description="Group ID for rate-limit bucketing")
     active: bool = True
     evts: list[str] = Field(min_length=1, description="Event types that trigger this rule")
     days_back: int = Field(0, ge=0, le=90, description="Historical look-back window in days")
     conds: ConditionsBlock
     action: ActionBlock
+
+    @field_validator("title")
+    @classmethod
+    def _validate_title(cls, v: str) -> str:
+        return _check_title_placeholders(v)
 
     @field_validator("evts")
     @classmethod
@@ -390,12 +409,18 @@ class NudgeRuleUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     slug: str | None = Field(None, pattern=_SLUG_PATTERN)
+    title: str | None = None
     gid: str | None = Field(None, pattern=_SLUG_PATTERN)
     active: bool | None = None
     evts: list[str] | None = None
     days_back: int | None = Field(None, ge=0, le=90)
     conds: ConditionsBlock | None = None
     action: ActionBlock | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _validate_title(cls, v: str | None) -> str | None:
+        return _check_title_placeholders(v) if v is not None else v
 
     @field_validator("evts")
     @classmethod
@@ -418,6 +443,7 @@ class NudgeRuleResponse(BaseModel):
 
     id: str
     slug: str
+    title: str
     gid: str
     active: bool
     evts: list[str]

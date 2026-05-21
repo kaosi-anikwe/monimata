@@ -148,6 +148,7 @@ def _rule_to_cache_dict(rule: object) -> dict:
     return {
         "id": getattr(rule, "id"),
         "slug": getattr(rule, "slug"),
+        "title": getattr(rule, "title"),
         "gid": getattr(rule, "gid"),
         "active": getattr(rule, "active"),
         "evts": list(getattr(rule, "evts")),
