@@ -20,6 +20,7 @@
  * Route: /add-transaction
  */
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Haptics from "expo-haptics";
 import { useRouter } from 'expo-router';
@@ -39,6 +40,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Polyline } from 'react-native-svg';
 
+import { useToast } from '@/components/Toast';
 import { Button, ScreenHeader } from '@/components/ui';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useAccounts } from '@/hooks/useAccounts';
@@ -185,28 +187,56 @@ function Frow({ label, isLast = false, children }: { label: string; isLast?: boo
 // ─── Category picker sheet ────────────────────────────────────────────────────
 
 function CategoryPickerSheet({
-  visible, groups, selected, onSelect, onClose,
+  visible, groups, selected, onSelect, onClose, disableTBB = false,
 }: {
   visible: boolean;
   groups: CategoryGroup[];
   selected: CategoryItem | null;
   onSelect: (item: CategoryItem | null) => void;
   onClose: () => void;
+  /** When true the TBB option is disabled with a warning on tap. */
+  disableTBB?: boolean;
 }) {
   const colors = useTheme();
+  const { info: showInfo } = useToast();
   return (
     <BottomSheet visible={visible} onClose={onClose} title="Category" scrollable={false}>
       <ScrollView style={{ maxHeight: 420 }}>
+        {/* TBB row */}
         <TouchableOpacity
-          style={[ss.pickRow, { borderBottomColor: colors.separator, borderBottomWidth: StyleSheet.hairlineWidth }]}
-          onPress={() => { onSelect(null); onClose(); }}
-          accessibilityRole="button" accessibilityLabel="No category"
+          style={[
+            ss.pickRow,
+            {
+              backgroundColor: disableTBB ? colors.surface : colors.successSubtle,
+              borderBottomColor: colors.separator,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              gap: spacing.sm,
+            },
+          ]}
+          onPress={() => {
+            if (disableTBB) {
+              showInfo('Not allowed', 'Expenses cannot be assigned to To Be Budgeted.');
+            } else {
+              onSelect(null);
+              onClose();
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={disableTBB ? 'To Be Budgeted — not available for expenses' : 'Assign to To Be Budgeted'}
         >
-          <Text style={[type_.body, { color: colors.textMeta, fontStyle: 'italic' }]}>No category</Text>
-          {!selected && (
+          <View style={[ss.tbbBadge, { backgroundColor: disableTBB ? colors.textTertiary : colors.brand }]}>
+            <Text style={[type_.labelSm, { color: colors.white }]}>TBB</Text>
+          </View>
+          <Text style={[type_.body, { color: disableTBB ? colors.textTertiary : colors.brand, flex: 1 }]}>
+            To Be Budgeted
+          </Text>
+          {!selected && !disableTBB && (
             <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
               <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
             </Svg>
+          )}
+          {disableTBB && (
+            <Ionicons name="lock-closed-outline" size={layout.iconSm} color={colors.textTertiary} />
           )}
         </TouchableOpacity>
         {groups.map((g) => (
@@ -685,6 +715,7 @@ export default function AddTransactionScreen() {
         selected={selectedCategory}
         onSelect={(c) => setSelectedCategory(c)}
         onClose={() => setShowCategoryPicker(false)}
+        disableTBB={txType === 'debit'}
       />
       <OptionPickerSheet
         visible={showRecurrencePicker}
@@ -754,6 +785,7 @@ const ss = StyleSheet.create({
   saveBar: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
   pickGroupHdr: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xxs },
   pickRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.mdn },
+  tbbBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm },
   pickerEmpty: { paddingHorizontal: spacing.xl, paddingVertical: spacing.xxl, alignItems: 'center' },
   dtBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   dtSheet: { paddingBottom: spacing.xxl, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },

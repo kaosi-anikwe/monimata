@@ -44,6 +44,7 @@ import Animated, { SlideInDown, SlideOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 
+import { useToast } from '@/components/Toast';
 import { TourTarget, useTour, type TourStep } from '@/components/tour';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Chip } from '@/components/ui/Chip';
@@ -98,12 +99,15 @@ interface DayGroup {
 interface CategoryPickerSheetProps {
   visible: boolean;
   groups: CategoryGroup[];
-  onSelect: (categoryId: string) => void;
+  onSelect: (categoryId: string | null) => void;
   onClose: () => void;
+  /** When true the TBB option is disabled with a warning on tap. */
+  disableTBB?: boolean;
 }
 
-function CategoryPickerSheet({ visible, groups, onSelect, onClose }: CategoryPickerSheetProps) {
+function CategoryPickerSheet({ visible, groups, onSelect, onClose, disableTBB = false }: CategoryPickerSheetProps) {
   const colors = useTheme();
+  const { info: showInfo } = useToast();
   const sections = groups.map((g) => ({ title: g.name, data: g.categories }));
   return (
     <BottomSheet
@@ -116,6 +120,39 @@ function CategoryPickerSheet({ visible, groups, onSelect, onClose }: CategoryPic
         sections={sections}
         keyExtractor={(item) => item.id}
         style={{ maxHeight: 440 }}
+        ListHeaderComponent={
+          <TouchableOpacity
+            style={[
+              ss.tbbRow,
+              {
+                backgroundColor: disableTBB ? colors.surface : colors.successSubtle,
+                borderBottomColor: colors.separator,
+              },
+            ]}
+            onPress={() => {
+              if (disableTBB) {
+                showInfo('Not allowed', 'Expenses cannot be assigned to To Be Budgeted.');
+              } else {
+                onSelect(null);
+                onClose();
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={disableTBB ? 'To Be Budgeted — not available for expenses' : 'Assign to To Be Budgeted'}
+          >
+            <View style={[ss.tbbBadge, { backgroundColor: disableTBB ? colors.textTertiary : colors.brand }]}>
+              <Text style={[type_.labelSm, { color: colors.white }]}>TBB</Text>
+            </View>
+            <Text style={[type_.body, { color: disableTBB ? colors.textTertiary : colors.brand, flex: 1 }]}>
+              To Be Budgeted
+            </Text>
+            <Ionicons
+              name={disableTBB ? 'lock-closed-outline' : 'chevron-forward'}
+              size={layout.iconSm}
+              color={disableTBB ? colors.textTertiary : colors.brand}
+            />
+          </TouchableOpacity>
+        }
         renderSectionHeader={({ section }) => (
           <View style={[ss.pickerGroupHeader, { backgroundColor: colors.surface }]}>
             <Text style={[type_.labelSm, { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 1.2 }]}>
@@ -411,6 +448,11 @@ export default function TransactionsScreen() {
     [txPages],
   );
 
+  const pickerTx = useMemo(
+    () => (pickerTxId ? allTx.find((tx) => tx.id === pickerTxId) ?? null : null),
+    [pickerTxId, allTx],
+  );
+
   const filteredTx = useMemo(() => {
     let result = allTx;
     if (search.trim()) {
@@ -625,6 +667,7 @@ export default function TransactionsScreen() {
           }
           setPickerTxId(null);
         }}
+        disableTBB={(pickerTx?.amount ?? 0) < 0}
       />
     </View>
   );
@@ -780,6 +823,19 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.mdn,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tbbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tbbBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
   },
 
   // Error state

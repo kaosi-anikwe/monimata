@@ -109,7 +109,15 @@ export default function CategorizeQueueScreen() {
         : [],
     [queueData, currentTx?.id],
   );
-
+  // For credit transactions TBB is always prepended as the top suggestion.
+  type EffectiveSuggestion = { category_id: string | null; category_name: string };
+  const effectiveSuggestions = useMemo((): EffectiveSuggestion[] => {
+    const base = suggestions as EffectiveSuggestion[];
+    if ((currentTx?.amount ?? 0) > 0) {
+      return [{ category_id: null, category_name: 'To Be Budgeted' }, ...base];
+    }
+    return base;
+  }, [currentTx?.amount, suggestions]);
   const currentItem = useMemo<ReviewQueueItem | null>(
     () =>
       currentTx
@@ -123,13 +131,12 @@ export default function CategorizeQueueScreen() {
   // ── Handlers ────────────────────────────────────────────────────────────
 
   const handleConfirm = useCallback(
-    (txId: string, categoryId: string) => {
-      if (!categoryId) return;
+    (txId: string, categoryId: string | null) => {
       // Capture tx before removing for potential revert on API error.
       const tx = queueRef.current.find((t) => t.id === txId);
       setQueue((prev) => prev.filter((t) => t.id !== txId));
       confirmMutation.mutate(
-        { params: { path: { tx_id: txId } }, body: { category_id: categoryId } },
+        { params: { path: { tx_id: txId } }, body: { category_id: categoryId as string } },
         {
           onSuccess: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -160,7 +167,7 @@ export default function CategorizeQueueScreen() {
   }, []);
 
   const handleSearchSelect = useCallback(
-    (categoryId: string) => {
+    (categoryId: string | null) => {
       const id = queueRef.current[0]?.id;
       if (id) handleConfirm(id, categoryId);
     },
@@ -220,7 +227,9 @@ export default function CategorizeQueueScreen() {
                   { color: colors.textMeta, textAlign: 'center', marginBottom: spacing.xl },
                 ]}
               >
-                What category does this belong to?
+                {(currentItem.transaction.amount ?? 0) < 0
+                  ? 'Where did this money come from?'
+                  : 'What is this money for?'}
               </Text>
 
               {/* ── Card stack: all three cards share the same wrapper so peek
@@ -290,7 +299,7 @@ export default function CategorizeQueueScreen() {
               style={[ss.hintBtn, { borderColor: colors.brand }]}
               onPress={() => {
                 if (!currentItem) return;
-                const top = currentItem.suggestions?.[0];
+                const top = effectiveSuggestions[0];
                 if (top) {
                   handleConfirm(currentItem.transaction.id, top.category_id);
                 } else {
@@ -299,10 +308,14 @@ export default function CategorizeQueueScreen() {
               }}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel={`${(currentItem?.suggestions?.length ?? 0) > 0 ? 'Confirm' : 'Assign'} category`}
+              accessibilityLabel={`${effectiveSuggestions.length > 0 ? 'Confirm' : 'Assign'} category`}
             >
               <Text style={[type_.small, { color: colors.brand }]}>
-                {(currentItem?.suggestions?.length ?? 0) > 0 ? 'Confirm →' : 'Assign →'}
+                {effectiveSuggestions.length > 0
+                  ? effectiveSuggestions[0].category_id === null
+                    ? 'TBB →'
+                    : 'Confirm →'
+                  : 'Assign →'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -320,6 +333,7 @@ export default function CategorizeQueueScreen() {
           setSearchVisible(false);
           handleSearchSelect(categoryId);
         }}
+        disableTBB={(currentTx?.amount ?? 0) < 0}
       />
     </View>
   );

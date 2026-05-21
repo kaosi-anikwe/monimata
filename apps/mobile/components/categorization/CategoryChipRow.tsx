@@ -30,6 +30,7 @@ import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 
+import { useToast } from '@/components/Toast';
 import { Chip } from '@/components/ui';
 import { spacing } from '@/lib/tokens';
 import type { CategoryGroup } from '@/types/category';
@@ -44,8 +45,9 @@ const MAX_CHIPS = 5;
 export interface CategoryChipRowProps {
   /** Full category tree from WatermelonDB via useCategoryGroups(). */
   groups: CategoryGroup[];
-  /** Called with the selected category id and display name. */
-  onSelect: (categoryId: string, categoryName: string) => void;
+  /** Called with the selected category id and display name.
+   *  categoryId is null when the user selects TBB. */
+  onSelect: (categoryId: string | null, categoryName: string) => void;
   /** Opens the full CategorySearchSheet. */
   onMorePress: () => void;
   /**
@@ -54,6 +56,8 @@ export interface CategoryChipRowProps {
    * chips are disabled while the mutation is pending.
    */
   pendingCategoryId?: string;
+  /** When true the TBB chip is shown disabled with a warning on tap. */
+  disableTBB?: boolean;
 }
 
 // ─── CategoryChipRow ─────────────────────────────────────────────────────────
@@ -63,7 +67,9 @@ export function CategoryChipRow({
   onSelect,
   onMorePress,
   pendingCategoryId,
+  disableTBB = false,
 }: CategoryChipRowProps) {
+  const { info: showInfo } = useToast();
   // Flatten all non-hidden categories and cap at MAX_CHIPS.
   const flatCategories = groups
     .filter((g) => !g.is_hidden)
@@ -79,6 +85,23 @@ export function CategoryChipRow({
       contentContainerStyle={ss.row}
       keyboardShouldPersistTaps="handled"
     >
+      {/* TBB chip — always first */}
+      <Chip
+        label="TBB"
+        selected={false}
+        onPress={() => {
+          if (disableTBB) {
+            showInfo('Not allowed', 'Expenses cannot be assigned to To Be Budgeted.');
+          } else {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onSelect(null, 'To Be Budgeted');
+          }
+        }}
+        disabled={isPending}
+        style={[ss.chip, disableTBB ? { opacity: 0.4 } : undefined]}
+        accessibilityLabel={disableTBB ? 'TBB — not available for expenses' : 'Assign to TBB'}
+      />
+
       {flatCategories.map((cat) => (
         <Chip
           key={cat.id}
