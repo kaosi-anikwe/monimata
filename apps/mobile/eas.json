@@ -12,7 +12,20 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "enterpriseProvisioning": "universal"
+      }
+    },
+    "github-release": {
+      "autoIncrement": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

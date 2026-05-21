@@ -29,11 +29,17 @@
  *   token helpers     – getAccessToken, saveTokens, clearTokens, …
  *   setLogoutHandler  – breaks the circular dep with the Redux store
  */
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import createClient from 'openapi-fetch';
 import createQueryClient from 'openapi-react-query';
+import { Platform } from 'react-native';
 
 import type { paths } from '@monimata/shared-types';
+
+// ── App identity headers ─────────────────────────────────────────────────────
+const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
+const APP_PLATFORM = Platform.OS as 'android' | 'ios';
 
 // ── Logout callback ───────────────────────────────────────────────────────────
 // Registered by app/_layout.tsx after the Redux store is initialised.
@@ -140,7 +146,11 @@ async function doTokenRefresh(): Promise<string> {
         if (!storedRefresh) throw new Error('No refresh token stored');
         const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-App-Version': APP_VERSION,
+                'X-App-Platform': APP_PLATFORM,
+            },
             body: JSON.stringify({ refresh_token: storedRefresh }),
         });
         if (!refreshRes.ok) throw new Error('Token refresh failed');
@@ -196,6 +206,8 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     const headers = new Headers(origInit.headers);
     const token = await getAccessToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);
+    headers.set('X-App-Version', APP_VERSION);
+    headers.set('X-App-Platform', APP_PLATFORM);
 
     const response = await fetch(url, { ...origInit, headers });
     if (response.status !== 401) return response;
@@ -211,6 +223,8 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
         const newToken = await doTokenRefresh();
         const retryHeaders = new Headers(origInit.headers);
         retryHeaders.set('Authorization', `Bearer ${newToken}`);
+        retryHeaders.set('X-App-Version', APP_VERSION);
+        retryHeaders.set('X-App-Platform', APP_PLATFORM);
         return fetch(url, { ...origInit, headers: retryHeaders });
     } catch {
         return response; // return the original 401 so callers see the failure
@@ -261,6 +275,8 @@ function xhrSend(
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url, true);
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('X-App-Version', APP_VERSION);
+        xhr.setRequestHeader('X-App-Platform', APP_PLATFORM);
         xhr.upload.onprogress = (e: ProgressEvent) => {
             if (e.lengthComputable) onProgress?.(e.loaded / e.total);
         };

@@ -13,6 +13,16 @@ Git tags follow the pattern `mobile/vX.Y.Z` and `api/vX.Y.Z`.
 
 ## Mobile App
 
+### [0.3.1] - 2026-05-21
+
+#### Changed
+
+- Every API request now includes `X-App-Version` and `X-App-Platform` headers,
+  enabling the server to enforce minimum-version requirements and return
+  platform-specific update links when an upgrade is needed.
+- `axios` moved to `devDependencies` — it is only used in test mocks and is no
+  longer bundled into the production app.
+
 ### [0.3.0] - 2026-05-21
 
 This is the first recorded changelog entry. It covers all features present at

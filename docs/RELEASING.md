@@ -5,6 +5,15 @@ Tag format: `mobile/vX.Y.Z` for the mobile app, `api/vX.Y.Z` for the API.
 
 ---
 
+## Table of Contents
+
+- [Versioning rules](#versioning-rules-semver)
+- [Mobile app release](#mobile-app-release)
+- [API release](#api-release)
+- [Checking existing tags](#checking-existing-tags)
+
+---
+
 ## Versioning rules (SemVer)
 
 | Change type                             | Example                                 | Bump                        |
@@ -15,7 +24,117 @@ Tag format: `mobile/vX.Y.Z` for the mobile app, `api/vX.Y.Z` for the API.
 
 ---
 
-## Before you tag
+## Mobile app release
+
+### How versioning works
+
+There are **two independent version numbers** for the mobile app:
+
+| Number                        | Where                  | Who controls it             | Purpose                                             |
+| ----------------------------- | ---------------------- | --------------------------- | --------------------------------------------------- |
+| `version` in `app.json`       | `apps/mobile/app.json` | You (bump manually)         | SemVer shown in stores ("0.4.0")                    |
+| `versionCode` / `buildNumber` | EAS remote             | EAS (`autoIncrement: true`) | Monotonically increasing integer required by stores |
+
+You never need to touch `versionCode` or `buildNumber` — EAS increments them
+automatically on every production build.
+
+### EAS build profiles
+
+| Profile          | Output                    | Use                                          |
+| ---------------- | ------------------------- | -------------------------------------------- |
+| `production`     | AAB (Android) + IPA (iOS) | Submit to Play Store / App Store             |
+| `github-release` | APK (Android)             | Attach to GitHub Release for direct download |
+| `preview`        | APK (Android)             | Share internally for testing                 |
+
+### Before you tag
+
+1. **Bump `version`** in `apps/mobile/app.json`:
+
+   ```json
+   "version": "0.4.0"
+   ```
+
+2. **Write the changelog** in `CHANGELOG.md` — add a new section at the top:
+
+   ```markdown
+   ## [0.4.0] - 2026-06-01
+
+   ### Added
+
+   - ...
+   ```
+
+3. **Commit both files together:**
+   ```bash
+   git add CHANGELOG.md apps/mobile/app.json
+   git commit -m "chore(mobile): release v0.4.0"
+   ```
+
+### Tagging (triggers the release workflow)
+
+```bash
+git tag -a mobile/v0.4.0 -m "mobile: release v0.4.0"
+git push && git push origin mobile/v0.4.0
+```
+
+Pushing the tag triggers `.github/workflows/mobile-release.yml`, which:
+
+1. **Builds a signed APK** via EAS (`github-release` profile) and publishes a
+   **GitHub Release** at `github.com/kaosi-anikwe/monimata/releases` with the APK
+   attached and the changelog section as the release body.
+
+2. **Builds AAB + IPA** via EAS (`production` profile) and submits them to
+   Google Play (internal track) and App Store Connect automatically.
+
+### One-time setup (do once per repo)
+
+#### GitHub secrets required
+
+| Secret                        | Value                                                                                                |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `EXPO_TOKEN`                  | Personal access token from [expo.dev/accounts](https://expo.dev/accounts) → Settings → Access tokens |
+| `GOOGLE_PLAY_JSON_KEY`        | JSON contents of a Google Play **service account key** with "Release manager" role                   |
+| `APP_STORE_CONNECT_KEY`       | Base-64 encoded `.p8` key downloaded from App Store Connect → Keys                                   |
+| `APP_STORE_CONNECT_KEY_ID`    | 10-character key ID shown next to the `.p8` download                                                 |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID from the same App Store Connect → Keys page                                                |
+
+#### Fill in `eas.json` submit config
+
+Open `apps/mobile/eas.json` and replace the placeholder values under `submit.production.ios`:
+
+```json
+"ios": {
+  "appleId": "you@example.com",
+  "ascAppId": "1234567890",      // App Store Connect → App → App Information → Apple ID
+  "appleTeamId": "ABCDE12345"    // developer.apple.com → Membership → Team ID
+}
+```
+
+#### Disable auto-submit if you prefer to submit manually
+
+Remove or comment out the two `eas submit` steps in
+`.github/workflows/mobile-release.yml`. You can then submit when ready:
+
+```bash
+cd apps/mobile
+eas submit --platform android --profile production --latest
+eas submit --platform ios    --profile production --latest
+```
+
+### Checking the release page
+
+```
+https://github.com/kaosi-anikwe/monimata/releases
+```
+
+Each release shows the changelog notes and has the APK attached as a downloadable
+asset. Share the APK link directly with users who want to sideload.
+
+---
+
+## API release
+
+### Before you tag
 
 1. **Update the version** in `apps/api/pyproject.toml`:
 
@@ -207,6 +326,7 @@ disappears.
 ## Checking existing tags
 
 ```bash
-git tag --list "api/*" --sort=-version:refname   # all API tags, newest first
-git show api/v0.3.0                               # show tag details + commit
+git tag --list "api/*"    --sort=-version:refname   # all API tags, newest first
+git tag --list "mobile/*" --sort=-version:refname   # all mobile tags, newest first
+git show api/v0.3.0                                  # show tag details + commit
 ```
