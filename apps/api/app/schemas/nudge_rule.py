@@ -460,6 +460,27 @@ class NudgeRuleListResponse(BaseModel):
     items: list[NudgeRuleResponse]
 
 
+class NudgeRuleGroup(BaseModel):
+    """Summary of a nudge rule group (GID)."""
+
+    gid: str
+    rule_count: int
+    active_count: int
+
+
+class NudgeRuleGroupList(BaseModel):
+    """List of all nudge rule groups."""
+
+    groups: list[NudgeRuleGroup]
+
+
+class NudgeRuleGroupDetail(BaseModel):
+    """All rules belonging to a single group."""
+
+    gid: str
+    rules: list[NudgeRuleResponse]
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
