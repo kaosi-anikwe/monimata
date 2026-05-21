@@ -46,26 +46,21 @@ import { Badge, BottomSheet, Button, EmptyState, ListRow, ScreenHeader } from '@
 import { useTheme } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { Nudge, NudgeTriggerType } from '@monimata/shared-types';
+import { formatNaira } from '@/utils/money';
+import type { DSLNudgeContext, Nudge, NudgeTriggerType, OperationalNudgeContext } from '@monimata/shared-types';
 import {
   useDismissNudge,
   useMarkAllNudgesRead,
   useNudges,
   useOpenNudge,
 } from '../../hooks/useNudges';
-import type {
-  BillPaymentContext,
-  LargeSingleTxContext,
-  PayReceivedContext,
-  Threshold100Context,
-  Threshold80Context,
-} from '../../types/nudge';
 
 
-// ── Trigger type metadata ─────────────────────────────────────────────────
+// ── Trigger type / GID metadata ───────────────────────────────────────────
+// GID-based theming for DSL nudges, trigger_type-based for operational ones.
 
-type BubbleBgToken = 'warningSubtle' | 'errorSubtle' | 'purpleSubtle' | 'successSubtle' | 'surface';
-type IconColorToken = 'warning' | 'error' | 'purple' | 'brand' | 'textMeta';
+type BubbleBgToken = 'warningSubtle' | 'errorSubtle' | 'purpleSubtle' | 'successSubtle' | 'surface' | 'infoSubtle';
+type IconColorToken = 'warning' | 'error' | 'purple' | 'brand' | 'textMeta' | 'info';
 
 interface TriggerMeta {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -74,36 +69,83 @@ interface TriggerMeta {
   label: string;
 }
 
-const TRIGGER_META: Record<string, TriggerMeta> = {
-  threshold_80: {
+/** GID-based theming for DSL nudges (trigger_type === "nudge"). */
+const GID_META: Record<string, TriggerMeta> = {
+  spend_alerts: {
     icon: 'warning-outline',
     bubbleBg: 'warningSubtle',
     iconColor: 'warning',
-    label: 'Budget warning',
+    label: 'Spending alert',
   },
-  threshold_100: {
-    icon: 'alert-circle-outline',
-    bubbleBg: 'errorSubtle',
-    iconColor: 'error',
-    label: 'Budget exceeded',
-  },
-  large_single_tx: {
-    icon: 'trending-down-outline',
-    bubbleBg: 'purpleSubtle',
-    iconColor: 'purple',
-    label: 'Large transaction',
-  },
-  pay_received: {
+  income: {
     icon: 'cash-outline',
     bubbleBg: 'successSubtle',
     iconColor: 'brand',
     label: 'Money received',
   },
-  bill_payment: {
+  budget: {
+    icon: 'wallet-outline',
+    bubbleBg: 'infoSubtle',
+    iconColor: 'info',
+    label: 'Budget insight',
+  },
+  streaks: {
+    icon: 'flame-outline',
+    bubbleBg: 'purpleSubtle',
+    iconColor: 'purple',
+    label: 'Streak',
+  },
+};
+
+/** Trigger-type theming for operational notifications. */
+const OPERATIONAL_META: Record<string, TriggerMeta> = {
+  statement_received: {
+    icon: 'document-outline',
+    bubbleBg: 'surface',
+    iconColor: 'textMeta',
+    label: 'Statement received',
+  },
+  statement_processed: {
+    icon: 'checkmark-done-outline',
+    bubbleBg: 'successSubtle',
+    iconColor: 'brand',
+    label: 'Statement imported',
+  },
+  statement_failed: {
+    icon: 'alert-circle-outline',
+    bubbleBg: 'errorSubtle',
+    iconColor: 'error',
+    label: 'Import failed',
+  },
+  receipt_received: {
+    icon: 'receipt-outline',
+    bubbleBg: 'surface',
+    iconColor: 'textMeta',
+    label: 'Receipt received',
+  },
+  receipt_processed: {
     icon: 'checkmark-circle-outline',
     bubbleBg: 'successSubtle',
     iconColor: 'brand',
-    label: 'Bill payment',
+    label: 'Receipt imported',
+  },
+  receipt_duplicate: {
+    icon: 'copy-outline',
+    bubbleBg: 'warningSubtle',
+    iconColor: 'warning',
+    label: 'Already recorded',
+  },
+  receipt_failed: {
+    icon: 'alert-circle-outline',
+    bubbleBg: 'errorSubtle',
+    iconColor: 'error',
+    label: 'Receipt failed',
+  },
+  transaction_received: {
+    icon: 'swap-vertical-outline',
+    bubbleBg: 'successSubtle',
+    iconColor: 'brand',
+    label: 'Transaction received',
   },
 };
 
@@ -114,8 +156,21 @@ const DEFAULT_META: TriggerMeta = {
   label: 'Nudge',
 };
 
-function getMeta(triggerType: string): TriggerMeta {
-  return TRIGGER_META[triggerType] ?? DEFAULT_META;
+function getMeta(nudge: Nudge): TriggerMeta {
+  if (nudge.trigger_type === 'nudge') {
+    // DSL nudge — theme by GID from context
+    const ctx = nudge.context as DSLNudgeContext | null;
+    if (ctx?.gid) {
+      // Match exact GID first, then match by prefix (e.g. "spend_high" → "spend")
+      const exact = GID_META[ctx.gid];
+      if (exact) return exact;
+      const prefix = Object.keys(GID_META).find((k) => ctx.gid.startsWith(k));
+      if (prefix) return GID_META[prefix];
+    }
+    return DEFAULT_META;
+  }
+  // Operational — theme by trigger_type
+  return OPERATIONAL_META[nudge.trigger_type] ?? DEFAULT_META;
 }
 
 // ── Helper: time ago ──────────────────────────────────────────────────────
@@ -138,55 +193,63 @@ function timeAgo(isoDate: string): string {
 // ── "Why you got this" summary ────────────────────────────────────────────
 
 function buildWhySummary(nudge: Nudge): string {
-  const ctx = nudge.context as unknown as Record<string, unknown> | null;
-  if (!ctx) return '';
+  if (!nudge.context) return '';
 
+  if (nudge.trigger_type === 'nudge') {
+    const ctx = nudge.context as DSLNudgeContext;
+    const parts: string[] = [];
+
+    if (ctx.category_name && ctx.spend_pct != null) {
+      const pct = Math.round(ctx.spend_pct * 100);
+      parts.push(
+        `You've used ${pct}% of your ${ctx.category_name} budget.`,
+      );
+    }
+
+    if (ctx.amount_kobo) {
+      parts.push(
+        `Transaction amount: ${formatNaira(Math.abs(ctx.amount_kobo))}.`,
+      );
+    }
+
+    if (ctx.budget_remaining_kobo != null) {
+      parts.push(
+        `Remaining: ${formatNaira(ctx.budget_remaining_kobo)}.`,
+      );
+    }
+
+    return parts.join(' ') || '';
+  }
+
+  // Operational
+  const ctx = nudge.context as OperationalNudgeContext;
   switch (nudge.trigger_type as NudgeTriggerType) {
-    case 'threshold_80': {
-      const c = ctx as unknown as Threshold80Context;
-      return (
-        `You've used ${c.percentage}% of your ${c.category_name} budget for ` +
-        `${_monthLabel(c.month)}. Only ₦${c.remaining_naira} of ₦${c.assigned_naira} remains.`
-      );
-    }
-    case 'threshold_100': {
-      const c = ctx as unknown as Threshold100Context;
-      return (
-        `Your ${c.category_name} budget for ${_monthLabel(c.month)} is fully used. ` +
-        `You overspent by ₦${c.overage_naira} (${c.percentage}% of assigned).`
-      );
-    }
-    case 'large_single_tx': {
-      const c = ctx as unknown as LargeSingleTxContext;
-      return (
-        `A single transaction of ₦${c.amount_naira} ("${c.narration}") consumed ` +
-        `${c.percentage}% of your ${c.category_name} budget.`
-      );
-    }
-    case 'pay_received': {
-      const c = ctx as unknown as PayReceivedContext;
-      return `₦${c.amount_naira} credit was received: "${c.narration}".`;
-    }
-    case 'bill_payment': {
-      const c = ctx as unknown as BillPaymentContext;
-      return (
-        `Your ${c.biller_name} payment of ₦${c.amount_naira} was processed ` +
-        `successfully.${c.category_name ? ` Your ${c.category_name} budget has been updated.` : ''}`
-      );
-    }
+    case 'receipt_processed':
+      return ctx.amount_naira
+        ? `Done! ${formatNaira(ctx.amount_kobo ?? 0)} ${ctx.direction ?? 'debit'} imported from your ${ctx.bank_name ?? 'bank'} receipt.`
+        : `A transaction was imported from your ${ctx.bank_name ?? 'bank'} receipt.`;
+    case 'receipt_duplicate':
+      return `That ${ctx.amount_naira ? formatNaira(ctx.amount_kobo ?? 0) : ''} ${ctx.bank_name ?? ''} transaction is already in your records — no need to import again.`;
+    case 'receipt_failed':
+      return ctx.reason === 'unrecognised'
+        ? `We couldn't recognise the receipt format. Try a clearer photo.`
+        : ctx.reason === 'no_account'
+          ? `No matching account found for this receipt. Add the account first.`
+          : `Failed to process the receipt. Please try again.`;
+    case 'statement_processed':
+      return `${ctx.imported ?? 0} new transaction${(ctx.imported ?? 0) !== 1 ? 's' : ''} imported from your ${ctx.bank_name ?? 'bank'} statement.${ctx.updated ? ` ${ctx.updated} existing updated.` : ''}`;
+    case 'statement_received':
+      return `${ctx.bank_name ?? 'Bank'} statement received — importing your transactions in the background.`;
+    case 'statement_failed':
+      return `Failed to process your ${ctx.bank_name ?? 'bank'} statement. Please try re-uploading.`;
+    case 'transaction_received':
+      return `A new transaction was received from ${ctx.bank_name ?? 'your bank'}.`;
     default:
       return '';
   }
 }
 
-function _monthLabel(month: string): string {
-  if (!month) return 'this month';
-  const [y, m] = month.split('-').map(Number);
-  const d = new Date(y, m - 1, 1);
-  return d.toLocaleDateString('en-NG', { month: 'long', year: 'numeric' });
-}
-
-// ── Actionable steps per trigger type ────────────────────────────────────
+// ── Actionable steps ─────────────────────────────────────────────────────
 
 interface NudgeAction {
   label: string;
@@ -194,51 +257,67 @@ interface NudgeAction {
   route: string;
 }
 
-function getActions(triggerType: string): NudgeAction[] {
-  switch (triggerType as NudgeTriggerType) {
-    case 'threshold_80':
-    case 'threshold_100':
-      return [
-        {
-          label: 'Adjust your budget',
-          icon: 'wallet-outline',
-          route: '/(tabs)/',
-        },
-        {
-          label: 'Review transactions',
-          icon: 'receipt-outline',
-          route: '/(tabs)/transactions',
-        },
-      ];
-    case 'large_single_tx':
-      return [
-        {
-          label: 'Review transactions',
-          icon: 'receipt-outline',
-          route: '/(tabs)/transactions',
-        },
-        {
-          label: 'Adjust your budget',
-          icon: 'wallet-outline',
-          route: '/(tabs)/',
-        },
-      ];
-    case 'pay_received':
-      return [
-        {
-          label: 'Assign to your budget',
-          icon: 'wallet-outline',
-          route: '/(tabs)/',
-        },
-      ];
-    case 'bill_payment':
-      return [
-        {
-          label: 'View bill history',
-          icon: 'flash-outline',
-          route: '/(tabs)/bills',
-        },
-      ];
+function getActions(nudge: Nudge): NudgeAction[] {
+  if (nudge.trigger_type === 'nudge') {
+    const ctx = nudge.context as DSLNudgeContext | null;
+    const actions: NudgeAction[] = [];
+
+    // If there's a transaction, offer to view it
+    if (ctx?.transaction_id) {
+      actions.push({
+        label: 'View transaction',
+        icon: 'receipt-outline',
+        route: `/transaction/${ctx.transaction_id}`,
+      });
+    }
+
+    // If budget-related (has spend_pct), offer budget adjustment
+    if (ctx?.spend_pct != null) {
+      actions.push({
+        label: 'Adjust your budget',
+        icon: 'wallet-outline',
+        route: '/(tabs)/budget',
+      });
+    }
+
+    // If category-linked, offer to review that category's transactions
+    if (ctx?.category_id) {
+      actions.push({
+        label: 'Review transactions',
+        icon: 'list-outline',
+        route: '/(tabs)/transactions',
+      });
+    }
+
+    // Fallback — at minimum offer to view budget
+    if (actions.length === 0) {
+      actions.push({
+        label: 'Go to budget',
+        icon: 'wallet-outline',
+        route: '/(tabs)/budget',
+      });
+    }
+
+    return actions;
+  }
+
+  // Operational
+  const ctx = nudge.context as OperationalNudgeContext | null;
+  switch (nudge.trigger_type as NudgeTriggerType) {
+    case 'receipt_processed':
+    case 'receipt_duplicate':
+      return ctx?.transaction_id
+        ? [{ label: 'View transaction', icon: 'receipt-outline', route: `/transaction/${ctx.transaction_id}` }]
+        : [{ label: 'View transactions', icon: 'list-outline', route: '/(tabs)/transactions' }];
+    case 'receipt_failed':
+      return [{ label: 'Try again', icon: 'camera-outline', route: '/upload-receipt' }];
+    case 'statement_processed':
+      return [{ label: 'View transactions', icon: 'list-outline', route: '/(tabs)/transactions' }];
+    case 'statement_received':
+    case 'statement_failed':
+      return [{ label: 'View accounts', icon: 'wallet-outline', route: '/(tabs)/accounts' }];
+    case 'transaction_received':
+      return [{ label: 'View transactions', icon: 'list-outline', route: '/(tabs)/transactions' }];
     default:
       return [];
   }
@@ -256,9 +335,9 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
   const router = useRouter();
   const dismiss = useDismissNudge();
 
-  const meta = nudge ? getMeta(nudge.trigger_type) : DEFAULT_META;
+  const meta = nudge ? getMeta(nudge) : DEFAULT_META;
   const why = nudge ? buildWhySummary(nudge) : '';
-  const actions = nudge ? getActions(nudge.trigger_type) : [];
+  const actions = nudge ? getActions(nudge) : [];
 
   function handleAction(route: string) {
     onClose();
@@ -295,7 +374,7 @@ function NudgeDetailSheet({ nudge, onClose }: DetailSheetProps) {
 
       {/* Message */}
       <View style={ss.sheetSection}>
-        <Text style={[type_.body, { color: colors.textSecondary, lineHeight: 25 }]}>
+        <Text style={[type_.body, { color: colors.textSecondary, lineHeight: 25, flexShrink: 1, flexWrap: 'wrap' }]}>
           {nudge?.message}
         </Text>
       </View>
@@ -370,7 +449,7 @@ interface NudgeCardProps {
 
 function NudgeCard({ nudge, onPress }: NudgeCardProps) {
   const colors = useTheme();
-  const meta = getMeta(nudge.trigger_type);
+  const meta = getMeta(nudge);
   const isUnread = !nudge.is_opened && !nudge.is_dismissed;
 
   return (
@@ -412,9 +491,8 @@ function NudgeCard({ nudge, onPress }: NudgeCardProps) {
         <Text
           style={[
             type_.small, ff(400),
-            { color: nudge.is_dismissed ? colors.textMeta : colors.textSecondary },
+            { color: nudge.is_dismissed ? colors.textMeta : colors.textSecondary, flexWrap: 'wrap' },
           ]}
-          numberOfLines={2}
         >
           {nudge.message}
         </Text>
