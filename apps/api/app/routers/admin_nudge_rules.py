@@ -44,6 +44,8 @@ from app.models.user import User
 from app.schemas.nudge_metrics import RuleDailyStat, RuleDailyStatList, RuleSummary, RuleSummaryList
 from app.schemas.nudge_rule import (
     NudgeRuleCreate,
+    NudgeRuleGroupDetail,
+    NudgeRuleGroupList,
     NudgeRuleListResponse,
     NudgeRuleResponse,
     NudgeRuleUpdate,
@@ -87,6 +89,63 @@ def list_nudge_rules(
         page=page,
         limit=limit,
         items=[NudgeRuleResponse.model_validate(r) for r in rules],
+    )
+
+
+# ── Groups ────────────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/groups",
+    response_model=NudgeRuleGroupList,
+    summary="List all rule groups (GIDs)",
+)
+def list_groups(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+) -> NudgeRuleGroupList:
+    from sqlalchemy import case, func
+
+    rows = (
+        db.query(
+            NudgeRule.gid,
+            func.count(NudgeRule.id).label("rule_count"),
+            func.sum(case((NudgeRule.active.is_(True), 1), else_=0)).label("active_count"),
+        )
+        .group_by(NudgeRule.gid)
+        .order_by(NudgeRule.gid)
+        .all()
+    )
+    from app.schemas.nudge_rule import NudgeRuleGroup
+
+    return NudgeRuleGroupList(
+        groups=[
+            NudgeRuleGroup(gid=r.gid, rule_count=r.rule_count, active_count=r.active_count)
+            for r in rows
+        ],
+    )
+
+
+@router.get(
+    "/groups/{gid}",
+    response_model=NudgeRuleGroupDetail,
+    summary="List all rules in a group",
+)
+def get_group_rules(
+    gid: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+) -> NudgeRuleGroupDetail:
+    rules = (
+        db.query(NudgeRule).filter(NudgeRule.gid == gid).order_by(NudgeRule.created_at.desc()).all()
+    )
+    if not rules:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"No rules found for group '{gid}'"
+        )
+    return NudgeRuleGroupDetail(
+        gid=gid,
+        rules=[NudgeRuleResponse.model_validate(r) for r in rules],
     )
 
 
