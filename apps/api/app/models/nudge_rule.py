@@ -34,6 +34,8 @@ class NudgeRule(Base):
     )
     # Human-readable slug; also doubles as the DSL "id" field (unique).
     slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    # Push notification title. Empty string = caller falls back to the slug.
+    title: Mapped[str] = mapped_column(Text, nullable=False, default="")
     # Group / family ID used for group-level rate limiting.
     gid: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -43,7 +45,7 @@ class NudgeRule(Base):
     days_back: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Root DSL conditions block: {"op": "AND"|"OR", "rules": [...]}
     conds: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    # Output definition: {"tmpls": ["template string 1", ...]}
+    # Output definition: {"tmpls": ["template string 1", ...]}  (title lives in its own column)
     action: Mapped[dict] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

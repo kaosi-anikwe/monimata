@@ -624,6 +624,114 @@ def send_statement_failed_push(db: Session, user: User, bank_name: str) -> None:
     db.commit()
 
 
+# ── DSL evaluation path ───────────────────────────────────────────────────────
+
+
+def _get_event_type(tx: Transaction) -> str:
+    """Map a Transaction to one of the four DSL event buckets."""
+    if tx.type == "credit":
+        return "credit_cat" if tx.category_id else "credit_uncat"
+    return "debit_cat" if tx.category_id else "debit_uncat"
+
+
+def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
+    """
+    Evaluate all active DSL rules for the event type implied by *tx*.
+
+    Called before the hardcoded trigger checks inside
+    ``evaluate_transaction_nudges``.  Both paths can fire for the same
+    transaction during the Phase 5→7 transition period; once Phase 7 seeds the
+    four legacy rules with matching slugs the existing ``_today_nudge_exists``
+    deduplication will prevent double-firing.
+    """
+    from app.core.redis_client import load_rules_for_evt
+    from app.models.category import Category
+    from app.models.transaction import Transaction as TxModel
+    from app.services.budget_logic import get_or_create_budget_month
+    from app.services.dsl_engine import (
+        filter_rules_by_gid_rate_limit,
+        hydrate_context,
+        run_dsl_rules,
+        set_gid_rate_limit,
+    )
+
+    evt_type = _get_event_type(tx)
+    rules = load_rules_for_evt(evt_type)
+    if not rules:
+        return
+
+    rules = filter_rules_by_gid_rate_limit(rules, user.id)
+    if not rules:
+        return
+
+    # One history query covers all surviving rules — use the largest window.
+    max_days_back = max(r.get("days_back", 0) for r in rules)
+    history: list[TxModel] = []
+    if max_days_back > 0:
+        cutoff = datetime.now(UTC) - timedelta(days=max_days_back)
+        history = (
+            db.query(TxModel)
+            .filter(
+                TxModel.user_id == tx.user_id,
+                TxModel.date >= cutoff,
+                TxModel.id != tx.id,
+            )
+            .order_by(TxModel.date.desc())
+            .all()
+        )
+
+    cat: Category | None = db.get(Category, tx.category_id) if tx.category_id else None
+    bm = None
+    target = None
+    if cat is not None and tx.category_id is not None:
+        month_str = tx.date.strftime("%Y-%m")
+        bm = get_or_create_budget_month(db, tx.user_id, tx.category_id, month_str)
+        target = cat.target  # lazy-loads via the Category → CategoryTarget relationship
+
+    context = hydrate_context(tx, cat, bm, history, target=target)
+
+    # Categorised events bind the nudge to the category for dedup purposes.
+    cid = tx.category_id if evt_type.endswith("_cat") else None
+    matched = run_dsl_rules(rules, context)
+
+    for rule, match_count in matched:
+        slug = rule["slug"]
+        if not can_send_nudge(db, user, slug, cid):
+            continue
+
+        # Restore the correct match_count snapshot before rendering the template.
+        context["hist"].match_count = match_count
+        try:
+            message = random.choice(rule["action"]["tmpls"]).format(**context)
+            raw_title = rule.get("title", "")
+            title = raw_title.format(**context) if raw_title else slug.replace("_", " ").title()
+        except (KeyError, AttributeError, IndexError):
+            logger.warning(
+                "DSL template render error: slug=%s evt=%s", slug, evt_type, exc_info=True
+            )
+            continue
+
+        create_nudge(
+            db,
+            user,
+            slug,
+            title,
+            message,
+            context={"slug": slug, "gid": rule["gid"], "evt_type": evt_type},
+            category_id=cid,
+            transaction_id=tx.id,
+        )
+        try:
+            set_gid_rate_limit(user.id, rule["gid"])
+        except Exception:
+            logger.warning(
+                "Failed to set GID rate limit: gid=%s user=%s",
+                rule["gid"],
+                user.id,
+                exc_info=True,
+            )
+
+
 def evaluate_transaction_nudges(db: Session, tx: Transaction) -> None:
     """
     Evaluate all nudge triggers for a newly categorized transaction and create
@@ -631,6 +739,9 @@ def evaluate_transaction_nudges(db: Session, tx: Transaction) -> None:
 
     Called from the `categorize_transactions` Celery task after `_update_budget_activity`.
     Also called from `fetch_transactions` for credit transactions (pay_received).
+
+    DSL rules are evaluated first (Phase 5+). The four hardcoded triggers below
+    remain as a fallback until Phase 7 seeds them as DSL rules and removes this block.
 
     Checks:
       - pay_received    if tx.type == "credit" and amount ≥ PAY_RECEIVED_THRESHOLD
@@ -649,7 +760,13 @@ def evaluate_transaction_nudges(db: Session, tx: Transaction) -> None:
     if not ns.get("enabled", True):
         return
 
-    # ── pay_received ──────────────────────────────────────────────────────────
+    # ── DSL-driven evaluation (Phase 5+) ─────────────────────────────────────
+    try:
+        _run_dsl_nudges(db, user, tx)
+    except Exception:
+        logger.exception("_run_dsl_nudges failed for tx=%s", tx.id)
+
+    # ── pay_received (hardcoded fallback — removed in Phase 7) ───────────────
     if tx.type == "credit" and tx.amount >= PAY_RECEIVED_THRESHOLD:
         if can_send_nudge(db, user, "pay_received"):
             amount_str = _kobo_to_naira_str(tx.amount)
