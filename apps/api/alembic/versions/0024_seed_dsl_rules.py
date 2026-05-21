@@ -3,7 +3,7 @@
 Converts the four legacy hardcoded triggers (pay_received, large_single_tx,
 threshold_80, threshold_100) into first-class DSL rows in the nudge_rules
 table.  The slugs are intentionally identical to the old trigger_type strings
-so that _today_nudge_exists deduplication prevents double-firing during any
+so that the GID rate-limit deduplication prevents double-firing during any
 overlap window.
 
 Uses ON CONFLICT (slug) DO NOTHING so the migration is idempotent — re-running

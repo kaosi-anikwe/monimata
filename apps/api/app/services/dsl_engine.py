@@ -400,9 +400,12 @@ def _today_wat_str() -> str:
     return datetime.now(WAT).strftime("%Y-%m-%d")
 
 
-def filter_rules_by_gid_rate_limit(rules: list[dict], user_id: str) -> list[dict]:
+def filter_rules_by_gid_rate_limit(
+    rules: list[dict], user_id: str, fatigue_limit: int = 3
+) -> list[dict]:
     """
-    Remove rules whose gid has already fired today (WAT calendar day) for this user.
+    Remove rules whose gid has already reached *fatigue_limit* fires
+    today (WAT calendar day) for this user.
 
     Uses a single Redis MGET across all unique gids — one round trip regardless
     of how many rules are in the bucket.
@@ -417,14 +420,15 @@ def filter_rules_by_gid_rate_limit(rules: list[dict], user_id: str) -> list[dict
     keys = [f"rl:nudge_gid:{user_id}:{gid}:{today}" for gid in gids]
 
     values: list[str | None] = get_redis().mget(keys)  # type: ignore[assignment]
-    skip_gids = {gid for gid, v in zip(gids, values) if v is not None}
+    skip_gids = {gid for gid, v in zip(gids, values) if v is not None and int(v) >= fatigue_limit}
 
     if skip_gids:
         logger.debug(
-            "GID rate-limit: skipping %d rule(s) for user=%s gids=%s",
+            "GID rate-limit: skipping %d rule(s) for user=%s gids=%s (limit=%d)",
             sum(1 for r in rules if r["gid"] in skip_gids),
             user_id,
             skip_gids,
+            fatigue_limit,
         )
 
     return [r for r in rules if r["gid"] not in skip_gids]
@@ -432,10 +436,10 @@ def filter_rules_by_gid_rate_limit(rules: list[dict], user_id: str) -> list[dict
 
 def set_gid_rate_limit(user_id: str, gid: str) -> None:
     """
-    Mark a gid as fired for this user for the current WAT calendar day.
+    Increment the fire-count for this user+gid for the current WAT calendar day.
 
     TTL is seconds-to-midnight WAT so the key self-expires without a
-    cleanup job.  Minimum TTL is 1 second to avoid a zero-TTL SETEX error.
+    cleanup job.  Minimum TTL is 1 second to avoid a zero-TTL error.
     """
     from app.core.redis_client import get_redis
 
@@ -445,7 +449,10 @@ def set_gid_rate_limit(user_id: str, gid: str) -> None:
 
     midnight = (now_wat + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     ttl_seconds = max(1, int((midnight - now_wat).total_seconds()))
-    get_redis().setex(key, ttl_seconds, "1")
+
+    r = get_redis()
+    r.incr(key)
+    r.expire(key, ttl_seconds)
 
 
 # =====================================================================
