@@ -66,10 +66,21 @@ const withWatermelonBuildGradle = (config) =>
 
     // b) implementation dependency
     if (!contents.includes("watermelondb-jsi")) {
-      contents = contents.replace(
-        /(\s*apply plugin: 'com\.google\.gms\.google-services')/,
-        `\n    // WatermelonDB JSI C++ bridge — required for jsi: true in SQLiteAdapter.\n    implementation project(':watermelondb-jsi')\n$1`,
+      // Anchor: end of the hermes/jsc conditional is the last block inside dependencies {}.
+      // Inserting here keeps the dep inside the closing brace of dependencies.
+      const withDep = contents.replace(
+        /([ \t]*implementation jscFlavor\n[ \t]*\})/,
+        `$1\n\n    // WatermelonDB JSI C++ bridge — required for jsi: true in SQLiteAdapter.\n    implementation project(':watermelondb-jsi')`,
       );
+      contents =
+        withDep !== contents
+          ? withDep
+          : contents.replace(
+              // Fallback: no jscFlavor line — insert before the last } of dependencies
+              // by anchoring on the hermes-android line instead.
+              /([ \t]*implementation\("com\.facebook\.react:hermes-android"\)\n[ \t]*\})/,
+              `$1\n\n    // WatermelonDB JSI C++ bridge — required for jsi: true in SQLiteAdapter.\n    implementation project(':watermelondb-jsi')`,
+            );
     }
 
     mod.modResults.contents = contents;

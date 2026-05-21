@@ -227,7 +227,7 @@ export default function CategorizeQueueScreen() {
                   { color: colors.textMeta, textAlign: 'center', marginBottom: spacing.xl },
                 ]}
               >
-                {(currentItem.transaction.amount ?? 0) < 0
+                {(currentItem.transaction.amount ?? 0) > 0
                   ? 'Where did this money come from?'
                   : 'What is this money for?'}
               </Text>

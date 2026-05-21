@@ -74,6 +74,8 @@
         }
       ],
       "./plugins/withWatermelonDBJSI",
+      "./plugins/withSQLCipher",
+      "./plugins/withMonorepoRoot",
       [
         "expo-share-intent",
         {
@@ -109,6 +111,7 @@
       "eas": {
         "projectId": "6f68cf17-0eea-4815-8e6c-e821e0823fe6"
       }
-    }
+    },
+    "owner": "kaosi_anikwe"
   }
 }

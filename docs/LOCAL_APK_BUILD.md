@@ -62,25 +62,15 @@ MYAPP_UPLOAD_KEY_PASSWORD=yourpassword
 
 ## Step 4 — Patch `android/app/build.gradle`
 
-`expo prebuild` generates a working-but-incomplete `build.gradle`. Several patches are required before a release build will succeed. The complete target file is shown at the end of this section — apply all changes at once after each prebuild.
+`expo prebuild` generates a working-but-incomplete `build.gradle`. Two manual patches
+are still required; everything else (monorepo root, SQLCipher packaging options,
+SQLCipher/WatermelonDB dependencies) is applied automatically by the project's
+Expo config plugins.
 
-### 4a — Uncomment the monorepo project root
+### 4a — Add the release signing config
 
-Prebuild leaves this line commented. Uncomment it:
-
-```groovy
-react {
-    // ...
-    root = file("../../")   // ← uncomment
-    // ...
-}
-```
-
-Without this, Gradle resolves Metro paths relative to `android/` and walks up to the monorepo root, causing bundling to fail.
-
-### 4b — Add the release signing config
-
-Prebuild wires `buildTypes.release` to the debug keystore. Add a `release` signing config block and point `buildTypes.release` at it:
+Prebuild wires `buildTypes.release` to the debug keystore. Add a `release` signing
+config block and point `buildTypes.release` at it:
 
 ```groovy
 signingConfigs {
@@ -101,27 +91,10 @@ buildTypes {
 }
 ```
 
-### 4c — Fix `packagingOptions` for SQLCipher and WatermelonDB
+### 4b — Pin CMake version (required on Windows)
 
-Prebuild adds only the `libc++_shared.so` rule. SQLCipher ships its own `libcrypto.so` for every ABI; without `pickFirst` rules Gradle aborts with a duplicate-file error. Replace the entire `jniLibs` block:
-
-```groovy
-packagingOptions {
-    jniLibs {
-        def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
-        useLegacyPackaging enableLegacyPackaging.toBoolean()
-        pickFirst 'lib/x86/libcrypto.so'
-        pickFirst 'lib/x86_64/libcrypto.so'
-        pickFirst 'lib/armeabi-v7a/libcrypto.so'
-        pickFirst 'lib/arm64-v8a/libcrypto.so'
-        pickFirst '**/libc++_shared.so'
-    }
-}
-```
-
-### 4d — Pin CMake version (required on Windows)
-
-Add this block inside `android { }` to avoid Windows long-path failures during the NDK build:
+Add this block inside `android { }` to avoid Windows long-path failures during the
+NDK build:
 
 ```groovy
 externalNativeBuild {
@@ -131,29 +104,11 @@ externalNativeBuild {
 }
 ```
 
-### 4e — Add SQLCipher and WatermelonDB JSI dependencies
-
-Prebuild does **not** add these. Append them inside the `dependencies { }` block.
-
-> ⚠️ Prebuild sometimes places the `watermelondb-jsi` line **outside** the `dependencies { }` closing brace. If you see it there, move it inside.
-
-```groovy
-dependencies {
-    // ... generated lines unchanged ...
-
-    // SQLCipher — AES-256 at-rest encryption for WatermelonDB
-    implementation "net.zetetic:android-database-sqlcipher:4.5.4"
-    // Required SQLite bridge for the SQLCipher adapter
-    implementation "androidx.sqlite:sqlite:2.4.0"
-
-    // WatermelonDB JSI C++ bridge (required for jsi: true in SQLiteAdapter)
-    implementation project(':watermelondb-jsi')
-}
-```
-
 ### Complete target `android/app/build.gradle`
 
-After all patches, the file should look exactly like this:
+After both patches, the file should look exactly like this (the monorepo root,
+SQLCipher packaging rules, and native dependencies are inserted automatically
+by the config plugins during prebuild):
 
 ```groovy
 apply plugin: "com.android.application"
@@ -172,7 +127,7 @@ react {
     cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
     bundleCommand = "export:embed"
 
-    root = file("../../")   // monorepo root — MUST be uncommented after every prebuild
+    root = file("../../")   // monorepo root — set automatically by withMonorepoRoot plugin
 
     autolinkLibrariesWithApp()
 }
@@ -396,7 +351,8 @@ cd android
 .\gradlew.bat assembleRelease
 ```
 
-> ⚠️ `expo prebuild --clean` wipes and regenerates the entire `android/` folder. All patches from Step 4 must be re-applied before building. Use the complete target file in Step 4 as your reference.
+> ⚠️ `expo prebuild --clean` wipes and regenerates the entire `android/` folder. The two
+> manual patches from Step 4 must be re-applied. Everything else is handled by the plugins.
 
 ---
 
@@ -404,9 +360,12 @@ cd android
 
 After every `expo prebuild --platform android --clean`, tick these off before running `assembleRelease`:
 
-- [ ] `root = file("../../")` uncommented in the `react { }` block
 - [ ] `signingConfigs.release` block added; `buildTypes.release` points to it
-- [ ] All five `pickFirst` rules present in `packagingOptions.jniLibs`
-- [ ] `externalNativeBuild { cmake { version "3.30.3+" } }` block present
-- [ ] SQLCipher dependencies inside `dependencies { }` block
-- [ ] `implementation project(':watermelondb-jsi')` inside `dependencies { }` block (not after the closing brace)
+- [ ] `externalNativeBuild { cmake { version "3.30.3+" } }` block present _(Windows only)_
+
+The following are applied automatically by Expo config plugins — no manual action needed:
+
+- ✅ `root = file("../../")` uncommented (`withMonorepoRoot`)
+- ✅ SQLCipher `pickFirst libcrypto.so` rules (`withSQLCipher`)
+- ✅ SQLCipher + SQLite bridge dependencies (`withSQLCipher`)
+- ✅ WatermelonDB JSI dependency + MainApplication registration (`withWatermelonDBJSI`)

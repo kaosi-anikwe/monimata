@@ -66,7 +66,7 @@ type CategorySuggestion = components['schemas']['CategorySuggestion'];
 export interface ReviewCardProps {
   item: ReviewQueueItem;
   /** Called when user confirms a category (right swipe or chip tap). */
-  onConfirm: (txId: string, categoryId: string) => void;
+  onConfirm: (txId: string, categoryId: string | null) => void;
   /** Called when user defers the transaction (left swipe). */
   onDefer: (txId: string) => void;
   /** Called when user swipes up — open the category search sheet. */
@@ -130,7 +130,7 @@ export function ReviewCard({
   // ── Action handlers ────────────────────────────────────────────────────────────
   // Gesture runs on the JS thread (.runOnJS(true) below) so these can be
   // called directly without any runOnJS wrapper.
-  function handleConfirmAction(categoryId: string) {
+  function handleConfirmAction(categoryId: string | null) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onConfirm(tx.id, categoryId);
   }
@@ -145,10 +145,11 @@ export function ReviewCard({
   }
 
   // ── Pan gesture ─────────────────────────────────────────────────────────
-  const topCategoryId = suggestions[0]?.category_id ?? '';
-  // When there are no suggestions right-swipe opens the search sheet rather
-  // than trying to confirm with an empty category id.
-  const hasSuggestion = suggestions.length > 0;
+  const topCategoryId: string | null = suggestions[0]?.category_id ?? null;
+  // Credits can always right-swipe to confirm: TBB (null) when no AI suggestion.
+  // Debits with no suggestions still open the search sheet instead.
+  const canConfirmOnSwipe = suggestions.length > 0 || !isDebit;
+  const swipeConfirmId: string | null = suggestions.length > 0 ? topCategoryId : null;
 
   const pan = Gesture.Pan()
     .runOnJS(true)
@@ -158,12 +159,12 @@ export function ReviewCard({
     })
     .onEnd((e) => {
       if (e.translationX > SWIPE_X) {
-        if (hasSuggestion) {
-          // Right — confirm with top suggestion
+        if (canConfirmOnSwipe) {
+          // Right — confirm with top suggestion, or TBB (null) for credits with no suggestion
           translateX.value = withTiming(600, { duration: 280 });
-          handleConfirmAction(topCategoryId);
+          handleConfirmAction(swipeConfirmId);
         } else {
-          // No suggestions — right swipe opens search instead
+          // Debit with no suggestions — open search instead
           translateX.value = withSpring(0, { damping: 28 });
           translateY.value = withSpring(0, { damping: 28 });
           handleSearchAction();
@@ -193,7 +194,7 @@ export function ReviewCard({
       bgColor = interpolateColor(
         translateX.value,
         [0, SWIPE_X],
-        [colors.cardBg, hasSuggestion ? colors.successSubtle : colors.infoSubtle],
+        [colors.cardBg, canConfirmOnSwipe ? colors.successSubtle : colors.infoSubtle],
       );
     } else if (translateX.value < 0) {
       // Left pull → neutral elevated tint
