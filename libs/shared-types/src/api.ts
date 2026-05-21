@@ -351,6 +351,15 @@ export interface paths {
     /** Update nudge settings */
     patch: operations["update_settings_nudges_settings_patch"];
   };
+  "/nudges/insights": {
+    /**
+     * Per-user nudge insights for weekly review
+     * @description Return the user's nudge trigger summary over the last *days* days.
+     *
+     * Useful for the AI-powered weekly review and the in-app insights card.
+     */
+    get: operations["get_user_insights_nudges_insights_get"];
+  };
   "/nudges/{nudge_id}": {
     /** Get a single nudge */
     get: operations["get_nudge_nudges__nudge_id__get"];
@@ -516,6 +525,40 @@ export interface paths {
      */
     get: operations["get_ai_usage_ai_usage_get"];
   };
+  "/admin/nudge-rules": {
+    /** List nudge rules */
+    get: operations["list_nudge_rules_admin_nudge_rules_get"];
+    /** Create a nudge rule */
+    post: operations["create_nudge_rule_admin_nudge_rules_post"];
+  };
+  "/admin/nudge-rules/groups": {
+    /** List all rule groups (GIDs) */
+    get: operations["list_groups_admin_nudge_rules_groups_get"];
+  };
+  "/admin/nudge-rules/groups/{gid}": {
+    /** List all rules in a group */
+    get: operations["get_group_rules_admin_nudge_rules_groups__gid__get"];
+  };
+  "/admin/nudge-rules/stats/summary": {
+    /** Aggregate stats for all rules over a period */
+    get: operations["get_stats_summary_admin_nudge_rules_stats_summary_get"];
+  };
+  "/admin/nudge-rules/{rule_id}": {
+    /** Get a single nudge rule */
+    get: operations["get_nudge_rule_admin_nudge_rules__rule_id__get"];
+    /** Update a nudge rule */
+    put: operations["update_nudge_rule_admin_nudge_rules__rule_id__put"];
+    /** Delete a nudge rule */
+    delete: operations["delete_nudge_rule_admin_nudge_rules__rule_id__delete"];
+  };
+  "/admin/nudge-rules/{rule_id}/toggle": {
+    /** Toggle a nudge rule active/inactive */
+    patch: operations["toggle_nudge_rule_admin_nudge_rules__rule_id__toggle_patch"];
+  };
+  "/admin/nudge-rules/{rule_id}/stats": {
+    /** Daily stats for a single rule */
+    get: operations["get_rule_stats_endpoint_admin_nudge_rules__rule_id__stats_get"];
+  };
   "/health": {
     /** Health Check */
     get: operations["health_check_health_get"];
@@ -537,6 +580,20 @@ export interface components {
        * @default bearer
        */
       token_type?: string;
+    };
+    /**
+     * ActionBlock
+     * @description Output definition — templates + optional navigation screen.
+     */
+    ActionBlock: {
+      /** Tmpls */
+      tmpls: string[];
+      /**
+       * Screen
+       * @description Screen to navigate to on nudge press. One of: transactions, transaction, budget, target, nudges
+       * @default nudges
+       */
+      screen?: string;
     };
     /** AddManualAccountRequest */
     AddManualAccountRequest: {
@@ -946,6 +1003,19 @@ export interface components {
       /** Total Uncategorised */
       total_uncategorised: number;
     };
+    /**
+     * ConditionsBlock
+     * @description Root or nested logical block. Supports arbitrary nesting depth.
+     */
+    ConditionsBlock: {
+      /**
+       * Op
+       * @enum {string}
+       */
+      op: "AND" | "OR";
+      /** Rules */
+      rules: (components["schemas"]["RuleCondition"] | components["schemas"]["ConditionsBlock"])[];
+    };
     /** ConfirmCategoryRequest */
     ConfirmCategoryRequest: {
       /**
@@ -1038,8 +1108,7 @@ export interface components {
     NudgeResponse: {
       /** Id */
       id: string;
-      /** Trigger Type */
-      trigger_type: components["schemas"]["NudgeTriggerType"] | string;
+      trigger_type: components["schemas"]["NudgeTriggerType"];
       /** Title */
       title: string | null;
       /** Message */
@@ -1061,6 +1130,148 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /**
+     * NudgeRuleCreate
+     * @description Validated input for creating a new nudge rule.
+     */
+    NudgeRuleCreate: {
+      /**
+       * Slug
+       * @description Unique rule identifier, e.g. 'threshold_80'
+       */
+      slug: string;
+      /**
+       * Title
+       * @description Push notification title (supports {placeholders})
+       * @default
+       */
+      title?: string;
+      /**
+       * Gid
+       * @description Group ID for rate-limit bucketing
+       */
+      gid: string;
+      /**
+       * Active
+       * @default true
+       */
+      active?: boolean;
+      /**
+       * Evts
+       * @description Event types that trigger this rule
+       */
+      evts: string[];
+      /**
+       * Days Back
+       * @description Historical look-back window in days
+       * @default 0
+       */
+      days_back?: number;
+      conds: components["schemas"]["ConditionsBlock"];
+      action: components["schemas"]["ActionBlock"];
+    };
+    /**
+     * NudgeRuleGroup
+     * @description Summary of a nudge rule group (GID).
+     */
+    NudgeRuleGroup: {
+      /** Gid */
+      gid: string;
+      /** Rule Count */
+      rule_count: number;
+      /** Active Count */
+      active_count: number;
+    };
+    /**
+     * NudgeRuleGroupDetail
+     * @description All rules belonging to a single group.
+     */
+    NudgeRuleGroupDetail: {
+      /** Gid */
+      gid: string;
+      /** Rules */
+      rules: components["schemas"]["NudgeRuleResponse"][];
+    };
+    /**
+     * NudgeRuleGroupList
+     * @description List of all nudge rule groups.
+     */
+    NudgeRuleGroupList: {
+      /** Groups */
+      groups: components["schemas"]["NudgeRuleGroup"][];
+    };
+    /**
+     * NudgeRuleListResponse
+     * @description Paginated list of nudge rules.
+     */
+    NudgeRuleListResponse: {
+      /** Total */
+      total: number;
+      /** Page */
+      page: number;
+      /** Limit */
+      limit: number;
+      /** Items */
+      items: components["schemas"]["NudgeRuleResponse"][];
+    };
+    /**
+     * NudgeRuleResponse
+     * @description Serialised nudge rule returned from the API.
+     */
+    NudgeRuleResponse: {
+      /** Id */
+      id: string;
+      /** Slug */
+      slug: string;
+      /** Title */
+      title: string;
+      /** Gid */
+      gid: string;
+      /** Active */
+      active: boolean;
+      /** Evts */
+      evts: string[];
+      /** Days Back */
+      days_back: number;
+      /** Conds */
+      conds: {
+        [key: string]: unknown;
+      };
+      /** Action */
+      action: {
+        [key: string]: unknown;
+      };
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /**
+     * NudgeRuleUpdate
+     * @description Validated input for a full rule replacement (PUT).  All fields optional.
+     */
+    NudgeRuleUpdate: {
+      /** Slug */
+      slug?: string | null;
+      /** Title */
+      title?: string | null;
+      /** Gid */
+      gid?: string | null;
+      /** Active */
+      active?: boolean | null;
+      /** Evts */
+      evts?: string[] | null;
+      /** Days Back */
+      days_back?: number | null;
+      conds?: components["schemas"]["ConditionsBlock"] | null;
+      action?: components["schemas"]["ActionBlock"] | null;
     };
     /** NudgeSettingsResponse */
     NudgeSettingsResponse: {
@@ -1098,7 +1309,7 @@ export interface components {
      * NudgeTriggerType
      * @enum {string}
      */
-    NudgeTriggerType: "threshold_80" | "threshold_100" | "large_single_tx" | "pay_received" | "bill_payment" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed";
+    NudgeTriggerType: "nudge" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed";
     /** ReconcileRequest */
     ReconcileRequest: {
       /**
@@ -1267,6 +1478,80 @@ export interface components {
       suggestions: components["schemas"]["CategorySuggestion"][];
       /** Remaining Count */
       remaining_count: number;
+    };
+    /**
+     * RuleCondition
+     * @description A single leaf condition — a (fact, op, val) triple.
+     */
+    RuleCondition: {
+      /** Fact */
+      fact: string;
+      /** Op */
+      op: string;
+      /** Val */
+      val: unknown;
+    };
+    /** RuleDailyStat */
+    RuleDailyStat: {
+      /** Rule Id */
+      rule_id: string;
+      /** Slug */
+      slug: string;
+      /**
+       * Date Wat
+       * Format: date
+       */
+      date_wat: string;
+      /** Hits */
+      hits: number;
+      /** Delivered */
+      delivered: number;
+      /** Suppressed */
+      suppressed: number;
+      /** Unique Users */
+      unique_users: number;
+      /** Opened */
+      opened: number;
+      /** Dismissed */
+      dismissed: number;
+    };
+    /** RuleDailyStatList */
+    RuleDailyStatList: {
+      /** Stats */
+      stats: components["schemas"]["RuleDailyStat"][];
+      /** Period Days */
+      period_days: number;
+    };
+    /** RuleSummary */
+    RuleSummary: {
+      /** Rule Id */
+      rule_id: string;
+      /** Slug */
+      slug: string;
+      /** Total Hits */
+      total_hits: number;
+      /** Total Delivered */
+      total_delivered: number;
+      /** Total Suppressed */
+      total_suppressed: number;
+      /** Total Unique Users */
+      total_unique_users: number;
+      /** Total Opened */
+      total_opened: number;
+      /** Total Dismissed */
+      total_dismissed: number;
+      /**
+       * Engagement Rate
+       * @description Fraction of delivered nudges that were opened (0.0–1.0)
+       */
+      engagement_rate: number;
+    };
+    /** RuleSummaryList */
+    RuleSummaryList: {
+      /** Rules */
+      rules: components["schemas"]["RuleSummary"][];
+      /** Period Days */
+      period_days: number;
     };
     /** SupportedBankResponse */
     SupportedBankResponse: {
@@ -1473,6 +1758,42 @@ export interface components {
       email?: string | null;
       /** Onboarded */
       onboarded?: boolean | null;
+    };
+    /** UserNudgeInsightRule */
+    UserNudgeInsightRule: {
+      /** Slug */
+      slug: string;
+      /** Count */
+      count: number;
+      /** Delivered */
+      delivered: number;
+      /** Suppressed */
+      suppressed: number;
+      /** Categories */
+      categories: string[];
+    };
+    /** UserNudgeInsights */
+    UserNudgeInsights: {
+      /**
+       * Period Start
+       * Format: date
+       */
+      period_start: string;
+      /**
+       * Period End
+       * Format: date
+       */
+      period_end: string;
+      /** Total Nudges */
+      total_nudges: number;
+      /** Total Suppressed */
+      total_suppressed: number;
+      /** Opened */
+      opened: number;
+      /** Dismissed */
+      dismissed: number;
+      /** Top Rules */
+      top_rules: components["schemas"]["UserNudgeInsightRule"][];
     };
     /** UserResponse */
     UserResponse: {
@@ -2778,6 +3099,33 @@ export interface operations {
       };
     };
   };
+  /**
+   * Per-user nudge insights for weekly review
+   * @description Return the user's nudge trigger summary over the last *days* days.
+   *
+   * Useful for the AI-powered weekly review and the in-app insights card.
+   */
+  get_user_insights_nudges_insights_get: {
+    parameters: {
+      query?: {
+        days?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["UserNudgeInsights"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   /** Get a single nudge */
   get_nudge_nudges__nudge_id__get: {
     parameters: {
@@ -3304,6 +3652,226 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["AiUsageResponse"];
+        };
+      };
+    };
+  };
+  /** List nudge rules */
+  list_nudge_rules_admin_nudge_rules_get: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        active?: boolean | null;
+        gid?: string | null;
+        /** @description Case-insensitive substring search on title */
+        q?: string | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["NudgeRuleListResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Create a nudge rule */
+  create_nudge_rule_admin_nudge_rules_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NudgeRuleCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": components["schemas"]["NudgeRuleResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** List all rule groups (GIDs) */
+  list_groups_admin_nudge_rules_groups_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["NudgeRuleGroupList"];
+        };
+      };
+    };
+  };
+  /** List all rules in a group */
+  get_group_rules_admin_nudge_rules_groups__gid__get: {
+    parameters: {
+      path: {
+        gid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["NudgeRuleGroupDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Aggregate stats for all rules over a period */
+  get_stats_summary_admin_nudge_rules_stats_summary_get: {
+    parameters: {
+      query?: {
+        days?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["RuleSummaryList"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get a single nudge rule */
+  get_nudge_rule_admin_nudge_rules__rule_id__get: {
+    parameters: {
+      path: {
+        rule_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["NudgeRuleResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Update a nudge rule */
+  update_nudge_rule_admin_nudge_rules__rule_id__put: {
+    parameters: {
+      path: {
+        rule_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NudgeRuleUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["NudgeRuleResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete a nudge rule */
+  delete_nudge_rule_admin_nudge_rules__rule_id__delete: {
+    parameters: {
+      path: {
+        rule_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Toggle a nudge rule active/inactive */
+  toggle_nudge_rule_admin_nudge_rules__rule_id__toggle_patch: {
+    parameters: {
+      path: {
+        rule_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["NudgeRuleResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Daily stats for a single rule */
+  get_rule_stats_endpoint_admin_nudge_rules__rule_id__stats_get: {
+    parameters: {
+      query?: {
+        days?: number;
+      };
+      path: {
+        rule_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["RuleDailyStatList"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
