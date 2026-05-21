@@ -170,7 +170,8 @@ the time of writing; future entries will document incremental changes only.
   transaction type, and search
 - `GET /transactions/{id}` — transaction detail
 - `PATCH /transactions/{id}` — edits amount, memo, date, and category with atomic budget and
-  account balance rebalancing
+  account balance rebalancing; raises `422` if the update would leave a debit transaction
+  without a category
 - `POST /transactions/{id}/confirm-category` — confirms a suggested category and persists a
   `UserCategoryRule` for future auto-classification; retroactively backfills matching
   uncategorised transactions
@@ -234,7 +235,8 @@ the time of writing; future entries will document incremental changes only.
   responding; anti-gap timestamp handling prevents missed records at boundary
 - `POST /sync/push` — processes client `created`, `updated`, and `deleted` change sets for
   all sync tables (transactions, bank accounts, categories, category groups, budget months,
-  category targets, recurring rules); per-record ownership validation; post-commit enqueues
+  category targets, recurring rules); per-record ownership validation; debit transactions
+  cannot have their category nulled via sync push; post-commit enqueues
   categorisation, nudge evaluation, and WebSocket invalidation events
 
 **Recurring Transactions**
