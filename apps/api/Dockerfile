@@ -49,7 +49,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 # installed on the database server separately — e.g. on Ubuntu/Debian:
 #   apt-get install postgresql-<version>-pgvector
 # The migration 0019 will fail at runtime if the extension is absent.
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+RUN uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
 # Copy application source.
 COPY app/       ./app/
