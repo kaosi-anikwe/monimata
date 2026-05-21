@@ -1024,6 +1024,75 @@ export interface components {
        */
       category_id: string;
     };
+    /**
+     * DSLNudgeContext
+     * @description Context for DSL-driven behavioural nudges (trigger_type == "nudge").
+     */
+    DSLNudgeContext: {
+      /**
+       * Nudge Type
+       * @description Rule slug, e.g. 'high_spend_pct'
+       */
+      nudge_type: string;
+      /**
+       * Slug
+       * @description Same as nudge_type
+       */
+      slug: string;
+      /**
+       * Gid
+       * @description Group ID for theming, e.g. 'spend_alerts'
+       */
+      gid: string;
+      /**
+       * Evt Type
+       * @description Event bucket: debit_cat, credit_uncat, etc.
+       */
+      evt_type: string;
+      /** @description Navigation target on press */
+      screen: components["schemas"]["NudgeScreen"];
+      /**
+       * Transaction Id
+       * @description Triggering transaction UUID
+       */
+      transaction_id: string;
+      /**
+       * Category Id
+       * @description Budget category UUID
+       */
+      category_id?: string | null;
+      /**
+       * Category Name
+       * @description Human-readable category name
+       */
+      category_name?: string | null;
+      /**
+       * Amount Kobo
+       * @description Transaction amount in kobo (negative for debits)
+       */
+      amount_kobo: number;
+      /**
+       * Match Count
+       * @description Historical txs matching the rule's count_where
+       * @default 0
+       */
+      match_count?: number;
+      /**
+       * Spend Pct
+       * @description Budget usage ratio 0.0–1.0+
+       */
+      spend_pct?: number | null;
+      /**
+       * Budget Amount Kobo
+       * @description Total assigned for the month
+       */
+      budget_amount_kobo?: number | null;
+      /**
+       * Budget Remaining Kobo
+       * @description Budget remaining
+       */
+      budget_remaining_kobo?: number | null;
+    };
     /** ForgotPasswordRequest */
     ForgotPasswordRequest: {
       /**
@@ -1114,9 +1183,7 @@ export interface components {
       /** Message */
       message: string;
       /** Context */
-      context?: {
-        [key: string]: unknown;
-      } | null;
+      context?: components["schemas"]["DSLNudgeContext"] | components["schemas"]["OperationalNudgeContext"] | null;
       /** Category Id */
       category_id?: string | null;
       /** Is Opened */
@@ -1273,6 +1340,12 @@ export interface components {
       conds?: components["schemas"]["ConditionsBlock"] | null;
       action?: components["schemas"]["ActionBlock"] | null;
     };
+    /**
+     * NudgeScreen
+     * @description Valid navigation targets for nudge press actions.
+     * @enum {string}
+     */
+    NudgeScreen: "transactions" | "transaction" | "budget" | "target" | "nudges" | "accounts";
     /** NudgeSettingsResponse */
     NudgeSettingsResponse: {
       /** Enabled */
@@ -1310,6 +1383,59 @@ export interface components {
      * @enum {string}
      */
     NudgeTriggerType: "nudge" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed";
+    /**
+     * OperationalNudgeContext
+     * @description Base context for operational notifications.
+     */
+    OperationalNudgeContext: {
+      /**
+       * Nudge Type
+       * @description Same as trigger_type
+       */
+      nudge_type: string;
+      /** @description Navigation target on press */
+      screen: components["schemas"]["NudgeScreen"];
+      /**
+       * Bank Name
+       * @description Display name of the bank
+       */
+      bank_name?: string | null;
+      /**
+       * Transaction Id
+       * @description Related transaction UUID
+       */
+      transaction_id?: string | null;
+      /**
+       * Amount Kobo
+       * @description Amount in kobo
+       */
+      amount_kobo?: number | null;
+      /**
+       * Amount Naira
+       * @description Formatted naira string
+       */
+      amount_naira?: string | null;
+      /**
+       * Direction
+       * @description 'credit' or 'debit'
+       */
+      direction?: string | null;
+      /**
+       * Imported
+       * @description Number of imported transactions
+       */
+      imported?: number | null;
+      /**
+       * Updated
+       * @description Number of updated transactions
+       */
+      updated?: number | null;
+      /**
+       * Reason
+       * @description Failure reason: 'unrecognised', 'no_account', 'parse_failed'
+       */
+      reason?: string | null;
+    };
     /** ReconcileRequest */
     ReconcileRequest: {
       /**

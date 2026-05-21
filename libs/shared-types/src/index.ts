@@ -83,6 +83,9 @@ export type NudgeListResponse = components['schemas']['NudgeListResponse'];
 export type NudgeSettings = components['schemas']['NudgeSettingsResponse'];
 export type NudgeSettingsUpdate = components['schemas']['NudgeSettingsUpdate'];
 export type NudgeTriggerType = components['schemas']['NudgeTriggerType'];
+export type NudgeScreen = components['schemas']['NudgeScreen'];
+export type DSLNudgeContext = components['schemas']['DSLNudgeContext'];
+export type OperationalNudgeContext = components['schemas']['OperationalNudgeContext'];
 export type RegisterDevicePayload = components['schemas']['RegisterDeviceRequest'];
 export type TestTriggerPayload = components['schemas']['TestTriggerRequest'];
 

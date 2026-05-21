@@ -41,6 +41,7 @@ import { useToast } from '@/components/Toast';
 import { getDatabase } from '@/database';
 import { registerPromptSetter, resetBridgeForUser } from '@/lib/notifPromptBridge';
 import { lightColors } from '@/lib/theme';
+import type { NudgePushData } from '@/types/nudge';
 import type { RootState } from '../store';
 
 import { useRegisterDevice } from './useNudges';
@@ -80,59 +81,47 @@ export function usePushNotifications(): PushNotificationConsent {
   // background-tap cases without the deprecated getLastNotificationResponseAsync.
   const lastNotificationResponse = Notifications.useLastNotificationResponse();
 
-  const handleNotificationTap = useCallback(async (data: Record<string, unknown> | null) => {
-    const triggerType = data?.trigger_type;
-
-    if (triggerType === 'nudge') {
-      switch (data?.screen) {
-        case 'transaction':
-          if (typeof data?.transaction_id === 'string') {
-            try {
-              await getDatabase().get('transactions').find(data.transaction_id);
-              router.push(`/transaction/${data.transaction_id}` as never);
-            } catch {
-              router.push('/(tabs)/nudges');
-            }
-          } else {
-            router.push('/(tabs)/nudges');
-          }
-          break;
-        case 'budget':
-          router.push('/(tabs)/budget');
-          break;
-        case 'transactions':
-          router.push('/(tabs)/transactions');
-          break;
-        case 'accounts':
-          router.push('/(tabs)/accounts');
-          break;
-        default:
-          router.push('/(tabs)/nudges');
-      }
+  const handleNotificationTap = useCallback(async (raw: Record<string, unknown> | null) => {
+    if (!raw?.trigger_type) {
+      router.push('/(tabs)/nudges');
       return;
     }
 
-    if (
-      (triggerType === 'receipt_processed' || triggerType === 'receipt_duplicate') &&
-      typeof data?.transaction_id === 'string'
-    ) {
-      try {
-        await getDatabase().get('transactions').find(data.transaction_id);
-        router.push(`/transaction/${data.transaction_id}` as never);
-      } catch {
+    const data = raw as unknown as NudgePushData;
+    const screen = data.screen;
+
+    switch (screen) {
+      case 'transaction':
+        if (typeof data.transaction_id === 'string') {
+          try {
+            await getDatabase().get('transactions').find(data.transaction_id);
+            router.push(`/transaction/${data.transaction_id}` as never);
+            return;
+          } catch {
+            // Transaction not in local DB — fall through to transactions list
+          }
+        }
         router.push('/(tabs)/transactions');
-      }
-    } else if (
-      triggerType === 'transaction_received' ||
-      triggerType === 'receipt_received' ||
-      triggerType === 'receipt_failed' ||
-      triggerType === 'statement_received' ||
-      triggerType === 'statement_processed' ||
-      triggerType === 'statement_failed'
-    ) {
-      router.push('/(tabs)/transactions');
-    } else {
-      router.push('/(tabs)/nudges');
+        break;
+      case 'budget':
+        router.push('/(tabs)/budget');
+        break;
+      case 'target':
+        if (data.trigger_type === 'nudge' && data.category_id) {
+          router.push(`/target/${data.category_id}` as never);
+        } else {
+          router.push('/(tabs)/budget');
+        }
+        break;
+      case 'transactions':
+        router.push('/(tabs)/transactions');
+        break;
+      case 'accounts':
+        router.push('/(tabs)/accounts');
+        break;
+      case 'nudges':
+      default:
+        router.push('/(tabs)/nudges');
     }
   }, [router]);
 
