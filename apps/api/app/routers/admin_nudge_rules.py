@@ -41,6 +41,7 @@ from app.core.deps import get_current_admin
 from app.core.redis_client import invalidate_and_rebuild
 from app.models.nudge_rule import NudgeRule
 from app.models.user import User
+from app.schemas.nudge_metrics import RuleDailyStat, RuleDailyStatList, RuleSummary, RuleSummaryList
 from app.schemas.nudge_rule import (
     NudgeRuleCreate,
     NudgeRuleListResponse,
@@ -86,6 +87,28 @@ def list_nudge_rules(
         page=page,
         limit=limit,
         items=[NudgeRuleResponse.model_validate(r) for r in rules],
+    )
+
+
+# ── Stats ─────────────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/stats/summary",
+    response_model=RuleSummaryList,
+    summary="Aggregate stats for all rules over a period",
+)
+def get_stats_summary(
+    days: int = Query(7, ge=1, le=90),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+) -> RuleSummaryList:
+    from app.services.nudge_metrics import get_rule_stats_summary
+
+    rows = get_rule_stats_summary(db, days=days)
+    return RuleSummaryList(
+        rules=[RuleSummary(**r) for r in rows],
+        period_days=days,
     )
 
 
@@ -248,3 +271,29 @@ def delete_nudge_rule(
     db.commit()
     invalidate_and_rebuild(db, evts)
     logger.info("Deleted nudge rule id=%s", rule_id)
+
+
+# ── Per-rule stats ────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/{rule_id}/stats",
+    response_model=RuleDailyStatList,
+    summary="Daily stats for a single rule",
+)
+def get_rule_stats_endpoint(
+    rule_id: str,
+    days: int = Query(7, ge=1, le=90),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+) -> RuleDailyStatList:
+    from app.services.nudge_metrics import get_rule_stats
+
+    rule = db.get(NudgeRule, rule_id)
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nudge rule not found")
+    rows = get_rule_stats(db, rule_id=rule_id, days=days)
+    return RuleDailyStatList(
+        stats=[RuleDailyStat(**r) for r in rows],
+        period_days=days,
+    )

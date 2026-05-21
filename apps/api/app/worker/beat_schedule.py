@@ -31,4 +31,9 @@ celery_app.conf.beat_schedule = {
         "task": "app.worker.tasks.deliver_queued_nudges",
         "schedule": crontab(minute="*/10"),
     },
+    # 00:15 WAT daily — roll up previous day's nudge rule metrics.
+    "roll-up-nudge-stats": {
+        "task": "app.worker.tasks.roll_up_nudge_stats",
+        "schedule": crontab(minute=15, hour=23),  # 23:15 UTC = 00:15 WAT
+    },
 }

@@ -175,6 +175,7 @@ def create_nudge(
     context: dict,
     category_id: str | None = None,
     *,
+    rule_id: str | None = None,
     send_push: bool = True,
     transaction_id: str | None = None,
     push_data: dict | None = None,
@@ -201,6 +202,7 @@ def create_nudge(
         message=message,
         context=context,
         category_id=category_id,
+        rule_id=rule_id,
         delivered_at=None if quiet else now,
     )
     db.add(nudge)
@@ -517,6 +519,7 @@ def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
     from app.services.dsl_engine import (
         filter_rules_by_gid_rate_limit,
         hydrate_context,
+        record_rule_hit,
         run_dsl_rules,
         set_gid_rate_limit,
     )
@@ -585,10 +588,12 @@ def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
             message,
             context={"slug": slug, "gid": rule["gid"], "evt_type": evt_type},
             category_id=cid,
+            rule_id=rule["id"],
             transaction_id=tx.id,
         )
         try:
             set_gid_rate_limit(user.id, rule["gid"])
+            record_rule_hit(rule["id"], user_id=user.id)
         except Exception:
             logger.warning(
                 "Failed to set GID rate limit: gid=%s user=%s",
