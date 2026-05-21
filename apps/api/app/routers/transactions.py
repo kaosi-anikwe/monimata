@@ -459,6 +459,14 @@ def patch_transaction(
 
     # ── Atomic budget impact recalculation ─────────────────────────────────
     old_category_id = str(tx.category_id) if tx.category_id else None
+
+    # Debit transactions cannot be stripped of their category once assigned.
+    if new_type == "debit" and new_category_id is None and old_category_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Debit transactions cannot be un-categorised",
+        )
+
     old_month = tx.date.strftime("%Y-%m")
     new_month = new_date.strftime("%Y-%m")
     budget_changed = (
