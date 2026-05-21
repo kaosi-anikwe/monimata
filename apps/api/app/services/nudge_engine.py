@@ -17,23 +17,17 @@
 """
 Nudge Engine — evaluates DSL rules and creates Nudge rows.
 
-All transaction-triggered nudges are fully DSL-driven.
-This module also provides fire-and-forget push helpers for operational
-notifications (statements, receipts, transaction alerts) that are not
-DSL-managed.
+All transaction-triggered nudges are fully DSL-driven with per-group
+rate limiting via Redis counters (driven by the user's fatigue_limit).
 
-Deduplication:
-  Only one nudge per (user, trigger_type, category_id, WAT calendar day) is created.
+Operational notifications (statements, receipts, transaction alerts) are
+not rate-limited — they fire every time.
 
 Quiet hours:
   Derived from user.nudge_settings.quiet_hours_start / quiet_hours_end (HH:MM, WAT).
   During quiet hours, nudge.delivered_at is set to None (queued).
   The `deliver_queued_nudges` beat task (07:05 WAT) dispatches all queued nudges.
   Outside quiet hours, nudge.delivered_at = created_at and a push is sent immediately.
-
-Fatigue limits:
-  user.nudge_settings.fatigue_limit (default 3) caps nudges per WAT calendar day.
-  One nudge per category per day is also enforced independently.
 
 Push delivery:
   Calls push_service.send_push_notification which handles both Expo push tokens.
@@ -138,7 +132,7 @@ PUSH_SCREEN: dict[str, str] = {
     "receipt_received": "transactions",
     "receipt_processed": "transaction",
     "receipt_duplicate": "transaction",
-    "receipt_failed": "nudges",
+    "receipt_failed": "transactions",
 }
 
 
@@ -167,75 +161,6 @@ def _is_quiet_hours(nudge_settings: dict) -> bool:
     if start > end:
         return now_wat >= start or now_wat < end
     return start <= now_wat < end
-
-
-def _today_wat_utc_start() -> datetime:
-    """Return midnight WAT for the current WAT calendar day as a UTC-aware datetime."""
-    today_wat = datetime.now(WAT).date()
-    return datetime(today_wat.year, today_wat.month, today_wat.day, 0, 0, 0, tzinfo=WAT).astimezone(
-        UTC
-    )
-
-
-def _count_today_nudges(db: Session, user_id: str) -> int:
-    """Count nudges already created for this user today (WAT day)."""
-    from sqlalchemy import func
-
-    from app.models.nudge import Nudge
-
-    return (
-        db.query(func.count(Nudge.id))
-        .filter(
-            Nudge.user_id == user_id,
-            Nudge.created_at >= _today_wat_utc_start(),
-        )
-        .scalar()
-        or 0
-    )
-
-
-def _today_nudge_exists(
-    db: Session,
-    user_id: str,
-    trigger_type: str,
-    category_id: str | None,
-) -> bool:
-    """Return True if an identical nudge (same type + category) was already created today."""
-    from app.models.nudge import Nudge
-
-    q = db.query(Nudge).filter(
-        Nudge.user_id == user_id,
-        Nudge.trigger_type == trigger_type,
-        Nudge.created_at >= _today_wat_utc_start(),
-    )
-    if category_id:
-        q = q.filter(Nudge.category_id == category_id)
-    else:
-        q = q.filter(Nudge.category_id == None)  # noqa: E711
-    return q.first() is not None
-
-
-def can_send_nudge(
-    db: Session,
-    user: User,
-    trigger_type: str,
-    category_id: str | None = None,
-) -> bool:
-    """
-    Return False if any of these guards prevent sending a nudge:
-      - nudge_settings.enabled is False
-      - daily fatigue limit already reached
-      - identical nudge already sent today for this category
-    """
-    ns = user.nudge_settings or {}
-    if not ns.get("enabled", True):
-        return False
-    limit = int(ns.get("fatigue_limit", 3))
-    if _count_today_nudges(db, user.id) >= limit:
-        return False
-    if _today_nudge_exists(db, user.id, trigger_type, category_id):
-        return False
-    return True
 
 
 # ── Core creator ─────────────────────────────────────────────────────────────
@@ -413,8 +338,6 @@ def send_transaction_received_push(
 
 def send_statement_received_push(db: Session, user: User, bank_name: str) -> None:
     """Fire-and-forget push: statement received, processing in background."""
-    if not can_send_nudge(db, user, "statement_received"):
-        return
     create_nudge(
         db,
         user,
@@ -430,8 +353,6 @@ def send_statement_processed_push(
     db: Session, user: User, bank_name: str, imported: int, updated: int
 ) -> None:
     """Fire-and-forget push: statement fully imported."""
-    if not can_send_nudge(db, user, "statement_processed"):
-        return
     create_nudge(
         db,
         user,
@@ -447,8 +368,6 @@ def send_statement_processed_push(
 
 def send_receipt_received_push(db: Session, user: User, bank_name: str) -> None:
     """Fire-and-forget push: receipt image received, processing in background."""
-    if not can_send_nudge(db, user, "receipt_received"):
-        return
     create_nudge(
         db,
         user,
@@ -479,8 +398,6 @@ def send_receipt_processed_push(
     transaction_id:
         ID of the imported transaction.
     """
-    if not can_send_nudge(db, user, "receipt_processed"):
-        return
     amount_naira = f"{abs(amount_kobo) / 100:,.2f}"
     create_nudge(
         db,
@@ -510,8 +427,6 @@ def send_receipt_duplicate_push(
     transaction_id: str,
 ) -> None:
     """Fire-and-forget push: receipt was a duplicate of an existing transaction."""
-    if not can_send_nudge(db, user, "receipt_duplicate"):
-        return
     amount_naira = f"{abs(amount_kobo) / 100:,.2f}"
     create_nudge(
         db,
@@ -549,8 +464,6 @@ def send_receipt_failed_push(
         Display name of the identified bank, if known.  May be empty when
         the receipt could not be identified at all.
     """
-    if not can_send_nudge(db, user, "receipt_failed"):
-        return
     reasons = RECEIPT_FAILED_MESSAGES
     template: str = reasons.get(reason, reasons["unrecognised"])
     body = template.format(bank_name=bank_name) if bank_name else template.split(".")[0] + "."
@@ -572,8 +485,6 @@ def send_statement_failed_push(db: Session, user: User, bank_name: str) -> None:
     or unsupported bank variant).  Always includes the bank name so the
     user knows which file to re-download.
     """
-    if not can_send_nudge(db, user, "statement_failed"):
-        return
     create_nudge(
         db,
         user,
@@ -615,7 +526,9 @@ def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
     if not rules:
         return
 
-    rules = filter_rules_by_gid_rate_limit(rules, user.id)
+    ns = user.nudge_settings or {}
+    fatigue_limit = int(ns.get("fatigue_limit", 3))
+    rules = filter_rules_by_gid_rate_limit(rules, user.id, fatigue_limit)
     if not rules:
         return
 
@@ -651,8 +564,6 @@ def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
 
     for rule, match_count in matched:
         slug = rule["slug"]
-        if not can_send_nudge(db, user, slug, cid):
-            continue
 
         # Restore the correct match_count snapshot before rendering the template.
         context["hist"].match_count = match_count

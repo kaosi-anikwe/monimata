@@ -790,23 +790,31 @@ class TestGidRateLimit:
     def test_no_rate_limited_gids(self, mock_get_redis):
         mock_get_redis.return_value.mget.return_value = [None, None]
         rules = self._rules("g1", "g2")
-        result = filter_rules_by_gid_rate_limit(rules, "user_x")
+        result = filter_rules_by_gid_rate_limit(rules, "user_x", 3)
         assert len(result) == 2
 
     @patch("app.core.redis_client.get_redis")
-    def test_one_gid_rate_limited(self, mock_get_redis):
-        # g1 is set (rate-limited), g2 is None (not rate-limited)
-        mock_get_redis.return_value.mget.return_value = ["1", None]
+    def test_gid_under_limit_passes(self, mock_get_redis):
+        # g1 fired twice, limit is 3 — still under limit
+        mock_get_redis.return_value.mget.return_value = ["2", None]
         rules = self._rules("g1", "g2")
-        result = filter_rules_by_gid_rate_limit(rules, "user_x")
+        result = filter_rules_by_gid_rate_limit(rules, "user_x", 3)
+        assert len(result) == 2
+
+    @patch("app.core.redis_client.get_redis")
+    def test_gid_at_limit_blocked(self, mock_get_redis):
+        # g1 fired 3 times, limit is 3 — blocked
+        mock_get_redis.return_value.mget.return_value = ["3", None]
+        rules = self._rules("g1", "g2")
+        result = filter_rules_by_gid_rate_limit(rules, "user_x", 3)
         assert len(result) == 1
         assert result[0]["gid"] == "g2"
 
     @patch("app.core.redis_client.get_redis")
     def test_all_rate_limited(self, mock_get_redis):
-        mock_get_redis.return_value.mget.return_value = ["1", "1"]
+        mock_get_redis.return_value.mget.return_value = ["3", "5"]
         rules = self._rules("g1", "g2")
-        result = filter_rules_by_gid_rate_limit(rules, "user_x")
+        result = filter_rules_by_gid_rate_limit(rules, "user_x", 3)
         assert result == []
 
     def test_empty_rules(self):
@@ -825,22 +833,31 @@ class TestGidRateLimit:
         # Only one unique key despite two rules
         assert len(call_keys) == 1
 
+    @patch("app.core.redis_client.get_redis")
+    def test_custom_fatigue_limit(self, mock_get_redis):
+        """User with fatigue_limit=1 blocks after one fire."""
+        mock_get_redis.return_value.mget.return_value = ["1"]
+        rules = self._rules("g1")
+        result = filter_rules_by_gid_rate_limit(rules, "user_x", 1)
+        assert result == []
+
 
 # ── set_gid_rate_limit ────────────────────────────────────────────────────────
 
 
 class TestSetGidRateLimit:
     @patch("app.core.redis_client.get_redis")
-    def test_sets_key_with_positive_ttl(self, mock_get_redis):
+    def test_increments_key_with_ttl(self, mock_get_redis):
         mock_redis = MagicMock()
         mock_get_redis.return_value = mock_redis
 
         set_gid_rate_limit("user_abc", "budget_pacing")
 
-        mock_redis.setex.assert_called_once()
-        _key, ttl, value = mock_redis.setex.call_args[0]
-        assert "user_abc" in _key
-        assert "budget_pacing" in _key
-        assert ttl >= 1
-        assert ttl <= 86400  # at most one full day
-        assert value == "1"
+        mock_redis.incr.assert_called_once()
+        key = mock_redis.incr.call_args[0][0]
+        assert "user_abc" in key
+        assert "budget_pacing" in key
+        mock_redis.expire.assert_called_once()
+        expire_key, ttl = mock_redis.expire.call_args[0]
+        assert expire_key == key
+        assert 1 <= ttl <= 86400
