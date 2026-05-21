@@ -328,13 +328,34 @@ ConditionsBlock.model_rebuild()
 
 # ── Action block ──────────────────────────────────────────────────────────────
 
+# Valid screen targets for nudge press navigation.
+# "transaction" requires a transaction_id in context.
+# "target" requires a category_id in context.
+VALID_SCREENS: frozenset[str] = frozenset(
+    {"transactions", "transaction", "budget", "target", "nudges"}
+)
+
 
 class ActionBlock(BaseModel):
-    """Output definition — a non-empty array of message template strings."""
+    """Output definition — templates + optional navigation screen."""
 
     model_config = ConfigDict(extra="forbid")
 
     tmpls: list[str] = Field(min_length=1)
+    screen: str = Field(
+        default="nudges",
+        description=(
+            "Screen to navigate to on nudge press. "
+            "One of: transactions, transaction, budget, target, nudges"
+        ),
+    )
+
+    @field_validator("screen")
+    @classmethod
+    def _validate_screen(cls, v: str) -> str:
+        if v not in VALID_SCREENS:
+            raise ValueError(f"Invalid screen {v!r}. Must be one of: {sorted(VALID_SCREENS)}")
+        return v
 
     @model_validator(mode="after")
     def _validate_placeholders(self) -> ActionBlock:

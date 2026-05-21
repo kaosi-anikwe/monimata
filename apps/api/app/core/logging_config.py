@@ -104,12 +104,7 @@ def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
                 "level": level,
             },
             "app_file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "filename": str(log_path / "app.log"),
-                "maxBytes": 10 * 1024 * 1024,  # 10 MB
-                "backupCount": 5,
-                "encoding": "utf-8",
-                "formatter": "detailed",
+                "()": lambda: _app_file_handler,
                 "level": level,
             },
             "error_file": {

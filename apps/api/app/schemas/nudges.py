@@ -26,11 +26,7 @@ from pydantic import BaseModel, Field
 
 
 class NudgeTriggerType(StrEnum):
-    threshold_80 = "threshold_80"
-    threshold_100 = "threshold_100"
-    large_single_tx = "large_single_tx"
-    pay_received = "pay_received"
-    bill_payment = "bill_payment"
+    nudge = "nudge"
     transaction_received = "transaction_received"
     statement_received = "statement_received"
     statement_processed = "statement_processed"
@@ -41,9 +37,81 @@ class NudgeTriggerType(StrEnum):
     statement_failed = "statement_failed"
 
 
+class NudgeScreen(StrEnum):
+    """Valid navigation targets for nudge press actions."""
+
+    transactions = "transactions"
+    transaction = "transaction"
+    budget = "budget"
+    target = "target"
+    nudges = "nudges"
+    accounts = "accounts"
+
+
+# ── Context models ────────────────────────────────────────────────────────────
+# The context JSONB is persisted on the Nudge row AND sent in the push
+# notification data payload.  The same shape is available via GET /nudges.
+
+
+class DSLNudgeContext(BaseModel):
+    """Context for DSL-driven behavioural nudges (trigger_type == "nudge")."""
+
+    nudge_type: str = Field(description="Rule slug, e.g. 'high_spend_pct'")
+    slug: str = Field(description="Same as nudge_type")
+    gid: str = Field(description="Group ID for theming, e.g. 'spend_alerts'")
+    evt_type: str = Field(description="Event bucket: debit_cat, credit_uncat, etc.")
+    screen: NudgeScreen = Field(description="Navigation target on press")
+    transaction_id: str = Field(description="Triggering transaction UUID")
+    category_id: str | None = Field(None, description="Budget category UUID")
+    category_name: str | None = Field(None, description="Human-readable category name")
+    amount_kobo: int = Field(description="Transaction amount in kobo (negative for debits)")
+    match_count: int = Field(0, description="Historical txs matching the rule's count_where")
+    spend_pct: float | None = Field(None, description="Budget usage ratio 0.0–1.0+")
+    budget_amount_kobo: int | None = Field(None, description="Total assigned for the month")
+    budget_remaining_kobo: int | None = Field(None, description="Budget remaining")
+
+
+class OperationalNudgeContext(BaseModel):
+    """Base context for operational notifications."""
+
+    nudge_type: str = Field(description="Same as trigger_type")
+    screen: NudgeScreen = Field(description="Navigation target on press")
+    bank_name: str | None = Field(None, description="Display name of the bank")
+    # Optional fields present on specific trigger types
+    transaction_id: str | None = Field(None, description="Related transaction UUID")
+    amount_kobo: int | None = Field(None, description="Amount in kobo")
+    amount_naira: str | None = Field(None, description="Formatted naira string")
+    direction: str | None = Field(None, description="'credit' or 'debit'")
+    imported: int | None = Field(None, description="Number of imported transactions")
+    updated: int | None = Field(None, description="Number of updated transactions")
+    reason: str | None = Field(
+        None, description="Failure reason: 'unrecognised', 'no_account', 'parse_failed'"
+    )
+
+
+# ── Push data model ──────────────────────────────────────────────────────────
+# The push data dict includes the full context plus canonical routing fields.
+
+
+class NudgePushData(BaseModel):
+    """Shape of the ``data`` dict inside the push notification payload.
+
+    Includes the full nudge context plus canonical routing fields
+    (``trigger_type``, ``nudge_id``, ``nudge_type``, ``screen``).
+    The same context is available via ``GET /nudges``.
+    """
+
+    trigger_type: str = Field(description="'nudge' for DSL, or operational type")
+    nudge_id: str = Field(description="UUID of the persisted Nudge row")
+    nudge_type: str = Field(description="Rule slug (DSL) or trigger_type (operational)")
+    screen: NudgeScreen = Field(description="Navigation target on press")
+    category_id: str | None = Field(None, description="Present when nudge has a category")
+    transaction_id: str | None = Field(None, description="Present for transaction-linked nudges")
+
+
 class NudgeResponse(BaseModel):
     id: str
-    trigger_type: NudgeTriggerType | str
+    trigger_type: NudgeTriggerType
     title: str | None
     message: str
     context: dict[str, Any] | None = None
