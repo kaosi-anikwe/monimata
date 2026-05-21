@@ -62,6 +62,8 @@ SCALAR_FACTS: frozenset[str] = frozenset(
         "cat.amt",
         "cat.rem",
         "cat.tx_ratio",
+        "cat.time_ratio",
+        "cat.type",
     }
 )
 
@@ -110,6 +112,9 @@ VALID_TEMPLATE_KEYS: frozenset[str] = frozenset(
         "cat.spend_ratio",
         "cat.spend_ratio_percentage",
         "cat.tx_ratio",
+        "cat.time_ratio",
+        "cat.time_ratio_percentage",
+        "cat.type",
         "hist",
         "hist.txs",
         "hist.match_count",
