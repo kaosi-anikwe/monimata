@@ -915,6 +915,20 @@ def push(
         old_category_id = str(tx.category_id) if tx.category_id else None
         new_category_id = record.get("category_id", old_category_id)
 
+        # Guard: debit transactions cannot be un-categorised once assigned.
+        if (
+            "category_id" in record
+            and new_category_id is None
+            and old_category_id is not None
+            and tx.type == "debit"
+        ):
+            logger.warning(
+                "Sync push: ignoring category_id=null on categorised debit %s — "
+                "debit transactions cannot be un-categorised",
+                tx.id,
+            )
+            new_category_id = old_category_id
+
         if "category_id" in record:
             tx.category_id = new_category_id
 
