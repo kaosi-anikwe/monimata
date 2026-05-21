@@ -454,6 +454,15 @@ class NudgeRuleResponse(BaseModel):
     updated_at: _dt
 
 
+class NudgeRuleListResponse(BaseModel):
+    """Paginated list of nudge rules."""
+
+    total: int
+    page: int
+    limit: int
+    items: list[NudgeRuleResponse]
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 

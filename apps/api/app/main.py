@@ -75,6 +75,7 @@ if settings.SENTRY_DSN:
 
 from app.routers import (  # noqa: E402
     accounts,
+    admin_nudge_rules,
     ai,
     auth,
     budget,
@@ -134,6 +135,7 @@ app.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 app.include_router(ai.router, prefix="/ai/credentials", tags=["ai"])
 app.include_router(ai.usage_router, prefix="/ai", tags=["ai"])
 app.include_router(ws.router, tags=["websocket"])
+app.include_router(admin_nudge_rules.router, prefix="/admin/nudge-rules", tags=["admin"])
 
 
 @app.exception_handler(RateLimitExceeded)
