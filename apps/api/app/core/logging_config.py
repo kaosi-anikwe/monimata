@@ -36,6 +36,7 @@ import logging.config
 from pathlib import Path
 
 from rich import traceback as rich_traceback
+from rich.console import Console
 from rich.logging import RichHandler
 
 # Install Rich as the global unhandled-exception renderer.
@@ -55,7 +56,7 @@ _RICH_HANDLER = RichHandler(
 
 def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
     """
-    Set up Rich console + rotating file logging.
+    Set up Rich console + Rich-formatted rotating file logging.
     Call once at application startup before any loggers are used.
     """
     log_path = Path(log_dir)
@@ -64,15 +65,39 @@ def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
     level = log_level.upper()
     _RICH_HANDLER.setLevel(level)
 
+    # -- Rich file handlers ----------------------------------------------------
+    # Each file gets its own Console(file=...) so Rich renders styled,
+    # human-readable output (with tracebacks) into the log files.
+
+    _app_log_file = open(log_path / "app.log", "a", encoding="utf-8")  # noqa: SIM115
+    _app_file_handler = RichHandler(
+        console=Console(file=_app_log_file, width=120, force_terminal=True),
+        rich_tracebacks=True,
+        tracebacks_max_frames=10,
+        tracebacks_show_locals=True,
+        tracebacks_word_wrap=True,
+        markup=False,
+        log_time_format="[%Y-%m-%d %H:%M:%S]",
+        show_path=True,
+    )
+    _app_file_handler.setLevel(level)
+
+    _err_log_file = open(log_path / "error.log", "a", encoding="utf-8")  # noqa: SIM115
+    _err_file_handler = RichHandler(
+        console=Console(file=_err_log_file, width=120, force_terminal=True),
+        rich_tracebacks=True,
+        tracebacks_max_frames=20,
+        tracebacks_show_locals=True,
+        tracebacks_word_wrap=True,
+        markup=False,
+        log_time_format="[%Y-%m-%d %H:%M:%S]",
+        show_path=True,
+    )
+    _err_file_handler.setLevel(logging.ERROR)
+
     config: dict = {
         "version": 1,
         "disable_existing_loggers": False,
-        "formatters": {
-            "detailed": {
-                "format": ("%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s"),
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-            },
-        },
         "handlers": {
             "console": {
                 "()": lambda: _RICH_HANDLER,
@@ -88,12 +113,7 @@ def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
                 "level": level,
             },
             "error_file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "filename": str(log_path / "error.log"),
-                "maxBytes": 10 * 1024 * 1024,  # 10 MB
-                "backupCount": 5,
-                "encoding": "utf-8",
-                "formatter": "detailed",
+                "()": lambda: _err_file_handler,
                 "level": "ERROR",
             },
         },
