@@ -36,8 +36,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# Firebase — managed via EAS secrets / team secrets manager, do NOT commit
-google-services.json
+# Firebase — iOS config contains a private key; keep it out of git.
+# Android google-services.json only has project IDs (embedded in the APK anyway)
+# and must be committed so EAS Build can access it.
 GoogleService-Info.plist
 
 app-example
