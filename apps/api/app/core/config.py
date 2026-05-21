@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     # ── Environment ───────────────────────────────────────────────────────────
     ENV: str = "development"  # "development" | "production"
 
+    # ── Client version enforcement ────────────────────────────────────────────
+    # Minimum mobile app version allowed to call the API.
+    # Leave empty (or "0.0.0") to disable enforcement.
+    # When set, requests missing X-App-Version are also rejected.
+    MIN_APP_VERSION: str = ""  # e.g. "0.4.0"
+    # Store deep-links sent in 426 responses (one per platform).
+    APP_UPDATE_URL_ANDROID: str = ""  # Play Store URL
+    APP_UPDATE_URL_IOS: str = ""  # App Store URL
+
     # ── Logging ───────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"  # DEBUG | INFO | WARNING | ERROR
     LOG_DIR: str = "logs"  # relative to the working directory (apps/api)

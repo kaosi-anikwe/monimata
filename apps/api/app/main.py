@@ -24,6 +24,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.logging_config import configure_logging
+from app.core.min_version import MinAppVersionMiddleware
 
 # Import registers SQLAlchemy event listeners on Transaction (insert/update/delete).
 from app.services import budget_events as _budget_events  # noqa: F401
@@ -100,7 +101,7 @@ _openapi_url = None if settings.ENV == "production" else "/openapi.json"
 app = FastAPI(
     title="MoniMata API",
     description="Zero-based budgeting for Nigerians — Every Kobo, Accounted For.",
-    version="0.0.1",
+    version="0.3.0",
     docs_url=_docs_url,
     redoc_url=_redoc_url,
     openapi_url=_openapi_url,
@@ -109,6 +110,12 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(
+    MinAppVersionMiddleware,
+    min_version=settings.MIN_APP_VERSION,
+    android_url=settings.APP_UPDATE_URL_ANDROID,
+    ios_url=settings.APP_UPDATE_URL_IOS,
+)
 
 
 app.add_middleware(
