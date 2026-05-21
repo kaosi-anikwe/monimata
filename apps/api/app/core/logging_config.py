@@ -33,15 +33,25 @@ from __future__ import annotations
 
 import logging
 import logging.config
+from collections.abc import Iterable
 from pathlib import Path
 
 from rich import traceback as rich_traceback
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.segment import Segment
 
 # Install Rich as the global unhandled-exception renderer.
 # max_frames=5 keeps tracebacks concise; show_locals exposes variable values on ERROR+.
 rich_traceback.install(max_frames=5, show_locals=True, word_wrap=True)
+
+
+class _FileConsole(Console):
+    """Console that emits ANSI colours but suppresses OSC8 hyperlinks."""
+
+    def _render_buffer(self, buffer: Iterable[Segment]) -> str:  # type: ignore[override]
+        return super()._render_buffer(Segment.strip_links(buffer))
+
 
 _RICH_HANDLER = RichHandler(
     rich_tracebacks=True,
@@ -71,7 +81,7 @@ def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
 
     _app_log_file = open(log_path / "app.log", "a", encoding="utf-8")  # noqa: SIM115
     _app_file_handler = RichHandler(
-        console=Console(file=_app_log_file, width=120, force_terminal=True),
+        console=_FileConsole(file=_app_log_file, width=120, force_terminal=True),
         rich_tracebacks=True,
         tracebacks_max_frames=10,
         tracebacks_show_locals=True,
@@ -84,7 +94,7 @@ def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
 
     _err_log_file = open(log_path / "error.log", "a", encoding="utf-8")  # noqa: SIM115
     _err_file_handler = RichHandler(
-        console=Console(file=_err_log_file, width=120, force_terminal=True),
+        console=_FileConsole(file=_err_log_file, width=120, force_terminal=True),
         rich_tracebacks=True,
         tracebacks_max_frames=20,
         tracebacks_show_locals=True,
