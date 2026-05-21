@@ -1,0 +1,224 @@
+# Triggered by a `mobile/vX.Y.Z` annotated tag.
+#
+# Jobs:
+#   1. check-eas       — detects which secrets are configured and sets outputs.
+#   2. github-release  — always runs: creates a GitHub Release with changelog notes.
+#                        Also attaches a signed APK when EXPO_TOKEN is available.
+#   3. store-build     — skipped unless EXPO_TOKEN is set.
+#                        Android AAB is always built (only needs the keystore).
+#                        iOS build + submission only runs when APP_STORE_CONFIGURED is set.
+#                        Play Store submission only runs when PLAY_STORE_CONFIGURED is set.
+#
+# GitHub secrets:
+#   EXPO_TOKEN              — required for any EAS build. Set this first.
+#   PLAY_STORE_CONFIGURED   — set to any non-empty value once you have a Google Play
+#                             service account configured in EAS (`eas credentials`).
+#                             Activates: Android AAB submission to Play Store.
+#   APP_STORE_CONFIGURED    — set to any non-empty value once you have Apple distribution
+#                             credentials configured in EAS (`eas credentials`).
+#                             Activates: iOS IPA build + App Store submission.
+
+name: Mobile Release
+
+on:
+  push:
+    tags:
+      - "mobile/v*"
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # -- Prerequisite: probe secrets, expose boolean outputs -------------------
+  # `secrets` context is not available in job-level `if:` conditions.
+  # This job reads them inside a step and exposes safe string outputs that
+  # downstream jobs can use in their `if: needs.check-eas.outputs.*` conditions.
+  check-eas:
+    name: Check EAS availability
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.probe.outputs.enabled }}
+      play-ready: ${{ steps.probe.outputs.play-ready }}
+      apple-ready: ${{ steps.probe.outputs.apple-ready }}
+    steps:
+      - name: Probe secrets
+        id: probe
+        env:
+          TOKEN: ${{ secrets.EXPO_TOKEN }}
+          PLAY_READY: ${{ secrets.PLAY_STORE_CONFIGURED }}
+          APPLE_READY: ${{ secrets.APP_STORE_CONFIGURED }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::EAS builds enabled."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EXPO_TOKEN not set — EAS builds skipped."
+          fi
+          if [ -n "$PLAY_READY" ]; then
+            echo "play-ready=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "play-ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::PLAY_STORE_CONFIGURED not set — Play Store submission skipped."
+          fi
+          if [ -n "$APPLE_READY" ]; then
+            echo "apple-ready=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "apple-ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::APP_STORE_CONFIGURED not set — iOS build + App Store submission skipped."
+          fi
+
+  # -- Job 1: APK build → GitHub Release -------------------------------------
+  # Always creates a release. APK is attached only when EXPO_TOKEN is present.
+  github-release:
+    name: Build APK & Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: check-eas
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Extract semver from tag (mobile/v0.4.0 → 0.4.0). No deps — runs always.
+      - name: Extract version
+        id: version
+        run: echo "semver=${GITHUB_REF_NAME#mobile/v}" >> "$GITHUB_OUTPUT"
+
+      # Node + EAS steps are skipped when EXPO_TOKEN is not configured.
+      - name: Set up Node.js
+        if: needs.check-eas.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        if: needs.check-eas.outputs.enabled == 'true'
+        run: npm ci
+        working-directory: apps/mobile
+
+      - name: Set up EAS CLI
+        if: needs.check-eas.outputs.enabled == 'true'
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build APK via EAS
+        id: apk-build
+        if: needs.check-eas.outputs.enabled == 'true'
+        working-directory: apps/mobile
+        run: |
+          OUTPUT=$(eas build \
+            --platform android \
+            --profile github-release \
+            --non-interactive \
+            --wait \
+            --json 2>/dev/null)
+          APK_URL=$(echo "$OUTPUT" | jq -r '.[0].artifacts.buildUrl // .[0].artifacts.applicationArchiveUrl')
+          echo "apk_url=$APK_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Download APK
+        if: needs.check-eas.outputs.enabled == 'true' && steps.apk-build.conclusion == 'success'
+        run: |
+          curl -fsSL "${{ steps.apk-build.outputs.apk_url }}" \
+            -o "monimata-${{ steps.version.outputs.semver }}.apk"
+
+      # Changelog extraction — no deps, runs always.
+      - name: Extract changelog section
+        run: |
+          VERSION="${{ steps.version.outputs.semver }}"
+          # Grab lines between "## [X.Y.Z]" and the next "## [" heading.
+          awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" \
+            CHANGELOG.md > release-notes.md
+
+      # GitHub Release — always created. APK attached only when the file exists.
+      # fail_on_unmatched_files: false means a missing APK produces a release
+      # without an attachment rather than a workflow failure.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "MoniMata v${{ steps.version.outputs.semver }}"
+          tag_name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
+          files: |
+            monimata-${{ steps.version.outputs.semver }}.apk
+
+  # -- Job 2: Store builds (AAB + IPA) ---------------------------------------
+  # Skipped entirely when EXPO_TOKEN is absent.
+  # Individual build/submit steps are gated by their own flags.
+  store-build:
+    name: Build for App Stores
+    runs-on: ubuntu-latest
+    needs: check-eas
+    if: needs.check-eas.outputs.enabled == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: apps/mobile
+
+      - name: Set up EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Android AAB — always built when EXPO_TOKEN is present (only needs keystore).
+      - name: Build AAB (Android)
+        working-directory: apps/mobile
+        run: |
+          eas build \
+            --platform android \
+            --profile production \
+            --non-interactive \
+            --wait
+
+      # iOS IPA — skipped until APP_STORE_CONFIGURED is set (needs Apple credentials).
+      - name: Build IPA (iOS)
+        if: needs.check-eas.outputs.apple-ready == 'true'
+        working-directory: apps/mobile
+        run: |
+          eas build \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --wait
+
+      # Submissions — each gated by its own flag secret.
+      - name: Submit to Google Play (internal track)
+        if: needs.check-eas.outputs.play-ready == 'true'
+        working-directory: apps/mobile
+        run: |
+          eas submit \
+            --platform android \
+            --profile production \
+            --non-interactive \
+            --latest
+
+      - name: Submit to App Store Connect
+        if: needs.check-eas.outputs.apple-ready == 'true'
+        working-directory: apps/mobile
+        run: |
+          eas submit \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --latest
