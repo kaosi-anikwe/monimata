@@ -94,7 +94,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         if: needs.check-eas.outputs.enabled == 'true'
@@ -169,7 +169,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
