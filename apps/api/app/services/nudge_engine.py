@@ -15,18 +15,15 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Nudge Engine — evaluates trigger conditions and creates Nudge rows.
+Nudge Engine — evaluates DSL rules and creates Nudge rows.
 
-Trigger types (MVP):
-  threshold_80    — spending has reached 80%–99% of a category's assigned amount
-  threshold_100   — spending has reached or exceeded 100% of assigned
-  large_single_tx — a single debit transaction consumed ≥ 40% of a category's budget
-  pay_received    — credit transaction ≥ PAY_RECEIVED_THRESHOLD kobo detected
+All transaction-triggered nudges are fully DSL-driven.
+This module also provides fire-and-forget push helpers for operational
+notifications (statements, receipts, transaction alerts) that are not
+DSL-managed.
 
 Deduplication:
   Only one nudge per (user, trigger_type, category_id, WAT calendar day) is created.
-  threshold_100 supersedes threshold_80 for the same category on the same day — once
-  a category hits 100%, no further threshold_80 nudge will be created that day.
 
 Quiet hours:
   Derived from user.nudge_settings.quiet_hours_start / quiet_hours_end (HH:MM, WAT).
@@ -57,21 +54,12 @@ logger = logging.getLogger(__name__)
 # West Africa Time — UTC+1, no daylight saving.
 WAT = timezone(timedelta(hours=1))
 
-# Minimum credit amount that triggers a pay_received nudge (₦50,000 in kobo).
-PAY_RECEIVED_THRESHOLD = 5_000_000
-
 if TYPE_CHECKING:
     from app.models.nudge import Nudge
     from app.models.transaction import Transaction
     from app.models.user import User
 
-# ── Message templates ─────────────────────────────────────────────────────────
-
 TITLES: dict[str, str] = {
-    "threshold_80": "⚠️ {category_name} don reach 80%",
-    "threshold_100": "🚨 {category_name} budget don finish!",
-    "large_single_tx": "Big spend on {category_name}",
-    "pay_received": "Money don enter! 🎉",
     "transaction_received": "{tx_type} Alert",
     "statement_received": "Statement received",
     "statement_processed": "Statement imported",
@@ -83,33 +71,6 @@ TITLES: dict[str, str] = {
 }
 
 MESSAGES: dict[str, list[str]] = {
-    "threshold_80": [
-        "You don use {percentage}% of your {category_name} budget. "
-        "Only ₦{remaining_naira} remain — use am wisely!",
-        "{category_name} almost done o! ₦{remaining_naira} remain from your "
-        "₦{assigned_naira} plan.",
-        "Guy, you don reach {percentage}% for {category_name}. "
-        "₦{remaining_naira} remain — no overdo am.",
-    ],
-    "threshold_100": [
-        "You don cross your {category_name} budget by ₦{overage_naira}. "
-        "Time to move money from another category.",
-        "{category_name} don dry! You spend ₦{overage_naira} pass your plan. "
-        "Readjust your budget now.",
-        "E don do for {category_name}. You overrun by ₦{overage_naira} — control the situation.",
-    ],
-    "large_single_tx": [
-        "One transaction of ₦{amount_naira} just take {percentage}% of your "
-        "{category_name} budget. Check am.",
-        "Chai! ₦{amount_naira} in {category_name} one time? "
-        "That na {percentage}% of your monthly plan.",
-    ],
-    "pay_received": [
-        "₦{amount_naira} credit don land! Time to give every kobo a job — "
-        "assign am to your budget.",
-        "Money don enter — ₦{amount_naira}. Assign am to your budget categories "
-        "before e disappear.",
-    ],
     "transaction_received": [
         "{type_verb} ₦{amount_naira} — {narration}. Balance: ₦{balance_naira}.",
         "₦{amount_naira} {type_verb_past} your account. {narration}. Bal: ₦{balance_naira}.",
@@ -636,13 +597,7 @@ def _get_event_type(tx: Transaction) -> str:
 
 def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
     """
-    Evaluate all active DSL rules for the event type implied by *tx*.
-
-    Called before the hardcoded trigger checks inside
-    ``evaluate_transaction_nudges``.  Both paths can fire for the same
-    transaction during the Phase 5→7 transition period; once Phase 7 seeds the
-    four legacy rules with matching slugs the existing ``_today_nudge_exists``
-    deduplication will prevent double-firing.
+    Evaluate all active DSL rules for the event type implied by `tx`.
     """
     from app.core.redis_client import load_rules_for_evt
     from app.models.category import Category
@@ -734,24 +689,14 @@ def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
 
 def evaluate_transaction_nudges(db: Session, tx: Transaction) -> None:
     """
-    Evaluate all nudge triggers for a newly categorized transaction and create
-    any applicable Nudge rows.
+    Evaluate all active DSL nudge rules for a newly categorized transaction
+    and create any applicable Nudge rows.
 
-    Called from the `categorize_transactions` Celery task after `_update_budget_activity`.
-    Also called from `fetch_transactions` for credit transactions (pay_received).
-
-    DSL rules are evaluated first (Phase 5+). The four hardcoded triggers below
-    remain as a fallback until Phase 7 seeds them as DSL rules and removes this block.
-
-    Checks:
-      - pay_received    if tx.type == "credit" and amount ≥ PAY_RECEIVED_THRESHOLD
-      - large_single_tx if debit category tx
-      - threshold_80    if debit category tx and budget month data exists
-      - threshold_100   if debit category tx and budget month data exists
+    Called from the `categorize_transactions` Celery task after
+    `_update_budget_activity`, and from `fetch_transactions` for credit
+    transactions.
     """
-    from app.models.category import Category
     from app.models.user import User
-    from app.services.budget_logic import get_or_create_budget_month
 
     user: User | None = db.get(User, tx.user_id)
     if not user:
@@ -760,139 +705,7 @@ def evaluate_transaction_nudges(db: Session, tx: Transaction) -> None:
     if not ns.get("enabled", True):
         return
 
-    # ── DSL-driven evaluation (Phase 5+) ─────────────────────────────────────
     try:
         _run_dsl_nudges(db, user, tx)
     except Exception:
         logger.exception("_run_dsl_nudges failed for tx=%s", tx.id)
-
-    # ── pay_received (hardcoded fallback — removed in Phase 7) ───────────────
-    if tx.type == "credit" and tx.amount >= PAY_RECEIVED_THRESHOLD:
-        if can_send_nudge(db, user, "pay_received"):
-            amount_str = _kobo_to_naira_str(tx.amount)
-            title = TITLES["pay_received"]
-            message = random.choice(MESSAGES["pay_received"]).format(amount_naira=amount_str)
-            create_nudge(
-                db,
-                user,
-                "pay_received",
-                title,
-                message,
-                context={
-                    "amount_kobo": tx.amount,
-                    "amount_naira": amount_str,
-                    "narration": tx.narration,
-                    "account_id": tx.account_id,
-                },
-            )
-
-    # Budget nudges only apply to categorized debit transactions
-    if tx.type != "debit" or not tx.category_id or tx.amount >= 0:
-        return
-
-    cat: Category | None = db.get(Category, tx.category_id)
-    if not cat:
-        return
-
-    month_str = tx.date.strftime("%Y-%m")
-    bm = get_or_create_budget_month(db, tx.user_id, tx.category_id, month_str)
-
-    if bm.assigned <= 0:
-        return  # no active budget for this category — skip threshold nudges
-
-    # spending = abs(activity); assigned is positive
-    spent = abs(bm.activity)
-    assigned = bm.assigned
-    pct = spent / assigned
-
-    # ── large_single_tx: one transaction took ≥ 40% of the budget ────────────
-    tx_abs = abs(tx.amount)
-    tx_pct = tx_abs / assigned
-    if tx_pct >= 0.4 and can_send_nudge(db, user, "large_single_tx", tx.category_id):
-        percentage = round(tx_pct * 100)
-        amount_str = _kobo_to_naira_str(tx_abs)
-        title = TITLES["large_single_tx"].format(category_name=cat.name)
-        message = random.choice(MESSAGES["large_single_tx"]).format(
-            amount_naira=amount_str,
-            percentage=percentage,
-            category_name=cat.name,
-        )
-        create_nudge(
-            db,
-            user,
-            "large_single_tx",
-            title,
-            message,
-            context={
-                "category_name": cat.name,
-                "tx_amount_kobo": tx.amount,
-                "amount_naira": amount_str,
-                "narration": tx.narration,
-                "assigned_kobo": assigned,
-                "percentage": percentage,
-                "tx_id": tx.id,
-            },
-            category_id=tx.category_id,
-            transaction_id=tx.id,
-        )
-
-    # ── threshold_100: budget exhausted / overspent ───────────────────────────
-    if pct >= 1.0 and can_send_nudge(db, user, "threshold_100", tx.category_id):
-        overage = spent - assigned
-        overage_str = _kobo_to_naira_str(overage)
-        title = TITLES["threshold_100"].format(category_name=cat.name)
-        message = random.choice(MESSAGES["threshold_100"]).format(
-            category_name=cat.name,
-            overage_naira=overage_str,
-        )
-        create_nudge(
-            db,
-            user,
-            "threshold_100",
-            title,
-            message,
-            context={
-                "category_name": cat.name,
-                "month": month_str,
-                "spent_kobo": spent,
-                "assigned_kobo": assigned,
-                "overage_kobo": max(0, overage),
-                "overage_naira": overage_str,
-                "percentage": round(pct * 100),
-            },
-            category_id=tx.category_id,
-        )
-        # threshold_100 supersedes threshold_80 for the same day
-        return
-
-    # ── threshold_80: 80–99% of budget used ──────────────────────────────────
-    if 0.8 <= pct < 1.0 and can_send_nudge(db, user, "threshold_80", tx.category_id):
-        remaining = assigned - spent
-        remaining_str = _kobo_to_naira_str(remaining)
-        assigned_str = _kobo_to_naira_str(assigned)
-        percentage = round(pct * 100)
-        title = TITLES["threshold_80"].format(category_name=cat.name)
-        message = random.choice(MESSAGES["threshold_80"]).format(
-            category_name=cat.name,
-            percentage=percentage,
-            remaining_naira=remaining_str,
-            assigned_naira=assigned_str,
-        )
-        create_nudge(
-            db,
-            user,
-            "threshold_80",
-            title,
-            message,
-            context={
-                "category_name": cat.name,
-                "month": month_str,
-                "spent_kobo": spent,
-                "assigned_kobo": assigned,
-                "remaining_kobo": remaining,
-                "remaining_naira": remaining_str,
-                "assigned_naira": assigned_str,
-                "percentage": percentage,
-            },
-            category_id=tx.category_id,
-        )
