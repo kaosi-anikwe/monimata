@@ -42,6 +42,7 @@ import {
   View,
 } from 'react-native';
 
+import { useToast } from '@/components/Toast';
 import { BottomSheet } from '@/components/ui';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useTheme } from '@/lib/theme';
@@ -59,8 +60,12 @@ const LIST_MAX_HEIGHT = SCREEN_H * 0.52;
 export interface CategorySearchSheetProps {
   visible: boolean;
   onClose: () => void;
-  /** Called with the selected categoryId and display name. Sheet auto-closes. */
-  onSelect: (categoryId: string, categoryName: string) => void;
+  /** Called with the selected categoryId and display name. Sheet auto-closes.
+   *  categoryId is null when the user selects "To Be Budgeted" (TBB). */
+  onSelect: (categoryId: string | null, categoryName: string) => void;
+  /** When true the TBB row is shown disabled and shows a warning on tap.
+   *  Pass true for debit transactions — TBB is only valid for credits. */
+  disableTBB?: boolean;
 }
 
 // ─── CategorySearchSheet ──────────────────────────────────────────────────────
@@ -69,8 +74,10 @@ export function CategorySearchSheet({
   visible,
   onClose,
   onSelect,
+  disableTBB = false,
 }: CategorySearchSheetProps) {
   const colors = useTheme();
+  const { info: showInfo } = useToast();
   const [query, setQuery] = useState('');
   const { data: groups = [] } = useCategoryGroups();
 
@@ -92,7 +99,7 @@ export function CategorySearchSheet({
     onClose();
   }
 
-  function handleSelect(categoryId: string, categoryName: string) {
+  function handleSelect(categoryId: string | null, categoryName: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onSelect(categoryId, categoryName);
     setQuery('');
@@ -131,6 +138,38 @@ export function CategorySearchSheet({
           </TouchableOpacity>
         )}
       </View>
+
+      {/* ── To Be Budgeted (TBB) row — always visible above search results ── */}
+      <TouchableOpacity
+        style={[
+          ss.tbbRow,
+          {
+            backgroundColor: disableTBB ? colors.surface : colors.successSubtle,
+            borderBottomColor: colors.border,
+          },
+        ]}
+        onPress={() => {
+          if (disableTBB) {
+            showInfo('Not allowed', 'Expenses cannot be assigned to To Be Budgeted.');
+          } else {
+            handleSelect(null, 'To Be Budgeted');
+          }
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={disableTBB ? 'To Be Budgeted — not available for expenses' : 'Assign to To Be Budgeted'}
+      >
+        <View style={[ss.tbbBadge, { backgroundColor: disableTBB ? colors.textTertiary : colors.brand }]}>
+          <Text style={[type_.labelSm, { color: colors.white }]}>TBB</Text>
+        </View>
+        <Text style={[type_.body, { color: disableTBB ? colors.textTertiary : colors.brand, flex: 1 }]}>
+          To Be Budgeted
+        </Text>
+        <Ionicons
+          name={disableTBB ? 'lock-closed-outline' : 'chevron-forward'}
+          size={layout.iconSm}
+          color={disableTBB ? colors.textTertiary : colors.brand}
+        />
+      </TouchableOpacity>
 
       {/* ── Category list ── */}
       <SectionList
@@ -203,6 +242,19 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tbbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tbbBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
   },
   emptyRow: {
     paddingHorizontal: spacing.xl,

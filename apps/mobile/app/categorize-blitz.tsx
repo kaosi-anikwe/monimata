@@ -114,13 +114,16 @@ export default function CategorizeBlitzScreen() {
   // ── Handlers ────────────────────────────────────────────────────────────
 
   const handleCategorize = useCallback(
-    (clusterKey: string, categoryId: string) => {
+    (clusterKey: string, categoryId: string | null) => {
       // Optimistic dismiss.
       setDismissedKeys((prev) => new Set([...prev, clusterKey]));
-      setPendingMap((prev) => new Map(prev).set(clusterKey, categoryId));
+      // Only track pending state for named categories (not TBB/null).
+      if (categoryId !== null) {
+        setPendingMap((prev) => new Map(prev).set(clusterKey, categoryId));
+      }
 
       categorizeMutation.mutate(
-        { body: { cluster_key: clusterKey, category_id: categoryId } },
+        { body: { cluster_key: clusterKey, category_id: categoryId as string } },
         {
           onSuccess: () => {
             setPendingMap((prev) => {
@@ -156,7 +159,7 @@ export default function CategorizeBlitzScreen() {
   }, []);
 
   const handleSearchSelect = useCallback(
-    (categoryId: string) => {
+    (categoryId: string | null) => {
       if (activeClusterKey) {
         handleCategorize(activeClusterKey, categoryId);
         setActiveClusterKey(null);

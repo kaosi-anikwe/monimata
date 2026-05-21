@@ -61,7 +61,7 @@ export interface ClusterCardProps {
   cluster: ClusterItem;
   groups: CategoryGroup[];
   /** Called when the user taps a chip or selects from the search sheet. */
-  onCategorize: (clusterKey: string, categoryId: string) => void;
+  onCategorize: (clusterKey: string, categoryId: string | null) => void;
   /** Moves this cluster to the bottom of the visible list without an API call. */
   onSkip: () => void;
   /**
