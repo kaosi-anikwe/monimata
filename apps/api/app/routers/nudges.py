@@ -42,6 +42,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.nudge import Nudge
 from app.models.user import User
+from app.schemas.nudge_metrics import UserNudgeInsightRule, UserNudgeInsights
 from app.schemas.nudges import (
     NudgeListResponse,
     NudgeResponse,
@@ -165,6 +166,37 @@ def update_settings(
         quiet_hours_end=ns.get("quiet_hours_end", "07:00"),
         fatigue_limit=int(ns.get("fatigue_limit", 3)),
         language=ns.get("language", "pidgin"),
+    )
+
+
+# ── Insights ─────────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/insights",
+    response_model=UserNudgeInsights,
+    summary="Per-user nudge insights for weekly review",
+)
+def get_user_insights(
+    days: int = Query(7, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserNudgeInsights:
+    """Return the user's nudge trigger summary over the last *days* days.
+
+    Useful for the AI-powered weekly review and the in-app insights card.
+    """
+    from app.services.nudge_metrics import get_user_nudge_summary
+
+    data = get_user_nudge_summary(db, current_user.id, days=days)
+    return UserNudgeInsights(
+        period_start=data["period_start"],
+        period_end=data["period_end"],
+        total_nudges=data["total_nudges"],
+        total_suppressed=data["total_suppressed"],
+        opened=data["opened"],
+        dismissed=data["dismissed"],
+        top_rules=[UserNudgeInsightRule(**r) for r in data["top_rules"]],
     )
 
 

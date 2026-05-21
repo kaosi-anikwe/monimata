@@ -27,6 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.nudge_rule import NudgeRule
     from app.models.user import User
 
 
@@ -52,6 +53,9 @@ class Nudge(Base):
     category_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False), ForeignKey("categories.id"), nullable=True
     )
+    rule_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("nudge_rules.id", ondelete="SET NULL"), nullable=True
+    )
     is_opened: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_dismissed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     delivered_at: Mapped[datetime | None] = mapped_column(
@@ -65,3 +69,4 @@ class Nudge(Base):
 
     # relationships
     user: Mapped[User] = relationship(back_populates="nudges")
+    rule: Mapped[NudgeRule | None] = relationship()

@@ -430,6 +430,12 @@ def filter_rules_by_gid_rate_limit(
             skip_gids,
             fatigue_limit,
         )
+        # Track suppressed rule hits for daily rollup metrics.
+        _record_suppressed_hits(
+            [r["id"] for r in rules if r["gid"] in skip_gids and "id" in r],
+            today,
+            user_id=user_id,
+        )
 
     return [r for r in rules if r["gid"] not in skip_gids]
 
@@ -453,6 +459,112 @@ def set_gid_rate_limit(user_id: str, gid: str) -> None:
     r = get_redis()
     r.incr(key)
     r.expire(key, ttl_seconds)
+
+
+_METRICS_HIT_PREFIX = "nudge:hits:"
+_METRICS_SUPPRESSED_PREFIX = "nudge:suppressed:"
+_METRICS_USER_HIT_PREFIX = "nudge:uhits:"
+_METRICS_USER_SUPPRESSED_PREFIX = "nudge:usup:"
+_METRICS_TTL = 48 * 3600  # 48 hours — survives a missed rollup cycle
+
+
+def record_rule_hit(rule_id: str, user_id: str | None = None, today: str | None = None) -> None:
+    """Increment the delivered-hit counter for a rule on the current WAT day.
+
+    When *user_id* is provided, also increments a per-user counter used for
+    user-facing insights.
+    """
+    from app.core.redis_client import get_redis
+
+    today = today or _today_wat_str()
+    r = get_redis()
+    pipe = r.pipeline(transaction=False)
+
+    key = f"{_METRICS_HIT_PREFIX}{rule_id}:{today}"
+    pipe.incr(key)
+    pipe.expire(key, _METRICS_TTL)
+
+    if user_id:
+        ukey = f"{_METRICS_USER_HIT_PREFIX}{user_id}:{rule_id}:{today}"
+        pipe.incr(ukey)
+        pipe.expire(ukey, _METRICS_TTL)
+
+    pipe.execute()
+
+
+def _record_suppressed_hits(
+    rule_ids: list[str], today: str | None = None, user_id: str | None = None
+) -> None:
+    """Increment suppressed counters for rules blocked by GID rate limit.
+
+    Tracks both global (for admin rollup) and per-user (for user insights)
+    counters when *user_id* is provided.
+    """
+    if not rule_ids:
+        return
+    from app.core.redis_client import get_redis
+
+    today = today or _today_wat_str()
+    r = get_redis()
+    pipe = r.pipeline(transaction=False)
+    for rid in rule_ids:
+        key = f"{_METRICS_SUPPRESSED_PREFIX}{rid}:{today}"
+        pipe.incr(key)
+        pipe.expire(key, _METRICS_TTL)
+        if user_id:
+            ukey = f"{_METRICS_USER_SUPPRESSED_PREFIX}{user_id}:{rid}:{today}"
+            pipe.incr(ukey)
+            pipe.expire(ukey, _METRICS_TTL)
+    pipe.execute()
+
+
+def get_rule_metrics_from_redis(rule_ids: list[str], date_str: str) -> dict[str, dict[str, int]]:
+    """Read hit + suppressed counters for a list of rule IDs on a given date.
+
+    Returns ``{rule_id: {"hits": N, "suppressed": M}}``.
+    """
+    if not rule_ids:
+        return {}
+    from app.core.redis_client import get_redis
+
+    r = get_redis()
+    hit_keys = [f"{_METRICS_HIT_PREFIX}{rid}:{date_str}" for rid in rule_ids]
+    sup_keys = [f"{_METRICS_SUPPRESSED_PREFIX}{rid}:{date_str}" for rid in rule_ids]
+    values: list[str | None] = r.mget(hit_keys + sup_keys)  # type: ignore[assignment]
+
+    result: dict[str, dict[str, int]] = {}
+    n = len(rule_ids)
+    for i, rid in enumerate(rule_ids):
+        hits = int(values[i] or 0)
+        suppressed = int(values[n + i] or 0)
+        result[rid] = {"hits": hits, "suppressed": suppressed}
+    return result
+
+
+def get_user_rule_metrics_from_redis(
+    user_id: str, rule_ids: list[str], date_str: str
+) -> dict[str, dict[str, int]]:
+    """Read per-user hit + suppressed counters for a list of rule IDs on a date.
+
+    Returns ``{rule_id: {"hits": N, "suppressed": M}}``.
+    """
+    if not rule_ids:
+        return {}
+    from app.core.redis_client import get_redis
+
+    r = get_redis()
+    hit_keys = [f"{_METRICS_USER_HIT_PREFIX}{user_id}:{rid}:{date_str}" for rid in rule_ids]
+    sup_keys = [f"{_METRICS_USER_SUPPRESSED_PREFIX}{user_id}:{rid}:{date_str}" for rid in rule_ids]
+    values: list[str | None] = r.mget(hit_keys + sup_keys)  # type: ignore[assignment]
+
+    result: dict[str, dict[str, int]] = {}
+    n = len(rule_ids)
+    for i, rid in enumerate(rule_ids):
+        hits = int(values[i] or 0)
+        suppressed = int(values[n + i] or 0)
+        if hits or suppressed:
+            result[rid] = {"hits": hits, "suppressed": suppressed}
+    return result
 
 
 # =====================================================================

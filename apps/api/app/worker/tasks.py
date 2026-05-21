@@ -1120,3 +1120,22 @@ def _find_manual_match(
         .all()
     )
     return candidates[0] if len(candidates) == 1 else None
+
+
+# ── roll_up_nudge_stats ──────────────────────────────────────────────────────
+
+
+@celery_app.task(name="app.worker.tasks.roll_up_nudge_stats")
+def roll_up_nudge_stats() -> None:
+    """Roll up previous WAT day's nudge metrics into nudge_stats."""
+    from app.services.nudge_metrics import roll_up_nudge_stats as _rollup
+
+    db = SessionLocal()
+    try:
+        _rollup(db)
+    except Exception:
+        db.rollback()
+        logger.exception("roll_up_nudge_stats failed")
+        raise
+    finally:
+        db.close()

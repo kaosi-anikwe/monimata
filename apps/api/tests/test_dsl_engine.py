@@ -784,7 +784,7 @@ class TestRunDslRules:
 
 class TestGidRateLimit:
     def _rules(self, *gids):
-        return [{"slug": f"r_{g}", "gid": g, "active": True} for g in gids]
+        return [{"slug": f"r_{g}", "gid": g, "id": f"id_{g}", "active": True} for g in gids]
 
     @patch("app.core.redis_client.get_redis")
     def test_no_rate_limited_gids(self, mock_get_redis):
