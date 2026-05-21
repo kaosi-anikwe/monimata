@@ -377,7 +377,7 @@ class TestConditionsBlock:
                             {
                                 "op": "AND",
                                 "rules": [
-                                    {"fact": "cat.spend_ratio", "op": "gte", "val": 0.8},
+                                    {"fact": "cat.spend_pct", "op": "gte", "val": 0.8},
                                     {"fact": "tx.amt", "op": "gt", "val": 0},
                                 ],
                             }
@@ -418,7 +418,7 @@ class TestActionBlock:
             {
                 "tmpls": [
                     "You spent {cat.amt} on {cat.name}.",
-                    "Your {cat.name} budget is {cat.spend_ratio_percentage} used.",
+                    "Your {cat.name} budget is {cat.spend_pct:.0%} used.",
                     "{hist.match_count} transactions at {tx.time_display}.",
                 ]
             }
@@ -460,7 +460,7 @@ class TestNudgeRuleCreateIntegration:
                     "rules": [
                         {"fact": "tx.dt", "op": "day_in", "val": ["FRI", "SAT", "SUN"]},
                         {"fact": "tx.dt", "op": "hour_range", "val": [22, 4]},
-                        {"fact": "cat.spend_ratio", "op": "gt", "val": 0.80},
+                        {"fact": "cat.spend_pct", "op": "gt", "val": 0.80},
                         {
                             "fact": "hist.txs",
                             "op": "count_where",
@@ -474,7 +474,7 @@ class TestNudgeRuleCreateIntegration:
                 "action": {
                     "tmpls": [
                         "It's {tx.time_display} on a weekend and your {cat.name} budget "
-                        "is {cat.spend_ratio_percentage} gone. "
+                        "is {cat.spend_pct:.0%} gone. "
                         "You've hit this category {hist.match_count} times.",
                     ]
                 },

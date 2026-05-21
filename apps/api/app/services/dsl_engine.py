@@ -49,6 +49,30 @@ logger = logging.getLogger(__name__)
 WAT = timezone(timedelta(hours=1))
 
 
+class NairaAmount(int):
+    """Kobo value that renders as Naira in ``str.format`` templates.
+
+    Behaves as a plain ``int`` for all arithmetic and comparison operators
+    (so DSL conditions like ``tx.amt gte 5000000`` work unchanged), but
+    ``str()`` / ``format()`` produce a human-readable Naira string::
+
+        >>> f"{NairaAmount(5_000_000)}"
+        '₦50,000.00'
+        >>> NairaAmount(-350_000)
+        -350000
+        >>> NairaAmount(-350_000) >= 0
+        False
+    """
+
+    def __format__(self, spec: str) -> str:
+        if spec:
+            return int.__format__(self, spec)
+        return f"\u20a6{abs(self) / 100:,.2f}"
+
+    def __str__(self) -> str:
+        return f"\u20a6{abs(self) / 100:,.2f}"
+
+
 # =====================================================================
 # 1. OPERATOR REGISTRY
 # =====================================================================
@@ -300,7 +324,7 @@ def hydrate_context(
 
     tx_ns = SimpleNamespace(
         id=tx.id,
-        amt=tx.amount,  # kobo; negative for debits
+        amt=NairaAmount(tx.amount),
         type=tx.type,  # "debit" | "credit"
         cid=tx.category_id,
         dt=tx.date.isoformat(),
@@ -308,27 +332,23 @@ def hydrate_context(
     )
 
     cat_type = target.frequency if target is not None else None
-    # time_ratio is frequency-scoped; computable even without an active budget month
-    time_ratio = _budget_time_ratio(bm, target) if cat is not None else None
-    time_ratio_pct = f"{int(time_ratio * 100)}%" if time_ratio is not None else None
+    # time_pct is frequency-scoped; computable even without an active budget month
+    time_pct = _budget_time_ratio(bm, target) if cat is not None else None
 
     if cat is not None and bm is not None and bm.assigned > 0:
         spent = abs(bm.activity)  # bm.activity is negative for net spending
         assigned = bm.assigned
-        spend_ratio = spent / assigned
         tx_abs = abs(tx.amount)
         cat_ns = SimpleNamespace(
             id=cat.id,
             name=cat.name,
             type=cat_type,
-            amt=assigned,
-            spent=spent,
-            rem=assigned - spent,
-            spend_ratio=spend_ratio,
-            spend_ratio_percentage=f"{int(spend_ratio * 100)}%",
-            tx_ratio=tx_abs / assigned,
-            time_ratio=time_ratio,
-            time_ratio_percentage=time_ratio_pct,
+            amt=NairaAmount(assigned),
+            spent=NairaAmount(spent),
+            rem=NairaAmount(assigned - spent),
+            spend_pct=spent / assigned,
+            tx_pct=tx_abs / assigned,
+            time_pct=time_pct,
         )
     elif cat is not None:
         cat_ns = SimpleNamespace(
@@ -338,11 +358,9 @@ def hydrate_context(
             amt=None,
             spent=None,
             rem=None,
-            spend_ratio=None,
-            spend_ratio_percentage=None,
-            tx_ratio=None,
-            time_ratio=time_ratio,
-            time_ratio_percentage=time_ratio_pct,
+            spend_pct=None,
+            tx_pct=None,
+            time_pct=time_pct,
         )
     else:
         cat_ns = SimpleNamespace(
@@ -352,11 +370,9 @@ def hydrate_context(
             amt=None,
             spent=None,
             rem=None,
-            spend_ratio=None,
-            spend_ratio_percentage=None,
-            tx_ratio=None,
-            time_ratio=None,
-            time_ratio_percentage=None,
+            spend_pct=None,
+            tx_pct=None,
+            time_pct=None,
         )
 
     hist_ns = SimpleNamespace(

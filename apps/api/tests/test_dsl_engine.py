@@ -100,7 +100,7 @@ def _minimal_context(
     tx_amt: int = -35_000_00,
     tx_type: str = "debit",
     tx_dt: str | None = None,
-    spend_ratio: float = 0.68,
+    spend_pct: float = 0.68,
     hist_txs: list | None = None,
 ) -> dict:
     """Build a minimal context dict without going through hydrate_context."""
@@ -122,11 +122,9 @@ def _minimal_context(
             amt=100_000_00,
             spent=68_000_00,
             rem=32_000_00,
-            spend_ratio=spend_ratio,
-            spend_ratio_percentage=f"{int(spend_ratio * 100)}%",
-            tx_ratio=0.35,
-            time_ratio=0.65,
-            time_ratio_percentage="65%",
+            spend_pct=spend_pct,
+            tx_pct=0.35,
+            time_pct=0.65,
         ),
         "hist": SimpleNamespace(
             txs=hist_txs or [],
@@ -307,41 +305,41 @@ class TestGetNestedValue:
 
 class TestEvaluateRule:
     def test_simple_and_passes(self):
-        ctx = _minimal_context(tx_amt=-50_000_00, spend_ratio=0.9)
+        ctx = _minimal_context(tx_amt=-50_000_00, spend_pct=0.9)
         assert evaluate_rule(
             {
                 "op": "AND",
                 "rules": [
                     {"fact": "tx.amt", "op": "lt", "val": 0},
-                    {"fact": "cat.spend_ratio", "op": "gt", "val": 0.8},
+                    {"fact": "cat.spend_pct", "op": "gt", "val": 0.8},
                 ],
             },
             ctx,
         )
 
     def test_simple_and_fails_one(self):
-        ctx = _minimal_context(spend_ratio=0.5)
+        ctx = _minimal_context(spend_pct=0.5)
         assert not evaluate_rule(
             {
                 "op": "AND",
                 "rules": [
                     {"fact": "tx.amt", "op": "lt", "val": 0},
-                    {"fact": "cat.spend_ratio", "op": "gt", "val": 0.8},
+                    {"fact": "cat.spend_pct", "op": "gt", "val": 0.8},
                 ],
             },
             ctx,
         )
 
     def test_or_passes_if_one_true(self):
-        ctx = _minimal_context(tx_dt=_wat_dt(hour=14), spend_ratio=0.9)
+        ctx = _minimal_context(tx_dt=_wat_dt(hour=14), spend_pct=0.9)
         assert evaluate_rule(
             {
                 "op": "OR",
                 "rules": [
                     # This is false — 14:00 is not in [22, 4]
                     {"fact": "tx.dt", "op": "hour_range", "val": [22, 4]},
-                    # This is true — spend_ratio 0.9 > 0.8
-                    {"fact": "cat.spend_ratio", "op": "gt", "val": 0.8},
+                    # This is true — spend_pct 0.9 > 0.8
+                    {"fact": "cat.spend_pct", "op": "gt", "val": 0.8},
                 ],
             },
             ctx,
@@ -350,14 +348,14 @@ class TestEvaluateRule:
     def test_nested_and_or(self):
         ctx = _minimal_context(
             tx_dt=_wat_dt(2026, 5, 22, 23, 0),  # Friday 23:00 WAT
-            spend_ratio=0.85,
+            spend_pct=0.85,
         )
         assert evaluate_rule(
             {
                 "op": "AND",
                 "rules": [
-                    # Outer: spend_ratio passes
-                    {"fact": "cat.spend_ratio", "op": "gte", "val": 0.8},
+                    # Outer: spend_pct passes
+                    {"fact": "cat.spend_pct", "op": "gte", "val": 0.8},
                     # Nested OR: either weekend OR late night
                     {
                         "op": "OR",
@@ -372,7 +370,7 @@ class TestEvaluateRule:
         )
 
     def test_three_level_nesting(self):
-        ctx = _minimal_context(tx_amt=-100_000, spend_ratio=0.95)
+        ctx = _minimal_context(tx_amt=-100_000, spend_pct=0.95)
         assert evaluate_rule(
             {
                 "op": "AND",
@@ -383,7 +381,7 @@ class TestEvaluateRule:
                             {
                                 "op": "AND",
                                 "rules": [
-                                    {"fact": "cat.spend_ratio", "op": "gte", "val": 0.9},
+                                    {"fact": "cat.spend_pct", "op": "gte", "val": 0.9},
                                     {"fact": "tx.amt", "op": "lt", "val": 0},
                                 ],
                             }
@@ -407,10 +405,10 @@ class TestEvaluateRule:
 
     def test_none_fact_is_false(self):
         ctx = _minimal_context()
-        # cat.spend_ratio is 0.68 but we check a None-producing path
-        ctx["cat"].spend_ratio = None
+        # cat.spend_pct is 0.68 but we check a None-producing path
+        ctx["cat"].spend_pct = None
         assert not evaluate_rule(
-            {"op": "AND", "rules": [{"fact": "cat.spend_ratio", "op": "gt", "val": 0.0}]},
+            {"op": "AND", "rules": [{"fact": "cat.spend_pct", "op": "gt", "val": 0.0}]},
             ctx,
         )
 
@@ -424,7 +422,7 @@ class TestEvaluateRule:
         ctx = _minimal_context(
             tx_cid="cat_lifestyle",
             tx_dt=_wat_dt(2026, 5, 22, 23, 45),  # Friday 23:45 WAT
-            spend_ratio=0.85,
+            spend_pct=0.85,
             hist_txs=txs,
         )
         result = evaluate_rule(
@@ -433,7 +431,7 @@ class TestEvaluateRule:
                 "rules": [
                     {"fact": "tx.dt", "op": "day_in", "val": ["FRI", "SAT", "SUN"]},
                     {"fact": "tx.dt", "op": "hour_range", "val": [22, 4]},
-                    {"fact": "cat.spend_ratio", "op": "gt", "val": 0.80},
+                    {"fact": "cat.spend_pct", "op": "gt", "val": 0.80},
                     {
                         "fact": "hist.txs",
                         "op": "count_where",
@@ -467,9 +465,8 @@ class TestHydrateContext:
         assert ctx["cat"].amt == 100_000_00
         assert ctx["cat"].spent == 68_000_00
         assert ctx["cat"].rem == 32_000_00
-        assert abs(ctx["cat"].spend_ratio - 0.68) < 1e-9
-        assert ctx["cat"].spend_ratio_percentage == "68%"
-        assert abs(ctx["cat"].tx_ratio - 0.35) < 1e-9
+        assert abs(ctx["cat"].spend_pct - 0.68) < 1e-9
+        assert abs(ctx["cat"].tx_pct - 0.35) < 1e-9
         assert ctx["hist"].match_count == 0
 
     def test_time_display_format(self):
@@ -481,8 +478,8 @@ class TestHydrateContext:
         tx = _make_tx()
         ctx = hydrate_context(tx, None, None, [])
         assert ctx["cat"].name is None
-        assert ctx["cat"].spend_ratio is None
-        assert ctx["cat"].tx_ratio is None
+        assert ctx["cat"].spend_pct is None
+        assert ctx["cat"].tx_pct is None
 
     def test_category_but_no_budget(self):
         tx = _make_tx()
@@ -523,9 +520,8 @@ class TestHydrateContext:
         bm = _make_bm(assigned=100_000_00, activity=-50_000_00, month=date(2026, 5, 1))
         target = _make_target(frequency="monthly")
         ctx = hydrate_context(tx, cat, bm, [], target=target)
-        assert ctx["cat"].time_ratio is not None
-        assert 0.0 < ctx["cat"].time_ratio <= 1.0
-        assert ctx["cat"].time_ratio_percentage.endswith("%")
+        assert ctx["cat"].time_pct is not None
+        assert 0.0 < ctx["cat"].time_pct <= 1.0
 
     def test_time_ratio_monthly_fallback_no_bm(self):
         """Without a BudgetMonth, monthly time_ratio falls back to current calendar month."""
@@ -533,8 +529,8 @@ class TestHydrateContext:
         cat = _make_cat()
         target = _make_target(frequency="monthly")
         ctx = hydrate_context(tx, cat, None, [], target=target)
-        assert ctx["cat"].time_ratio is not None
-        assert 0.0 < ctx["cat"].time_ratio <= 1.0
+        assert ctx["cat"].time_pct is not None
+        assert 0.0 < ctx["cat"].time_pct <= 1.0
 
     def test_time_ratio_weekly(self):
         """Weekly time_ratio = (weekday + 1) / 7, independent of bm."""
@@ -545,7 +541,7 @@ class TestHydrateContext:
         bm = _make_bm(month=date(2026, 5, 1))
         target = _make_target(frequency="weekly")
         ctx = hydrate_context(tx, cat, bm, [], target=target)
-        tr = ctx["cat"].time_ratio
+        tr = ctx["cat"].time_pct
         assert tr is not None
         # Must be exactly one of the 7 valid daily fractions
         valid_ratios = [d / 7 for d in range(1, 8)]
@@ -556,7 +552,7 @@ class TestHydrateContext:
         cat = _make_cat()
         target = _make_target(frequency="yearly")
         ctx = hydrate_context(tx, cat, None, [], target=target)
-        tr = ctx["cat"].time_ratio
+        tr = ctx["cat"].time_pct
         assert tr is not None
         assert 0.0 < tr <= 1.0
         # 2026 is not a leap year; May 21 = day 141 → 141/365 ≈ 0.386
@@ -575,8 +571,7 @@ class TestHydrateContext:
         ) - timedelta(days=10)
         target.target_date = today_utc + timedelta(days=10)
         ctx = hydrate_context(tx, cat, None, [], target=target)
-        assert abs(ctx["cat"].time_ratio - 0.5) < 1e-9
-        assert ctx["cat"].time_ratio_percentage == "50%"
+        assert abs(ctx["cat"].time_pct - 0.5) < 1e-9
 
     def test_time_ratio_custom_no_target_date_returns_none(self):
         tx = _make_tx()
@@ -584,8 +579,7 @@ class TestHydrateContext:
         target = _make_target(frequency="custom")
         target.target_date = None
         ctx = hydrate_context(tx, cat, None, [], target=target)
-        assert ctx["cat"].time_ratio is None
-        assert ctx["cat"].time_ratio_percentage is None
+        assert ctx["cat"].time_pct is None
 
     def test_time_ratio_custom_clamped_to_one_when_overdue(self):
         """Past-due custom goal should not exceed 1.0."""
@@ -600,7 +594,7 @@ class TestHydrateContext:
         ) - timedelta(days=30)
         target.target_date = today_utc - timedelta(days=5)  # deadline passed
         ctx = hydrate_context(tx, cat, None, [], target=target)
-        assert ctx["cat"].time_ratio == 1.0
+        assert ctx["cat"].time_pct == 1.0
 
     def test_cat_type_from_target_frequency(self):
         tx = _make_tx()
@@ -617,12 +611,11 @@ class TestHydrateContext:
         ctx = hydrate_context(tx, cat, bm, [])
         assert ctx["cat"].type is None
 
-    def test_time_ratio_none_when_no_cat(self):
-        """time_ratio is None for uncategorised transactions regardless of target."""
+    def test_time_pct_none_when_no_cat(self):
+        """time_pct is None for uncategorised transactions regardless of target."""
         tx = _make_tx()
         ctx = hydrate_context(tx, None, None, [])
-        assert ctx["cat"].time_ratio is None
-        assert ctx["cat"].time_ratio_percentage is None
+        assert ctx["cat"].time_pct is None
 
     def test_template_formatting_with_context(self):
         """Demonstrate that str.format(**context) resolves dotted attrs."""
@@ -632,9 +625,7 @@ class TestHydrateContext:
         ctx = hydrate_context(tx, cat, bm, [])
         ctx["hist"].match_count = 3
 
-        tmpl = (
-            "Your {cat.name} budget is {cat.spend_ratio_percentage} gone. Txs: {hist.match_count}."
-        )
+        tmpl = "Your {cat.name} budget is {cat.spend_pct:.0%} gone. Txs: {hist.match_count}."
         result = tmpl.format(**ctx)
         assert "Lifestyle" in result
         assert "85%" in result
@@ -654,36 +645,36 @@ class TestRunDslRules:
             "days_back": 0,
             "conds": {
                 "op": "AND",
-                "rules": [{"fact": "cat.spend_ratio", "op": "gt", "val": cond_val}],
+                "rules": [{"fact": "cat.spend_pct", "op": "gt", "val": cond_val}],
             },
-            "action": {"tmpls": ["Budget {cat.name} is {cat.spend_ratio_percentage} spent."]},
+            "action": {"tmpls": ["Budget {cat.name} is {cat.spend_pct:.0%} spent."]},
         }
 
     def test_matching_rule_returned(self):
-        ctx = _minimal_context(spend_ratio=0.9)
+        ctx = _minimal_context(spend_pct=0.9)
         results = run_dsl_rules([self._rule("r1")], ctx)
         assert len(results) == 1
         assert results[0][0]["slug"] == "r1"
 
     def test_non_matching_rule_excluded(self):
-        ctx = _minimal_context(spend_ratio=0.3)
+        ctx = _minimal_context(spend_pct=0.3)
         results = run_dsl_rules([self._rule("r1")], ctx)
         assert results == []
 
     def test_multiple_rules_both_match(self):
-        ctx = _minimal_context(spend_ratio=0.95)
+        ctx = _minimal_context(spend_pct=0.95)
         results = run_dsl_rules(
             [self._rule("r1", cond_val=0.8), self._rule("r2", cond_val=0.9)], ctx
         )
         assert len(results) == 2
 
     def test_inactive_rule_skipped(self):
-        ctx = _minimal_context(spend_ratio=0.99)
+        ctx = _minimal_context(spend_pct=0.99)
         results = run_dsl_rules([self._rule("r1", active=False)], ctx)
         assert results == []
 
     def test_broken_rule_does_not_abort_others(self):
-        ctx = _minimal_context(spend_ratio=0.95)
+        ctx = _minimal_context(spend_pct=0.95)
         broken = {
             "slug": "broken",
             "gid": "g1",
@@ -706,7 +697,7 @@ class TestRunDslRules:
             {"cid": "cat_lifestyle", "amt": -12000, "type": "debit", "dt": "2026-05-22T13:30:00Z"},
             {"cid": "cat_lifestyle", "amt": -12000, "type": "debit", "dt": "2026-05-22T11:00:00Z"},
         ]
-        ctx = _minimal_context(tx_cid="cat_lifestyle", spend_ratio=0.9, hist_txs=txs)
+        ctx = _minimal_context(tx_cid="cat_lifestyle", spend_pct=0.9, hist_txs=txs)
 
         r1 = {
             "slug": "r1",
@@ -736,8 +727,8 @@ class TestRunDslRules:
             "active": True,
             "evts": ["debit_cat"],
             "days_back": 0,
-            "conds": {"op": "AND", "rules": [{"fact": "cat.spend_ratio", "op": "gt", "val": 0.8}]},
-            "action": {"tmpls": ["ratio: {cat.spend_ratio_percentage}."]},
+            "conds": {"op": "AND", "rules": [{"fact": "cat.spend_pct", "op": "gt", "val": 0.8}]},
+            "action": {"tmpls": ["pct: {cat.spend_pct:.0%}."]},
         }
 
         results = run_dsl_rules([r1, r2], ctx)
@@ -755,7 +746,7 @@ class TestRunDslRules:
             {"cid": "cat_test", "amt": -1000, "type": "debit", "dt": "2026-05-22T10:00:00+01:00"},
             {"cid": "cat_test", "amt": -1000, "type": "debit", "dt": "2026-05-22T11:00:00+01:00"},
         ]
-        ctx = _minimal_context(spend_ratio=0.9, hist_txs=txs)
+        ctx = _minimal_context(spend_pct=0.9, hist_txs=txs)
         rule = {
             "slug": "r1",
             "gid": "g1",
