@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -114,7 +113,7 @@ class NudgeResponse(BaseModel):
     trigger_type: NudgeTriggerType
     title: str | None
     message: str
-    context: dict[str, Any] | None = None
+    context: DSLNudgeContext | OperationalNudgeContext | None = None
     category_id: str | None = None
     is_opened: bool
     is_dismissed: bool

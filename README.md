@@ -170,7 +170,7 @@ monimata/
 │   │   │   │   │   ├── registry.py     # Bank registry + iter_*_parsers helpers
 │   │   │   │   │   ├── channels/       # Per-channel dispatch (email, statement, receipt)
 │   │   │   │   │   └── banks/          # Per-bank parser implementations
-│   │   │   │   ├── categorization.py   # Rule-based + fuzzy narration categorisation
+│   │   │   │   ├── categorization/     # Tiered auto-categorisation pipeline (see docs/CATEGORISATION.md)
 │   │   │   │   ├── nudge_engine.py     # Nudge triggers, quiet hours, fatigue limits
 │   │   │   │   └── push_service.py     # Expo push notification delivery
 │   │   │   └── worker/         # Celery app, tasks, beat schedule
@@ -415,13 +415,15 @@ For building a release APK without EAS or the Play Store, see [docs/LOCAL_APK_BU
 
 ## Documentation
 
-| Document                                           | Description                                                  |
-| -------------------------------------------------- | ------------------------------------------------------------ |
-| [apps/api/README.md](apps/api/README.md)           | Backend deep-dive: ingestion, categorisation, budget engine  |
-| [apps/mobile/README.md](apps/mobile/README.md)     | Mobile app setup, architecture notes, push payload reference |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Full system architecture and all technical decisions         |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Ubuntu server setup and production deployment guide          |
-| [docs/LOCAL_APK_BUILD.md](docs/LOCAL_APK_BUILD.md) | Building and signing a local release APK                     |
+| Document                                           | Description                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------ |
+| [apps/api/README.md](apps/api/README.md)           | Backend deep-dive: ingestion, categorisation, budget engine              |
+| [apps/mobile/README.md](apps/mobile/README.md)     | Mobile app setup, architecture notes, push payload reference             |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Full system architecture and all technical decisions                     |
+| [docs/CATEGORISATION.md](docs/CATEGORISATION.md)   | Tiered auto-categorisation pipeline: narration cleaning through BYOK LLM |
+| [docs/NUDGE_DSL.md](docs/NUDGE_DSL.md)             | Nudge DSL reference: rule schema, operators, rate limiting, push data    |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Ubuntu server setup and production deployment guide                      |
+| [docs/LOCAL_APK_BUILD.md](docs/LOCAL_APK_BUILD.md) | Building and signing a local release APK                                 |
 
 ---
 
