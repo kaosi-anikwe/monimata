@@ -24,7 +24,7 @@ export interface Env {
     SENTRY_DSN: string;
 }
 
-const API_URL = 'https://test.moni-mata.ng/webhooks/bank-alerts';
+const API_URL = 'https://test.monimata.ng/webhooks/bank-alerts';
 
 function arrayBufferToBase64(buffer: string | ArrayBuffer | Uint8Array): string {
     if (typeof buffer === 'string') return btoa(buffer);

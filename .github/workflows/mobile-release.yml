@@ -131,8 +131,8 @@ jobs:
       - name: Extract changelog section
         run: |
           VERSION="${{ steps.version.outputs.semver }}"
-          # Grab lines between "## [X.Y.Z]" and the next "## [" heading.
-          awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" \
+          # Grab lines between "### [X.Y.Z]" and the next "### [" version heading.
+          awk "/^### \[${VERSION}\]/{found=1; next} found && /^### \[/{exit} found{print}" \
             CHANGELOG.md > release-notes.md
 
       # GitHub Release — always created. APK attached only when the file exists.
