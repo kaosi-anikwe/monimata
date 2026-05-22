@@ -163,4 +163,4 @@ class ReviewQueueItem(BaseModel):
 
 
 class ConfirmCategoryRequest(BaseModel):
-    category_id: UUID
+    category_id: UUID | None = None  # required for debits; optional for credits

@@ -211,6 +211,7 @@ async def logout(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> None:
     """
     Invalidate both the refresh token (Redis delete) and the current access
@@ -222,6 +223,10 @@ async def logout(
     from jose import JWTError
 
     delete_refresh_token(current_user.id)
+
+    # Clear the push token so the device stops receiving notifications.
+    current_user.expo_push_token = None
+    db.commit()
 
     # Blocklist the access token for its remaining lifetime.
     try:

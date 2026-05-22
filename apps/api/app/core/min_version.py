@@ -49,10 +49,10 @@ remove it from .env) to disable all enforcement.
 
 Exempt paths
 ~~~~~~~~~~~~
-Server-to-server and internal paths that never have an app version:
-  - /health
-  - /webhooks/*
-  - /docs, /redoc, /openapi.json  (disabled in production)
+Only application routes are checked. Anything not in the protected list passes
+through without a version header — this includes /health, /webhooks/*, /docs,
+/redoc, /openapi.json, and any future internal paths added outside the app
+route prefixes.
 """
 
 from __future__ import annotations
@@ -66,8 +66,26 @@ from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger(__name__)
 
-# Paths that must never be blocked (server-to-server or browser tooling).
-_EXEMPT_PREFIXES = ("/health", "/webhooks/", "/docs", "/redoc", "/openapi.json")
+# Only requests whose path starts with one of these prefixes are version-checked.
+# /health and /webhooks/* are intentionally absent — they are server-to-server
+# or infrastructure paths that never carry an app version header.
+_PROTECTED_PREFIXES = (
+    "/auth",
+    "/accounts",
+    "/transactions",
+    "/budget",
+    "/categories",
+    "/category-groups",
+    "/nudges",
+    "/reports",
+    "/sync",
+    "/content",
+    "/recurring-rules",
+    "/uploads",
+    "/ai",
+    "/ws",
+    "/admin",
+)
 
 
 class MinAppVersionMiddleware(BaseHTTPMiddleware):
@@ -112,10 +130,9 @@ class MinAppVersionMiddleware(BaseHTTPMiddleware):
         if self._min is None:
             return await call_next(request)
 
-        # Exempt paths — always pass through.
-        for prefix in _EXEMPT_PREFIXES:
-            if request.url.path.startswith(prefix):
-                return await call_next(request)
+        # Only enforce on protected application routes.
+        if not any(request.url.path.startswith(p) for p in _PROTECTED_PREFIXES):
+            return await call_next(request)
 
         header = request.headers.get("X-App-Version")
 

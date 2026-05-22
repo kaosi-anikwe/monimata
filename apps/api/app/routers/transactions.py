@@ -574,6 +574,17 @@ def confirm_category(
     """
     tx = _get_tx_or_404(db, str(tx_id), str(current_user.id))
 
+    # Credits can be confirmed without a category (they feed TBB).
+    if tx.type == "credit" and body.category_id is None:
+        return tx
+
+    # Debits must always have a category.
+    if body.category_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A category is required for debit transactions",
+        )
+
     cat = (
         db.query(Category)
         .filter(Category.id == str(body.category_id), Category.user_id == str(current_user.id))
@@ -766,6 +777,14 @@ def create_manual_transaction(
 
     # Amount sign convention: debit → negative, credit → positive
     signed_amount = -abs(body.amount) if body.type == "debit" else abs(body.amount)
+
+    # Debits must always have a category; credits are allowed to be uncategorised
+    # (credits feed TBB and are not categorised).
+    if body.type == "debit" and not body.category_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A category is required for debit transactions",
+        )
 
     from app.services.categorization import clean_narration
 

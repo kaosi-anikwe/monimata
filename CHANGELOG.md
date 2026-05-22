@@ -128,8 +128,7 @@ the time of writing; future entries will document incremental changes only.
 - `MinAppVersionMiddleware` — every API request must carry an `X-App-Version` header.
   Requests without the header, or with a version below `MIN_APP_VERSION`, receive
   `HTTP 426 Upgrade Required` with `min_version` and (when configured) `update_url` in
-  the response body. Enforcement is off when `MIN_APP_VERSION` is empty or `"0.0.0"`.
-  Exempt paths: `/health`, `/webhooks/*`, `/docs`, `/redoc`, `/openapi.json`.
+  the response body.
 - `X-App-Platform` header support — clients send `android` or `ios`; the 426 response
   returns the matching store deep-link (`APP_UPDATE_URL_ANDROID` / `APP_UPDATE_URL_IOS`),
   falling back to whichever URL is configured when the platform is unknown.
