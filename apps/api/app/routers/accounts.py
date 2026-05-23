@@ -40,11 +40,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import CurrentUser, get_current_user
 from app.core.security import encrypt_pii
 from app.models.bank_account import BankAccount
 from app.models.transaction import Transaction, TransactionSource
-from app.models.user import User
 from app.schemas.accounts import (
     AddManualAccountRequest,
     BankAccountResponse,
@@ -87,7 +86,7 @@ def supported_banks() -> list[SupportedBankResponse]:
 @router.post("/manual", response_model=BankAccountResponse, status_code=status.HTTP_201_CREATED)
 async def add_manual_account(
     payload: AddManualAccountRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BankAccount:
     """Create a manual bank account.
@@ -179,7 +178,7 @@ async def add_manual_account(
 
 @router.get("", response_model=list[BankAccountResponse])
 def list_accounts(
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[BankAccountResponse]:
     accounts = (
@@ -216,7 +215,7 @@ def list_accounts(
 def update_alias(
     account_id: str,
     payload: UpdateAliasRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BankAccount:
     """Update the display alias for any account (manual or linked)."""
@@ -234,7 +233,7 @@ def update_alias(
 def update_manual_balance(
     account_id: str,
     payload: UpdateManualBalanceRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BankAccount:
     """Update the balance of a manual account via an adjustment transaction.
@@ -295,7 +294,7 @@ def update_manual_balance(
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(
     account_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
     """Soft-delete an account. Transaction history is preserved."""
@@ -311,7 +310,7 @@ def delete_account(
 def reconcile_account(
     account_id: str,
     payload: ReconcileRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ReconcileResponse:
     """Anchor the tracked balance to a verified real-world balance (spec §8.3).

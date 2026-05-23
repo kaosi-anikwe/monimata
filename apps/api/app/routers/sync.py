@@ -51,7 +51,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, sta
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import CurrentUser, get_current_user
 from app.core.limiter import limiter
 from app.models.bank_account import BankAccount
 from app.models.budget import BudgetMonth
@@ -59,7 +59,6 @@ from app.models.category import Category, CategoryGroup
 from app.models.recurring_rule import RecurringRule
 from app.models.target import CategoryTarget
 from app.models.transaction import Transaction, TransactionSource
-from app.models.user import User
 from app.schemas.transactions import TransactionResponse
 from app.services.budget_logic import get_or_create_budget_month, str_to_month_date
 from app.ws_manager import notify_user
@@ -258,7 +257,7 @@ def pull(
     last_pulled_at: int = Query(
         0, description="Unix millisecond timestamp of last successful pull"
     ),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """
@@ -470,7 +469,7 @@ def push(
         0, description="Unix millisecond timestamp of last successful pull"
     ),
     body: dict[str, Any] = Body(...),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """

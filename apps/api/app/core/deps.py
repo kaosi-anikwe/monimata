@@ -15,7 +15,13 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-FastAPI dependency: extract and validate the current user from the Authorization header.
+FastAPI dependency: extract the current user identity from the Authorization header.
+
+The public engine verifies JWT tokens using the PUBLIC key only.
+It cannot mint tokens — that responsibility belongs to console.monimata.ng.
+
+Returns a lightweight stateless CurrentUser extracted from the signed token
+claims.
 """
 
 from __future__ import annotations
@@ -24,42 +30,33 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from jose.exceptions import JWKError
-from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
-from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.models.user import User, UserRole
 
 bearer_scheme = HTTPBearer()
 
 
+class CurrentUser(BaseModel):
+    """Stateless identity extracted from the RS256 JWT claims."""
+
+    id: str
+    username: str | None = None
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-) -> User:
+) -> CurrentUser:
     token = credentials.credentials
     try:
         payload = decode_access_token(token)
-        user_id: str = payload["sub"]
+        return CurrentUser(
+            id=payload["sub"],
+            username=payload.get("usr"),
+        )
     except (JWTError, JWKError, KeyError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    user = db.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-
-    return user
-
-
-def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Dependency that requires the authenticated user to have the admin role."""
-    if current_user.role != UserRole.admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
-    return current_user

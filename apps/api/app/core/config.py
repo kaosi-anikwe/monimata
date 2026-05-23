@@ -31,16 +31,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8081"]
 
     # ── JWT ───────────────────────────────────────────────────────────────────
-    # RS256 keys stored as base64-encoded PEM.
-    # Generate with the snippet in docs/DEPLOYMENT.md §4.3.
-    # Leave both empty to fall back to HS256 (development only).
-    JWT_PRIVATE_KEY: str = ""  # base64-encoded PKCS8 private key
+    # The public engine only needs the PUBLIC KEY to verify tokens.
+    # The private key lives exclusively on console.monimata.ng.
     JWT_PUBLIC_KEY: str = ""  # base64-encoded public key
     JWT_ALGORITHM: str = "RS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Fallback HS256 secret for development (used only when RS256 keys are absent)
+    # HS256 fallback for development (used only when RS256 public key is absent)
     SECRET_KEY: str = "change-me-in-production"
 
     # ── AI / LLM ──────────────────────────────────────────────────────────────

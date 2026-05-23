@@ -38,10 +38,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import CurrentUser, get_current_user
 from app.core.limiter import limiter
 from app.models.bank_account import BankAccount
-from app.models.user import User
 from app.services.ingestion import identify_statement
 
 logger = logging.getLogger(__name__)
@@ -81,7 +80,7 @@ def _detect_mime(content: bytes) -> str | None:
 async def upload_receipt(
     request: Request,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> dict:
     """Upload a transaction receipt image or PDF for background import.
 
@@ -146,7 +145,7 @@ async def upload_receipt(
 async def upload_statement(
     request: Request,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Upload a bank statement PDF for background import.

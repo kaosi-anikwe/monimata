@@ -29,11 +29,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import CurrentUser, get_current_user
 from app.models.budget import BudgetMonth
 from app.models.category import Category, CategoryGroup
 from app.models.target import CategoryTarget
-from app.models.user import User
 from app.schemas.budget import (
     AssignRequest,
     AutoAssignResponse,
@@ -75,7 +74,7 @@ def _month_param(month: str | None = Query(None, description="YYYY-MM")) -> str:
 @router.get("", response_model=BudgetResponse)
 def get_budget(
     month: str = Depends(_month_param),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BudgetResponse:
     """
@@ -162,7 +161,7 @@ def set_assignment(
     category_id: uuid.UUID,
     body: AssignRequest,
     month: str = Depends(_month_param),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BudgetCategoryResponse:
     """Set (replace) the assigned amount for a category in a month."""
@@ -226,7 +225,7 @@ def set_assignment(
 @router.post("/move", response_model=dict)
 def move_money(
     body: MoveMoneyRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """
@@ -285,7 +284,7 @@ def move_money(
 @router.get("/tbb", response_model=TBBResponse)
 def get_tbb(
     month: str = Depends(_month_param),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> TBBResponse:
     tbb = compute_tbb(db, str(current_user.id), month)
@@ -298,7 +297,7 @@ def get_tbb(
 @router.get("/underfunded", response_model=list[UnderfundedCategoryResponse])
 def list_underfunded(
     month: str = Depends(_month_param),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[UnderfundedCategoryResponse]:
     """Return categories where available < required_this_month."""
@@ -354,7 +353,7 @@ def auto_assign(
         description="Assignment strategy to apply",
     ),
     month: str = Depends(_month_param),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AutoAssignResponse:
     """

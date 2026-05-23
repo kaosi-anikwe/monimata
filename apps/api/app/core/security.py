@@ -15,45 +15,26 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Security utilities:
-  - Password hashing (bcrypt, cost 12)
-  - JWT creation / verification (RS256 preferred; HS256 fallback for dev)
+Security utilities for the public calculation engine.
+
+This module contains ONLY:
+  - JWT verification using the PUBLIC KEY
   - AES-256-GCM encryption for PII columns (account numbers)
-  - Refresh token generation
+  - Fernet BYOK key encryption
 """
 
 from __future__ import annotations
 
 import base64
 import os
-import secrets
-import uuid
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import bcrypt
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from jose import JWTError, jwt
 
 from app.core.config import settings
 
-_BCRYPT_ROUNDS = 12
-
-# ── Password ──────────────────────────────────────────────────────────────────
-
-
-def hash_password(plain: str) -> str:
-    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)).decode()
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    try:
-        return bcrypt.checkpw(plain.encode(), hashed.encode())
-    except ValueError:
-        return False
-
-
-# ── JWT ───────────────────────────────────────────────────────────────────────
+# ── JWT (decode only — no private key) ────────────────────────────────────────
 
 
 def _decode_pem(b64_value: str) -> str:
@@ -61,50 +42,21 @@ def _decode_pem(b64_value: str) -> str:
     return base64.b64decode(b64_value).decode()
 
 
-def _jwt_encode_key() -> str:
-    if settings.JWT_PRIVATE_KEY:
-        return _decode_pem(settings.JWT_PRIVATE_KEY)
-    return settings.SECRET_KEY
-
-
 def _jwt_decode_key() -> str:
-    if settings.JWT_PRIVATE_KEY:
+    if settings.JWT_PUBLIC_KEY:
         return _decode_pem(settings.JWT_PUBLIC_KEY)
     return settings.SECRET_KEY
 
 
 def _jwt_algorithm() -> str:
-    return "RS256" if settings.JWT_PRIVATE_KEY else "HS256"
-
-
-def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None) -> str:
-    now = datetime.now(UTC)
-    expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload: dict[str, Any] = {
-        "sub": subject,
-        "iat": now,
-        "exp": expire,
-        "type": "access",
-        "jti": uuid.uuid4().hex,  # unique token ID — used for the blocklist
-    }
-    if extra_claims:
-        payload.update(extra_claims)
-    return jwt.encode(payload, _jwt_encode_key(), algorithm=_jwt_algorithm())
-
-
-def create_refresh_token() -> str:
-    """Return a cryptographically random opaque refresh token (64 bytes → 128 hex chars)."""
-    return secrets.token_hex(64)
-
-
-def generate_otp(length: int = 6) -> str:
-    """Return a cryptographically random numeric OTP of the given length."""
-    return "".join(str(secrets.randbelow(10)) for _ in range(length))
+    return "RS256" if settings.JWT_PUBLIC_KEY else "HS256"
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
     """
-    Decode and verify an access token.
+    Decode and verify an access token using the PUBLIC key.
+
+    The public engine cannot mint tokens — it can only verify them.
     Raises jose.JWTError on any failure (expired, invalid signature, blocklisted).
     """
     payload = jwt.decode(

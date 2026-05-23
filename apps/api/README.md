@@ -53,7 +53,7 @@ apps/api/
 │   │   ├── deps.py         # FastAPI dependency injectors (get_db, get_current_user)
 │   │   ├── limiter.py      # SlowAPI rate-limit instance
 │   │   ├── redis_client.py # Shared Redis connection helper
-│   │   └── security.py     # bcrypt, RS256 JWT, AES-256-GCM PII encryption
+│   │   └── security.py     # RS256 JWT verification, AES-256-GCM PII encryption
 │   ├── models/             # SQLAlchemy ORM models (one file per domain entity)
 │   ├── routers/            # FastAPI routers (one file per URL prefix)
 │   ├── schemas/            # Pydantic request/response schemas
@@ -111,12 +111,8 @@ source .venv/bin/activate
 
 # Copy and populate environment variables
 cp .env.example .env
-# Required: DATABASE_URL, REDIS_URL, JWT_PRIVATE_KEY, JWT_PUBLIC_KEY,
+# Required: DATABASE_URL, REDIS_URL, JWT_PUBLIC_KEY,
 #           AES_ENCRYPTION_KEY, BANK_ALERT_WEBHOOK_SECRET
-
-# Generate RS256 key pair
-openssl genrsa -out keys/private.pem 2048
-openssl rsa -in keys/private.pem -pubout -out keys/public.pem
 
 # Generate AES encryption key (copy into .env as AES_ENCRYPTION_KEY)
 python -c "import secrets; print(secrets.token_hex(32))"
@@ -138,8 +134,7 @@ The interactive API docs are at `http://localhost:8000/docs`.
 | --------------------------- | ------------------------------------------------------------------ |
 | `DATABASE_URL`              | `postgresql://user:pass@host/db`                                   |
 | `REDIS_URL`                 | `redis://localhost:6379/0`                                         |
-| `JWT_PRIVATE_KEY`           | RS256 private key PEM (path or inline)                             |
-| `JWT_PUBLIC_KEY`            | RS256 public key PEM                                               |
+| `JWT_PUBLIC_KEY`            | RS256 public key PEM (verifies tokens minted by admin gateway)     |
 | `AES_ENCRYPTION_KEY`        | 64-char hex string — encrypts bank account numbers at rest         |
 | `BANK_ALERT_WEBHOOK_SECRET` | Shared secret matched against `X-MoniMata-Secret` on every webhook |
 | `OPENAI_API_KEY`            | Optional — powers nudge copy generation when no BYOK key is set    |
@@ -151,12 +146,11 @@ The interactive API docs are at `http://localhost:8000/docs`.
 
 ### Token flow
 
-Access tokens are **RS256 JWTs** with a 15-minute lifetime. Clients send them in the `Authorization: Bearer <token>` header. On expiry the client exchanges a 7-day **rotating refresh token** (opaque, stored in Redis) for a new pair.
+Access tokens are **RS256 JWTs** with a 15-minute lifetime minted by the admin gateway. This API verifies them using the corresponding **public key only**. Clients send tokens in the `Authorization: Bearer <token>` header. On expiry the client exchanges a 7-day **rotating refresh token** directly with the admin gateway for a new pair.
 
-`app/core/security.py` owns all cryptographic primitives:
+`app/core/security.py` owns the verification primitives:
 
-- **Password hashing** — bcrypt with cost 12. Raw passwords are never stored or logged.
-- **JWT signing / verification** — `python-jose`, RS256 in production. An HS256 secret falls back for local dev when no PEM keys are configured.
+- **JWT verification** — `python-jose`, RS256 public key only. An HS256 secret falls back for local dev when no PEM key is configured.
 - **PII encryption** — AES-256-GCM via `cryptography`. Bank account numbers are encrypted at the service boundary before persisting and decrypted in-memory only when a parser needs to match a statement to an account. Only the last 4 digits are ever returned to the mobile client.
 
 ### Webhook authentication

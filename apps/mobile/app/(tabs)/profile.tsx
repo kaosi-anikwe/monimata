@@ -350,14 +350,14 @@ export default function ProfileScreen() {
             iconBg={colors.infoSubtle}
             leftIcon={<Ionicons name="document-text-outline" size={17} color={colors.info} />}
             title="Terms of Service"
-            onPress={() => Linking.openURL('https://moni-mata.ng/terms-of-service')}
+            onPress={() => Linking.openURL('https://monimata.ng/terms-of-service')}
             showChevron
           />
           <ListRow
             iconBg={colors.purpleSubtle}
             leftIcon={<Ionicons name="shield-checkmark-outline" size={17} color={colors.purple} />}
             title="Privacy Policy"
-            onPress={() => Linking.openURL('https://moni-mata.ng/privacy-policy')}
+            onPress={() => Linking.openURL('https://monimata.ng/privacy-policy')}
             showChevron
             separator={false}
           />

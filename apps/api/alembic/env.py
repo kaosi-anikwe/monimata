@@ -39,6 +39,17 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+_TABLES: set[str] = {t.name for t in target_metadata.tables.values()} - {"users"}
+
+
+def include_object(object, name, type_, reflected, compare_to):
+    if type_ == "table":
+        return name in _TABLES
+    if hasattr(object, "table") and object.table is not None:
+        return object.table.name in _TABLES
+    return True
+
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -47,6 +58,8 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        version_table="alembic_version",
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -63,6 +76,8 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            version_table="alembic_version",
+            include_object=include_object,
         )
         with context.begin_transaction():
             context.run_migrations()

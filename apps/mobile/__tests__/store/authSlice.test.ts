@@ -13,7 +13,7 @@
  */
 
 // Mock all native/Expo dependencies so tests run in a plain Node environment.
-import type { User } from '@monimata/shared-types';
+import type { User } from '../../types/auth';
 import authReducer, { clearAuth, clearError, markOnboarded } from '../../store/authSlice';
 
 jest.mock('expo-secure-store', () => ({
@@ -67,7 +67,6 @@ const mockUser: User = {
   first_name: 'Emeka',
   last_name: 'Okafor',
   phone: null,
-  identity_verified: false,
   onboarded: true,
   streak: 0,
   created_at: '2026-01-01T00:00:00Z',

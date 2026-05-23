@@ -37,7 +37,7 @@ import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
-import client from '@/services/api';
+import consoleClient from '@/services/consoleApi';
 import { AuthHdr, BackBtn, TrustCard, s } from './_authShared';
 
 const schema = z
@@ -81,7 +81,7 @@ export default function ResetPasswordScreen() {
     setError(null);
     setLoading(true);
     try {
-      const { error: apiError } = await client.POST('/auth/reset-password', {
+      const { error: apiError } = await consoleClient.POST('/auth/reset-password', {
         body: { reset_token, new_password: data.new_password },
       });
       if (apiError) {

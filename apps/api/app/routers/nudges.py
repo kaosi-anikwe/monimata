@@ -39,7 +39,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import CurrentUser, get_current_user
 from app.models.nudge import Nudge
 from app.models.user import User
 from app.schemas.nudge_metrics import UserNudgeInsightRule, UserNudgeInsights
@@ -49,7 +49,6 @@ from app.schemas.nudges import (
     NudgeSettingsResponse,
     NudgeSettingsUpdate,
     RegisterDeviceRequest,
-    TestTriggerRequest,
 )
 
 router = APIRouter()
@@ -69,7 +68,7 @@ def list_nudges(
     limit: int = Query(20, ge=1, le=100),
     include_dismissed: bool = Query(True),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> NudgeListResponse:
     """
     Returns the user's nudges sorted by creation time (newest first).
@@ -123,9 +122,13 @@ def list_nudges(
     summary="Get nudge settings",
 )
 def get_settings(
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> NudgeSettingsResponse:
-    ns = current_user.nudge_settings or {}
+    user = db.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    ns = user.nudge_settings or {}
     return NudgeSettingsResponse(
         enabled=ns.get("enabled", True),
         quiet_hours_start=ns.get("quiet_hours_start", "23:00"),
@@ -143,9 +146,12 @@ def get_settings(
 def update_settings(
     body: NudgeSettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> NudgeSettingsResponse:
-    ns: dict = dict(current_user.nudge_settings or {})
+    user = db.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    ns: dict = dict(user.nudge_settings or {})
     if body.enabled is not None:
         ns["enabled"] = body.enabled
     if body.quiet_hours_start is not None:
@@ -157,8 +163,8 @@ def update_settings(
     if body.language is not None:
         ns["language"] = body.language
 
-    current_user.nudge_settings = ns
-    db.add(current_user)
+    user.nudge_settings = ns
+    db.add(user)
     db.commit()
     return NudgeSettingsResponse(
         enabled=ns.get("enabled", True),
@@ -180,7 +186,7 @@ def update_settings(
 def get_user_insights(
     days: int = Query(7, ge=1, le=30),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> UserNudgeInsights:
     """Return the user's nudge trigger summary over the last *days* days.
 
@@ -211,13 +217,13 @@ def get_user_insights(
 def get_nudge(
     nudge_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> NudgeResponse:
     nudge = _get_owned_nudge(db, nudge_id, current_user.id)
     return NudgeResponse.model_validate(nudge)
 
 
-# ── Open ─────────────────────────────────────────────────────────────────────
+# ── Open ───────────────────────────────────────────────────────────────────────
 
 
 @router.post(
@@ -228,7 +234,7 @@ def get_nudge(
 def open_nudge(
     nudge_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> NudgeResponse:
     nudge = _get_owned_nudge(db, nudge_id, current_user.id)
     nudge.is_opened = True
@@ -250,7 +256,7 @@ def open_nudge(
 def dismiss_nudge(
     nudge_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> NudgeResponse:
     nudge = _get_owned_nudge(db, nudge_id, current_user.id)
     nudge.is_dismissed = True
@@ -273,7 +279,7 @@ def dismiss_nudge(
 def delete_nudge(
     nudge_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> None:
     nudge = _get_owned_nudge(db, nudge_id, current_user.id)
     db.delete(nudge)
@@ -290,7 +296,7 @@ def delete_nudge(
 )
 def mark_all_read(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> None:
     now = datetime.now(UTC)
     db.query(Nudge).filter(
@@ -314,7 +320,7 @@ def mark_all_read(
 def register_device(
     body: RegisterDeviceRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> None:
     """
     Store the device's push token so the backend can deliver push notifications.
@@ -324,114 +330,17 @@ def register_device(
 
     Idempotent — re-registering the same token is safe.
     """
-    current_user.expo_push_token = body.token
-    db.add(current_user)
+    user = db.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.expo_push_token = body.token
+    db.add(user)
     db.commit()
     logger.info(
         "Device registered for user=%s token_prefix=%s",
         current_user.id,
         body.token[:30],
     )
-
-
-# ── Test trigger (QA / dev) ──────────────────────────────────────────────────
-
-
-@router.post(
-    "/test-trigger",
-    response_model=NudgeResponse,
-    summary="Create a synthetic nudge for testing",
-    description=(
-        "Creates a realistic synthetic nudge for the given trigger_type. "
-        "Bypasses fatigue and dedup checks. Safe in all environments."
-    ),
-)
-def test_trigger(
-    body: TestTriggerRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> NudgeResponse:
-    """
-    Inject a test nudge directly.  Supported trigger_types:
-      threshold_80, threshold_100, large_single_tx, pay_received, bill_payment
-    """
-    import random
-
-    from app.services.nudge_engine import MESSAGES, TITLES, create_nudge
-
-    SAMPLE_CONTEXTS: dict = {
-        "threshold_80": {
-            "category_name": "Food & Drinks",
-            "month": datetime.now(UTC).strftime("%Y-%m"),
-            "spent_kobo": 1_600_000,
-            "assigned_kobo": 2_000_000,
-            "remaining_kobo": 400_000,
-            "remaining_naira": "4k",
-            "assigned_naira": "20k",
-            "percentage": 80,
-        },
-        "threshold_100": {
-            "category_name": "Transport",
-            "month": datetime.now(UTC).strftime("%Y-%m"),
-            "spent_kobo": 2_500_000,
-            "assigned_kobo": 2_000_000,
-            "overage_kobo": 500_000,
-            "overage_naira": "5k",
-            "percentage": 125,
-        },
-        "large_single_tx": {
-            "category_name": "Entertainment",
-            "tx_amount_kobo": -1_200_000,
-            "amount_naira": "12k",
-            "narration": "NETFLIX SUBSCRIPTION",
-            "assigned_kobo": 3_000_000,
-            "percentage": 40,
-            "tx_id": "00000000-0000-0000-0000-000000000001",
-        },
-        "pay_received": {
-            "amount_kobo": 50_000_000,
-            "amount_naira": "500k",
-            "narration": "SALARY PAYMENT",
-            "account_id": "00000000-0000-0000-0000-000000000002",
-        },
-        "bill_payment": {
-            "biller_name": "DSTV",
-            "amount_kobo": -2_600_000,
-            "amount_naira": "26k",
-            "reference": "TEST-REF-001",
-        },
-    }
-
-    ttype = body.trigger_type
-    if ttype not in TITLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown trigger_type '{ttype}'. Valid: {list(TITLES.keys())}",
-        )
-
-    ctx = SAMPLE_CONTEXTS.get(ttype, {})
-    category_name = ctx.get("category_name", "Bills")
-    biller_name = ctx.get("biller_name", "Biller")
-
-    title = TITLES[ttype].format(category_name=category_name, biller_name=biller_name)
-    try:
-        message = random.choice(MESSAGES[ttype]).format(**ctx)
-    except KeyError:
-        message = random.choice(MESSAGES[ttype])
-
-    nudge = create_nudge(
-        db,
-        current_user,
-        ttype,
-        title,
-        message,
-        context={**ctx, "_synthetic": True},
-        category_id=body.category_id,
-        send_push=True,
-    )
-    db.commit()
-    db.refresh(nudge)
-    return NudgeResponse.model_validate(nudge)
 
 
 # ── Internal helper ──────────────────────────────────────────────────────────

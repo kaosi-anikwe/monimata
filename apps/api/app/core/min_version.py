@@ -70,7 +70,6 @@ logger = logging.getLogger(__name__)
 # /health and /webhooks/* are intentionally absent — they are server-to-server
 # or infrastructure paths that never carry an app version header.
 _PROTECTED_PREFIXES = (
-    "/auth",
     "/accounts",
     "/transactions",
     "/budget",
@@ -84,7 +83,6 @@ _PROTECTED_PREFIXES = (
     "/uploads",
     "/ai",
     "/ws",
-    "/admin",
 )
 
 

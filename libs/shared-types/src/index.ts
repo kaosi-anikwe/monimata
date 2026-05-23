@@ -29,15 +29,6 @@ export type { components, operations, paths } from './api';
 
 import type { components } from './api';
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-export type User = components['schemas']['UserResponse'];
-export type RegisterPayload = components['schemas']['RegisterRequest'];
-export type LoginPayload = components['schemas']['LoginRequest'];
-export type UpdateProfilePayload = components['schemas']['UpdateProfileRequest'];
-export type TokenResponse = components['schemas']['TokenResponse'];
-export type AccessTokenResponse = components['schemas']['AccessTokenResponse'];
-export type RefreshPayload = components['schemas']['RefreshRequest'];
-
 // ── Accounts ─────────────────────────────────────────────────────────────────
 export type BankAccount = components['schemas']['BankAccountResponse'];
 export type SupportedBank = components['schemas']['SupportedBankResponse'];
@@ -87,7 +78,6 @@ export type NudgeScreen = components['schemas']['NudgeScreen'];
 export type DSLNudgeContext = components['schemas']['DSLNudgeContext'];
 export type OperationalNudgeContext = components['schemas']['OperationalNudgeContext'];
 export type RegisterDevicePayload = components['schemas']['RegisterDeviceRequest'];
-export type TestTriggerPayload = components['schemas']['TestTriggerRequest'];
 
 // ── Recurring rules ───────────────────────────────────────────────────────────
 export type RecurringRule = components['schemas']['RecurringRuleResponse'];

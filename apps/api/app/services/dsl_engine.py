@@ -497,8 +497,7 @@ def _record_suppressed_hits(
 ) -> None:
     """Increment suppressed counters for rules blocked by GID rate limit.
 
-    Tracks both global (for admin rollup) and per-user (for user insights)
-    counters when *user_id* is provided.
+    Tracks counters when *user_id* is provided.
     """
     if not rule_ids:
         return

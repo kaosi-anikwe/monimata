@@ -14,49 +14,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Pydantic schemas for nudge rule metrics endpoints."""
+"""Pydantic schemas for per-user nudge insight endpoints."""
 
 from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, Field
-
-
-class RuleDailyStat(BaseModel):
-    rule_id: str
-    slug: str
-    date_wat: date
-    hits: int
-    delivered: int
-    suppressed: int
-    unique_users: int
-    opened: int
-    dismissed: int
-
-
-class RuleDailyStatList(BaseModel):
-    stats: list[RuleDailyStat]
-    period_days: int
-
-
-class RuleSummary(BaseModel):
-    rule_id: str
-    slug: str
-    total_hits: int
-    total_delivered: int
-    total_suppressed: int
-    total_unique_users: int
-    total_opened: int
-    total_dismissed: int
-    engagement_rate: float = Field(
-        description="Fraction of delivered nudges that were opened (0.0–1.0)"
-    )
-
-
-class RuleSummaryList(BaseModel):
-    rules: list[RuleSummary]
-    period_days: int
+from pydantic import BaseModel
 
 
 class UserNudgeInsightRule(BaseModel):

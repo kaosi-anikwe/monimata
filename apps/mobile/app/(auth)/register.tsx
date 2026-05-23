@@ -41,7 +41,7 @@ import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import client from '@/services/api';
+import consoleClient from '@/services/consoleApi';
 import { AuthHdr, BackBtn, s } from './_authShared';
 
 const USERNAME_RE = /^[a-z0-9_-]+$/;
@@ -89,7 +89,7 @@ export default function RegisterScreen() {
     setUsernameStatus('checking');
     debounceRef.current = setTimeout(async () => {
       try {
-        const { data } = await client.GET('/auth/check-username', {
+        const { data } = await consoleClient.GET<{ available: boolean }>('/auth/check-username', {
           params: { query: { username: value } },
         });
         setUsernameStatus(data?.['available'] ? 'available' : 'taken');
@@ -342,9 +342,9 @@ export default function RegisterScreen() {
           <View style={s.tosWrap}>
             <Text style={[s.tosText, { color: colors.textMeta }]}>
               By creating an account, you agree to our{' '}
-              <Text style={[s.tosLink, { color: colors.textSecondary }]} onPress={() => Linking.openURL('https://moni-mata.ng/terms-of-service')}>Terms of Service</Text>
+              <Text style={[s.tosLink, { color: colors.textSecondary }]} onPress={() => Linking.openURL('https://monimata.ng/terms-of-service')}>Terms of Service</Text>
               {' '}and{' '}
-              <Text style={[s.tosLink, { color: colors.textSecondary }]} onPress={() => Linking.openURL('https://moni-mata.ng/privacy-policy')}>Privacy Policy</Text>.
+              <Text style={[s.tosLink, { color: colors.textSecondary }]} onPress={() => Linking.openURL('https://monimata.ng/privacy-policy')}>Privacy Policy</Text>.
             </Text>
           </View>
 

@@ -4,3 +4,5 @@ categorisation*.md
 budget*.md
 nudge*.md
 *.pdf
+alembic/versions/*.py
+!alembic/versions/__init__.py

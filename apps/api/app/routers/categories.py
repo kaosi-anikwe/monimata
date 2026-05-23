@@ -32,11 +32,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import CurrentUser, get_current_user
 from app.models.category import Category, CategoryGroup
 from app.models.target import CategoryTarget
 from app.models.transaction import Transaction
-from app.models.user import User
 from app.schemas.categories import (
     CategoryCreate,
     CategoryGroupCreate,
@@ -75,7 +74,7 @@ def _get_group_or_404(db: Session, group_id: str, user_id: str) -> CategoryGroup
 
 @groups_router.get("", response_model=list[CategoryGroupWithCategories])
 def list_groups(
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[CategoryGroup]:
     return (
@@ -89,7 +88,7 @@ def list_groups(
 @groups_router.post("", response_model=CategoryGroupResponse, status_code=status.HTTP_201_CREATED)
 def create_group(
     body: CategoryGroupCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CategoryGroup:
     # Default sort_order: append after existing groups
@@ -116,7 +115,7 @@ def create_group(
 def update_group(
     group_id: UUID,
     body: CategoryGroupUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CategoryGroup:
     group = _get_group_or_404(db, str(group_id), str(current_user.id))
@@ -135,7 +134,7 @@ def update_group(
 @groups_router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_group(
     group_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
     """
@@ -163,7 +162,7 @@ def delete_group(
 def sort_group(
     group_id: UUID,
     sort_order: int,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CategoryGroup:
     group = _get_group_or_404(db, str(group_id), str(current_user.id))
@@ -188,7 +187,7 @@ def _get_category_or_404(db: Session, category_id: str, user_id: str) -> Categor
 
 @router.get("", response_model=list[CategoryGroupWithCategories])
 def list_categories(
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[CategoryGroup]:
     """Return all category groups with their nested categories."""
@@ -203,7 +202,7 @@ def list_categories(
 @router.post("", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 def create_category(
     body: CategoryCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Category:
     # Verify the group belongs to this user
@@ -238,7 +237,7 @@ def create_category(
 def update_category(
     category_id: UUID,
     body: CategoryUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Category:
     cat = _get_category_or_404(db, str(category_id), str(current_user.id))
@@ -260,7 +259,7 @@ def update_category(
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_category(
     category_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
     """
@@ -290,7 +289,7 @@ def delete_category(
 def sort_category(
     category_id: UUID,
     sort_order: int,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Category:
     cat = _get_category_or_404(db, str(category_id), str(current_user.id))
@@ -309,7 +308,7 @@ def sort_category(
 @router.get("/{category_id}/target", response_model=CategoryTargetResponse | None)
 def get_target(
     category_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CategoryTarget | None:
     _get_category_or_404(db, str(category_id), str(current_user.id))
@@ -320,7 +319,7 @@ def get_target(
 def upsert_target(
     category_id: UUID,
     body: CategoryTargetUpsert,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CategoryTarget:
     _get_category_or_404(db, str(category_id), str(current_user.id))
@@ -346,7 +345,7 @@ def upsert_target(
 @router.delete("/{category_id}/target", status_code=status.HTTP_204_NO_CONTENT)
 def delete_target(
     category_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
     _get_category_or_404(db, str(category_id), str(current_user.id))

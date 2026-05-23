@@ -18,11 +18,8 @@
 Push Notification Service
 
 All notifications are sent through Expo's managed push API
-(https://exp.host/--/api/v2/push/send).  Expo handles the last-mile delivery
-to FCM (Android) and APNs (iOS) using credentials you register once via
-`eas credentials`.  This works identically in Expo Go, local builds
-(`npx expo run:android`), and EAS-built standalone apps — no Firebase Admin
-SDK or google-services.json required on the backend.
+(https://exp.host/--/api/v2/push/send).
+
 """
 
 from __future__ import annotations

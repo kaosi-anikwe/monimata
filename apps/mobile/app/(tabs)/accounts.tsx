@@ -206,7 +206,7 @@ const bps = StyleSheet.create({
 // ── Tour definition ─────────────────────────────────────────────────────
 
 /** Knowledge Hub article that walks users through email-forwarding setup. */
-const HUB_EMAIL_SETUP_URL = 'https://moni-mata.ng/hub/email-setup';
+const HUB_EMAIL_SETUP_URL = 'https://monimata.ng/guides/email-setup';
 
 const ACCOUNTS_TOUR: TourStep[] = [
   {

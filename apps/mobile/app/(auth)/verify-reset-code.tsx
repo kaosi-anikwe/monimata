@@ -39,7 +39,8 @@ import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
-import client from '@/services/api';
+import consoleClient from '@/services/consoleApi';
+import type { ResetTokenResponse } from '@/types/auth';
 import { AuthHdr, BackBtn, s } from './_authShared';
 
 const schema = z.object({
@@ -73,7 +74,7 @@ export default function VerifyResetCodeScreen() {
     setError(null);
     setLoading(true);
     try {
-      const { data: res, error: apiError } = await client.POST('/auth/verify-reset-code', {
+      const { data: res, error: apiError } = await consoleClient.POST<ResetTokenResponse>('/auth/verify-reset-code', {
         body: { email: email ?? '', code: data.code },
       });
       if (apiError || !res?.reset_token) {
@@ -97,7 +98,7 @@ export default function VerifyResetCodeScreen() {
     setResendSent(false);
     setError(null);
     try {
-      await client.POST('/auth/forgot-password', { body: { email } });
+      await consoleClient.POST('/auth/forgot-password', { body: { email } });
       setResendSent(true);
     } catch {
       setError('Could not resend code. Please try again.');

@@ -36,7 +36,7 @@ import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { ff } from '@/lib/typography';
-import client from '@/services/api';
+import consoleClient from '@/services/consoleApi';
 import { AuthHdr, BackBtn, TrustCard, s } from './_authShared';
 
 const schema = z.object({
@@ -63,7 +63,7 @@ export default function ForgotPasswordScreen() {
     setError(null);
     setLoading(true);
     try {
-      const { error: apiError } = await client.POST('/auth/forgot-password', {
+      const { error: apiError } = await consoleClient.POST('/auth/forgot-password', {
         body: { email: data.email },
       });
       if (apiError) {

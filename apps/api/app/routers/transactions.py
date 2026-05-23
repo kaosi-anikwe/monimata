@@ -28,11 +28,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import CurrentUser, get_current_user
 from app.models.bank_account import BankAccount
 from app.models.category import Category
 from app.models.transaction import Transaction, TransactionSource, TransactionSplit
-from app.models.user import User
 from app.schemas.transactions import (
     ClusterCategorizeRequest,
     ClusterCategorizeResponse,
@@ -148,7 +147,7 @@ def list_transactions(
     start_date: str | None = Query(None, description="YYYY-MM-DD"),
     end_date: str | None = Query(None, description="YYYY-MM-DD"),
     uncategorized: bool | None = Query(None),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> TransactionListResponse:
     q = (
@@ -196,7 +195,7 @@ def list_transactions(
 
 @router.get("/clusters", response_model=ClustersResponse)
 def list_clusters(
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClustersResponse:
     """Return Levenshtein-clustered merchant groups for all uncategorised transactions.
@@ -268,7 +267,7 @@ def list_clusters(
 @router.post("/clusters/categorize", response_model=ClusterCategorizeResponse)
 def categorize_cluster(
     body: ClusterCategorizeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClusterCategorizeResponse:
     """Batch-assign a category to every uncategorised transaction in a cluster.
@@ -345,7 +344,7 @@ def categorize_cluster(
 
 @router.get("/review-queue", response_model=ReviewQueueItem | None)
 def get_review_queue(
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ReviewQueueItem | None:
     """Return the next uncategorised transaction with top-3 category suggestions.
@@ -402,7 +401,7 @@ def get_review_queue(
 @router.get("/{tx_id}", response_model=TransactionResponse)
 def get_transaction(
     tx_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Transaction:
     return _get_tx_or_404(db, str(tx_id), str(current_user.id))
@@ -415,7 +414,7 @@ def get_transaction(
 def patch_transaction(
     tx_id: UUID,
     body: TransactionPatchRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Transaction:
     """
@@ -564,7 +563,7 @@ def patch_transaction(
 def confirm_category(
     tx_id: UUID,
     body: ConfirmCategoryRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Transaction:
     """Confirm or override a category suggestion for a transaction.
@@ -624,7 +623,7 @@ def confirm_category(
 def split_transaction(
     tx_id: UUID,
     body: TransactionSplitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Transaction:
     """
@@ -706,7 +705,7 @@ def split_transaction(
 @router.delete("/{tx_id}/split", response_model=TransactionResponse)
 def remove_split(
     tx_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Transaction:
     """Remove all splits, reverting the transaction to uncategorized."""
@@ -742,7 +741,7 @@ def remove_split(
 @router.post("/manual", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 def create_manual_transaction(
     body: ManualTransactionRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Transaction:
     """Create a transaction entered manually by the user."""
@@ -840,7 +839,7 @@ def delete_transaction(
             "also deactivate the recurring rule so no further instances are generated."
         ),
     ),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
     """Delete a transaction. Pass cancel_rule=true to also stop the associated recurring rule."""

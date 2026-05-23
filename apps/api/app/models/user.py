@@ -16,22 +16,15 @@
 
 from __future__ import annotations
 
-import enum
 import uuid
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-
-
-class UserRole(enum.StrEnum):
-    user = "user"
-    admin = "admin"
-
 
 if TYPE_CHECKING:
     from app.models.bank_account import BankAccount
@@ -56,35 +49,19 @@ class User(Base):
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
-    # Unique handle — becomes the local part of the alert email <username>@moni-mata.ng.
-    # Lowercase letters, digits, hyphens and underscores only; 3–30 chars.
-    username: Mapped[str] = mapped_column(
-        Text, unique=True, nullable=True
-    )  # NULL until user sets it during onboarding
-    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    first_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    last_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    username: Mapped[str] = mapped_column(Text, unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),
     )
-    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     nudge_settings: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=DEFAULT_NUDGE_SETTINGS
     )
     onboarded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    identity_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    expo_push_token: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )  # Expo push token ("ExponentPushToken[...]"); NULL = notifications not granted
+    expo_push_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_streak_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="userrole"), nullable=False, default=UserRole.user
-    )
 
     # relationships
     bank_accounts: Mapped[list[BankAccount]] = relationship(

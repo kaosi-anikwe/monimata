@@ -15,10 +15,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Pydantic v2 schemas for nudge DSL rule CRUD.
+Pydantic v2 schemas for nudge DSL rule validation.
 
-Validation is enforced at the API boundary so that no structurally invalid
-rule can ever reach the database or the Redis cache.
+The condition and action schemas are used at runtime by the DSL engine
+to validate rules loaded from the Redis cache.
 
 Key design decisions
 ────────────────────
@@ -120,9 +120,6 @@ VALID_TEMPLATE_KEYS: frozenset[str] = frozenset(
 
 # Extracts {key} and {key.attr} placeholders; ignores format-spec suffixes like {val:.2f}
 _PLACEHOLDER_RE = re.compile(r"\{(\w+(?:\.\w+)*)(?:[^}]*)?\}")
-
-# Slug / gid identifier pattern: lowercase alphanumeric + underscores, 1–64 chars
-_SLUG_PATTERN = r"^[a-z0-9_]{1,64}$"
 
 
 # ── count_where sub-schemas ───────────────────────────────────────────────────
@@ -368,138 +365,6 @@ class ActionBlock(BaseModel):
                     f"Valid keys: {sorted(VALID_TEMPLATE_KEYS)}"
                 )
         return self
-
-
-# ── API schemas ───────────────────────────────────────────────────────────────
-
-
-def _check_title_placeholders(title: str) -> str:
-    """Shared validator: reject unknown {placeholders} in a title string."""
-    if not title:
-        return title
-    unknown = set(_PLACEHOLDER_RE.findall(title)) - VALID_TEMPLATE_KEYS
-    if unknown:
-        raise ValueError(
-            f"title contains unknown placeholder(s): {sorted(unknown)}. "
-            f"Valid keys: {sorted(VALID_TEMPLATE_KEYS)}"
-        )
-    return title
-
-
-class NudgeRuleCreate(BaseModel):
-    """Validated input for creating a new nudge rule."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    slug: str = Field(
-        pattern=_SLUG_PATTERN,
-        description="Unique rule identifier, e.g. 'threshold_80'",
-    )
-    title: str = Field(default="", description="Push notification title (supports {placeholders})")
-    gid: str = Field(pattern=_SLUG_PATTERN, description="Group ID for rate-limit bucketing")
-    active: bool = True
-    evts: list[str] = Field(min_length=1, description="Event types that trigger this rule")
-    days_back: int = Field(0, ge=0, le=90, description="Historical look-back window in days")
-    conds: ConditionsBlock
-    action: ActionBlock
-
-    @field_validator("title")
-    @classmethod
-    def _validate_title(cls, v: str) -> str:
-        return _check_title_placeholders(v)
-
-    @field_validator("evts")
-    @classmethod
-    def _validate_evts(cls, v: list[str]) -> list[str]:
-        invalid = set(v) - VALID_EVTS
-        if invalid:
-            raise ValueError(
-                f"Invalid event type(s): {sorted(invalid)}. Must be from: {sorted(VALID_EVTS)}"
-            )
-        # Deduplicate while preserving a canonical order
-        seen: set[str] = set()
-        return [x for x in v if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
-
-
-class NudgeRuleUpdate(BaseModel):
-    """Validated input for a full rule replacement (PUT).  All fields optional."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    slug: str | None = Field(None, pattern=_SLUG_PATTERN)
-    title: str | None = None
-    gid: str | None = Field(None, pattern=_SLUG_PATTERN)
-    active: bool | None = None
-    evts: list[str] | None = None
-    days_back: int | None = Field(None, ge=0, le=90)
-    conds: ConditionsBlock | None = None
-    action: ActionBlock | None = None
-
-    @field_validator("title")
-    @classmethod
-    def _validate_title(cls, v: str | None) -> str | None:
-        return _check_title_placeholders(v) if v is not None else v
-
-    @field_validator("evts")
-    @classmethod
-    def _validate_evts(cls, v: list[str] | None) -> list[str] | None:
-        if v is None:
-            return v
-        invalid = set(v) - VALID_EVTS
-        if invalid:
-            raise ValueError(
-                f"Invalid event type(s): {sorted(invalid)}. Must be from: {sorted(VALID_EVTS)}"
-            )
-        seen: set[str] = set()
-        return [x for x in v if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
-
-
-class NudgeRuleResponse(BaseModel):
-    """Serialised nudge rule returned from the API."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    slug: str
-    title: str
-    gid: str
-    active: bool
-    evts: list[str]
-    days_back: int
-    conds: dict[str, Any]
-    action: dict[str, Any]
-    created_at: _dt
-    updated_at: _dt
-
-
-class NudgeRuleListResponse(BaseModel):
-    """Paginated list of nudge rules."""
-
-    total: int
-    page: int
-    limit: int
-    items: list[NudgeRuleResponse]
-
-
-class NudgeRuleGroup(BaseModel):
-    """Summary of a nudge rule group (GID)."""
-
-    gid: str
-    rule_count: int
-    active_count: int
-
-
-class NudgeRuleGroupList(BaseModel):
-    """List of all nudge rule groups."""
-
-    groups: list[NudgeRuleGroup]
-
-
-class NudgeRuleGroupDetail(BaseModel):
-    """All rules belonging to a single group."""
-
-    gid: str
-    rules: list[NudgeRuleResponse]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

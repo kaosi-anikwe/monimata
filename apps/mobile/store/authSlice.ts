@@ -19,8 +19,9 @@
  * Tokens themselves live in SecureStore (never in Redux).
  */
 import { clearDatabase } from '@/database';
-import client, { clearLastUserId, clearTokens, getLastUserId, saveLastUserId, saveTokens } from '@/services/api';
-import type { User } from '@monimata/shared-types';
+import { clearLastUserId, clearTokens, getLastUserId, saveLastUserId, saveTokens } from '@/services/api';
+import consoleClient from '@/services/consoleApi';
+import type { TokenResponse, User, UserResponse } from '@/types/auth';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export type { User as AuthUser };
@@ -86,7 +87,7 @@ export const register = createAsyncThunk(
 
         try {
             const { data: regData, error: regError, response: regResponse } =
-                await client.POST('/auth/register', { body: payload });
+                await consoleClient.POST<TokenResponse>('/auth/register', { body: payload });
             if (regError) {
                 if (regResponse.status < 500) {
                     console.log('[register] 4xx error:', regResponse.status, regError);
@@ -111,7 +112,7 @@ export const register = createAsyncThunk(
         //   B) Register 2xx but tokens not included in the response body
         if (!accessToken || !refreshToken) {
             try {
-                const { data: loginData, error: loginError } = await client.POST('/auth/login', {
+                const { data: loginData, error: loginError } = await consoleClient.POST<TokenResponse>('/auth/login', {
                     body: { email: payload.email, password: payload.password },
                 });
                 if (loginError) {
@@ -137,7 +138,7 @@ export const register = createAsyncThunk(
             // refreshToken may legitimately be absent (stateless / cookie-based
             // refresh backends). saveTokens accepts null for refresh.
             await saveTokens(accessToken, refreshToken ?? '');
-            const { data: me, error: meError } = await client.GET('/auth/me', {});
+            const { data: me, error: meError } = await consoleClient.GET<UserResponse>('/auth/me', {});
             if (meError || !me) return rejectWithValue('Registration failed');
             await clearDatabase();
             await saveLastUserId(me.id);
@@ -153,11 +154,11 @@ export const login = createAsyncThunk(
     'auth/login',
     async (payload: { email: string; password: string }, { rejectWithValue }) => {
         try {
-            const { data, error } = await client.POST('/auth/login', { body: payload });
+            const { data, error } = await consoleClient.POST<TokenResponse>('/auth/login', { body: payload });
             if (error) return rejectWithValue(extractDetail(error, 'Login failed'));
             if (!data) return rejectWithValue('Login failed');
             await saveTokens(data.access_token, data.refresh_token);
-            const { data: me, error: meError } = await client.GET('/auth/me', {});
+            const { data: me, error: meError } = await consoleClient.GET<UserResponse>('/auth/me', {});
             if (meError || !me) return rejectWithValue('Login failed');
             const user = me as User;
             // Wipe local DB when a different account uses this device.
@@ -180,7 +181,7 @@ export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) =>
 
     // Fire the server-side logout without awaiting it so a slow or unreachable
     // server never blocks the user from leaving the app.
-    client.POST('/auth/logout', {}).catch(() => { });
+    consoleClient.POST('/auth/logout', {}).catch(() => { });
 
     // Wipe local data in parallel. clearDatabase() failure is non-fatal — the
     // next login will re-sync from the server anyway.
@@ -193,7 +194,7 @@ export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) =>
 
 export const restoreSession = createAsyncThunk('auth/restoreSession', async (_, { rejectWithValue }) => {
     try {
-        const { data, error } = await client.GET('/auth/me', {});
+        const { data, error } = await consoleClient.GET<UserResponse>('/auth/me', {});
         if (error || !data) return rejectWithValue('No active session');
         return data as User;
     } catch {
@@ -205,7 +206,7 @@ export const markOnboardedThunk = createAsyncThunk(
     'auth/markOnboarded',
     async (_, { rejectWithValue }) => {
         try {
-            const { data, error } = await client.PATCH('/auth/me', { body: { onboarded: true } });
+            const { data, error } = await consoleClient.PATCH<UserResponse>('/auth/me', { body: { onboarded: true } });
             if (error) return rejectWithValue(extractDetail(error, 'Failed to update onboarding status'));
             if (!data) return rejectWithValue('Failed to update onboarding status');
             return data as User;

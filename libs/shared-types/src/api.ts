@@ -5,86 +5,6 @@
 
 
 export interface paths {
-  "/auth/register": {
-    /** Register */
-    post: operations["register_auth_register_post"];
-  };
-  "/auth/login": {
-    /** Login */
-    post: operations["login_auth_login_post"];
-  };
-  "/auth/refresh": {
-    /**
-     * Refresh Token
-     * @description Exchange a valid refresh token for a new access token.
-     * The refresh token is rotated on every use.
-     */
-    post: operations["refresh_token_auth_refresh_post"];
-  };
-  "/auth/logout": {
-    /**
-     * Logout
-     * @description Invalidate both the refresh token (Redis delete) and the current access
-     * token (jti blocklist, expiring when the token would have expired naturally).
-     * After this returns, the access token is unusable even within its 15-min window.
-     */
-    post: operations["logout_auth_logout_post"];
-  };
-  "/auth/me": {
-    /** Me */
-    get: operations["me_auth_me_get"];
-    /**
-     * Update Profile
-     * @description Update mutable profile fields. Only provided (non-None) fields are changed.
-     */
-    patch: operations["update_profile_auth_me_patch"];
-  };
-  "/auth/check-username": {
-    /**
-     * Check Username
-     * @description Real-time uniqueness check for use during signup.
-     * Returns {"available": true} when the username is valid and not yet taken.
-     * No authentication required — called as the user types.
-     */
-    get: operations["check_username_auth_check_username_get"];
-  };
-  "/auth/forgot-password": {
-    /**
-     * Forgot Password
-     * @description Step 1 of the password-reset flow.
-     *
-     * Generates a 6-digit OTP, stores it in Redis for 10 minutes, and emails it
-     * to the user.  Always returns 200 regardless of whether the email is
-     * registered — this prevents user enumeration.
-     *
-     * Rate-limited to 5/hour per IP via slowapi.
-     */
-    post: operations["forgot_password_auth_forgot_password_post"];
-  };
-  "/auth/verify-reset-code": {
-    /**
-     * Verify Reset Code
-     * @description Step 2 of the password-reset flow.
-     *
-     * Verifies the OTP sent in step 1.  On success the OTP is consumed (deleted)
-     * and a single-use reset token valid for 15 minutes is returned.  The client
-     * presents this token in step 3 instead of the raw OTP.
-     *
-     * Rate-limited to 10/hour per IP via slowapi.
-     */
-    post: operations["verify_reset_code_auth_verify_reset_code_post"];
-  };
-  "/auth/reset-password": {
-    /**
-     * Reset Password
-     * @description Step 3 of the password-reset flow.
-     *
-     * Validates the reset token issued in step 2, updates the user's password,
-     * consumes the reset token (single-use), and revokes all active refresh
-     * tokens — forcing a fresh login after the reset completes.
-     */
-    post: operations["reset_password_auth_reset_password_post"];
-  };
   "/accounts/supported-banks": {
     /**
      * Supported Banks
@@ -390,13 +310,6 @@ export interface paths {
      */
     post: operations["register_device_nudges_register_device_post"];
   };
-  "/nudges/test-trigger": {
-    /**
-     * Create a synthetic nudge for testing
-     * @description Creates a realistic synthetic nudge for the given trigger_type. Bypasses fatigue and dedup checks. Safe in all environments.
-     */
-    post: operations["test_trigger_nudges_test_trigger_post"];
-  };
   "/sync/pull": {
     /**
      * Pull
@@ -525,40 +438,6 @@ export interface paths {
      */
     get: operations["get_ai_usage_ai_usage_get"];
   };
-  "/admin/nudge-rules": {
-    /** List nudge rules */
-    get: operations["list_nudge_rules_admin_nudge_rules_get"];
-    /** Create a nudge rule */
-    post: operations["create_nudge_rule_admin_nudge_rules_post"];
-  };
-  "/admin/nudge-rules/groups": {
-    /** List all rule groups (GIDs) */
-    get: operations["list_groups_admin_nudge_rules_groups_get"];
-  };
-  "/admin/nudge-rules/groups/{gid}": {
-    /** List all rules in a group */
-    get: operations["get_group_rules_admin_nudge_rules_groups__gid__get"];
-  };
-  "/admin/nudge-rules/stats/summary": {
-    /** Aggregate stats for all rules over a period */
-    get: operations["get_stats_summary_admin_nudge_rules_stats_summary_get"];
-  };
-  "/admin/nudge-rules/{rule_id}": {
-    /** Get a single nudge rule */
-    get: operations["get_nudge_rule_admin_nudge_rules__rule_id__get"];
-    /** Update a nudge rule */
-    put: operations["update_nudge_rule_admin_nudge_rules__rule_id__put"];
-    /** Delete a nudge rule */
-    delete: operations["delete_nudge_rule_admin_nudge_rules__rule_id__delete"];
-  };
-  "/admin/nudge-rules/{rule_id}/toggle": {
-    /** Toggle a nudge rule active/inactive */
-    patch: operations["toggle_nudge_rule_admin_nudge_rules__rule_id__toggle_patch"];
-  };
-  "/admin/nudge-rules/{rule_id}/stats": {
-    /** Daily stats for a single rule */
-    get: operations["get_rule_stats_endpoint_admin_nudge_rules__rule_id__stats_get"];
-  };
   "/health": {
     /** Health Check */
     get: operations["health_check_health_get"];
@@ -569,32 +448,6 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
-    /** AccessTokenResponse */
-    AccessTokenResponse: {
-      /** Access Token */
-      access_token: string;
-      /** Refresh Token */
-      refresh_token: string;
-      /**
-       * Token Type
-       * @default bearer
-       */
-      token_type?: string;
-    };
-    /**
-     * ActionBlock
-     * @description Output definition — templates + optional navigation screen.
-     */
-    ActionBlock: {
-      /** Tmpls */
-      tmpls: string[];
-      /**
-       * Screen
-       * @description Screen to navigate to on nudge press. One of: transactions, transaction, budget, target, nudges
-       * @default nudges
-       */
-      screen?: string;
-    };
     /** AddManualAccountRequest */
     AddManualAccountRequest: {
       /** Institution */
@@ -1003,26 +856,10 @@ export interface components {
       /** Total Uncategorised */
       total_uncategorised: number;
     };
-    /**
-     * ConditionsBlock
-     * @description Root or nested logical block. Supports arbitrary nesting depth.
-     */
-    ConditionsBlock: {
-      /**
-       * Op
-       * @enum {string}
-       */
-      op: "AND" | "OR";
-      /** Rules */
-      rules: (components["schemas"]["RuleCondition"] | components["schemas"]["ConditionsBlock"])[];
-    };
     /** ConfirmCategoryRequest */
     ConfirmCategoryRequest: {
-      /**
-       * Category Id
-       * Format: uuid
-       */
-      category_id: string;
+      /** Category Id */
+      category_id?: string | null;
     };
     /**
      * DSLNudgeContext
@@ -1093,14 +930,6 @@ export interface components {
        */
       budget_remaining_kobo?: number | null;
     };
-    /** ForgotPasswordRequest */
-    ForgotPasswordRequest: {
-      /**
-       * Email
-       * Format: email
-       */
-      email: string;
-    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -1110,16 +939,6 @@ export interface components {
     LlmCategorizeResponse: {
       /** Queued */
       queued: number;
-    };
-    /** LoginRequest */
-    LoginRequest: {
-      /**
-       * Email
-       * Format: email
-       */
-      email: string;
-      /** Password */
-      password: string;
     };
     /** ManualTransactionRequest */
     ManualTransactionRequest: {
@@ -1197,148 +1016,6 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
-    };
-    /**
-     * NudgeRuleCreate
-     * @description Validated input for creating a new nudge rule.
-     */
-    NudgeRuleCreate: {
-      /**
-       * Slug
-       * @description Unique rule identifier, e.g. 'threshold_80'
-       */
-      slug: string;
-      /**
-       * Title
-       * @description Push notification title (supports {placeholders})
-       * @default
-       */
-      title?: string;
-      /**
-       * Gid
-       * @description Group ID for rate-limit bucketing
-       */
-      gid: string;
-      /**
-       * Active
-       * @default true
-       */
-      active?: boolean;
-      /**
-       * Evts
-       * @description Event types that trigger this rule
-       */
-      evts: string[];
-      /**
-       * Days Back
-       * @description Historical look-back window in days
-       * @default 0
-       */
-      days_back?: number;
-      conds: components["schemas"]["ConditionsBlock"];
-      action: components["schemas"]["ActionBlock"];
-    };
-    /**
-     * NudgeRuleGroup
-     * @description Summary of a nudge rule group (GID).
-     */
-    NudgeRuleGroup: {
-      /** Gid */
-      gid: string;
-      /** Rule Count */
-      rule_count: number;
-      /** Active Count */
-      active_count: number;
-    };
-    /**
-     * NudgeRuleGroupDetail
-     * @description All rules belonging to a single group.
-     */
-    NudgeRuleGroupDetail: {
-      /** Gid */
-      gid: string;
-      /** Rules */
-      rules: components["schemas"]["NudgeRuleResponse"][];
-    };
-    /**
-     * NudgeRuleGroupList
-     * @description List of all nudge rule groups.
-     */
-    NudgeRuleGroupList: {
-      /** Groups */
-      groups: components["schemas"]["NudgeRuleGroup"][];
-    };
-    /**
-     * NudgeRuleListResponse
-     * @description Paginated list of nudge rules.
-     */
-    NudgeRuleListResponse: {
-      /** Total */
-      total: number;
-      /** Page */
-      page: number;
-      /** Limit */
-      limit: number;
-      /** Items */
-      items: components["schemas"]["NudgeRuleResponse"][];
-    };
-    /**
-     * NudgeRuleResponse
-     * @description Serialised nudge rule returned from the API.
-     */
-    NudgeRuleResponse: {
-      /** Id */
-      id: string;
-      /** Slug */
-      slug: string;
-      /** Title */
-      title: string;
-      /** Gid */
-      gid: string;
-      /** Active */
-      active: boolean;
-      /** Evts */
-      evts: string[];
-      /** Days Back */
-      days_back: number;
-      /** Conds */
-      conds: {
-        [key: string]: unknown;
-      };
-      /** Action */
-      action: {
-        [key: string]: unknown;
-      };
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-      /**
-       * Updated At
-       * Format: date-time
-       */
-      updated_at: string;
-    };
-    /**
-     * NudgeRuleUpdate
-     * @description Validated input for a full rule replacement (PUT).  All fields optional.
-     */
-    NudgeRuleUpdate: {
-      /** Slug */
-      slug?: string | null;
-      /** Title */
-      title?: string | null;
-      /** Gid */
-      gid?: string | null;
-      /** Active */
-      active?: boolean | null;
-      /** Evts */
-      evts?: string[] | null;
-      /** Days Back */
-      days_back?: number | null;
-      conds?: components["schemas"]["ConditionsBlock"] | null;
-      action?: components["schemas"]["ActionBlock"] | null;
     };
     /**
      * NudgeScreen
@@ -1554,11 +1231,6 @@ export interface components {
       /** Memo */
       memo?: string | null;
     };
-    /** RefreshRequest */
-    RefreshRequest: {
-      /** Refresh Token */
-      refresh_token: string;
-    };
     /** RegisterDeviceRequest */
     RegisterDeviceRequest: {
       /**
@@ -1567,36 +1239,6 @@ export interface components {
        */
       token: string;
     };
-    /** RegisterRequest */
-    RegisterRequest: {
-      /**
-       * Email
-       * Format: email
-       */
-      email: string;
-      /** Password */
-      password: string;
-      /** Username */
-      username: string;
-      /** First Name */
-      first_name?: string | null;
-      /** Last Name */
-      last_name?: string | null;
-      /** Phone */
-      phone?: string | null;
-    };
-    /** ResetPasswordRequest */
-    ResetPasswordRequest: {
-      /** Reset Token */
-      reset_token: string;
-      /** New Password */
-      new_password: string;
-    };
-    /** ResetTokenResponse */
-    ResetTokenResponse: {
-      /** Reset Token */
-      reset_token: string;
-    };
     /** ReviewQueueItem */
     ReviewQueueItem: {
       transaction: components["schemas"]["TransactionResponse"];
@@ -1604,80 +1246,6 @@ export interface components {
       suggestions: components["schemas"]["CategorySuggestion"][];
       /** Remaining Count */
       remaining_count: number;
-    };
-    /**
-     * RuleCondition
-     * @description A single leaf condition — a (fact, op, val) triple.
-     */
-    RuleCondition: {
-      /** Fact */
-      fact: string;
-      /** Op */
-      op: string;
-      /** Val */
-      val: unknown;
-    };
-    /** RuleDailyStat */
-    RuleDailyStat: {
-      /** Rule Id */
-      rule_id: string;
-      /** Slug */
-      slug: string;
-      /**
-       * Date Wat
-       * Format: date
-       */
-      date_wat: string;
-      /** Hits */
-      hits: number;
-      /** Delivered */
-      delivered: number;
-      /** Suppressed */
-      suppressed: number;
-      /** Unique Users */
-      unique_users: number;
-      /** Opened */
-      opened: number;
-      /** Dismissed */
-      dismissed: number;
-    };
-    /** RuleDailyStatList */
-    RuleDailyStatList: {
-      /** Stats */
-      stats: components["schemas"]["RuleDailyStat"][];
-      /** Period Days */
-      period_days: number;
-    };
-    /** RuleSummary */
-    RuleSummary: {
-      /** Rule Id */
-      rule_id: string;
-      /** Slug */
-      slug: string;
-      /** Total Hits */
-      total_hits: number;
-      /** Total Delivered */
-      total_delivered: number;
-      /** Total Suppressed */
-      total_suppressed: number;
-      /** Total Unique Users */
-      total_unique_users: number;
-      /** Total Opened */
-      total_opened: number;
-      /** Total Dismissed */
-      total_dismissed: number;
-      /**
-       * Engagement Rate
-       * @description Fraction of delivered nudges that were opened (0.0–1.0)
-       */
-      engagement_rate: number;
-    };
-    /** RuleSummaryList */
-    RuleSummaryList: {
-      /** Rules */
-      rules: components["schemas"]["RuleSummary"][];
-      /** Period Days */
-      period_days: number;
     };
     /** SupportedBankResponse */
     SupportedBankResponse: {
@@ -1705,24 +1273,6 @@ export interface components {
      * @enum {string}
      */
     TargetFrequency: "weekly" | "monthly" | "yearly" | "custom";
-    /** TestTriggerRequest */
-    TestTriggerRequest: {
-      trigger_type: components["schemas"]["NudgeTriggerType"];
-      /** Category Id */
-      category_id?: string | null;
-    };
-    /** TokenResponse */
-    TokenResponse: {
-      /** Access Token */
-      access_token: string;
-      /** Refresh Token */
-      refresh_token: string;
-      /**
-       * Token Type
-       * @default bearer
-       */
-      token_type?: string;
-    };
     /** TransactionListResponse */
     TransactionListResponse: {
       /** Items */
@@ -1872,19 +1422,6 @@ export interface components {
       /** Note */
       note?: string | null;
     };
-    /** UpdateProfileRequest */
-    UpdateProfileRequest: {
-      /** First Name */
-      first_name?: string | null;
-      /** Last Name */
-      last_name?: string | null;
-      /** Phone */
-      phone?: string | null;
-      /** Email */
-      email?: string | null;
-      /** Onboarded */
-      onboarded?: boolean | null;
-    };
     /** UserNudgeInsightRule */
     UserNudgeInsightRule: {
       /** Slug */
@@ -1921,32 +1458,6 @@ export interface components {
       /** Top Rules */
       top_rules: components["schemas"]["UserNudgeInsightRule"][];
     };
-    /** UserResponse */
-    UserResponse: {
-      /** Id */
-      id: string;
-      /** Email */
-      email: string;
-      /** Username */
-      username: string | null;
-      /** First Name */
-      first_name: string | null;
-      /** Last Name */
-      last_name: string | null;
-      /** Phone */
-      phone: string | null;
-      /** Identity Verified */
-      identity_verified: boolean;
-      /** Onboarded */
-      onboarded: boolean;
-      /** Streak */
-      streak: number;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-    };
     /** ValidationError */
     ValidationError: {
       /** Location */
@@ -1959,16 +1470,6 @@ export interface components {
       input?: unknown;
       /** Context */
       ctx?: Record<string, never>;
-    };
-    /** VerifyResetCodeRequest */
-    VerifyResetCodeRequest: {
-      /**
-       * Email
-       * Format: email
-       */
-      email: string;
-      /** Code */
-      code: string;
     };
   };
   responses: never;
@@ -1984,246 +1485,6 @@ export type external = Record<string, never>;
 
 export interface operations {
 
-  /** Register */
-  register_auth_register_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["RegisterRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        content: {
-          "application/json": components["schemas"]["TokenResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Login */
-  login_auth_login_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["LoginRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["TokenResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Refresh Token
-   * @description Exchange a valid refresh token for a new access token.
-   * The refresh token is rotated on every use.
-   */
-  refresh_token_auth_refresh_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["RefreshRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["AccessTokenResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Logout
-   * @description Invalidate both the refresh token (Redis delete) and the current access
-   * token (jti blocklist, expiring when the token would have expired naturally).
-   * After this returns, the access token is unusable even within its 15-min window.
-   */
-  logout_auth_logout_post: {
-    responses: {
-      /** @description Successful Response */
-      204: {
-        content: never;
-      };
-    };
-  };
-  /** Me */
-  me_auth_me_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["UserResponse"];
-        };
-      };
-    };
-  };
-  /**
-   * Update Profile
-   * @description Update mutable profile fields. Only provided (non-None) fields are changed.
-   */
-  update_profile_auth_me_patch: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["UpdateProfileRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["UserResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Check Username
-   * @description Real-time uniqueness check for use during signup.
-   * Returns {"available": true} when the username is valid and not yet taken.
-   * No authentication required — called as the user types.
-   */
-  check_username_auth_check_username_get: {
-    parameters: {
-      query: {
-        username: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: boolean;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Forgot Password
-   * @description Step 1 of the password-reset flow.
-   *
-   * Generates a 6-digit OTP, stores it in Redis for 10 minutes, and emails it
-   * to the user.  Always returns 200 regardless of whether the email is
-   * registered — this prevents user enumeration.
-   *
-   * Rate-limited to 5/hour per IP via slowapi.
-   */
-  forgot_password_auth_forgot_password_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ForgotPasswordRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: string;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Verify Reset Code
-   * @description Step 2 of the password-reset flow.
-   *
-   * Verifies the OTP sent in step 1.  On success the OTP is consumed (deleted)
-   * and a single-use reset token valid for 15 minutes is returned.  The client
-   * presents this token in step 3 instead of the raw OTP.
-   *
-   * Rate-limited to 10/hour per IP via slowapi.
-   */
-  verify_reset_code_auth_verify_reset_code_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["VerifyResetCodeRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["ResetTokenResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Reset Password
-   * @description Step 3 of the password-reset flow.
-   *
-   * Validates the reset token issued in step 2, updates the user's password,
-   * consumes the reset token (single-use), and revokes all active refresh
-   * tokens — forcing a fresh login after the reset completes.
-   */
-  reset_password_auth_reset_password_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ResetPasswordRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      204: {
-        content: never;
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /**
    * Supported Banks
    * @description Return every bank that MoniMata can ingest data from.
@@ -3376,31 +2637,6 @@ export interface operations {
     };
   };
   /**
-   * Create a synthetic nudge for testing
-   * @description Creates a realistic synthetic nudge for the given trigger_type. Bypasses fatigue and dedup checks. Safe in all environments.
-   */
-  test_trigger_nudges_test_trigger_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["TestTriggerRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["NudgeResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
    * Pull
    * @description Return all records created or updated since last_pulled_at.
    * Runs lazy recurring-transaction generation before querying.
@@ -3778,226 +3014,6 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["AiUsageResponse"];
-        };
-      };
-    };
-  };
-  /** List nudge rules */
-  list_nudge_rules_admin_nudge_rules_get: {
-    parameters: {
-      query?: {
-        page?: number;
-        limit?: number;
-        active?: boolean | null;
-        gid?: string | null;
-        /** @description Case-insensitive substring search on title */
-        q?: string | null;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["NudgeRuleListResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Create a nudge rule */
-  create_nudge_rule_admin_nudge_rules_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["NudgeRuleCreate"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        content: {
-          "application/json": components["schemas"]["NudgeRuleResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** List all rule groups (GIDs) */
-  list_groups_admin_nudge_rules_groups_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["NudgeRuleGroupList"];
-        };
-      };
-    };
-  };
-  /** List all rules in a group */
-  get_group_rules_admin_nudge_rules_groups__gid__get: {
-    parameters: {
-      path: {
-        gid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["NudgeRuleGroupDetail"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Aggregate stats for all rules over a period */
-  get_stats_summary_admin_nudge_rules_stats_summary_get: {
-    parameters: {
-      query?: {
-        days?: number;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["RuleSummaryList"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Get a single nudge rule */
-  get_nudge_rule_admin_nudge_rules__rule_id__get: {
-    parameters: {
-      path: {
-        rule_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["NudgeRuleResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Update a nudge rule */
-  update_nudge_rule_admin_nudge_rules__rule_id__put: {
-    parameters: {
-      path: {
-        rule_id: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["NudgeRuleUpdate"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["NudgeRuleResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Delete a nudge rule */
-  delete_nudge_rule_admin_nudge_rules__rule_id__delete: {
-    parameters: {
-      path: {
-        rule_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      204: {
-        content: never;
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Toggle a nudge rule active/inactive */
-  toggle_nudge_rule_admin_nudge_rules__rule_id__toggle_patch: {
-    parameters: {
-      path: {
-        rule_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["NudgeRuleResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Daily stats for a single rule */
-  get_rule_stats_endpoint_admin_nudge_rules__rule_id__stats_get: {
-    parameters: {
-      query?: {
-        days?: number;
-      };
-      path: {
-        rule_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["RuleDailyStatList"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

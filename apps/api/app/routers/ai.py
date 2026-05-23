@@ -19,9 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import CurrentUser, get_current_user
 from app.core.security import encrypt_api_key
-from app.models.user import User
 from app.models.user_ai_credential import UserAiCredential
 from app.schemas.ai import (
     AiCredentialCreate,
@@ -38,7 +37,7 @@ usage_router = APIRouter()
 @router.get("", response_model=list[AiCredentialResponse])
 def list_credentials(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> list[UserAiCredential]:
     return (
         db.query(UserAiCredential)
@@ -55,7 +54,7 @@ def list_credentials(
 def create_credential(
     body: AiCredentialCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> UserAiCredential:
     # Deactivate any existing active credential for the same provider so there
     # is always at most one active key per provider per user.
@@ -112,7 +111,7 @@ def create_credential(
 def delete_credential(
     credential_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> None:
     credential = (
         db.query(UserAiCredential)
@@ -140,7 +139,7 @@ def delete_credential(
 )
 def trigger_llm_categorization(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> LlmCategorizeResponse:
     """Manually trigger LLM categorisation for all uncategorised transactions.
 
@@ -197,7 +196,7 @@ def trigger_llm_categorization(
 @usage_router.get("/usage", response_model=AiUsageResponse)
 def get_ai_usage(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> AiUsageResponse:
     """AI efficiency monitor panel — spec §8.3.
 

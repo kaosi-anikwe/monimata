@@ -20,7 +20,7 @@
  */
 
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -37,10 +37,10 @@ import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
-import { $api } from '@/services/api';
+import consoleClient from '@/services/consoleApi';
 import { setUser } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import type { UpdateProfilePayload, User } from '@monimata/shared-types';
+import type { UpdateProfileRequest, User, UserResponse } from '@/types/auth';
 
 export default function EditProfileScreen() {
   const colors = useTheme();
@@ -68,17 +68,7 @@ export default function EditProfileScreen() {
     setPhone(user.phone ?? '');
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const updateProfile = $api.useMutation('patch', '/auth/me', {
-    onSuccess: (updated) => {
-      dispatch(setUser(updated as User));
-      showSuccess('Profile updated', 'Your changes have been saved.');
-      router.back();
-    },
-    onError: (err: unknown) => {
-      const detail = (err as { detail?: string })?.detail;
-      showError('Update failed', detail ?? 'Please try again.');
-    },
-  });
+  const [isSaving, setIsSaving] = useState(false);
 
   function isDirty(): boolean {
     return (
@@ -89,19 +79,29 @@ export default function EditProfileScreen() {
     );
   }
 
-  function handleSave() {
+  const handleSave = useCallback(async () => {
     if (!isDirty()) { router.back(); return; }
 
-    const body: UpdateProfilePayload = {};
-    if (firstName.trim() !== (user?.first_name ?? '')) body.first_name = firstName.trim() || null;
-    if (lastName.trim() !== (user?.last_name ?? '')) body.last_name = lastName.trim() || null;
-    if (email.trim() !== (user?.email ?? '')) body.email = email.trim() || null;
-    if (phone.trim() !== (user?.phone ?? '')) body.phone = phone.trim() || null;
+    const body: UpdateProfileRequest = {};
+    if (firstName.trim() !== (user?.first_name ?? '')) body.first_name = firstName.trim() || undefined;
+    if (lastName.trim() !== (user?.last_name ?? '')) body.last_name = lastName.trim() || undefined;
+    if (email.trim() !== (user?.email ?? '')) body.email = email.trim() || undefined;
+    if (phone.trim() !== (user?.phone ?? '')) body.phone = phone.trim() || undefined;
 
-    updateProfile.mutate({ body });
-  }
+    setIsSaving(true);
+    const { data, error } = await consoleClient.PATCH<UserResponse>('/auth/me', { body });
+    setIsSaving(false);
 
-  const isSaving = updateProfile.isPending;
+    if (error || !data) {
+      const detail = (error as { detail?: string })?.detail;
+      showError('Update failed', detail ?? 'Please try again.');
+      return;
+    }
+
+    dispatch(setUser(data as User));
+    showSuccess('Profile updated', 'Your changes have been saved.');
+    router.back();
+  }, [firstName, lastName, email, phone, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <View style={[ss.root, { backgroundColor: colors.background }]}>
@@ -160,7 +160,7 @@ export default function EditProfileScreen() {
               <Text style={[type_.label, { color: colors.textTertiary }]}>Username</Text>
               <Text style={[type_.body, { marginTop: spacing.xxs }]}>
                 <Text style={{ color: colors.brand, fontWeight: '600' }}>{user.username}</Text>
-                <Text style={{ color: colors.textMeta }}>@moni-mata.ng</Text>
+                <Text style={{ color: colors.textMeta }}>@monimata.ng</Text>
               </Text>
             </View>
           ) : null}
@@ -185,15 +185,6 @@ export default function EditProfileScreen() {
             returnKeyType="done"
             containerStyle={{ marginTop: spacing.sm }}
           />
-
-          {/* ── Verified badge (read-only) ────────────────────────────── */}
-          {user?.identity_verified && (
-            <View style={[ss.verifiedRow, { backgroundColor: colors.successSubtle }]}>
-              <Text style={[type_.small, { color: colors.successText }]}>
-                ✓  Identity verified
-              </Text>
-            </View>
-          )}
 
           <Button
             variant="green"

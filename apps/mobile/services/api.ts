@@ -53,9 +53,15 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 if (!BASE_URL) {
     throw new Error(
         '[MoniMata] EXPO_PUBLIC_API_URL is not set. ' +
-        'Create apps/mobile/.env with EXPO_PUBLIC_API_URL=https://api.moni-mata.ng'
+        'Create apps/mobile/.env with EXPO_PUBLIC_API_URL=https://api.monimata.ng'
     );
 }
+
+/**
+ * Console gateway URL for auth operations (token refresh, login, etc.).
+ * Falls back to BASE_URL in development when a single server handles everything.
+ */
+const CONSOLE_URL = process.env.EXPO_PUBLIC_CONSOLE_URL || BASE_URL;
 
 // ── SecureStore keys ──────────────────────────────────────────────────────────
 const SECURE_KEYS = {
@@ -144,7 +150,7 @@ async function doTokenRefresh(): Promise<string> {
     try {
         const storedRefresh = await getRefreshToken();
         if (!storedRefresh) throw new Error('No refresh token stored');
-        const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+        const refreshRes = await fetch(`${CONSOLE_URL}/auth/refresh`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -15,13 +15,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Nudge metrics — daily rollup and query helpers.
+Nudge metrics — daily rollup and per-user query helpers.
 
 The ``roll_up_nudge_stats`` function is called by a Celery beat task at
 00:15 WAT each day to aggregate the previous day's nudge activity into
 the ``nudge_stats`` table (one row per user × rule × WAT day).
 
-Admin endpoints aggregate across all users.
 User endpoints filter by their own user_id.
 """
 
@@ -145,107 +144,6 @@ def roll_up_nudge_stats(db: Session, target_date: date | None = None) -> int:
     db.commit()
     logger.info("roll_up_nudge_stats: upserted %d rows for %s", upserted, date_str)
     return upserted
-
-
-# ── Admin queries (aggregate across users) ───────────────────────────────────
-
-
-def get_rule_stats(
-    db: Session,
-    rule_id: str | None = None,
-    days: int = 7,
-) -> list[dict]:
-    """Return daily stats for one rule or all rules over the last *days* days.
-
-    Aggregates across all users.  Each item includes ``unique_users``.
-    """
-    from app.models.nudge_rule import NudgeRule
-    from app.models.nudge_stat import NudgeStat
-
-    cutoff = (datetime.now(WAT) - timedelta(days=days)).date()
-    q = (
-        db.query(
-            NudgeStat.rule_id,
-            NudgeStat.date_wat,
-            NudgeRule.slug,
-            func.sum(NudgeStat.hits).label("hits"),
-            func.sum(NudgeStat.delivered).label("delivered"),
-            func.sum(NudgeStat.suppressed).label("suppressed"),
-            func.count(func.distinct(NudgeStat.user_id)).label("unique_users"),
-            func.sum(NudgeStat.opened).label("opened"),
-            func.sum(NudgeStat.dismissed).label("dismissed"),
-        )
-        .join(NudgeRule, NudgeStat.rule_id == NudgeRule.id)
-        .filter(NudgeStat.date_wat >= cutoff)
-        .group_by(NudgeStat.rule_id, NudgeStat.date_wat, NudgeRule.slug)
-    )
-    if rule_id:
-        q = q.filter(NudgeStat.rule_id == rule_id)
-    q = q.order_by(NudgeStat.date_wat.desc())
-
-    return [
-        {
-            "rule_id": row.rule_id,
-            "slug": row.slug,
-            "date_wat": row.date_wat,
-            "hits": row.hits or 0,
-            "delivered": row.delivered or 0,
-            "suppressed": row.suppressed or 0,
-            "unique_users": row.unique_users or 0,
-            "opened": row.opened or 0,
-            "dismissed": row.dismissed or 0,
-        }
-        for row in q.all()
-    ]
-
-
-def get_rule_stats_summary(db: Session, days: int = 7) -> list[dict]:
-    """Aggregate stats across *days* for each rule — sorted by total hits desc.
-
-    Returns one dict per rule with cross-user totals + engagement rate.
-    ``unique_users`` is derived via ``COUNT(DISTINCT user_id)``.
-    """
-    from app.models.nudge_rule import NudgeRule
-    from app.models.nudge_stat import NudgeStat
-
-    cutoff = (datetime.now(WAT) - timedelta(days=days)).date()
-    rows = (
-        db.query(
-            NudgeStat.rule_id,
-            NudgeRule.slug,
-            func.sum(NudgeStat.hits).label("total_hits"),
-            func.sum(NudgeStat.delivered).label("total_delivered"),
-            func.sum(NudgeStat.suppressed).label("total_suppressed"),
-            func.count(func.distinct(NudgeStat.user_id)).label("total_unique_users"),
-            func.sum(NudgeStat.opened).label("total_opened"),
-            func.sum(NudgeStat.dismissed).label("total_dismissed"),
-        )
-        .join(NudgeRule, NudgeStat.rule_id == NudgeRule.id)
-        .filter(NudgeStat.date_wat >= cutoff)
-        .group_by(NudgeStat.rule_id, NudgeRule.slug)
-        .order_by(func.sum(NudgeStat.hits).desc())
-        .all()
-    )
-
-    result = []
-    for row in rows:
-        delivered = row.total_delivered or 0
-        opened = row.total_opened or 0
-        engagement = round(opened / delivered, 4) if delivered > 0 else 0.0
-        result.append(
-            {
-                "rule_id": row.rule_id,
-                "slug": row.slug,
-                "total_hits": row.total_hits or 0,
-                "total_delivered": delivered,
-                "total_suppressed": row.total_suppressed or 0,
-                "total_unique_users": row.total_unique_users or 0,
-                "total_opened": opened,
-                "total_dismissed": row.total_dismissed or 0,
-                "engagement_rate": engagement,
-            }
-        )
-    return result
 
 
 # ── User queries ─────────────────────────────────────────────────────────────

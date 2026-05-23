@@ -159,8 +159,3 @@ class RegisterDeviceRequest(BaseModel):
         min_length=1,
         description="Expo push token ('ExponentPushToken[...]')",
     )
-
-
-class TestTriggerRequest(BaseModel):
-    trigger_type: NudgeTriggerType
-    category_id: str | None = None
