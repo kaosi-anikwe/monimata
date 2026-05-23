@@ -13,6 +13,25 @@ Git tags follow the pattern `mobile/vX.Y.Z` and `api/vX.Y.Z`.
 
 ## Mobile App
 
+### [0.4.0] - 2026-05-23
+
+#### Changed
+
+- **Auth split** — all authentication flows (login, register, password reset, profile
+  updates) now route to the private admin gateway (`console.monimata.ng`) instead of the
+  public API, enforcing a clear security boundary between identity and data planes.
+- New `consoleClient` service (`services/consoleApi.ts`) — typed HTTP wrapper for the
+  admin gateway with `APP_VERSION` and `APP_PLATFORM` headers on every request.
+- `doTokenRefresh` in `services/api.ts` now calls the console gateway for token refresh.
+- Edit Profile screen rewritten to use `consoleClient.PATCH` instead of the openapi-fetch
+  `$api.useMutation` hook; removed the `identity_verified` badge (field no longer exposed).
+- Auth types (`TokenResponse`, `UserResponse`, `UpdateProfileRequest`, etc.) moved from
+  generated shared-types to a manually maintained `types/auth.ts` file — prevents the
+  private gateway's API surface from leaking into the open-source repository.
+- All `consoleClient` call sites in auth screens and `authSlice` now use generic type
+  parameters for full type safety.
+- `EXPO_PUBLIC_CONSOLE_URL` added to `.env.example` and test setup.
+
 ### [0.3.1] - 2026-05-21
 
 #### Changed
@@ -121,6 +140,59 @@ the time of writing; future entries will document incremental changes only.
 
 ## API
 
+### [0.4.0] - 2026-05-23
+
+#### Changed
+
+- **Architecture split** — the API is now a stateless public calculation engine
+  (`api.monimata.ng`). Authentication, user management, and nudge rule CRUD are
+  handled exclusively by the private admin gateway (`console.monimata.ng`).
+
+#### Removed
+
+- **Auth endpoints** — `POST /auth/register`, `/login`, `/refresh`, `/logout`,
+  `GET /auth/me`, `PATCH /auth/me`, `/check-username`, `/forgot-password`,
+  `/verify-reset-code`, `/reset-password` removed. Clients authenticate via the
+  admin gateway and present the resulting JWT to this API.
+- **Admin nudge-rule endpoints** — `GET/POST/PUT/PATCH/DELETE /admin/nudge-rules/*`
+  and all admin metrics endpoints removed. Rule CRUD and aggregate metrics live on
+  the admin gateway; this API only reads rules from the Redis cache for evaluation.
+- **Admin schemas** — `NudgeRuleCreate`, `NudgeRuleUpdate`, `NudgeRuleResponse`,
+  `NudgeRuleListResponse`, `NudgeRuleGroup*` removed from `schemas/nudge_rule.py`.
+  Auth schemas (`schemas/auth.py`) deleted entirely.
+- **Admin metric schemas** — `RuleDailyStat`, `RuleDailyStatList`, `RuleSummary`,
+  `RuleSummaryList` removed from `schemas/nudge_metrics.py`.
+- **Admin metric functions** — `get_rule_stats` and `get_rule_stats_summary` removed
+  from `services/nudge_metrics.py` (cross-user aggregation belongs on admin).
+- **Admin test file** — `tests/test_admin_nudge_rules.py` deleted.
+
+#### Security
+
+- **JWT verification only** — `app/core/security.py` stripped to public-key-only
+  operations: `decode_access_token` and AES PII encryption. `create_access_token`,
+  `create_refresh_token`, `hash_password`, `verify_password`, and `generate_otp`
+  removed. The RS256 private key never touches this codebase.
+- **Stateless identity** — `get_current_user` returns a `CurrentUser` dataclass
+  (fields: `id`, `username`) decoded directly from the JWT. Zero database queries
+  per request for identity resolution; no `get_current_admin` dependency.
+- **Slim User model** — `app/models/user.py` maps only the columns the public API
+  reads or writes (`id`, `username`, `created_at`, `nudge_settings`, `onboarded`,
+  `expo_push_token`, `streak`, `last_streak_date`). Auth-sensitive columns
+  (`password_hash`, `email`, `phone`, `role`, `identity_verified`) are unmapped and
+  invisible to the ORM.
+- **Redis read-only auth** — all auth write helpers removed from
+  `app/core/redis_client.py`. Only `is_token_blocklisted` (read) and nudge rule
+  cache operations remain.
+- **Config hardened** — `JWT_PRIVATE_KEY`, token expiry settings removed from
+  `app/core/config.py`. Only `JWT_PUBLIC_KEY` is accepted.
+- **Migration isolation** — Alembic version files gitignored; all schema authority
+  centralised in the admin backend.
+- **`/admin` and `/auth` prefix removed** from `MinAppVersionMiddleware` protected prefixes.
+- **`.env.example`** and **`README.md`** scrubbed of `JWT_PRIVATE_KEY` references
+  and password-hashing documentation.
+
+---
+
 ### [0.3.1] - 2026-05-21
 
 #### Added
@@ -150,23 +222,10 @@ the time of writing; future entries will document incremental changes only.
 
 #### Added
 
-**Authentication & User Management**
+**Authentication**
 
-- `POST /auth/register` — creates a user account, seeds default category groups and
-  categories, issues a JWT access/refresh token pair, and starts the daily streak at 1
-- `POST /auth/login` — authenticates with email + password and issues tokens; updates streak
-- `POST /auth/refresh` — rotates the refresh token and returns a new access/refresh pair;
-  token-reuse detection revokes the entire session on replay
-- `POST /auth/logout` — revokes the active refresh token and blocklists the access token JTI
-- `GET /auth/me` — returns the authenticated user's profile
-- `PATCH /auth/me` — updates mutable profile fields (first name, last name, phone, email,
-  onboarding flag); uniqueness-checked; username is immutable after onboarding
-- `GET /auth/check-username` — validates format and availability of a candidate username
-- `POST /auth/forgot-password` — sends a time-limited OTP via email; constant response body
-  to prevent account enumeration
-- `POST /auth/verify-reset-code` — validates OTP and returns a short-lived signed reset token
-- `POST /auth/reset-password` — resets password and invalidates all active refresh sessions
-- Sensitive endpoints rate-limited via slowapi; constant-time password and OTP comparisons
+- JWT access tokens verified using RS256 public key; tokens are minted by the
+  admin gateway (`console.monimata.ng`)
 - Daily login streak tracked on `users.streak` / `users.last_streak_date`
 
 **Zero-Based Budgeting**
@@ -332,19 +391,6 @@ the time of writing; future entries will document incremental changes only.
   `category_id` for deep linking
 - Tokens detected as expired during delivery are cleared from the user record
 
-**Admin — Nudge Rules**
-
-- `GET /admin/nudge-rules` — paginated, filterable rule list (by active state, group, title)
-- `GET /admin/nudge-rules/groups` — rule groups aggregated with `rule_count`/`active_count`
-- `GET /admin/nudge-rules/groups/{gid}` — rules by group
-- `POST /admin/nudge-rules`, `PUT /admin/nudge-rules/{id}`,
-  `PATCH /admin/nudge-rules/{id}/toggle`, `DELETE /admin/nudge-rules/{id}` — full CRUD;
-  every mutation rebuilds the Redis rule cache
-- `GET /admin/nudge-rules/stats/summary` — aggregate metrics (hits, delivered, suppressed,
-  opened, dismissed) per rule over a date range
-- `GET /admin/nudge-rules/{id}/stats` — daily per-rule breakdown
-- All admin routes are guarded by a separate `get_current_admin` dependency
-
 **WebSocket — Real-Time Events**
 
 - `WS /ws/events` — per-user event stream authenticated via JWT query token; backed by
@@ -376,15 +422,12 @@ the time of writing; future entries will document incremental changes only.
 
 **Security & Infrastructure**
 
-- FastAPI 0.135 on Python 3.11+; PostgreSQL with SQLAlchemy 2 ORM; Alembic migrations
+- FastAPI 0.135 on Python 3.11+; PostgreSQL with SQLAlchemy 2 ORM
 - Account numbers Fernet-encrypted at rest; decrypt-and-compare for duplicate detection
   and statement ownership verification
-- JWT access tokens (short-lived) + rotating refresh tokens stored server-side; JTI
-  blocklist for immediate revocation
+- JWT access tokens verified with RS256 public key; JTI blocklist for immediate revocation
 - Rate limiting via slowapi on authentication, upload, and webhook endpoints
 - pgvector extension for cosine-similarity category matching
 - Celery 5 + Redis for task queuing and pub/sub; Africa/Lagos timezone throughout
 - Structured logging: Rich console + rotating file handlers (`logs/app.log`,
   `logs/error.log`); Celery worker writes to the same log files
-- 25 incremental Alembic schema migrations covering the full evolution from initial schema
-  to vector embeddings, nudge metrics, and DSL rule seeding
