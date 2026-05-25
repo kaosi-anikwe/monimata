@@ -13,6 +13,50 @@ Git tags follow the pattern `mobile/vX.Y.Z` and `api/vX.Y.Z`.
 
 ## Mobile App
 
+### [0.5.0] - 2026-05-25
+
+#### Added
+
+- **Knowledge Hub — live CMS posts** — the tab now fetches posts from Sanity CMS
+  via the `/content/posts` proxy. Article cards show the cover image (or a greyed
+  logo placeholder), post title, author name, and publish date. Category filter
+  chips are derived from the fetched posts.
+- **Post detail screen** (`/post/[slug]`) — new screen navigated to from every
+  post card:
+  - Full **Portable Text renderer** supporting: paragraphs, H2 / H3 / H4 headings
+    with distinct type scales, bullet and numbered lists (nested), blockquotes,
+    inline marks (bold, italic, underline, strikethrough, code), hyperlinks, code
+    blocks with optional filename / language label, callout cards
+    (info / warning / tip / note), inline images with captions, and video embeds.
+  - Cover image hero or greyed logo fallback.
+  - Author avatar, name, and publish date row.
+  - Tag pills.
+  - Skeleton loading animation and pull-to-refresh on both the hub list and
+    post detail screen.
+  - Tapping a video embed card deep-links into the YouTube or Vimeo native app.
+- **Global API error toast** — `authFetch` now surfaces a user-visible error toast
+  for every non-2xx response except 401, with friendly status-specific messages
+  (`502`/`503` → "Service unavailable", `504` → "Request timed out",
+  other 5xx → "Server error", other 4xx → "Request failed").
+- `usePosts` and `usePost` hooks (`hooks/usePosts.ts`) for typed TanStack Query
+  access to the content endpoints.
+- `Skeleton` reusable pulsing placeholder component (`components/ui/Skeleton.tsx`).
+- `queryKeys.posts` and `queryKeys.post` entries in `lib/queryKeys.ts`.
+- User profile now cached in SecureStore on login, registration, and session
+  restore; restored from cache on cold start if the server is unavailable.
+
+#### Changed
+
+- Knowledge Hub and Post detail screens use the shared `ScreenHeader` component
+  for consistent navigation chrome across both screens.
+- Post list `useMemo` stabilised to prevent the `categories` derived value
+  recalculating on every render.
+
+#### Removed
+
+- `react-native-webview` dependency dropped — video embeds now deep-link to the
+  native YouTube / Vimeo app instead of rendering an in-app WebView player.
+
 ### [0.4.0] - 2026-05-23
 
 #### Changed
@@ -139,6 +183,32 @@ the time of writing; future entries will document incremental changes only.
 ---
 
 ## API
+
+### [0.5.0] - 2026-05-25
+
+#### Added
+
+- **Sanity CMS content proxy** — two new endpoints backed by GROQ queries against
+  the Sanity API:
+  - `GET /content/posts` — paginated list of published posts with optional
+    `category` filter; returns `PostSummary` items (id, title, slug, excerpt,
+    cover image URL, category, author, publish date, tags).
+  - `GET /content/posts/{slug}` — full post detail including resolved Portable
+    Text body, author avatar, and category; returns `PostDetail`.
+- `app/services/sanity.py` — singleton async HTTP client for executing GROQ
+  queries; reads `SANITY_PROJECT_ID`, `SANITY_DATASET`, and `SANITY_API_TOKEN`
+  from config.
+- `app/schemas/content.py` — `PostSummary`, `PostDetail`, `PostListResponse`,
+  `AuthorSummary`, and `CategorySummary` Pydantic models.
+- Redis async caching for both content endpoints (5-minute TTL); cache is keyed
+  per query so filtered lists are cached independently.
+
+#### Changed
+
+- `app/core/redis_client.py` migrated from `redis` (sync) to `redis.asyncio`;
+  added `get_async_redis_client` helper and cache-key constants for content.
+- Structured logging configuration (`app/core/logging_config.py`) improved with
+  more granular handler setup.
 
 ### [0.4.0] - 2026-05-23
 
