@@ -91,6 +91,21 @@ def _pct_change(current: int, previous: int) -> float | None:
     return round((current - previous) / abs(previous) * 100, 1)
 
 
+def _resolve_months(db: Session, user_id: str, months: int | None) -> int:
+    """Return actual month count: use *months* if given, else span from earliest txn."""
+    if months is not None:
+        return months
+    earliest = db.query(func.min(Transaction.date)).filter(Transaction.user_id == user_id).scalar()
+    if earliest is None:
+        return 1
+    today = date.today()
+    return (
+        (today.year - earliest.year) * 12
+        + (today.month - earliest.month)
+        + 1  # include both endpoints
+    )
+
+
 def _income_expense_for_month(db: Session, user_id: str, month: date) -> tuple[int, int]:
     """Return (total_income, total_expenses) for a month. Expenses as positive."""
     start, end = _month_range(month)
@@ -220,19 +235,22 @@ def monthly_summary(
 
 @router.get("/income-expense-trend", response_model=IncomeExpenseTrendResponse)
 def income_expense_trend(
-    months: int = Query(6, ge=1, le=24, description="Number of months to look back"),
+    months: int | None = Query(
+        None, ge=1, le=24, description="Months to look back; omit for all history"
+    ),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
     """
     Monthly income and expense totals for the last N months.
-    Suitable for bar/line charts.
+    Suitable for bar/line charts.  Omit *months* to retrieve full history.
     """
+    resolved = _resolve_months(db, user.id, months)
     today = date.today()
     current = today.replace(day=1)
     points: list[IncomeExpensePoint] = []
 
-    for i in range(months - 1, -1, -1):
+    for i in range(resolved - 1, -1, -1):
         m = current - relativedelta(months=i)
         inc, exp = _income_expense_for_month(db, user.id, m)
         points.append(
@@ -313,14 +331,17 @@ def spending_by_category(
 @router.get("/category-trend", response_model=CategoryTrendResponse)
 def category_trend(
     category_id: UUID = Query(...),
-    months: int = Query(6, ge=1, le=24),
+    months: int | None = Query(
+        None, ge=1, le=24, description="Months to look back; omit for all history"
+    ),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
     """
     A single category's spending over the last N months.
-    Useful for sparklines or detailed category views.
+    Useful for sparklines or detailed category views.  Omit *months* for full history.
     """
+    resolved = _resolve_months(db, user.id, months)
     cat = db.query(Category).filter(Category.id == category_id, Category.user_id == user.id).first()
     cat_name = cat.name if cat else "Unknown"
 
@@ -328,7 +349,7 @@ def category_trend(
     current = today.replace(day=1)
     points: list[CategoryTrendPoint] = []
 
-    for i in range(months - 1, -1, -1):
+    for i in range(resolved - 1, -1, -1):
         m = current - relativedelta(months=i)
         start, end = _month_range(m)
         row = (
