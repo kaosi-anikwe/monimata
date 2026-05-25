@@ -228,7 +228,13 @@ function RootNavigator() {
     return () => subscription.remove();
   }, [isAuthenticated, dispatch]);
 
-  if (!isInitialised) return null;
+  if (!isInitialised) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.darkGreen, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.lime} />
+      </View>
+    );
+  }
 
   return (
     <>

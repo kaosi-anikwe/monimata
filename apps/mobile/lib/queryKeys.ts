@@ -55,6 +55,10 @@ export const queryKeys = {
   // transactions are fetched at once and managed client-side).
   uncategorisedQueue: () => ['get', '/transactions'] as const,
 
+  // ── Content (Knowledge Hub) ───────────────────────────────────────────
+  posts: () => ['get', '/content/posts'] as const,
+  post: (slug: string) => ['get', '/content/posts/{slug}', slug] as const,
+
   // ── AI / BYOK ─────────────────────────────────────────────────────────
   aiCredentials: () => ['get', '/ai/credentials'] as const,
   aiUsage: () => ['get', '/ai/usage'] as const,

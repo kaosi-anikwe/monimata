@@ -69,5 +69,8 @@ export type { ListRowProps } from './ListRow';
 export { ScreenHeader } from './ScreenHeader';
 export type { ScreenHeaderProps } from './ScreenHeader';
 
+export { Skeleton } from './Skeleton';
+export type { SkeletonProps } from './Skeleton';
+
 export { MainTabBar } from './TabBar';
 

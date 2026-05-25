@@ -35,6 +35,7 @@ import createClient from 'openapi-fetch';
 import createQueryClient from 'openapi-react-query';
 import { Platform } from 'react-native';
 
+import { showToast } from '@/components/Toast';
 import type { paths } from '@monimata/shared-types';
 
 // ── App identity headers ─────────────────────────────────────────────────────
@@ -69,6 +70,8 @@ const SECURE_KEYS = {
     REFRESH_TOKEN: 'mm_refresh_token',
     /** Tracks which user ID is currently stored in the local WatermelonDB. */
     LAST_USER_ID: 'mm_last_uid',
+    /** Cached user profile for offline / slow-server cold-start fallback. */
+    CACHED_USER: 'mm_cached_user',
 } as const;
 
 // ── In-memory token cache ─────────────────────────────────────────────────────
@@ -119,6 +122,23 @@ export async function getLastUserId(): Promise<string | null> {
 /** Removes the stored user ID — called on logout. */
 export async function clearLastUserId(): Promise<void> {
     await SecureStore.deleteItemAsync(SECURE_KEYS.LAST_USER_ID);
+}
+
+/** Persists the full user profile for offline / slow-server cold-start fallback. */
+export async function saveLastUser(user: object): Promise<void> {
+    await SecureStore.setItemAsync(SECURE_KEYS.CACHED_USER, JSON.stringify(user));
+}
+
+/** Returns the cached user profile, or null if absent / unparseable. */
+export async function getLastUser<T>(): Promise<T | null> {
+    const raw = await SecureStore.getItemAsync(SECURE_KEYS.CACHED_USER);
+    if (!raw) return null;
+    try { return JSON.parse(raw) as T; } catch { return null; }
+}
+
+/** Removes the cached user profile — called on logout. */
+export async function clearLastUser(): Promise<void> {
+    await SecureStore.deleteItemAsync(SECURE_KEYS.CACHED_USER);
 }
 
 // ── 401 refresh queue ─────────────────────────────────────────────────────────
@@ -183,6 +203,27 @@ async function doTokenRefresh(): Promise<string> {
 // openapi-fetch constructs a Request object and calls fetch(request, undefined).
 // We must extract method/body/headers from it — otherwise origInit is {} and
 // every call silently falls back to GET (the fetch default).
+
+/** Show an error toast for a non-2xx HTTP status code. */
+function toastApiError(status: number): void {
+    let title: string;
+    let message: string | undefined;
+    if (status === 502 || status === 503) {
+        title = 'Service unavailable';
+        message = 'The server is temporarily down. Please try again shortly.';
+    } else if (status === 504) {
+        title = 'Request timed out';
+        message = 'The server took too long to respond. Please try again.';
+    } else if (status >= 500) {
+        title = 'Server error';
+        message = 'Something went wrong on our end. Please try again.';
+    } else {
+        title = 'Request failed';
+        message = `The server returned an error (${status}).`;
+    }
+    showToast({ variant: 'error', title, message });
+}
+
 async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     let url: string;
     let origInit: RequestInit;
@@ -216,7 +257,10 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     headers.set('X-App-Platform', APP_PLATFORM);
 
     const response = await fetch(url, { ...origInit, headers });
-    if (response.status !== 401) return response;
+    if (response.status !== 401) {
+        if (!response.ok) toastApiError(response.status);
+        return response;
+    }
 
     // If we had no token to send the server wasn't talking about an expired
     // session — it's a genuine auth failure (e.g. wrong password on /auth/login).
@@ -231,7 +275,9 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
         retryHeaders.set('Authorization', `Bearer ${newToken}`);
         retryHeaders.set('X-App-Version', APP_VERSION);
         retryHeaders.set('X-App-Platform', APP_PLATFORM);
-        return fetch(url, { ...origInit, headers: retryHeaders });
+        const retryResponse = await fetch(url, { ...origInit, headers: retryHeaders });
+        if (!retryResponse.ok) toastApiError(retryResponse.status);
+        return retryResponse;
     } catch {
         return response; // return the original 401 so callers see the failure
     }

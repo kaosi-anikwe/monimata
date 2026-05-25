@@ -19,7 +19,7 @@
  * Tokens themselves live in SecureStore (never in Redux).
  */
 import { clearDatabase } from '@/database';
-import { clearLastUserId, clearTokens, getLastUserId, saveLastUserId, saveTokens } from '@/services/api';
+import { clearLastUser, clearLastUserId, clearTokens, getAccessToken, getLastUser, getLastUserId, saveLastUser, saveLastUserId, saveTokens } from '@/services/api';
 import consoleClient from '@/services/consoleApi';
 import type { TokenResponse, User, UserResponse } from '@/types/auth';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
@@ -142,7 +142,9 @@ export const register = createAsyncThunk(
             if (meError || !me) return rejectWithValue('Registration failed');
             await clearDatabase();
             await saveLastUserId(me.id);
-            return me as User;
+            const registeredUser = me as User;
+            saveLastUser(registeredUser).catch(() => { });
+            return registeredUser;
         } catch (err: unknown) {
             console.log('[register] post-auth step failed:', err);
             return rejectWithValue('Registration failed');
@@ -167,6 +169,7 @@ export const login = createAsyncThunk(
                 await clearDatabase();
             }
             await saveLastUserId(user.id);
+            saveLastUser(user).catch(() => { });
             return user;
         } catch {
             return rejectWithValue('Login failed');
@@ -189,15 +192,37 @@ export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) =>
         clearDatabase().catch(console.warn),
         clearTokens(),
         clearLastUserId(),
+        clearLastUser(),
     ]);
 });
 
 export const restoreSession = createAsyncThunk('auth/restoreSession', async (_, { rejectWithValue }) => {
+    // Fast path: no local token means no session — skip the network entirely.
+    const token = await getAccessToken();
+    if (!token) return rejectWithValue('No active session');
+
+    // Race /auth/me against a timeout so a down or unreachable server never
+    // keeps the splash screen visible indefinitely.
+    const TIMEOUT_MS = 8_000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS),
+    );
+
     try {
-        const { data, error } = await consoleClient.GET<UserResponse>('/auth/me', {});
+        const { data, error } = await Promise.race([
+            consoleClient.GET<UserResponse>('/auth/me', {}),
+            timeoutPromise,
+        ]);
         if (error || !data) return rejectWithValue('No active session');
-        return data as User;
+        const user = data as User;
+        // Refresh the offline cache with the latest profile from the server.
+        saveLastUser(user).catch(() => { });
+        return user;
     } catch {
+        // Server timed out or was unreachable — fall back to the cached profile
+        // so the user can still access the app and its local WatermelonDB data.
+        const cached = await getLastUser<User>();
+        if (cached) return cached;
         return rejectWithValue('No active session');
     }
 });
@@ -209,7 +234,9 @@ export const markOnboardedThunk = createAsyncThunk(
             const { data, error } = await consoleClient.PATCH<UserResponse>('/auth/me', { body: { onboarded: true } });
             if (error) return rejectWithValue(extractDetail(error, 'Failed to update onboarding status'));
             if (!data) return rejectWithValue('Failed to update onboarding status');
-            return data as User;
+            const user = data as User;
+            saveLastUser(user).catch(() => { });
+            return user;
         } catch {
             return rejectWithValue('Failed to update onboarding status');
         }

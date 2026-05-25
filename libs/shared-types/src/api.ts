@@ -327,6 +327,20 @@ export interface paths {
      */
     post: operations["push_sync_push_post"];
   };
+  "/content/posts": {
+    /**
+     * List Posts
+     * @description Return a paginated list of mobile-visible posts.
+     */
+    get: operations["listPosts"];
+  };
+  "/content/posts/{slug}": {
+    /**
+     * Get Post
+     * @description Return a single mobile-visible post by slug.
+     */
+    get: operations["getPost"];
+  };
   "/webhooks/bank-alerts": {
     /**
      * Bank Alert Webhook
@@ -537,6 +551,15 @@ export interface components {
     AssignRequest: {
       /** Assigned */
       assigned: number;
+    };
+    /** AuthorSummary */
+    AuthorSummary: {
+      /** Name */
+      name: string;
+      /** Slug */
+      slug: string;
+      /** Avatar */
+      avatar?: string | null;
     };
     /** AutoAssignResponse */
     AutoAssignResponse: {
@@ -762,6 +785,13 @@ export interface components {
       confidence: number;
       /** Source */
       source: string;
+    };
+    /** CategorySummary */
+    CategorySummary: {
+      /** Name */
+      name: string;
+      /** Slug */
+      slug: string;
     };
     /** CategoryTargetResponse */
     CategoryTargetResponse: {
@@ -1112,6 +1142,63 @@ export interface components {
        * @description Failure reason: 'unrecognised', 'no_account', 'parse_failed'
        */
       reason?: string | null;
+    };
+    /**
+     * PostDetail
+     * @description Full post including Portable Text body.
+     */
+    PostDetail: {
+      /** Id */
+      id: string;
+      /** Title */
+      title: string;
+      /** Slug */
+      slug: string;
+      /** Excerpt */
+      excerpt?: string | null;
+      /** Published At */
+      published_at?: string | null;
+      /** Tags */
+      tags?: string[] | null;
+      /** Cover Image */
+      cover_image?: string | null;
+      category?: components["schemas"]["CategorySummary"] | null;
+      author?: components["schemas"]["AuthorSummary"] | null;
+      /** Body */
+      body?: unknown[] | null;
+    };
+    /** PostListResponse */
+    PostListResponse: {
+      /** Total */
+      total: number;
+      /** Page */
+      page: number;
+      /** Limit */
+      limit: number;
+      /** Items */
+      items: components["schemas"]["PostSummary"][];
+    };
+    /**
+     * PostSummary
+     * @description Lightweight post representation used in list responses.
+     */
+    PostSummary: {
+      /** Id */
+      id: string;
+      /** Title */
+      title: string;
+      /** Slug */
+      slug: string;
+      /** Excerpt */
+      excerpt?: string | null;
+      /** Published At */
+      published_at?: string | null;
+      /** Tags */
+      tags?: string[] | null;
+      /** Cover Image */
+      cover_image?: string | null;
+      category?: components["schemas"]["CategorySummary"] | null;
+      author?: components["schemas"]["AuthorSummary"] | null;
     };
     /** ReconcileRequest */
     ReconcileRequest: {
@@ -2692,6 +2779,59 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * List Posts
+   * @description Return a paginated list of mobile-visible posts.
+   */
+  listPosts: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+        /** @description Filter by category slug */
+        category?: string | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PostListResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Post
+   * @description Return a single mobile-visible post by slug.
+   */
+  getPost: {
+    parameters: {
+      path: {
+        slug: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PostDetail"];
         };
       };
       /** @description Validation Error */

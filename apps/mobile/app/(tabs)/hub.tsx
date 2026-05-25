@@ -15,22 +15,22 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Knowledge Hub screen — articles, video courses, and quizzes.
+ * Knowledge Hub screen — posts from Sanity CMS, proxied via /content/posts.
  *
- * Phase 13 — all data is static seed (fake). Phase 14+ will connect to
- * backend CMS endpoints and award XP via the gamification service.
- * See docs/UI_MIGRATION_PLAN.md Phase 13 for backend design notes.
+ * Categories are derived from the fetched posts and drive the filter chips.
+ * Cover images are rendered from Sanity CDN URLs; a greyed logo is shown
+ * when a post has no cover image.
  *
  * Accessibility: every interactive element has accessibilityRole + accessibilityLabel.
  * Touch targets: all tappable rows/cards ≥ 44 pt.
  */
 
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -39,484 +39,121 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useToast } from '@/components/Toast';
 import { Chip } from '@/components/ui/Chip';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { usePosts } from '@/hooks/usePosts';
 import { useTheme } from '@/lib/theme';
-import { hitSlop, layout, radius, shadow, spacing } from '@/lib/tokens';
+import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
+import type { components } from '@monimata/shared-types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type HubTab = 'articles' | 'courses' | 'quizzes';
-
-type ThumbColor = 'g' | 'a' | 'b' | 'r' | 'p' | 't';
-
-interface Article {
-  id: string;
-  emoji: string;
-  tag: string;
-  title: string;
-  readMin: number;
-  xp: number;
-  thumbColor: ThumbColor;
-  category: string;
-  featured?: boolean;
-  featuredMeta?: string;
-}
-
-interface Course {
-  id: string;
-  emoji: string;
-  tag: string;
-  title: string;
-  description: string;
-  lessons: number;
-  durationMin: number;
-  xp: number;
-  progressPct: number;
-  gradientColor: 'g' | 'b' | 'a' | 'p';
-}
-
-interface Quiz {
-  id: string;
-  emoji: string;
-  title: string;
-  description: string;
-  xp: number;
-  score?: string;       // e.g. "8/10" — undefined = not attempted
-  isDaily?: boolean;
-  thumbColor: ThumbColor;
-}
-
-// ── Fake seed data ────────────────────────────────────────────────────────────
-// Phase 14 will replace with API calls to the Content service.
-
-const CATEGORIES = ['All', 'Budgeting', 'Saving', 'Investing', 'Debt'] as const;
-
-const ARTICLES: Article[] = [
-  {
-    id: '1',
-    emoji: '📖',
-    tag: 'Budgeting',
-    category: 'Budgeting',
-    title: 'Zero-Based Budgeting: The Nigerian Way',
-    readMin: 5,
-    xp: 120,
-    thumbColor: 'g',
-    featured: true,
-    featuredMeta: 'By MoniMata Team',
-  },
-  {
-    id: '2',
-    emoji: '💰',
-    tag: 'Saving',
-    category: 'Saving',
-    title: 'How to Save on a ₦150k Salary in Lagos',
-    readMin: 4,
-    xp: 80,
-    thumbColor: 'g',
-  },
-  {
-    id: '3',
-    emoji: '📊',
-    tag: 'Budgeting',
-    category: 'Budgeting',
-    title: 'The 50/30/20 Rule: Does It Work in Nigeria?',
-    readMin: 6,
-    xp: 100,
-    thumbColor: 'a',
-  },
-  {
-    id: '4',
-    emoji: '📈',
-    tag: 'Investing',
-    category: 'Investing',
-    title: 'Starting to Invest with ₦10,000',
-    readMin: 8,
-    xp: 150,
-    thumbColor: 'b',
-  },
-  {
-    id: '5',
-    emoji: '🏦',
-    tag: 'Debt',
-    category: 'Debt',
-    title: 'Avoiding the Debt Trap: Smart Credit Habits',
-    readMin: 5,
-    xp: 90,
-    thumbColor: 'r',
-  },
-];
-
-const COURSES: Course[] = [
-  {
-    id: '1',
-    emoji: '💰',
-    tag: 'Budgeting',
-    title: 'Zero-Based Budgeting Masterclass',
-    description: 'Give every Naira a job. Master ZBB from scratch.',
-    lessons: 8,
-    durationMin: 47,
-    xp: 800,
-    progressPct: 0.37,
-    gradientColor: 'g',
-  },
-  {
-    id: '2',
-    emoji: '💸',
-    tag: 'Saving',
-    title: 'Saving on a Nigerian Salary',
-    description: 'Real tactics for saving ₦5k–₦50k/month.',
-    lessons: 6,
-    durationMin: 32,
-    xp: 600,
-    progressPct: 0,
-    gradientColor: 'a',
-  },
-  {
-    id: '3',
-    emoji: '📈',
-    tag: 'Investing',
-    title: 'Your First ₦10k Investment',
-    description: 'Treasury bills, money markets, and mutual funds.',
-    lessons: 6,
-    durationMin: 38,
-    xp: 600,
-    progressPct: 0.16,
-    gradientColor: 'b',
-  },
-  {
-    id: '4',
-    emoji: '🛡️',
-    tag: 'Saving',
-    title: 'Building an Emergency Fund',
-    description: '3–6 months cover strategy for Nigerians.',
-    lessons: 5,
-    durationMin: 28,
-    xp: 500,
-    progressPct: 0,
-    gradientColor: 'p',
-  },
-];
-
-const QUIZZES: Quiz[] = [
-  {
-    id: 'daily',
-    emoji: '🧠',
-    title: 'Daily Money Quiz',
-    description: '5 questions · +100 XP · Resets daily',
-    xp: 100,
-    thumbColor: 'g',
-    isDaily: true,
-  },
-  {
-    id: '2',
-    emoji: '📋',
-    title: 'Budgeting Basics',
-    description: '10 questions on zero-based budgeting',
-    xp: 150,
-    score: '8/10',
-    thumbColor: 'g',
-  },
-  {
-    id: '3',
-    emoji: '💰',
-    title: 'Nigerian Banking',
-    description: 'Know your BVN, NIN, and CBN rules',
-    xp: 120,
-    thumbColor: 'a',
-  },
-];
+type PostSummary = components['schemas']['PostSummary'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Maps a ThumbColor variant to the correct theme token key. */
-type SubtleToken =
-  | 'successSubtle'
-  | 'warningSubtle'
-  | 'infoSubtle'
-  | 'errorSubtle'
-  | 'purpleSubtle'
-  | 'tealSubtle';
-
-const THUMB_TOKEN: Record<ThumbColor, SubtleToken> = {
-  g: 'successSubtle',
-  a: 'warningSubtle',
-  b: 'infoSubtle',
-  r: 'errorSubtle',
-  p: 'purpleSubtle',
-  t: 'tealSubtle',
-};
-
-/** Gradient pair for course thumbnail (.course-thumb.g / .b / .a / .p) */
-function courseGradient(color: Course['gradientColor']): [string, string] {
-  switch (color) {
-    case 'g': return ['#1B3A1B', '#2D6A2D'];
-    case 'b': return ['#1E3A5F', '#2563EB'];
-    case 'a': return ['#78350F', '#D97706'];
-    case 'p': return ['#4C1D95', '#7C3AED'];
-  }
+/** Format an ISO date string to a short human-readable date. */
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-NG', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-/** Featured article hero card (.feat-card) */
-function FeaturedCard({
-  article,
-  onPress,
+/** Skeleton placeholder for a single post card while loading */
+function PostCardSkeleton({
   ss,
   colors,
 }: {
-  article: Article;
-  onPress: () => void;
   ss: ReturnType<typeof makeStyles>;
   colors: ReturnType<typeof useTheme>;
 }) {
+  const thumbSize = layout.avatarLg + spacing.smd;
   return (
-    <TouchableOpacity
-      style={[ss.featCard, { backgroundColor: colors.brand }]}
-      onPress={onPress}
-      activeOpacity={0.88}
-      accessibilityRole="button"
-      accessibilityLabel={`Featured article: ${article.title}`}
-    >
-      {/* Decorative glow circle */}
-      <View style={ss.featGlow} pointerEvents="none" />
-
-      {/* Tag row */}
-      <View style={ss.featTagRow}>
-        <View style={ss.featTagPill}>
-          <Text style={[ss.featTagTxt, { color: colors.lime, ...ff(700) }]}>
-            Featured · {article.readMin} min read
-          </Text>
-        </View>
+    <View style={[ss.artCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+      <Skeleton width={thumbSize} height={thumbSize} borderRadius={radius.sm} />
+      <View style={[ss.artContent, { gap: spacing.xs }]}>
+        <Skeleton width="28%" height={11} />
+        <Skeleton width="95%" height={15} />
+        <Skeleton width="70%" height={15} />
+        <Skeleton width="22%" height={11} />
       </View>
-
-      {/* Title */}
-      <Text style={[ss.featTitle, { color: colors.white, ...ff(800) }]}>
-        {article.title}
-      </Text>
-
-      {/* Meta row */}
-      <View style={ss.featMeta}>
-        <View style={ss.featXpBadge}>
-          <Text style={[ss.featXpTxt, { color: colors.white, ...ff(700) }]}>
-            +{article.xp} XP
-          </Text>
-        </View>
-        {article.featuredMeta ? (
-          <Text style={[ss.featMetaTxt, { color: colors.textInverseFaint }]}>
-            {article.featuredMeta}
-          </Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
-/** Single article list row (.art-c) */
-function ArticleCard({
-  article,
+/** Single post card row */
+function PostCard({
+  post,
   onPress,
   ss,
   colors,
 }: {
-  article: Article;
+  post: PostSummary;
   onPress: () => void;
   ss: ReturnType<typeof makeStyles>;
   colors: ReturnType<typeof useTheme>;
 }) {
-  const thumbBg = colors[THUMB_TOKEN[article.thumbColor]];
   return (
     <TouchableOpacity
       style={[ss.artCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.88}
       accessibilityRole="button"
-      accessibilityLabel={`Article: ${article.title}`}
+      accessibilityLabel={`Post: ${post.title}`}
     >
-      {/* Emoji thumbnail */}
-      <View style={[ss.artThumb, { backgroundColor: thumbBg }]}>
-        <Text style={ss.artEmoji}>{article.emoji}</Text>
+      {/* Cover image / greyed logo fallback */}
+      <View style={[ss.artThumb, { backgroundColor: colors.surface, overflow: 'hidden' }]}>
+        {post.cover_image ? (
+          <Image
+            source={{ uri: post.cover_image }}
+            style={ss.coverImg}
+            contentFit="cover"
+            accessibilityLabel={post.title}
+          />
+        ) : (
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={ss.logoFallback}
+            contentFit="contain"
+            tintColor={colors.borderStrong}
+          />
+        )}
       </View>
 
       {/* Content */}
       <View style={ss.artContent}>
-        <Text style={[ss.artTag, { color: colors.brand }]}>{article.tag}</Text>
-        <Text style={[ss.artTitle, { color: colors.textPrimary, ...ff(700) }]} numberOfLines={2}>
-          {article.title}
+        {post.category && (
+          <Text style={[ss.artTag, { color: colors.brand }]}>{post.category.name}</Text>
+        )}
+        <Text
+          style={[ss.artTitle, { color: colors.textPrimary, ...ff(700) }]}
+          numberOfLines={2}
+        >
+          {post.title}
         </Text>
-        <View style={ss.artMeta}>
-          <Text style={[ss.artMetaTxt, { color: colors.textMeta }]}>{article.readMin} min</Text>
-          <View style={[ss.artXpBadge, { backgroundColor: colors.surface }]}>
-            <Text style={[ss.artXpTxt, { color: colors.brand, ...ff(700) }]}>+{article.xp} XP</Text>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-/** Horizontal course card — used in "In Progress" scroll (.course-card) */
-function CourseCardMini({
-  course,
-  onPress,
-  ss,
-  colors,
-}: {
-  course: Course;
-  onPress: () => void;
-  ss: ReturnType<typeof makeStyles>;
-  colors: ReturnType<typeof useTheme>;
-}) {
-  const [from, to] = courseGradient(course.gradientColor);
-  return (
-    <TouchableOpacity
-      style={[ss.courseMini, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-      onPress={onPress}
-      activeOpacity={0.88}
-      accessibilityRole="button"
-      accessibilityLabel={`Course: ${course.title}`}
-    >
-      {/* Gradient thumbnail */}
-      <LinearGradient
-        colors={[from, to]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={ss.courseThumb}
-      >
-        <Text style={ss.courseThumbEmoji}>{course.emoji}</Text>
-        {/* Play button */}
-        <View style={ss.coursePlay}>
-          <Ionicons name="play" size={10} color={colors.textPrimary} />
-        </View>
-      </LinearGradient>
-
-      {/* Info */}
-      <View style={ss.courseMiniInfo}>
-        <Text style={[ss.courseTag, { color: colors.brand }]}>{course.tag}</Text>
-        <Text style={[ss.courseTitle, { color: colors.textPrimary, ...ff(700) }]} numberOfLines={2}>
-          {course.title}
-        </Text>
-        <View style={ss.courseMeta}>
-          <Text style={[ss.courseLessons, { color: colors.textMeta }]}>{course.lessons} lessons</Text>
-          <View style={[ss.courseXpBadge, { backgroundColor: colors.surface }]}>
-            <Text style={[ss.courseXpTxt, { color: colors.brand, ...ff(700) }]}>+{course.xp} XP</Text>
-          </View>
-        </View>
-        {/* Progress bar */}
-        <View style={[ss.courseProg, { backgroundColor: colors.surfaceElevated }]}>
-          <View
-            style={[ss.courseProgFill, { backgroundColor: colors.brand, width: `${course.progressPct * 100}%` }]}
-          />
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-/** Full-width course list row — used in "All Courses" (.chal-c style) */
-function CourseListRow({
-  course,
-  onPress,
-  ss,
-  colors,
-}: {
-  course: Course;
-  onPress: () => void;
-  ss: ReturnType<typeof makeStyles>;
-  colors: ReturnType<typeof useTheme>;
-}) {
-  const [from, to] = courseGradient(course.gradientColor);
-
-  // Progress bar color per gradient variant
-  const progressColor =
-    course.gradientColor === 'g' ? colors.brand
-      : course.gradientColor === 'b' ? colors.info
-        : course.gradientColor === 'a' ? colors.warning
-          : colors.purple;
-
-  return (
-    <TouchableOpacity
-      style={[ss.courseRow, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-      onPress={onPress}
-      activeOpacity={0.88}
-      accessibilityRole="button"
-      accessibilityLabel={`Course: ${course.title}`}
-    >
-      {/* Icon tile with gradient */}
-      <LinearGradient colors={[from, to]} style={ss.courseRowIc}>
-        <Text style={ss.courseRowEmoji}>{course.emoji}</Text>
-      </LinearGradient>
-
-      <View style={ss.courseRowInfo}>
-        <Text style={[ss.chTtl, { color: colors.textPrimary, ...ff(700) }]}>{course.title}</Text>
-        <Text style={[ss.chDesc, { color: colors.textMeta }]} numberOfLines={1}>
-          {course.description}
-        </Text>
-        {/* Footer row */}
-        <View style={ss.chFoot}>
-          <View style={[ss.chXpBadge, { backgroundColor: colors.surface }]}>
-            <Text style={[ss.chXpTxt, { color: colors.brand, ...ff(700) }]}>+{course.xp} XP</Text>
-          </View>
-          <Text style={[ss.chProgTxt, { color: colors.textMeta }]}>
-            {course.lessons} lessons · {course.durationMin} min
-          </Text>
-        </View>
-        {/* Progress bar */}
-        {course.progressPct > 0 && (
-          <View style={[ss.chBar, { backgroundColor: colors.surfaceElevated }]}>
-            <View
-              style={[ss.chFill, { backgroundColor: progressColor, width: `${course.progressPct * 100}%` }]}
-            />
+        {(post.author || post.published_at) && (
+          <View style={ss.artMeta}>
+            {post.author && (
+              <Text style={[ss.artMetaTxt, { color: colors.textMeta }]} numberOfLines={1}>
+                {post.author.name}
+              </Text>
+            )}
+            {post.author && post.published_at && (
+              <Text style={[ss.artMetaTxt, { color: colors.textMeta }]}> · </Text>
+            )}
+            {post.published_at && (
+              <Text style={[ss.artMetaTxt, { color: colors.textMeta }]}>
+                {formatDate(post.published_at)}
+              </Text>
+            )}
           </View>
         )}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-/** Quiz card row (.chal-c style) */
-function QuizCard({
-  quiz,
-  onPress,
-  ss,
-  colors,
-}: {
-  quiz: Quiz;
-  onPress: () => void;
-  ss: ReturnType<typeof makeStyles>;
-  colors: ReturnType<typeof useTheme>;
-}) {
-  const thumbBg = colors[THUMB_TOKEN[quiz.thumbColor]];
-  return (
-    <TouchableOpacity
-      style={[ss.courseRow, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-      onPress={onPress}
-      activeOpacity={0.88}
-      accessibilityRole="button"
-      accessibilityLabel={`Quiz: ${quiz.title}`}
-    >
-      {/* Icon tile */}
-      <View style={[ss.courseRowIc, { backgroundColor: thumbBg }]}>
-        <Text style={ss.courseRowEmoji}>{quiz.emoji}</Text>
-      </View>
-
-      <View style={ss.courseRowInfo}>
-        <Text style={[ss.chTtl, { color: colors.textPrimary, ...ff(700) }]}>{quiz.title}</Text>
-        <Text style={[ss.chDesc, { color: colors.textMeta }]}>{quiz.description}</Text>
-        <View style={ss.chFoot}>
-          <View style={[ss.chXpBadge, { backgroundColor: colors.surface }]}>
-            <Text style={[ss.chXpTxt, { color: colors.brand, ...ff(700) }]}>+{quiz.xp} XP</Text>
-          </View>
-          {quiz.score ? (
-            <Text style={[ss.chProgTxt, { color: colors.brand, ...ff(600) }]}>
-              Score: {quiz.score}
-            </Text>
-          ) : (
-            <Text style={[ss.chProgTxt, { color: colors.textMeta }]}>Not attempted</Text>
-          )}
-        </View>
       </View>
     </TouchableOpacity>
   );
@@ -528,259 +165,114 @@ export default function HubScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const ss = makeStyles(colors, insets.bottom);
-  const { info } = useToast();
 
-  const [activeTab, setActiveTab] = useState<HubTab>('articles');
   const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Filter articles by selected category chip
-  const visibleArticles = ARTICLES.filter(
-    (a) => !a.featured && (activeCategory === 'All' || a.category === activeCategory),
-  );
+  const { data, isLoading, isError, refetch } = usePosts({ limit: 50 });
+  const posts = useMemo(() => data?.items ?? [], [data?.items]);
 
-  // "In Progress" = courses with progressPct > 0
-  const inProgressCourses = COURSES.filter((c) => c.progressPct > 0);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
-  function handleArticle(title: string) {
-    info('📖', `Opening "${title}"… +${ARTICLES.find((a) => a.title === title)?.xp ?? 0} XP`);
-  }
-
-  function handleCourse(title: string) {
-    info('🎬', `Opening "${title}"…`);
-  }
-
-  function handleQuiz(quiz: Quiz) {
-    if (quiz.isDaily) {
-      info('🎯', 'Daily quiz starting! Good luck!');
-    } else {
-      info('📋', `Opening "${quiz.title}"…`);
+  // Derive unique category names from posts in the order they first appear
+  const categories = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = ['All'];
+    for (const post of posts) {
+      if (post.category && !seen.has(post.category.slug)) {
+        seen.add(post.category.slug);
+        list.push(post.category.name);
+      }
     }
-  }
+    return list;
+  }, [posts]);
+
+  const visiblePosts =
+    activeCategory === 'All'
+      ? posts
+      : posts.filter((p) => p.category?.name === activeCategory);
 
   return (
     <View style={[ss.root, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
 
-      {/* ── Dark-green header ───────────────────────────────────────────────── */}
-      <View
-        style={[
-          ss.header,
-          { paddingTop: insets.top + spacing.lg, backgroundColor: colors.darkGreen },
-        ]}
+      <ScreenHeader
+        title="Knowledge Hub"
+        subtitle="Financial knowledge made for Nigerians"
+        onBack={() => router.back()}
+        paddingTop={insets.top + spacing.lg}
+      />
+
+      {/* ── Content ─────────────────────────────────────────────────────────── */}
+
+      <ScrollView
+        style={ss.scroll}
+        contentContainerStyle={ss.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
+        }
       >
-        {/* Title row */}
-        <View style={ss.titleRow}>
-          <TouchableOpacity
-            style={[ss.backBtn, { backgroundColor: colors.overlayGhost, borderColor: colors.overlayGhostBorder }]}
-            onPress={() => router.back()}
-            hitSlop={hitSlop(36)}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="arrow-back" size={layout.iconMd} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={[ss.titleTxt, { color: colors.white }]}>Knowledge Hub</Text>
-          {/* Spacer to balance the back button */}
-          <View style={ss.titleSpacer} />
-        </View>
-
-        {/* Hero copy */}
-        <Text style={[ss.heroHeading, { color: colors.white, ...ff(800) }]}>
-          Learn &amp; Earn 📚
-        </Text>
-        <Text style={[ss.heroSub, { color: colors.textInverseFaint }]}>
-          Read articles · Watch courses · Earn XP
-        </Text>
-
-        {/* 3-tab pill switcher (.hub-tabs) */}
-        <View style={[ss.hubTabs, { backgroundColor: colors.overlayGhost }]}>
-          {(['articles', 'courses', 'quizzes'] as HubTab[]).map((tab) => {
-            const isOn = activeTab === tab;
-            const label = tab === 'articles' ? 'Articles' : tab === 'courses' ? 'Video Courses' : 'Quizzes';
-            return (
-              <TouchableOpacity
-                key={tab}
-                style={[
-                  ss.hubTab,
-                  isOn && { backgroundColor: colors.lime },
-                ]}
-                onPress={() => setActiveTab(tab)}
-                accessibilityRole="tab"
-                accessibilityLabel={label}
-                accessibilityState={{ selected: isOn }}
-              >
-                <Text
-                  style={[
-                    ss.hubTabTxt,
-                    { color: isOn ? colors.darkGreen : colors.textInverseFaint, ...ff(600) },
-                  ]}
-                >
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* ── Tab content ─────────────────────────────────────────────────────── */}
-
-      {/* ARTICLES TAB */}
-      {activeTab === 'articles' && (
-        <ScrollView
-          style={ss.scroll}
-          contentContainerStyle={ss.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Category filter chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={ss.chips}
-          >
-            {CATEGORIES.map((cat) => (
-              <Chip
-                key={cat}
-                label={cat}
-                selected={activeCategory === cat}
-                onPress={() => setActiveCategory(cat)}
-                accessibilityLabel={`Filter by ${cat}`}
-              />
+        {isLoading ? (
+          /* Skeleton loading state */
+          <View style={[ss.artList, { paddingTop: spacing.mdn }]}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <PostCardSkeleton key={i} ss={ss} colors={colors} />
             ))}
-          </ScrollView>
-
-          {/* Featured article hero card */}
-          {(activeCategory === 'All' || activeCategory === 'Budgeting') && (
-            <FeaturedCard
-              article={ARTICLES[0]!}
-              onPress={() => handleArticle(ARTICLES[0]!.title)}
-              ss={ss}
-              colors={colors}
-            />
-          )}
-
-          {/* Article list */}
-          <View style={ss.artList}>
-            {visibleArticles.map((article) => (
-              <ArticleCard
-                key={article.id}
-                article={article}
-                onPress={() => handleArticle(article.title)}
-                ss={ss}
-                colors={colors}
-              />
-            ))}
-            {visibleArticles.length === 0 && (
-              <View style={ss.emptyWrap}>
-                <Text style={[ss.emptyTxt, { color: colors.textMeta, ...ff(500) }]}>
-                  No articles in this category yet.
-                </Text>
-              </View>
-            )}
           </View>
-        </ScrollView>
-      )}
-
-      {/* COURSES TAB */}
-      {activeTab === 'courses' && (
-        <ScrollView
-          style={ss.scroll}
-          contentContainerStyle={ss.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* In Progress section */}
-          {inProgressCourses.length > 0 && (
-            <>
-              <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(600) }]}>
-                In Progress
-              </Text>
+        ) : isError ? (
+          <View style={ss.centered}>
+            <Text style={[ss.emptyTxt, { color: colors.textMeta, ...ff(500) }]}>
+              Could not load posts. Pull down to retry.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Category filter chips — only shown when there are categories */}
+            {categories.length > 1 && (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={ss.courseMiniRow}
+                contentContainerStyle={ss.chips}
               >
-                {inProgressCourses.map((course) => (
-                  <CourseCardMini
-                    key={course.id}
-                    course={course}
-                    onPress={() => handleCourse(course.title)}
-                    ss={ss}
-                    colors={colors}
+                {categories.map((cat) => (
+                  <Chip
+                    key={cat}
+                    label={cat}
+                    selected={activeCategory === cat}
+                    onPress={() => setActiveCategory(cat)}
+                    accessibilityLabel={`Filter by ${cat}`}
                   />
                 ))}
               </ScrollView>
-            </>
-          )}
+            )}
 
-          {/* All Courses section */}
-          <Text style={[ss.sectionLbl, { color: colors.textMeta, ...ff(600) }]}>
-            All Courses
-          </Text>
-          <View style={ss.courseList}>
-            {COURSES.map((course) => (
-              <CourseListRow
-                key={course.id}
-                course={course}
-                onPress={() => handleCourse(course.title)}
-                ss={ss}
-                colors={colors}
-              />
-            ))}
-          </View>
-        </ScrollView>
-      )}
-
-      {/* QUIZZES TAB */}
-      {activeTab === 'quizzes' && (
-        <ScrollView
-          style={ss.scroll}
-          contentContainerStyle={ss.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Daily quiz card */}
-          <TouchableOpacity
-            style={[
-              ss.dailyQuiz,
-              { backgroundColor: colors.cardBg, borderColor: colors.border },
-            ]}
-            onPress={() => handleQuiz(QUIZZES[0]!)}
-            activeOpacity={0.88}
-            accessibilityRole="button"
-            accessibilityLabel="Start today's daily quiz"
-          >
-            <Text style={ss.dailyEmoji}>🧠</Text>
-            <Text style={[ss.dailyTitle, { color: colors.textPrimary, ...ff(700) }]}>
-              Daily Money Quiz
-            </Text>
-            <Text style={[ss.dailySub, { color: colors.textMeta }]}>
-              5 questions · +100 XP · Resets daily
-            </Text>
-            <TouchableOpacity
-              style={[ss.startBtn, { backgroundColor: colors.brand }]}
-              onPress={() => handleQuiz(QUIZZES[0]!)}
-              accessibilityRole="button"
-              accessibilityLabel="Start today's quiz"
-            >
-              <Text style={[ss.startBtnTxt, { color: colors.white }]}>
-                Start Today&apos;s Quiz
-              </Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-
-          {/* Past quizzes */}
-          <View style={ss.quizList}>
-            {QUIZZES.filter((q) => !q.isDaily).map((quiz) => (
-              <QuizCard
-                key={quiz.id}
-                quiz={quiz}
-                onPress={() => handleQuiz(quiz)}
-                ss={ss}
-                colors={colors}
-              />
-            ))}
-          </View>
-        </ScrollView>
-      )}
+            {/* Post list */}
+            <View style={ss.artList}>
+              {visiblePosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onPress={() => router.push(`/post/${post.slug}` as never)}
+                  ss={ss}
+                  colors={colors}
+                />
+              ))}
+              {visiblePosts.length === 0 && (
+                <View style={ss.emptyWrap}>
+                  <Text style={[ss.emptyTxt, { color: colors.textMeta, ...ff(500) }]}>
+                    No posts in this category yet.
+                  </Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -793,48 +285,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
     root: { flex: 1 },
     scroll: { flex: 1 },
     scrollContent: { paddingBottom: Math.max(bottomInset, 4) + spacing.xl },
-
-    // ── Header ───────────────────────────────────────────────────────────────
-    header: {
-      borderBottomLeftRadius: radius.xl,
-      borderBottomRightRadius: radius.xl,
-      paddingHorizontal: spacing.xl,
-      paddingBottom: spacing.lg,
-    },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.smd,
-    },
-    backBtn: {
-      width: layout.iconBtnSize,
-      height: layout.iconBtnSize,
-      borderRadius: radius.smd,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    titleTxt: { ...type_.h1 },
-    titleSpacer: { width: layout.iconBtnSize },
-    heroHeading: { ...type_.h1Sm },
-    heroSub: { ...type_.bodyReg, marginTop: spacing.xxs },
-
-    // ── Hub tab pills ─────────────────────────────────────────────────────────
-    hubTabs: {
-      flexDirection: 'row',
-      borderRadius: radius.sm,
-      padding: spacing.xxs,
-      marginTop: spacing.mdn,
-    },
-    hubTab: {
-      flex: 1,
-      height: layout.avatarSm + spacing.xs,
-      borderRadius: radius.smd,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    hubTabTxt: { ...type_.bodyReg },
+    centered: { alignItems: 'center', justifyContent: 'center', paddingTop: spacing.xxxl },
 
     // ── Category chips ────────────────────────────────────────────────────────
     chips: {
@@ -843,58 +294,8 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
     },
-    chip: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xxs,
-      borderRadius: radius.full,
-      borderWidth: 1.5,
-    },
-    chipTxt: { ...type_.small },
 
-    // ── Featured card ─────────────────────────────────────────────────────────
-    featCard: {
-      marginHorizontal: spacing.lg,
-      marginTop: spacing.md,
-      borderRadius: radius.lg,
-      padding: spacing.xl,
-      overflow: 'hidden',
-    },
-    featGlow: {
-      position: 'absolute',
-      top: -20,
-      right: -20,
-      width: spacing.xxxl + spacing.xxl + spacing.xxxl,
-      height: spacing.xxxl + spacing.xxl + spacing.xxxl,
-      borderRadius: radius.full,
-      backgroundColor: 'rgba(168,224,99,0.20)',
-    },
-    featTagRow: { marginBottom: spacing.smd },
-    featTagPill: {
-      alignSelf: 'flex-start',
-      backgroundColor: 'rgba(168,224,99,0.15)',
-      borderRadius: radius.xxs,
-      paddingHorizontal: spacing.smd,
-      paddingVertical: spacing.xxs,
-    },
-    featTagTxt: { ...type_.label },
-    featTitle: { ...type_.subHead },
-    featMeta: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.smd,
-      marginTop: spacing.smd,
-    },
-    featXpBadge: {
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      borderRadius: radius.xxs,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xxs,
-    },
-    featXpTxt: { ...type_.caption },
-    featMetaTxt: { ...type_.small },
-    textInverseFaint: { opacity: 0.55 },
-
-    // ── Article list ──────────────────────────────────────────────────────────
+    // ── Post list ─────────────────────────────────────────────────────────────
     artList: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
     artCard: {
       flexDirection: 'row',
@@ -913,126 +314,20 @@ function makeStyles(colors: ReturnType<typeof useTheme>, bottomInset: number) {
       justifyContent: 'center',
       flexShrink: 0,
     },
-    artEmoji: { ...type_.displayNum },
+    coverImg: {
+      width: '100%',
+      height: '100%',
+    },
+    logoFallback: {
+      width: '60%',
+      height: '60%',
+    },
     artContent: { flex: 1, minWidth: 0 },
     artTag: { ...type_.labelSm },
     artTitle: { ...type_.bodyReg, lineHeight: 21, marginTop: spacing.xxs },
     artMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs, marginTop: spacing.xxs },
     artMetaTxt: { ...type_.caption },
-    artXpBadge: { borderRadius: radius.xxs, paddingHorizontal: spacing.xxs, paddingVertical: 2 },
-    artXpTxt: { ...type_.caption },
     emptyWrap: { alignItems: 'center', paddingVertical: spacing.xxl },
     emptyTxt: { ...type_.body },
-
-    // ── Courses — section label ───────────────────────────────────────────────
-    sectionLbl: { ...type_.bodyReg, marginLeft: spacing.lg, marginTop: spacing.mdn, marginBottom: spacing.smd },
-    courseMiniRow: {
-      flexDirection: 'row',
-      gap: spacing.md,
-      paddingHorizontal: spacing.lg,
-    },
-
-    // ── Course mini card (horizontal scroll) ──────────────────────────────────
-    courseMini: {
-      width: 200,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      overflow: 'hidden',
-      flexShrink: 0,
-      ...shadow.sm,
-    },
-    courseThumb: {
-      height: layout.avatarLg + spacing.xxxl,
-      alignItems: 'center',
-      justifyContent: 'center',
-      position: 'relative',
-    },
-    courseThumbEmoji: { ...type_.display },
-    coursePlay: {
-      position: 'absolute',
-      bottom: spacing.sm,
-      right: spacing.sm,
-      width: layout.avatarSm - spacing.xxs,
-      height: layout.avatarSm - spacing.xxs,
-      borderRadius: radius.full,
-      backgroundColor: 'rgba(255,255,255,0.9)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    courseMiniInfo: { padding: spacing.smd },
-    courseTag: { ...type_.labelSm },
-    courseTitle: { ...type_.bodyReg, lineHeight: 21, marginTop: spacing.xxs },
-    courseMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs, marginTop: spacing.xxs },
-    courseLessons: { ...type_.labelSm },
-    courseXpBadge: { borderRadius: radius.xxs, paddingHorizontal: spacing.xxs, paddingVertical: 2 },
-    courseXpTxt: { ...type_.labelSm },
-    courseProg: { height: layout.progressSm, borderRadius: 2, marginTop: spacing.xxs, overflow: 'hidden' },
-    courseProgFill: { height: '100%', borderRadius: 2 },
-
-    // ── Course list row (chal-c style) ────────────────────────────────────────
-    courseList: { paddingHorizontal: spacing.lg, gap: spacing.sm + 1, paddingTop: 0 },
-    courseRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: spacing.md,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      padding: spacing.mdn,
-      ...shadow.sm,
-    },
-    courseRowIc: {
-      width: layout.fabSize,
-      height: layout.fabSize,
-      borderRadius: radius.smd,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-      overflow: 'hidden',
-    },
-    courseRowEmoji: { ...type_.h1 },
-    courseRowInfo: { flex: 1, minWidth: 0 },
-    chTtl: { ...type_.bodyReg },
-    chDesc: { ...type_.small, marginTop: 2, lineHeight: 20 },
-    chFoot: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: spacing.sm,
-    },
-    chXpBadge: { borderRadius: radius.xxs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xxs },
-    chXpTxt: { ...type_.caption },
-    chProgTxt: { ...type_.caption },
-    chBar: { height: layout.progressSm + 1, borderRadius: 2, marginTop: spacing.xxs, overflow: 'hidden' },
-    chFill: { height: '100%', borderRadius: 2 },
-
-    // ── Daily quiz card ───────────────────────────────────────────────────────
-    dailyQuiz: {
-      marginHorizontal: spacing.lg,
-      marginTop: spacing.mdn,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      padding: spacing.xl,
-      alignItems: 'center',
-      ...shadow.sm,
-    },
-    dailyEmoji: { ...type_.displayLg, marginBottom: spacing.md },
-    dailyTitle: { ...type_.h3 },
-    dailySub: { ...type_.bodyReg, marginTop: spacing.xxs },
-    startBtn: {
-      marginTop: spacing.lg,
-      height: layout.fabSize,
-      width: '100%',
-      borderRadius: radius.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    startBtnTxt: { ...type_.btnSm },
-
-    // ── Quiz list ─────────────────────────────────────────────────────────────
-    quizList: {
-      paddingHorizontal: spacing.lg,
-      gap: spacing.sm + 1,
-      marginTop: spacing.mdn,
-    },
   });
 }
