@@ -24,6 +24,7 @@ All queries go through ``groq_query()``, which returns the raw
 
 from __future__ import annotations
 
+import json
 import urllib.parse
 from typing import Any
 
@@ -32,6 +33,14 @@ import httpx
 from app.core.config import settings
 
 _TIMEOUT = httpx.Timeout(10.0)
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(timeout=_TIMEOUT)
+    return _client
 
 
 def _sanity_url() -> str:
@@ -56,12 +65,11 @@ async def groq_query(query: str, params: dict[str, Any] | None = None) -> Any:
         # Sanity expects GROQ params prefixed with "$" in the query string.
         for key, value in params.items():
             param_key = key if key.startswith("$") else f"${key}"
-            qs[param_key] = str(value) if not isinstance(value, str) else value
+            qs[param_key] = json.dumps(value)
 
     url = f"{_sanity_url()}?{urllib.parse.urlencode(qs)}"
 
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        response = await client.get(url, headers=_headers())
-        response.raise_for_status()
-        data = response.json()
-        return data.get("result")
+    response = await _get_client().get(url, headers=_headers())
+    response.raise_for_status()
+    data = response.json()
+    return data.get("result")

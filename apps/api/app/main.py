@@ -17,12 +17,9 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from aioredis import from_url as aioredis_from_url  # noqa: E402
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi_cache import FastAPICache  # type: ignore[import-untyped]  # noqa: E402
-from fastapi_cache.backends.redis import RedisBackend  # type: ignore[import-untyped]  # noqa: E402
 from rich.console import Console
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -58,9 +55,6 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
     finally:
         db.close()
-
-    redis = await aioredis_from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
-    FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
 
     yield
     # Shutdown — nothing to clean up

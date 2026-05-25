@@ -34,6 +34,8 @@ from __future__ import annotations
 import logging
 import logging.config
 from collections.abc import Iterable
+from io import StringIO
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from rich import traceback as rich_traceback
@@ -51,6 +53,66 @@ class _FileConsole(Console):
 
     def _render_buffer(self, buffer: Iterable[Segment]) -> str:  # type: ignore[override]
         return super()._render_buffer(Segment.strip_links(buffer))
+
+
+class _RotatingRichFileHandler(RotatingFileHandler):
+    """RotatingFileHandler that renders log records with Rich before writing.
+
+    Rich formatting is rendered into a StringIO buffer, then the result is
+    written to the rotating file stream.  Rotation is triggered by actual
+    on-disk file size so the 10 MB limit is always accurate regardless of
+    how many ANSI escape bytes Rich adds.
+    """
+
+    def __init__(
+        self,
+        filename: str,
+        maxBytes: int,
+        backupCount: int,
+        level: int | str,
+        rich_kwargs: dict,
+    ) -> None:
+        super().__init__(
+            filename,
+            mode="a",
+            maxBytes=maxBytes,
+            backupCount=backupCount,
+            encoding="utf-8",
+            delay=False,
+        )
+        self.setLevel(level)
+        self._buf: StringIO = StringIO()
+        self._rich_console = _FileConsole(file=self._buf, width=120, force_terminal=True)
+        self._rich_handler = RichHandler(console=self._rich_console, **rich_kwargs)
+        self._rich_handler.setLevel(level)
+
+    def shouldRollover(self, record: logging.LogRecord) -> int:  # noqa: N802
+        """Trigger rollover when the file reaches maxBytes on disk."""
+        if self.maxBytes <= 0:
+            return 0
+        if self.stream is None:
+            self.stream = self._open()
+        self.stream.seek(0, 2)
+        return 1 if self.stream.tell() >= self.maxBytes else 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.acquire()
+            try:
+                self._buf.seek(0)
+                self._buf.truncate()
+                self._rich_handler.emit(record)
+                rendered = self._buf.getvalue()
+                if self.shouldRollover(record):
+                    self.doRollover()
+                if self.stream is None:
+                    self.stream = self._open()
+                self.stream.write(rendered)
+                self.stream.flush()
+            finally:
+                self.release()
+        except Exception:
+            self.handleError(record)
 
 
 _RICH_HANDLER = RichHandler(
@@ -79,31 +141,37 @@ def configure_logging(log_dir: str = "logs", log_level: str = "INFO") -> None:
     # Each file gets its own Console(file=...) so Rich renders styled,
     # human-readable output (with tracebacks) into the log files.
 
-    _app_log_file = open(log_path / "app.log", "a", encoding="utf-8")  # noqa: SIM115
-    _app_file_handler = RichHandler(
-        console=_FileConsole(file=_app_log_file, width=120, force_terminal=True),
-        rich_tracebacks=True,
-        tracebacks_max_frames=10,
-        tracebacks_show_locals=True,
-        tracebacks_word_wrap=True,
-        markup=False,
-        log_time_format="[%Y-%m-%d %H:%M:%S]",
-        show_path=True,
+    _app_file_handler = _RotatingRichFileHandler(
+        filename=str(log_path / "app.log"),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        level=level,
+        rich_kwargs=dict(
+            rich_tracebacks=True,
+            tracebacks_max_frames=10,
+            tracebacks_show_locals=True,
+            tracebacks_word_wrap=True,
+            markup=False,
+            log_time_format="[%Y-%m-%d %H:%M:%S]",
+            show_path=True,
+        ),
     )
-    _app_file_handler.setLevel(level)
 
-    _err_log_file = open(log_path / "error.log", "a", encoding="utf-8")  # noqa: SIM115
-    _err_file_handler = RichHandler(
-        console=_FileConsole(file=_err_log_file, width=120, force_terminal=True),
-        rich_tracebacks=True,
-        tracebacks_max_frames=20,
-        tracebacks_show_locals=True,
-        tracebacks_word_wrap=True,
-        markup=False,
-        log_time_format="[%Y-%m-%d %H:%M:%S]",
-        show_path=True,
+    _err_file_handler = _RotatingRichFileHandler(
+        filename=str(log_path / "error.log"),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        level=logging.ERROR,
+        rich_kwargs=dict(
+            rich_tracebacks=True,
+            tracebacks_max_frames=20,
+            tracebacks_show_locals=True,
+            tracebacks_word_wrap=True,
+            markup=False,
+            log_time_format="[%Y-%m-%d %H:%M:%S]",
+            show_path=True,
+        ),
     )
-    _err_file_handler.setLevel(logging.ERROR)
 
     config: dict = {
         "version": 1,

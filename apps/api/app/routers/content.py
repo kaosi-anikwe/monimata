@@ -18,14 +18,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi_cache.decorator import cache  # type: ignore[import-untyped]
 
 from app.core.deps import get_current_user
 from app.core.limiter import limiter
+from app.core.redis_client import (
+    content_post_detail_key,
+    content_post_list_key,
+    get_async_redis,
+)
 from app.models.user import User
 from app.schemas.content import (
     AuthorSummary,
@@ -38,6 +43,8 @@ from app.services.sanity import groq_query
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_CACHE_TTL = 3600
 
 # ── GROQ queries ──────────────────────────────────────────────────────────────
 
@@ -95,7 +102,6 @@ def _map_post(raw: dict) -> PostSummary:
 
 
 @router.get("/posts", response_model=PostListResponse, operation_id="listPosts")
-@cache(expire=3600)
 @limiter.limit("60/minute")
 async def list_posts(
     request: Request,
@@ -105,7 +111,13 @@ async def list_posts(
     _: User = Depends(get_current_user),
 ) -> PostListResponse:
     """Return a paginated list of mobile-visible posts."""
-    category_filter = f" && category->slug.current == '{category}'" if category else ""
+    cache_key = content_post_list_key(page=page, limit=limit, category=category)
+    r = await get_async_redis()
+    cached = await r.get(cache_key)
+    if cached:
+        return PostListResponse.model_validate_json(cached)
+
+    category_filter = " && category->slug.current == $category" if category else ""
     full_filter = f"{_MOBILE_POST_FILTER}{category_filter}"
     from_idx = (page - 1) * limit
     to_idx = from_idx + limit - 1
@@ -114,9 +126,10 @@ async def list_posts(
     list_query = (
         f"*[{full_filter}] | order(publishedAt desc) [{from_idx}...{to_idx + 1}] {_POST_PROJECTION}"
     )
+    groq_params = {"$category": category} if category else None
 
     try:
-        total, items_raw = await _run_two(count_query, list_query)
+        total, items_raw = await _run_two(count_query, list_query, groq_params)
     except httpx.HTTPError as exc:
         logger.error("Sanity request failed: %s", exc)
         raise HTTPException(
@@ -124,19 +137,20 @@ async def list_posts(
             detail="Content service unavailable",
         )
 
-    return PostListResponse(
+    result = PostListResponse(
         total=int(total or 0),
         page=page,
         limit=limit,
         items=[_map_post(p) for p in (items_raw or [])],
     )
+    await r.set(cache_key, result.model_dump_json(), ex=_CACHE_TTL)
+    return result
 
 
 # ── GET /content/posts/{slug} ─────────────────────────────────────────────────
 
 
 @router.get("/posts/{slug}", response_model=PostDetail, operation_id="getPost")
-@cache(expire=3600)
 @limiter.limit("120/minute")
 async def get_post(
     request: Request,
@@ -144,6 +158,12 @@ async def get_post(
     _: User = Depends(get_current_user),
 ) -> PostDetail:
     """Return a single mobile-visible post by slug."""
+    cache_key = content_post_detail_key(slug=slug)
+    r = await get_async_redis()
+    cached = await r.get(cache_key)
+    if cached:
+        return PostDetail.model_validate_json(cached)
+
     query = f"*[{_MOBILE_POST_FILTER} && slug.current == $slug][0] {_POST_DETAIL_PROJECTION}"
     try:
         raw = await groq_query(query, {"slug": slug})
@@ -159,7 +179,7 @@ async def get_post(
 
     cat = raw.get("category")
     auth = raw.get("author")
-    return PostDetail(
+    result = PostDetail(
         id=raw.get("id", ""),
         title=raw.get("title", ""),
         slug=raw.get("slug", ""),
@@ -171,13 +191,13 @@ async def get_post(
         author=AuthorSummary(**auth) if auth else None,
         body=raw.get("body"),
     )
+    await r.set(cache_key, result.model_dump_json(), ex=_CACHE_TTL)
+    return result
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-async def _run_two(query_a: str, query_b: str):
+async def _run_two(query_a: str, query_b: str, params: dict | None = None):
     """Run two independent GROQ queries concurrently."""
-    import asyncio
-
-    return await asyncio.gather(groq_query(query_a), groq_query(query_b))
+    return await asyncio.gather(groq_query(query_a, params), groq_query(query_b, params))

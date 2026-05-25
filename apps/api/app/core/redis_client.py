@@ -28,6 +28,7 @@ import logging
 from typing import TYPE_CHECKING, cast
 
 import redis
+import redis.asyncio
 
 from app.core.config import settings
 
@@ -37,6 +38,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _redis_client: redis.Redis | None = None
+_async_redis_client: redis.asyncio.Redis | None = None
 
 
 def get_redis() -> redis.Redis:
@@ -46,6 +48,27 @@ def get_redis() -> redis.Redis:
             settings.REDIS_URL, decode_responses=True
         )
     return _redis_client
+
+
+async def get_async_redis() -> redis.asyncio.Redis:
+    global _async_redis_client
+    if _async_redis_client is None:
+        _async_redis_client = redis.asyncio.from_url(settings.REDIS_URL, decode_responses=True)
+    return _async_redis_client
+
+
+# ── Content cache keys ────────────────────────────────────────────────────────
+
+_CONTENT_POST_LIST_KEY = "content:posts:{page}:{limit}:{category}"
+_CONTENT_POST_DETAIL_KEY = "content:post:{slug}"
+
+
+def content_post_list_key(*, page: int, limit: int, category: str | None) -> str:
+    return _CONTENT_POST_LIST_KEY.format(page=page, limit=limit, category=category or "")
+
+
+def content_post_detail_key(*, slug: str) -> str:
+    return _CONTENT_POST_DETAIL_KEY.format(slug=slug)
 
 
 # ── JWT access-token blocklist (read-only) ────────────────────────────────────
