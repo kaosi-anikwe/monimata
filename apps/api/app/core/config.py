@@ -79,6 +79,13 @@ class Settings(BaseSettings):
     APP_UPDATE_URL_ANDROID: str = ""  # Play Store URL
     APP_UPDATE_URL_IOS: str = ""  # App Store URL
 
+    # ── Sanity Content Lake ───────────────────────────────────────────────────
+    SANITY_PROJECT_ID: str = ""
+    SANITY_DATASET: str = "production"
+    SANITY_API_VERSION: str = "2024-01-01"
+    # Read token — only required if the dataset is private.
+    SANITY_API_TOKEN: str = ""
+
     # ── Logging ───────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"  # DEBUG | INFO | WARNING | ERROR
     LOG_DIR: str = "logs"  # relative to the working directory (apps/api)

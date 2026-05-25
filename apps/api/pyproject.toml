@@ -1,6 +1,6 @@
 [project]
 name = "monimata-api"
-version = "0.4.0"
+version = "0.5.0"
 description = "MoniMata backend — zero-based budgeting for Nigerians"
 readme = "README.md"
 license = "AGPL-3.0"
@@ -27,6 +27,7 @@ dependencies = [
     "ecdsa==0.19.1",
     "email-validator==2.3.0",
     "fastapi==0.135.1",
+    "fastapi-cache2[redis]>=0.1.8",
     "fastapi-cli==0.0.24",
     "fastapi-cloud-cli==0.14.1",
     "fastar==0.8.0",

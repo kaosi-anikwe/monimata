@@ -14,9 +14,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from aioredis import from_url as aioredis_from_url  # noqa: E402
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi_cache import FastAPICache  # type: ignore[import-untyped]  # noqa: E402
+from fastapi_cache.backends.redis import RedisBackend  # type: ignore[import-untyped]  # noqa: E402
 from rich.console import Console
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -32,13 +38,12 @@ from app.services import budget_events as _budget_events  # noqa: F401
 configure_logging(log_dir=settings.LOG_DIR, log_level=settings.LOG_LEVEL)
 
 import logging  # noqa: E402 — after configure_logging
-from contextlib import asynccontextmanager  # noqa: E402
 
 _startup_logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def _lifespan(app: FastAPI):  # type: ignore[type-arg]
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Warm caches and run any pre-flight setup before the server starts accepting requests."""
     from app.core.database import SessionLocal
     from app.core.redis_client import warm_nudge_rule_cache
@@ -53,6 +58,9 @@ async def _lifespan(app: FastAPI):  # type: ignore[type-arg]
         )
     finally:
         db.close()
+
+    redis = await aioredis_from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+    FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
 
     yield
     # Shutdown — nothing to clean up
