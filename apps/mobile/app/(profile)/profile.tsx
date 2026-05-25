@@ -246,7 +246,7 @@ export default function ProfileScreen() {
             leftIcon={<Ionicons name="book-outline" size={17} color={colors.info} />}
             title="Knowledge Hub"
             subtitle="Articles, courses, quizzes"
-            onPress={() => router.push('/(tabs)/hub')}
+            onPress={() => router.push('/hub')}
             showChevron
           />
           <ListRow

@@ -253,7 +253,7 @@ export default function HomeScreen() {
           <TourTarget id="home-profile">
             <TouchableOpacity
               style={s.userRow}
-              onPress={() => router.push('/(tabs)/profile')}
+              onPress={() => router.push('/profile')}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel="Go to profile"
@@ -303,7 +303,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.balBtnGhost, s.balBtnPrimary, { backgroundColor: colors.lime, borderColor: colors.lime }]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/add-transaction'); }}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/(transactions)/add-transaction'); }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel="Add transaction"

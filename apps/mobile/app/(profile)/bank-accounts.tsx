@@ -26,7 +26,7 @@
  * without the back button.
  */
 
-import AccountsScreen from './(tabs)/accounts';
+import AccountsScreen from '../(tabs)/accounts';
 
 export default function AccountsStackScreen() {
   return <AccountsScreen showBackButton />;

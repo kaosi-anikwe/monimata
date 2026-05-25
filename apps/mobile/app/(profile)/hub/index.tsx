@@ -257,7 +257,7 @@ export default function HubScreen() {
                 <PostCard
                   key={post.id}
                   post={post}
-                  onPress={() => router.push(`/post/${post.slug}` as never)}
+                  onPress={() => router.push(`/hub/post/${post.slug}` as never)}
                   ss={ss}
                   colors={colors}
                 />

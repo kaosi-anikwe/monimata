@@ -13,6 +13,28 @@ Git tags follow the pattern `mobile/vX.Y.Z` and `api/vX.Y.Z`.
 
 ## Mobile App
 
+### [0.5.1] - 2026-05-25
+
+#### Changed
+
+- Reorganised app routes into domain-scoped route groups: `(profile)/`,
+  `(budget)/`, and `(transactions)/` replace the flat collection of screens
+  that previously lived at the app root.
+- Added a nested `<Stack>` layout for `(profile)/hub/` so that hub list →
+  post detail navigation is self-contained; hardware back / swipe-back on a
+  post returns to the hub list rather than the profile screen.
+
+#### Fixed
+
+- Renamed `(profile)/index.tsx` → `profile.tsx` and `(profile)/accounts.tsx`
+  → `bank-accounts.tsx` to eliminate URL collisions with the Home tab (`/`)
+  and the Accounts tab (`/accounts`) caused by Expo Router's transparent
+  route-group semantics.
+- Fixed broken post deep-link: push target corrected from `/post/:slug` to
+  `/hub/post/:slug` after the post screen moved under the hub group.
+- Removed extraneous `Tabs.Screen` entries for `profile` and `hub` that were
+  causing "Too many screens defined" warnings.
+
 ### [0.5.0] - 2026-05-25
 
 #### Added

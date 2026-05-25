@@ -35,7 +35,7 @@ function SharedFAB() {
 
   // Only show at the root level of a tab (segments.length <= 2),
   // not when a stack screen is pushed on top, and not on profile/hub.
-  if (segments.length > 2 || segments[1] === 'profile' || segments[1] === 'hub') return null;
+  if (segments.length > 2) return null;
 
   const bottomOffset = layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.sm;
 
@@ -46,7 +46,7 @@ function SharedFAB() {
         { backgroundColor: colors.lime, bottom: bottomOffset },
         shadow.fab,
       ]}
-      onPress={() => router.push('/add-transaction')}
+      onPress={() => router.push('/(transactions)/add-transaction')}
       activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel="Add transaction"
@@ -70,10 +70,6 @@ export default function TabsLayout() {
         <Tabs.Screen name="transactions" options={{ title: 'Transactions' }} />
         <Tabs.Screen name="nudges" options={{ title: 'Nudges' }} />
         <Tabs.Screen name="accounts" options={{ title: 'Accounts' }} />
-
-        {/* ── Hidden — accessible via router.push() ────────────────────── */}
-        <Tabs.Screen name="profile" options={{ href: null }} />
-        <Tabs.Screen name="hub" options={{ href: null }} />
       </Tabs>
 
       {/* Floating action button — bottom-right above the tab bar */}

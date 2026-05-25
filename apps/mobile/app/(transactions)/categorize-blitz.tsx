@@ -107,7 +107,7 @@ export default function CategorizeBlitzScreen() {
   const allCategorised = noMultiClustersLeft && (data?.total_uncategorised ?? 0) === 0;
   useEffect(() => {
     if (noMultiClustersLeft && !allCategorised) {
-      router.replace('/categorize-queue');
+      router.replace('/(transactions)/categorize-queue');
     }
   }, [noMultiClustersLeft, allCategorised]);
 

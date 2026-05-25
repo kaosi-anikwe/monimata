@@ -24,7 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Haptics from "expo-haptics";
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   BackHandler,
@@ -386,10 +386,10 @@ export default function AddTransactionScreen() {
     setNumpadVisible(true);
     Animated.spring(numpadAnim, { toValue: 1, useNativeDriver: true, tension: 220, friction: 26 }).start();
   }
-  function dismissNumpad() {
+  const dismissNumpad = useCallback(() => {
     setNumpadVisible(false);
     Animated.spring(numpadAnim, { toValue: 0, useNativeDriver: true, tension: 220, friction: 26 }).start();
-  }
+  }, [numpadAnim])
 
   const caretOpacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -414,7 +414,7 @@ export default function AddTransactionScreen() {
       return true;
     });
     return () => sub.remove();
-  }, [numpadVisible]);
+  }, [dismissNumpad, numpadVisible]);
 
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
