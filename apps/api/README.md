@@ -94,9 +94,24 @@ apps/api/
 ### Prerequisites
 
 - Python 3.11+
-- PostgreSQL 15+
+- PostgreSQL 16+ with the [pgvector](https://github.com/pgvector/pgvector) extension (`CREATE EXTENSION vector`)
 - Redis 7+
 - Tesseract 4+ (`sudo apt install tesseract-ocr`) — receipt image OCR
+
+#### PostgreSQL setup
+
+The API uses PostgreSQL-specific types (`JSONB`, `ARRAY`, `UUID`) and the `pgvector` extension for embedding-based transaction categorisation. SQLite is **not** supported.
+
+```bash
+# Install pgvector (Ubuntu/Debian)
+sudo apt install postgresql-16-pgvector
+
+# Or on macOS with Homebrew
+brew install pgvector
+
+# Enable the extension in your database
+psql -d monimata -c "CREATE EXTENSION IF NOT EXISTS vector"
+```
 
 ### Setup
 

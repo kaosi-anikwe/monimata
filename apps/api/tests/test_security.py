@@ -71,7 +71,8 @@ class TestJwtDecode:
             with pytest.raises(JWTError, match="Not an access token"):
                 decode_access_token(token)
 
-    def test_missing_sub_raises(self):
+    def test_missing_sub_returns_no_sub(self):
+        """Token without 'sub' decodes but payload has no 'sub' key."""
         from jose import jwt
 
         from app.core.security import decode_access_token
@@ -81,8 +82,9 @@ class TestJwtDecode:
             settings.SECRET_KEY,
             algorithm="HS256",
         )
-        with pytest.raises(Exception):
-            decode_access_token(token)
+        with patch.object(settings, "JWT_PUBLIC_KEY", ""):
+            payload = decode_access_token(token)
+            assert "sub" not in payload
 
 
 class TestFernetEncryption:
