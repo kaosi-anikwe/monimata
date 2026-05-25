@@ -77,13 +77,13 @@ def create_credential(
         validate_api_key(body.provider, body.api_key)
     except LlmHttpError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"API key rejected by {body.provider} (HTTP {exc.status_code}). \
             Check your key and try again.",
         ) from exc
     except Exception as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Could not reach {body.provider} to validate key: {exc}",
         ) from exc
 
@@ -165,7 +165,7 @@ def trigger_llm_categorization(
     )
     if credential is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="No active AI credential configured. Add one at POST /ai/credentials.",
         )
 

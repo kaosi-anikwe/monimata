@@ -287,7 +287,7 @@ def categorize_cluster(
     )
     if cat is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Category not found"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Category not found"
         )
 
     # Fetch unique uncategorised narrations to compare against cluster_key.
@@ -449,7 +449,7 @@ def patch_transaction(
         )
         if cat is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Category not found",
             )
         new_category_id: str | None = str(body.category_id)
@@ -462,7 +462,7 @@ def patch_transaction(
     # Debit transactions cannot be stripped of their category once assigned.
     if new_type == "debit" and new_category_id is None and old_category_id is not None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Debit transactions cannot be un-categorised",
         )
 
@@ -501,7 +501,7 @@ def patch_transaction(
         )
         if account is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Account not found",
             )
         tx.account_id = str(body.account_id)
@@ -580,7 +580,7 @@ def confirm_category(
     # Debits must always have a category.
     if body.category_id is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="A category is required for debit transactions",
         )
 
@@ -591,7 +591,7 @@ def confirm_category(
     )
     if cat is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Category not found"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Category not found"
         )
 
     old_category_id = str(tx.category_id) if tx.category_id else None
@@ -636,7 +636,7 @@ def split_transaction(
     split_sum = sum(s.amount for s in body.splits)
     if split_sum != total_abs:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Split amounts sum to {split_sum} kobo but transaction is {total_abs} kobo",
         )
 
@@ -652,7 +652,7 @@ def split_transaction(
         )
         if cat is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Category {item.category_id} not found",
             )
 
@@ -712,7 +712,7 @@ def remove_split(
     tx = _get_tx_or_404(db, str(tx_id), str(current_user.id))
     if not tx.is_split:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Transaction is not split",
         )
 
@@ -756,7 +756,7 @@ def create_manual_transaction(
     )
     if account is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Account not found"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Account not found"
         )
 
     if body.category_id:
@@ -770,7 +770,7 @@ def create_manual_transaction(
         )
         if cat is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Category not found",
             )
 
@@ -781,7 +781,7 @@ def create_manual_transaction(
     # (credits feed TBB and are not categorised).
     if body.type == "debit" and not body.category_id:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="A category is required for debit transactions",
         )
 

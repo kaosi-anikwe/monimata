@@ -182,7 +182,7 @@ async def upload_statement(
     result = identify_statement(content)
     if result is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 "Could not identify the bank from this statement. "
                 "Make sure it is an unmodified PDF statement from a supported bank."

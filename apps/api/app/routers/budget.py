@@ -236,7 +236,7 @@ def move_money(
 
     if str(body.from_category_id) == str(body.to_category_id):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Source and destination cannot be the same",
         )
 
@@ -258,7 +258,7 @@ def move_money(
     from_available = from_bm.available
     if from_available < body.amount:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 f"Insufficient available funds: {from_available} kobo available, "
                 f"{body.amount} kobo requested"
