@@ -555,8 +555,10 @@ class TestHydrateContext:
         tr = ctx["cat"].time_pct
         assert tr is not None
         assert 0.0 < tr <= 1.0
-        # 2026 is not a leap year; May 21 = day 141 → 141/365 ≈ 0.386
-        assert abs(tr - 141 / 365) < 1e-6
+        # Dynamic: compute expected from today's actual date
+        today_wat = datetime.now(WAT).date()
+        expected = today_wat.timetuple().tm_yday / 365
+        assert abs(tr - expected) < 1e-6
 
     def test_time_ratio_custom_midpoint(self):
         """Custom goal: exactly halfway through the window → time_ratio == 0.5."""

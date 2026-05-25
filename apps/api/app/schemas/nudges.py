@@ -133,12 +133,12 @@ class NudgeSettingsUpdate(BaseModel):
     enabled: bool | None = None
     quiet_hours_start: str | None = Field(
         None,
-        pattern=r"^\d{2}:\d{2}$",
+        pattern=r"^([01]\d|2[0-3]):[0-5]\d$",
         description="HH:MM format, e.g. '23:00'",
     )
     quiet_hours_end: str | None = Field(
         None,
-        pattern=r"^\d{2}:\d{2}$",
+        pattern=r"^([01]\d|2[0-3]):[0-5]\d$",
         description="HH:MM format, e.g. '07:00'",
     )
     fatigue_limit: int | None = Field(None, ge=1, le=10)

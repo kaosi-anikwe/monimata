@@ -115,7 +115,7 @@ def create_rule(
         next_due=body.next_due,
         ends_on=body.ends_on,
         is_active=True,
-        template=body.template,
+        template=body.template.model_dump(),
     )
     db.add(rule)
     db.flush()  # populate rule.id before using it below
