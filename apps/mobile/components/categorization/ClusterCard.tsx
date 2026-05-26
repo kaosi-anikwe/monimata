@@ -107,6 +107,7 @@ export function ClusterCard({
     <Animated.View
       entering={FadeInDown.springify().damping(26)}
       exiting={FadeOutUp.duration(220)}
+      style={{ overflow: 'visible' }}
     >
       <View
         style={[

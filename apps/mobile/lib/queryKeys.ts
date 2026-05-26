@@ -63,6 +63,19 @@ export const queryKeys = {
   aiCredentials: () => ['get', '/ai/credentials'] as const,
   aiUsage: () => ['get', '/ai/usage'] as const,
 
+  // ── Reports ────────────────────────────────────────────────────────────
+  reports: () => ['get', '/reports'] as const,
+  monthlySummary: () => ['get', '/reports/monthly-summary'] as const,
+  incomeExpenseTrend: () => ['get', '/reports/income-expense-trend'] as const,
+  spendingByCategory: () => ['get', '/reports/spending-by-category'] as const,
+  categoryTrend: () => ['get', '/reports/category-trend'] as const,
+  topMerchants: () => ['get', '/reports/top-merchants'] as const,
+  budgetPerformance: () => ['get', '/reports/budget-performance'] as const,
+  cashFlow: () => ['get', '/reports/cash-flow'] as const,
+  accountBalances: () => ['get', '/reports/account-balances'] as const,
+  recurringCommitments: () => ['get', '/reports/recurring-commitments'] as const,
+  ageOfMoney: () => ['get', '/reports/age-of-money'] as const,
+
   // ── Billing (TBD: API or WatermelonDB) ────────────────────────────────
   billCategories: () => ['bill-categories'] as const,
   billers: (categoryId: string) => ['billers', categoryId] as const,

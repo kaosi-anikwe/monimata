@@ -254,7 +254,7 @@ export default function ProfileScreen() {
             leftIcon={<Ionicons name="bar-chart-outline" size={17} color={colors.purple} />}
             title="Reports"
             subtitle="Spending, income, and net worth"
-            onPress={() => comingSoon('Reports')}
+            onPress={() => router.push('/(reports)/reports')}
             showChevron
             separator={false}
           />

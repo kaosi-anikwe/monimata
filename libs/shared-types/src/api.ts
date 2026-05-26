@@ -310,6 +310,88 @@ export interface paths {
      */
     post: operations["register_device_nudges_register_device_post"];
   };
+  "/reports/monthly-summary": {
+    /**
+     * Monthly Summary
+     * @description High-level financial snapshot for a single month.
+     *
+     * Returns total income, expenses, net savings, savings rate,
+     * month-over-month comparison, and top spending categories.
+     */
+    get: operations["monthly_summary_reports_monthly_summary_get"];
+  };
+  "/reports/income-expense-trend": {
+    /**
+     * Income Expense Trend
+     * @description Monthly income and expense totals for the last N months.
+     * Suitable for bar/line charts.  Omit *months* to retrieve full history.
+     */
+    get: operations["income_expense_trend_reports_income_expense_trend_get"];
+  };
+  "/reports/spending-by-category": {
+    /**
+     * Spending By Category
+     * @description Full category-level spending breakdown for a month.
+     * Returns each category's total, percentage, count, and average.
+     */
+    get: operations["spending_by_category_reports_spending_by_category_get"];
+  };
+  "/reports/category-trend": {
+    /**
+     * Category Trend
+     * @description A single category's spending over the last N months.
+     * Useful for sparklines or detailed category views.  Omit *months* for full history.
+     */
+    get: operations["category_trend_reports_category_trend_get"];
+  };
+  "/reports/top-merchants": {
+    /**
+     * Top Merchants
+     * @description Top merchants by total spend in a month, grouped by cleaned narration.
+     */
+    get: operations["top_merchants_reports_top_merchants_get"];
+  };
+  "/reports/budget-performance": {
+    /**
+     * Budget Performance
+     * @description Budget vs. actual spending for each budgeted category in a month.
+     */
+    get: operations["budget_performance_reports_budget_performance_get"];
+  };
+  "/reports/cash-flow": {
+    /**
+     * Cash Flow
+     * @description Cash in/out/net over a date range at daily, weekly, or monthly granularity.
+     */
+    get: operations["cash_flow_reports_cash_flow_get"];
+  };
+  "/reports/account-balances": {
+    /**
+     * Account Balances
+     * @description Current balances for all active accounts and total net worth.
+     */
+    get: operations["account_balances_reports_account_balances_get"];
+  };
+  "/reports/recurring-commitments": {
+    /**
+     * Recurring Commitments
+     * @description Active recurring rules with estimated monthly impact.
+     */
+    get: operations["recurring_commitments_reports_recurring_commitments_get"];
+  };
+  "/reports/age-of-money": {
+    /**
+     * Age Of Money
+     * @description Age of Money — estimates how many days old the money you spend today is.
+     *
+     * Calculated as: total cash balance ÷ average daily spending.
+     * A higher number means you're living on older money (more financial buffer).
+     *
+     * Also returns a trend comparing the current period against the prior
+     * equal-length period (positive = improving).
+     */
+    get: operations["age_of_money_reports_age_of_money_get"];
+  };
   "/sync/pull": {
     /**
      * Pull
@@ -462,6 +544,30 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
+    /** AccountBalance */
+    AccountBalance: {
+      /** Account Id */
+      account_id: string;
+      /** Institution */
+      institution: string;
+      /** Account Name */
+      account_name: string;
+      /** Alias */
+      alias: string | null;
+      /** Account Type */
+      account_type: string;
+      /** Currency */
+      currency: string;
+      /** Balance */
+      balance: number;
+    };
+    /** AccountBalancesResponse */
+    AccountBalancesResponse: {
+      /** Total Balance */
+      total_balance: number;
+      /** Accounts */
+      accounts: components["schemas"]["AccountBalance"][];
+    };
     /** AddManualAccountRequest */
     AddManualAccountRequest: {
       /** Institution */
@@ -487,6 +593,19 @@ export interface components {
        * @default 0
        */
       balance?: number;
+    };
+    /** AgeOfMoneyResponse */
+    AgeOfMoneyResponse: {
+      /** Age Days */
+      age_days: number;
+      /** Total Balance */
+      total_balance: number;
+      /** Avg Daily Expense */
+      avg_daily_expense: number;
+      /** Lookback Days */
+      lookback_days: number;
+      /** Trend */
+      trend: number | null;
     };
     /** AiCredentialCreate */
     AiCredentialCreate: {
@@ -622,6 +741,26 @@ export interface components {
       /** File */
       file: string;
     };
+    /** BudgetCategoryPerformance */
+    BudgetCategoryPerformance: {
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string;
+      /** Category Name */
+      category_name: string;
+      /** Group Name */
+      group_name: string;
+      /** Assigned */
+      assigned: number;
+      /** Spent */
+      spent: number;
+      /** Available */
+      available: number;
+      /** Utilization Pct */
+      utilization_pct: number;
+    };
     /** BudgetCategoryResponse */
     BudgetCategoryResponse: {
       /**
@@ -668,6 +807,21 @@ export interface components {
       /** Categories */
       categories: components["schemas"]["BudgetCategoryResponse"][];
     };
+    /** BudgetPerformanceResponse */
+    BudgetPerformanceResponse: {
+      /** Month */
+      month: string;
+      /** Total Assigned */
+      total_assigned: number;
+      /** Total Spent */
+      total_spent: number;
+      /** Total Available */
+      total_available: number;
+      /** Overall Utilization Pct */
+      overall_utilization_pct: number;
+      /** Categories */
+      categories: components["schemas"]["BudgetCategoryPerformance"][];
+    };
     /** BudgetResponse */
     BudgetResponse: {
       /** Month */
@@ -681,6 +835,23 @@ export interface components {
        * @default 0
        */
       total_debit?: number;
+    };
+    /** CashFlowPoint */
+    CashFlowPoint: {
+      /** Period */
+      period: string;
+      /** Inflow */
+      inflow: number;
+      /** Outflow */
+      outflow: number;
+      /** Net */
+      net: number;
+    };
+    /** CashFlowResponse */
+    CashFlowResponse: {
+      granularity: components["schemas"]["Granularity"];
+      /** Points */
+      points: components["schemas"]["CashFlowPoint"][];
     };
     /** CategoryCreate */
     CategoryCreate: {
@@ -772,6 +943,31 @@ export interface components {
        */
       created_at: string;
     };
+    /** CategorySpend */
+    CategorySpend: {
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string;
+      /** Category Name */
+      category_name: string;
+      /**
+       * Group Id
+       * Format: uuid
+       */
+      group_id: string;
+      /** Group Name */
+      group_name: string;
+      /** Total Spent */
+      total_spent: number;
+      /** Percentage */
+      percentage: number;
+      /** Transaction Count */
+      transaction_count: number;
+      /** Avg Transaction */
+      avg_transaction: number;
+    };
     /** CategorySuggestion */
     CategorySuggestion: {
       /**
@@ -841,6 +1037,27 @@ export interface components {
        * @default false
        */
       repeats?: boolean;
+    };
+    /** CategoryTrendPoint */
+    CategoryTrendPoint: {
+      /** Month */
+      month: string;
+      /** Spent */
+      spent: number;
+      /** Transaction Count */
+      transaction_count: number;
+    };
+    /** CategoryTrendResponse */
+    CategoryTrendResponse: {
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string;
+      /** Category Name */
+      category_name: string;
+      /** Points */
+      points: components["schemas"]["CategoryTrendPoint"][];
     };
     /** CategoryUpdate */
     CategoryUpdate: {
@@ -960,10 +1177,31 @@ export interface components {
        */
       budget_remaining_kobo?: number | null;
     };
+    /**
+     * Granularity
+     * @enum {string}
+     */
+    Granularity: "daily" | "weekly" | "monthly";
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
+    };
+    /** IncomeExpensePoint */
+    IncomeExpensePoint: {
+      /** Month */
+      month: string;
+      /** Income */
+      income: number;
+      /** Expenses */
+      expenses: number;
+      /** Net */
+      net: number;
+    };
+    /** IncomeExpenseTrendResponse */
+    IncomeExpenseTrendResponse: {
+      /** Points */
+      points: components["schemas"]["IncomeExpensePoint"][];
     };
     /** LlmCategorizeResponse */
     LlmCategorizeResponse: {
@@ -995,6 +1233,55 @@ export interface components {
       category_id?: string | null;
       /** Memo */
       memo?: string | null;
+    };
+    /** MerchantSpend */
+    MerchantSpend: {
+      /** Narration */
+      narration: string;
+      /** Total Spent */
+      total_spent: number;
+      /** Transaction Count */
+      transaction_count: number;
+      /** Avg Transaction */
+      avg_transaction: number;
+      /** Category Name */
+      category_name: string | null;
+      /**
+       * Last Date
+       * Format: date-time
+       */
+      last_date: string;
+    };
+    /** MonthComparison */
+    MonthComparison: {
+      /** Income Change Pct */
+      income_change_pct: number | null;
+      /** Expense Change Pct */
+      expense_change_pct: number | null;
+      /** Savings Change Pct */
+      savings_change_pct: number | null;
+    };
+    /** MonthlySummaryResponse */
+    MonthlySummaryResponse: {
+      /** Month */
+      month: string;
+      /** Total Income */
+      total_income: number;
+      /** Total Expenses */
+      total_expenses: number;
+      /** Net Savings */
+      net_savings: number;
+      /** Savings Rate */
+      savings_rate: number;
+      /** Credit Count */
+      credit_count: number;
+      /** Debit Count */
+      debit_count: number;
+      /** Avg Daily Expense */
+      avg_daily_expense: number;
+      /** Top Categories */
+      top_categories: components["schemas"]["TopCategorySpend"][];
+      comparison: components["schemas"]["MonthComparison"];
     };
     /** MoveMoneyRequest */
     MoveMoneyRequest: {
@@ -1217,6 +1504,39 @@ export interface components {
       /** Transaction Id */
       transaction_id?: string | null;
     };
+    /** RecurringCommitment */
+    RecurringCommitment: {
+      /** Rule Id */
+      rule_id: string;
+      /** Narration */
+      narration: string;
+      /** Amount */
+      amount: number;
+      /** Type */
+      type: string;
+      /** Frequency */
+      frequency: string;
+      /**
+       * Next Due
+       * Format: date
+       */
+      next_due: string;
+      /** Category Name */
+      category_name: string | null;
+      /** Account Name */
+      account_name: string | null;
+    };
+    /** RecurringCommitmentsResponse */
+    RecurringCommitmentsResponse: {
+      /** Total Monthly Outflow */
+      total_monthly_outflow: number;
+      /** Total Monthly Inflow */
+      total_monthly_inflow: number;
+      /** Active Count */
+      active_count: number;
+      /** Commitments */
+      commitments: components["schemas"]["RecurringCommitment"][];
+    };
     /** RecurringRuleCreate */
     RecurringRuleCreate: {
       /**
@@ -1334,6 +1654,15 @@ export interface components {
       /** Remaining Count */
       remaining_count: number;
     };
+    /** SpendingByCategoryResponse */
+    SpendingByCategoryResponse: {
+      /** Month */
+      month: string;
+      /** Total Spent */
+      total_spent: number;
+      /** Categories */
+      categories: components["schemas"]["CategorySpend"][];
+    };
     /** SupportedBankResponse */
     SupportedBankResponse: {
       /** Slug */
@@ -1360,6 +1689,29 @@ export interface components {
      * @enum {string}
      */
     TargetFrequency: "weekly" | "monthly" | "yearly" | "custom";
+    /** TopCategorySpend */
+    TopCategorySpend: {
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string;
+      /** Category Name */
+      category_name: string;
+      /** Group Name */
+      group_name: string;
+      /** Total Spent */
+      total_spent: number;
+      /** Percentage */
+      percentage: number;
+    };
+    /** TopMerchantsResponse */
+    TopMerchantsResponse: {
+      /** Month */
+      month: string;
+      /** Merchants */
+      merchants: components["schemas"]["MerchantSpend"][];
+    };
     /** TransactionListResponse */
     TransactionListResponse: {
       /** Items */
@@ -2714,6 +3066,257 @@ export interface operations {
       /** @description Successful Response */
       204: {
         content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Monthly Summary
+   * @description High-level financial snapshot for a single month.
+   *
+   * Returns total income, expenses, net savings, savings rate,
+   * month-over-month comparison, and top spending categories.
+   */
+  monthly_summary_reports_monthly_summary_get: {
+    parameters: {
+      query: {
+        /** @description YYYY-MM */
+        month: string;
+        top_n?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["MonthlySummaryResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Income Expense Trend
+   * @description Monthly income and expense totals for the last N months.
+   * Suitable for bar/line charts.  Omit *months* to retrieve full history.
+   */
+  income_expense_trend_reports_income_expense_trend_get: {
+    parameters: {
+      query?: {
+        /** @description Months to look back; omit for all history */
+        months?: number | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["IncomeExpenseTrendResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Spending By Category
+   * @description Full category-level spending breakdown for a month.
+   * Returns each category's total, percentage, count, and average.
+   */
+  spending_by_category_reports_spending_by_category_get: {
+    parameters: {
+      query: {
+        month: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SpendingByCategoryResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Category Trend
+   * @description A single category's spending over the last N months.
+   * Useful for sparklines or detailed category views.  Omit *months* for full history.
+   */
+  category_trend_reports_category_trend_get: {
+    parameters: {
+      query: {
+        category_id: string;
+        /** @description Months to look back; omit for all history */
+        months?: number | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["CategoryTrendResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Top Merchants
+   * @description Top merchants by total spend in a month, grouped by cleaned narration.
+   */
+  top_merchants_reports_top_merchants_get: {
+    parameters: {
+      query: {
+        month: string;
+        limit?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["TopMerchantsResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Budget Performance
+   * @description Budget vs. actual spending for each budgeted category in a month.
+   */
+  budget_performance_reports_budget_performance_get: {
+    parameters: {
+      query: {
+        month: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BudgetPerformanceResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Cash Flow
+   * @description Cash in/out/net over a date range at daily, weekly, or monthly granularity.
+   */
+  cash_flow_reports_cash_flow_get: {
+    parameters: {
+      query: {
+        /** @description Start YYYY-MM */
+        start: string;
+        /** @description End YYYY-MM */
+        end: string;
+        granularity?: components["schemas"]["Granularity"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["CashFlowResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Account Balances
+   * @description Current balances for all active accounts and total net worth.
+   */
+  account_balances_reports_account_balances_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["AccountBalancesResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Recurring Commitments
+   * @description Active recurring rules with estimated monthly impact.
+   */
+  recurring_commitments_reports_recurring_commitments_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["RecurringCommitmentsResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Age Of Money
+   * @description Age of Money — estimates how many days old the money you spend today is.
+   *
+   * Calculated as: total cash balance ÷ average daily spending.
+   * A higher number means you're living on older money (more financial buffer).
+   *
+   * Also returns a trend comparing the current period against the prior
+   * equal-length period (positive = improving).
+   */
+  age_of_money_reports_age_of_money_get: {
+    parameters: {
+      query?: {
+        /** @description Days to average over */
+        lookback_days?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["AgeOfMoneyResponse"];
+        };
       };
       /** @description Validation Error */
       422: {

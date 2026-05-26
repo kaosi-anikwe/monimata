@@ -243,6 +243,7 @@ export default function CategorizeBlitzScreen() {
               <Animated.View
                 key={cluster.key}
                 layout={LinearTransition.springify().damping(28)}
+                style={{ overflow: 'visible' }}
               >
                 <ClusterCard
                   cluster={cluster}
