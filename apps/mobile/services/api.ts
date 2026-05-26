@@ -167,6 +167,8 @@ async function doTokenRefresh(): Promise<string> {
         });
     }
     isRefreshing = true;
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 15_000);
     try {
         const storedRefresh = await getRefreshToken();
         if (!storedRefresh) throw new Error('No refresh token stored');
@@ -178,6 +180,7 @@ async function doTokenRefresh(): Promise<string> {
                 'X-App-Platform': APP_PLATFORM,
             },
             body: JSON.stringify({ refresh_token: storedRefresh }),
+            signal: abort.signal,
         });
         if (!refreshRes.ok) throw new Error('Token refresh failed');
         const tokens: { access_token: string; refresh_token: string } = await refreshRes.json();
@@ -192,6 +195,7 @@ async function doTokenRefresh(): Promise<string> {
         _onLogout?.();
         throw err;
     } finally {
+        clearTimeout(timer);
         isRefreshing = false;
     }
 }

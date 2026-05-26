@@ -13,6 +13,38 @@ Git tags follow the pattern `mobile/vX.Y.Z` and `api/vX.Y.Z`.
 
 ## Mobile App
 
+### [0.6.0] - 2026-05-26
+
+#### Added
+
+- **Financial Reports module** — new `(reports)/` route group with a hub screen
+  and nine dedicated report screens:
+  - **Reports hub** (`reports.tsx`) — dashboard of summary cards with at-a-glance
+    metrics for income vs expenses, spending breakdown, budget performance, net
+    worth, and age of money; each card navigates to its full report.
+  - **Income & Expenses** (`income-expenses.tsx`) — monthly income vs expense
+    trend chart with net savings.
+  - **Spending Breakdown** (`spending-breakdown.tsx`) — donut chart of spending by
+    category for the selected month.
+  - **Category Detail** (`category-detail.tsx`) — per-category spending trend over
+    time.
+  - **Budget Performance** (`budget-performance.tsx`) — assigned vs spent per
+    category with utilisation percentages.
+  - **Cash Flow** (`cash-flow.tsx`) — inflow/outflow bar chart with
+    daily/weekly/monthly granularity toggle.
+  - **Net Worth** (`net-worth.tsx`) — account balances overview.
+  - **Top Merchants** (`top-merchants.tsx`) — ranked list of highest-spend
+    narrations for the month.
+  - **Recurring Commitments** (`recurring.tsx`) — active recurring rules with
+    estimated monthly inflow/outflow totals.
+- Chart components (`components/reports/`): `AreaChart`, `BarChart`,
+  `DonutChart`, `CountUp`, `MonthPicker`, `PercentBadge`, `ReportSkeletons`,
+  and `SegmentedControl`.
+- `useReports` hooks (`hooks/useReports.ts`) — TanStack Query hooks for all
+  report endpoints.
+- `react-native-gifted-charts` dependency added for chart rendering.
+- Report-related query keys added to `lib/queryKeys.ts`.
+
 ### [0.5.1] - 2026-05-25
 
 #### Changed
@@ -205,6 +237,55 @@ the time of writing; future entries will document incremental changes only.
 ---
 
 ## API
+
+### [0.6.0] - 2026-05-26
+
+#### Added
+
+- **Financial Reports endpoints** — ten new read-only analytics endpoints under
+  `/reports`:
+  - `GET /reports/monthly-summary` — total income, expenses, net savings, savings
+    rate, average daily expense, top spending categories, and month-over-month
+    comparison percentages.
+  - `GET /reports/income-expense-trend` — monthly income vs expense time series;
+    supports full-history retrieval via `months=all`.
+  - `GET /reports/spending-by-category` — per-category spend totals with
+    percentages and transaction counts for a given month.
+  - `GET /reports/category-trend` — monthly spend trend for a single category;
+    supports full-history retrieval via `months=all`.
+  - `GET /reports/top-merchants` — ranked narrations by total spend, with average
+    transaction size and last-seen date.
+  - `GET /reports/budget-performance` — assigned vs actual spend per category with
+    utilisation percentage.
+  - `GET /reports/cash-flow` — inflow/outflow time series with configurable
+    granularity (daily, weekly, monthly).
+  - `GET /reports/account-balances` — per-account computed balances and total
+    net worth.
+  - `GET /reports/recurring-commitments` — active recurring rules with estimated
+    monthly inflow/outflow totals.
+  - `GET /reports/age-of-money` — estimated age of money in days based on balance
+    and average daily spending, with trend vs prior period.
+- Pydantic response schemas for all report endpoints (`schemas/reports.py`).
+- **Comprehensive test suite** — 319 pytest tests covering all routers, services,
+  schemas, middleware, and security modules. Tests use a dedicated PostgreSQL
+  database with SAVEPOINT-based transaction isolation; Redis, Celery, and push
+  notifications are fully mocked.
+- CI workflow updated: `api-lint.yml` → `api-ci.yml` with a `pytest` job
+  (PostgreSQL 16 + pgvector, Redis 7).
+
+#### Fixed
+
+- HTTP 422 status code updated from deprecated `UNPROCESSABLE_ENTITY` to
+  `UNPROCESSABLE_CONTENT` across all routers (AI, budget, transactions, uploads).
+- `routers/recurring.py`: Pydantic model now serialised to dict before storing
+  in JSONB column (found during test development).
+- `schemas/nudges.py`: stricter `HH:MM` quiet-hours validation regex.
+- Webhook tests patched to use settings-level secret validation.
+
+#### Changed
+
+- `README.md` updated with PostgreSQL 16 version requirement and pgvector
+  extension setup instructions.
 
 ### [0.5.0] - 2026-05-25
 
