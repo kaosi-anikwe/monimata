@@ -51,6 +51,7 @@ from app.schemas.accounts import (
     ReconcileResponse,
     SupportedBankResponse,
     UpdateAliasRequest,
+    UpdateExcludeFromNetWorthRequest,
     UpdateManualBalanceRequest,
 )
 from app.services.ingestion import list_supported_banks
@@ -223,6 +224,25 @@ def update_alias(
     account.alias = payload.alias.strip()
     db.commit()
     db.refresh(account)
+    return account
+
+
+# ── PATCH /accounts/{id}/exclude-from-net-worth ─────────────────────────────
+
+
+@router.patch("/{account_id}/exclude-from-net-worth", response_model=BankAccountResponse)
+def update_exclude_from_net_worth(
+    account_id: str,
+    payload: UpdateExcludeFromNetWorthRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BankAccount:
+    """Toggle whether this account is excluded from the net-worth calculation."""
+    account = _get_live_account_or_404(db, account_id, current_user.id)
+    account.exclude_from_net_worth = payload.exclude_from_net_worth
+    db.commit()
+    db.refresh(account)
+    notify_user(current_user.id, ["accounts"])
     return account
 
 

@@ -40,6 +40,10 @@ class UpdateAliasRequest(BaseModel):
     alias: str
 
 
+class UpdateExcludeFromNetWorthRequest(BaseModel):
+    exclude_from_net_worth: bool
+
+
 class ReconcileRequest(BaseModel):
     true_actual_balance: int = Field(description="Verified real-world balance in kobo")
 
@@ -69,6 +73,7 @@ class BankAccountResponse(BaseModel):
     balance_as_of: datetime | None = None
     last_synced_at: datetime | None = None
     is_active: bool
+    exclude_from_net_worth: bool = False
     deleted_at: datetime | None = None
     created_at: datetime
 

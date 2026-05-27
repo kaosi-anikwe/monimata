@@ -61,6 +61,7 @@ class BankAccount(Base):
     # Timestamp of the last bank alert processed for this account
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    exclude_from_net_worth: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # NULL = live; non-NULL = soft-deleted
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

@@ -72,6 +72,14 @@ router = APIRouter()
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
+def _parse_account_ids(account_ids: str | None) -> list[str] | None:
+    """Parse comma-separated account UUID strings. Returns None if empty/omitted."""
+    if not account_ids:
+        return None
+    ids = [aid.strip() for aid in account_ids.split(",") if aid.strip()]
+    return ids or None
+
+
 def _parse_month(month_str: str) -> date:
     """Parse 'YYYY-MM' into the first day of that month."""
     return datetime.strptime(month_str, "%Y-%m").date().replace(day=1)
@@ -91,11 +99,16 @@ def _pct_change(current: int, previous: int) -> float | None:
     return round((current - previous) / abs(previous) * 100, 1)
 
 
-def _resolve_months(db: Session, user_id: str, months: int | None) -> int:
+def _resolve_months(
+    db: Session, user_id: str, months: int | None, account_ids: list[str] | None = None
+) -> int:
     """Return actual month count: use *months* if given, else span from earliest txn."""
     if months is not None:
         return months
-    earliest = db.query(func.min(Transaction.date)).filter(Transaction.user_id == user_id).scalar()
+    q = db.query(func.min(Transaction.date)).filter(Transaction.user_id == user_id)
+    if account_ids:
+        q = q.filter(Transaction.account_id.in_(account_ids))
+    earliest = q.scalar()
     if earliest is None:
         return 1
     today = date.today()
@@ -106,27 +119,28 @@ def _resolve_months(db: Session, user_id: str, months: int | None) -> int:
     )
 
 
-def _income_expense_for_month(db: Session, user_id: str, month: date) -> tuple[int, int]:
+def _income_expense_for_month(
+    db: Session, user_id: str, month: date, account_ids: list[str] | None = None
+) -> tuple[int, int]:
     """Return (total_income, total_expenses) for a month. Expenses as positive."""
     start, end = _month_range(month)
-    row = (
-        db.query(
-            func.coalesce(
-                func.sum(case((Transaction.type == "credit", Transaction.amount))),
-                0,
-            ).label("income"),
-            func.coalesce(
-                func.sum(case((Transaction.type == "debit", func.abs(Transaction.amount)))),
-                0,
-            ).label("expenses"),
-        )
-        .filter(
-            Transaction.user_id == user_id,
-            Transaction.date >= start,
-            Transaction.date <= end,
-        )
-        .one()
+    q = db.query(
+        func.coalesce(
+            func.sum(case((Transaction.type == "credit", Transaction.amount))),
+            0,
+        ).label("income"),
+        func.coalesce(
+            func.sum(case((Transaction.type == "debit", func.abs(Transaction.amount)))),
+            0,
+        ).label("expenses"),
+    ).filter(
+        Transaction.user_id == user_id,
+        Transaction.date >= start,
+        Transaction.date <= end,
     )
+    if account_ids:
+        q = q.filter(Transaction.account_id.in_(account_ids))
+    row = q.one()
     return int(row.income), int(row.expenses)
 
 
@@ -137,6 +151,7 @@ def _income_expense_for_month(db: Session, user_id: str, month: date) -> tuple[i
 def monthly_summary(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$", description="YYYY-MM"),
     top_n: int = Query(5, ge=1, le=20),
+    account_ids: str | None = Query(None, description="Comma-separated account UUIDs to include"),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
@@ -146,27 +161,27 @@ def monthly_summary(
     Returns total income, expenses, net savings, savings rate,
     month-over-month comparison, and top spending categories.
     """
+    aids = _parse_account_ids(account_ids)
     m = _parse_month(month)
     start, end = _month_range(m)
 
     # Current month totals
-    income, expenses = _income_expense_for_month(db, user.id, m)
+    income, expenses = _income_expense_for_month(db, user.id, m, aids)
     net = income - expenses
     savings_rate = round(net / income * 100, 1) if income > 0 else 0.0
 
     # Transaction counts
-    counts = (
-        db.query(
-            func.count(case((Transaction.type == "credit", 1))).label("credits"),
-            func.count(case((Transaction.type == "debit", 1))).label("debits"),
-        )
-        .filter(
-            Transaction.user_id == user.id,
-            Transaction.date >= start,
-            Transaction.date <= end,
-        )
-        .one()
+    counts_q = db.query(
+        func.count(case((Transaction.type == "credit", 1))).label("credits"),
+        func.count(case((Transaction.type == "debit", 1))).label("debits"),
+    ).filter(
+        Transaction.user_id == user.id,
+        Transaction.date >= start,
+        Transaction.date <= end,
     )
+    if aids:
+        counts_q = counts_q.filter(Transaction.account_id.in_(aids))
+    counts = counts_q.one()
 
     # Average daily expense
     _, last_day = calendar.monthrange(m.year, m.month)
@@ -175,7 +190,7 @@ def monthly_summary(
     avg_daily = expenses // max(days_elapsed, 1)
 
     # Top spending categories
-    top_cats_q = (
+    top_cats_base = (
         db.query(
             Category.id,
             Category.name,
@@ -190,7 +205,11 @@ def monthly_summary(
             Transaction.date >= start,
             Transaction.date <= end,
         )
-        .group_by(Category.id, Category.name, CategoryGroup.name)
+    )
+    if aids:
+        top_cats_base = top_cats_base.filter(Transaction.account_id.in_(aids))
+    top_cats_q = (
+        top_cats_base.group_by(Category.id, Category.name, CategoryGroup.name)
         .order_by(func.sum(func.abs(Transaction.amount)).desc())
         .limit(top_n)
         .all()
@@ -208,7 +227,7 @@ def monthly_summary(
 
     # Month-over-month comparison
     prev_m = m - relativedelta(months=1)
-    prev_income, prev_expenses = _income_expense_for_month(db, user.id, prev_m)
+    prev_income, prev_expenses = _income_expense_for_month(db, user.id, prev_m, aids)
     prev_net = prev_income - prev_expenses
     comparison = MonthComparison(
         income_change_pct=_pct_change(income, prev_income),
@@ -238,6 +257,7 @@ def income_expense_trend(
     months: int | None = Query(
         None, ge=1, le=24, description="Months to look back; omit for all history"
     ),
+    account_ids: str | None = Query(None, description="Comma-separated account UUIDs to include"),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
@@ -245,14 +265,15 @@ def income_expense_trend(
     Monthly income and expense totals for the last N months.
     Suitable for bar/line charts.  Omit *months* to retrieve full history.
     """
-    resolved = _resolve_months(db, user.id, months)
+    aids = _parse_account_ids(account_ids)
+    resolved = _resolve_months(db, user.id, months, aids)
     today = date.today()
     current = today.replace(day=1)
     points: list[IncomeExpensePoint] = []
 
     for i in range(resolved - 1, -1, -1):
         m = current - relativedelta(months=i)
-        inc, exp = _income_expense_for_month(db, user.id, m)
+        inc, exp = _income_expense_for_month(db, user.id, m, aids)
         points.append(
             IncomeExpensePoint(
                 month=m.strftime("%Y-%m"),
@@ -271,6 +292,7 @@ def income_expense_trend(
 @router.get("/spending-by-category", response_model=SpendingByCategoryResponse)
 def spending_by_category(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
+    account_ids: str | None = Query(None, description="Comma-separated account UUIDs to include"),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
@@ -278,10 +300,11 @@ def spending_by_category(
     Full category-level spending breakdown for a month.
     Returns each category's total, percentage, count, and average.
     """
+    aids = _parse_account_ids(account_ids)
     m = _parse_month(month)
     start, end = _month_range(m)
 
-    rows = (
+    rows_q = (
         db.query(
             Category.id,
             Category.name,
@@ -298,7 +321,11 @@ def spending_by_category(
             Transaction.date >= start,
             Transaction.date <= end,
         )
-        .group_by(Category.id, Category.name, CategoryGroup.id, CategoryGroup.name)
+    )
+    if aids:
+        rows_q = rows_q.filter(Transaction.account_id.in_(aids))
+    rows = (
+        rows_q.group_by(Category.id, Category.name, CategoryGroup.id, CategoryGroup.name)
         .order_by(func.sum(func.abs(Transaction.amount)).desc())
         .all()
     )
@@ -334,6 +361,7 @@ def category_trend(
     months: int | None = Query(
         None, ge=1, le=24, description="Months to look back; omit for all history"
     ),
+    account_ids: str | None = Query(None, description="Comma-separated account UUIDs to include"),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
@@ -341,7 +369,8 @@ def category_trend(
     A single category's spending over the last N months.
     Useful for sparklines or detailed category views.  Omit *months* for full history.
     """
-    resolved = _resolve_months(db, user.id, months)
+    aids = _parse_account_ids(account_ids)
+    resolved = _resolve_months(db, user.id, months, aids)
     cat = db.query(Category).filter(Category.id == category_id, Category.user_id == user.id).first()
     cat_name = cat.name if cat else "Unknown"
 
@@ -352,20 +381,19 @@ def category_trend(
     for i in range(resolved - 1, -1, -1):
         m = current - relativedelta(months=i)
         start, end = _month_range(m)
-        row = (
-            db.query(
-                func.coalesce(func.sum(func.abs(Transaction.amount)), 0).label("spent"),
-                func.count(Transaction.id).label("tx_count"),
-            )
-            .filter(
-                Transaction.user_id == user.id,
-                Transaction.category_id == category_id,
-                Transaction.type == "debit",
-                Transaction.date >= start,
-                Transaction.date <= end,
-            )
-            .one()
+        row_q = db.query(
+            func.coalesce(func.sum(func.abs(Transaction.amount)), 0).label("spent"),
+            func.count(Transaction.id).label("tx_count"),
+        ).filter(
+            Transaction.user_id == user.id,
+            Transaction.category_id == category_id,
+            Transaction.type == "debit",
+            Transaction.date >= start,
+            Transaction.date <= end,
         )
+        if aids:
+            row_q = row_q.filter(Transaction.account_id.in_(aids))
+        row = row_q.one()
         points.append(
             CategoryTrendPoint(
                 month=m.strftime("%Y-%m"),
@@ -388,22 +416,23 @@ def category_trend(
 def top_merchants(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
     limit: int = Query(10, ge=1, le=50),
+    account_ids: str | None = Query(None, description="Comma-separated account UUIDs to include"),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
     """
     Top merchants by total spend in a month, grouped by cleaned narration.
     """
+    aids = _parse_account_ids(account_ids)
     m = _parse_month(month)
     start, end = _month_range(m)
 
-    rows = (
+    merch_q = (
         db.query(
             func.coalesce(Transaction.cleaned_narration, Transaction.narration).label("narration"),
             func.sum(func.abs(Transaction.amount)).label("total_spent"),
             func.count(Transaction.id).label("tx_count"),
             func.max(Transaction.date).label("last_date"),
-            # Pick the most common category for this narration
             func.mode().within_group(Category.name).label("category_name"),
         )
         .outerjoin(Category, Transaction.category_id == Category.id)
@@ -413,7 +442,11 @@ def top_merchants(
             Transaction.date >= start,
             Transaction.date <= end,
         )
-        .group_by(func.coalesce(Transaction.cleaned_narration, Transaction.narration))
+    )
+    if aids:
+        merch_q = merch_q.filter(Transaction.account_id.in_(aids))
+    rows = (
+        merch_q.group_by(func.coalesce(Transaction.cleaned_narration, Transaction.narration))
         .order_by(func.sum(func.abs(Transaction.amount)).desc())
         .limit(limit)
         .all()
@@ -513,12 +546,14 @@ def cash_flow(
     start: str = Query(..., pattern=r"^\d{4}-\d{2}$", description="Start YYYY-MM"),
     end: str = Query(..., pattern=r"^\d{4}-\d{2}$", description="End YYYY-MM"),
     granularity: Granularity = Query(Granularity.monthly),
+    account_ids: str | None = Query(None, description="Comma-separated account UUIDs to include"),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
     """
     Cash in/out/net over a date range at daily, weekly, or monthly granularity.
     """
+    aids = _parse_account_ids(account_ids)
     start_d = _parse_month(start)
     end_m = _parse_month(end)
     _, end_last = calendar.monthrange(end_m.year, end_m.month)
@@ -535,27 +570,24 @@ def cash_flow(
         trunc = func.date_trunc(literal_column("'month'"), Transaction.date)
         fmt = "%Y-%m"
 
-    rows = (
-        db.query(
-            trunc.label("period"),
-            func.coalesce(
-                func.sum(case((Transaction.type == "credit", Transaction.amount))),
-                0,
-            ).label("inflow"),
-            func.coalesce(
-                func.sum(case((Transaction.type == "debit", func.abs(Transaction.amount)))),
-                0,
-            ).label("outflow"),
-        )
-        .filter(
-            Transaction.user_id == user.id,
-            Transaction.date >= start_dt,
-            Transaction.date <= end_d,
-        )
-        .group_by(trunc)
-        .order_by(trunc)
-        .all()
+    cf_q = db.query(
+        trunc.label("period"),
+        func.coalesce(
+            func.sum(case((Transaction.type == "credit", Transaction.amount))),
+            0,
+        ).label("inflow"),
+        func.coalesce(
+            func.sum(case((Transaction.type == "debit", func.abs(Transaction.amount)))),
+            0,
+        ).label("outflow"),
+    ).filter(
+        Transaction.user_id == user.id,
+        Transaction.date >= start_dt,
+        Transaction.date <= end_d,
     )
+    if aids:
+        cf_q = cf_q.filter(Transaction.account_id.in_(aids))
+    rows = cf_q.group_by(trunc).order_by(trunc).all()
 
     points: list[CashFlowPoint] = []
     for r in rows:
@@ -711,30 +743,34 @@ def recurring_commitments(
 
 
 def _total_expenses_in_range(
-    db: Session, user_id: str, start_dt: datetime, end_dt: datetime
+    db: Session,
+    user_id: str,
+    start_dt: datetime,
+    end_dt: datetime,
+    account_ids: list[str] | None = None,
 ) -> int:
     """Total debit amount (positive) in a datetime range."""
-    row = (
-        db.query(
-            func.coalesce(
-                func.sum(func.abs(Transaction.amount)),
-                0,
-            )
+    q = db.query(
+        func.coalesce(
+            func.sum(func.abs(Transaction.amount)),
+            0,
         )
-        .filter(
-            Transaction.user_id == user_id,
-            Transaction.type == "debit",
-            Transaction.date >= start_dt,
-            Transaction.date <= end_dt,
-        )
-        .scalar()
+    ).filter(
+        Transaction.user_id == user_id,
+        Transaction.type == "debit",
+        Transaction.date >= start_dt,
+        Transaction.date <= end_dt,
     )
+    if account_ids:
+        q = q.filter(Transaction.account_id.in_(account_ids))
+    row = q.scalar()
     return int(row)
 
 
 @router.get("/age-of-money", response_model=AgeOfMoneyResponse)
 def age_of_money(
     lookback_days: int = Query(30, ge=7, le=90, description="Days to average over"),
+    account_ids: str | None = Query(None, description="Comma-separated account UUIDs to include"),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
@@ -747,31 +783,30 @@ def age_of_money(
     Also returns a trend comparing the current period against the prior
     equal-length period (positive = improving).
     """
+    aids = _parse_account_ids(account_ids)
     now = datetime.utcnow()
 
     # Current period
     period_start = now - relativedelta(days=lookback_days)
-    total_expenses = _total_expenses_in_range(db, user.id, period_start, now)
+    total_expenses = _total_expenses_in_range(db, user.id, period_start, now, aids)
     avg_daily = total_expenses // max(lookback_days, 1)
 
     # Total balance across active accounts
-    total_balance = (
-        db.query(func.coalesce(func.sum(BankAccount.balance), 0))
-        .filter(
-            BankAccount.user_id == user.id,
-            BankAccount.is_active.is_(True),
-            BankAccount.deleted_at.is_(None),
-        )
-        .scalar()
+    bal_q = db.query(func.coalesce(func.sum(BankAccount.balance), 0)).filter(
+        BankAccount.user_id == user.id,
+        BankAccount.is_active.is_(True),
+        BankAccount.deleted_at.is_(None),
     )
-    total_balance = int(total_balance)
+    if aids:
+        bal_q = bal_q.filter(BankAccount.id.in_(aids))
+    total_balance = int(bal_q.scalar())
 
     age_days = round(total_balance / avg_daily, 1) if avg_daily > 0 else 0.0
 
     # Trend: compare against prior period of the same length
     prev_end = period_start
     prev_start = prev_end - relativedelta(days=lookback_days)
-    prev_expenses = _total_expenses_in_range(db, user.id, prev_start, prev_end)
+    prev_expenses = _total_expenses_in_range(db, user.id, prev_start, prev_end, aids)
     prev_avg_daily = prev_expenses // max(lookback_days, 1)
     prev_age = round(total_balance / prev_avg_daily, 1) if prev_avg_daily > 0 else None
     trend = round(age_days - prev_age, 1) if prev_age is not None else None
