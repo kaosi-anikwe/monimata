@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 class NudgeTriggerType(StrEnum):
     nudge = "nudge"
+    system = "system"
     transaction_received = "transaction_received"
     statement_received = "statement_received"
     statement_processed = "statement_processed"
