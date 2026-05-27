@@ -13,6 +13,47 @@ Git tags follow the pattern `mobile/vX.Y.Z` and `api/vX.Y.Z`.
 
 ## Mobile App
 
+### [0.7.0] - 2026-05-27
+
+#### Added
+
+- **Privacy mode** — new `amountsHidden` preference in Redux (`preferencesSlice`);
+  all monetary values are masked via `<AmountDisplay>` when enabled. Eye toggle on
+  the Home screen Total Balance and Accounts screen header. Reports wrapped in
+  `<ShowAmountsProvider>` to force-show amounts regardless of the global toggle.
+- **Exclude account from net worth** — per-account toggle on the accounts screen;
+  calls `PATCH /accounts/{id}/exclude-from-net-worth` and dims excluded accounts
+  in the list.
+- **Report account filter** — shared `<ReportAccountFilterSheet>` component and
+  `useReportAccountFilter` hook; all report screens and hooks accept an
+  `accountIds` parameter to scope data to selected accounts.
+- **Category transactions screen** (`category-transactions.tsx`) — view all
+  transactions for a specific category with month filtering.
+- **Cluster detail screen** (`cluster-detail.tsx`) — view all transactions in a
+  narration cluster with bulk categorisation.
+- **Shared `<CategoryPickerSheet>`** — extracted category picker with inline
+  "add category" (via `useCreateCategoryInline` hook) into a reusable component;
+  replaces four inline copies across add-transaction, split-transaction,
+  transaction detail, and transactions screens.
+- **Transaction search** — server-side full-text search across narration, cleaned
+  narration, and category name via the new `q` query parameter.
+- **System nudge rendering** — `system` trigger type displayed with info-themed
+  icon bubble on the nudges screen.
+
+#### Changed
+
+- **Cash-flow report** — row-based summary layout with granularity filter
+  (daily / weekly / monthly) and `visiblePoints={6}` chart window.
+- **Income & Expenses** — row-based summary layout with `<AmountDisplay>`.
+- **Home screen** — Income and Spent cards are now pressable; tapping navigates
+  to the Transactions tab pre-filtered by `credits` or `debits`.
+- **Budget TBB card** and **Accounts total balance** now use `<AmountDisplay>`
+  for privacy mode support.
+- **Transaction detail** — displays account name for non-editable (bank-synced)
+  transactions.
+- **Budget edit sheets** — removed bottom divider line from `CategoryOptionsSheet`
+  and `GroupOptionsSheet`.
+
 ### [0.6.0] - 2026-05-26
 
 #### Added
@@ -237,6 +278,31 @@ the time of writing; future entries will document incremental changes only.
 ---
 
 ## API
+
+### [0.7.0] - 2026-05-27
+
+#### Added
+
+- **Exclude from net worth** — `exclude_from_net_worth` boolean column on
+  `BankAccount` model; new `PATCH /accounts/{id}/exclude-from-net-worth`
+  endpoint to toggle it. Field included in `BankAccountResponse`.
+- **Transaction search** — `GET /transactions` accepts a `q` query parameter
+  for server-side `ILIKE` search across narration, cleaned narration, and
+  category name.
+- **Cluster transactions endpoint** — `GET /transactions/clusters/{key}`
+  returns paginated transactions for a specific narration cluster.
+- **Report account filtering** — all report endpoints accept an `account_ids`
+  query parameter (comma-separated UUIDs) to scope calculations to selected
+  accounts.
+- **`system` nudge trigger type** — new `NudgeTriggerType.system` enum value
+  for system-level notifications.
+
+#### Fixed
+
+- **Budget activity for statement transactions** — narration-map upsert,
+  sync push (insert / update / delete), and budget event listeners now skip
+  `source=statement` transactions to prevent double-counting historical
+  spending already reflected in closing balances.
 
 ### [0.6.1] - 2026-05-27
 
