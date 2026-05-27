@@ -25,6 +25,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -147,25 +148,28 @@ def list_transactions(
     start_date: str | None = Query(None, description="YYYY-MM-DD"),
     end_date: str | None = Query(None, description="YYYY-MM-DD"),
     uncategorized: bool | None = Query(None),
+    q: str | None = Query(
+        None, description="Search narration, cleaned narration, or category name"
+    ),
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> TransactionListResponse:
-    q = (
+    query = (
         db.query(Transaction)
         .filter(Transaction.user_id == str(current_user.id))
         .order_by(Transaction.date.desc(), Transaction.created_at.desc())
     )
 
     if account_id:
-        q = q.filter(Transaction.account_id == str(account_id))
+        query = query.filter(Transaction.account_id == str(account_id))
     if category_id:
-        q = q.filter(Transaction.category_id == str(category_id))
+        query = query.filter(Transaction.category_id == str(category_id))
     if uncategorized is True:
-        q = q.filter(Transaction.category_id.is_(None))
+        query = query.filter(Transaction.category_id.is_(None))
     if start_date:
         try:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=UTC)
-            q = q.filter(Transaction.date >= start_dt)
+            query = query.filter(Transaction.date >= start_dt)
         except ValueError:
             pass
     if end_date:
@@ -174,12 +178,21 @@ def list_transactions(
             end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
                 hour=23, minute=59, second=59, microsecond=999999, tzinfo=UTC
             )
-            q = q.filter(Transaction.date <= end_dt)
+            query = query.filter(Transaction.date <= end_dt)
         except ValueError:
             pass
+    if q:
+        search_term = f"%{q}%"
+        query = query.outerjoin(Category, Transaction.category_id == Category.id).filter(
+            or_(
+                Transaction.narration.ilike(search_term),
+                Transaction.cleaned_narration.ilike(search_term),
+                Category.name.ilike(search_term),
+            )
+        )
 
-    total = q.count()
-    items = q.offset((page - 1) * limit).limit(limit).all()
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
 
     return TransactionListResponse.model_validate(
         {"items": items, "total": total, "page": page, "limit": limit}
