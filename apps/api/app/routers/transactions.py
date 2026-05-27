@@ -132,8 +132,9 @@ def _upsert_narration_map(db: Session, user_id: str, narration: str, category_id
             other_tx.category_id = category_id
             other_tx.categorization_source = "exact_match"
             other_tx.category_confidence = 100
-            bm = get_or_create_budget_month(db, user_id, category_id, month_str)
-            bm.activity += other_tx.amount
+            if other_tx.source != TransactionSource.statement:
+                bm = get_or_create_budget_month(db, user_id, category_id, month_str)
+                bm.activity += other_tx.amount
 
 
 # ── GET /transactions ─────────────────────────────────────────────────────────
@@ -341,8 +342,9 @@ def categorize_cluster(
         tx.category_id = str(body.category_id)
         tx.categorization_source = "exact_match"
         tx.category_confidence = 100
-        bm = _get_bm(db, str(current_user.id), str(body.category_id), month_str)
-        bm.activity += tx.amount
+        if tx.source != TransactionSource.statement:
+            bm = _get_bm(db, str(current_user.id), str(body.category_id), month_str)
+            bm.activity += tx.amount
 
     # Write UserCategoryRule for the cluster representative.
     _upsert_narration_map(db, str(current_user.id), body.cluster_key, str(body.category_id))
@@ -485,7 +487,7 @@ def patch_transaction(
         new_signed != tx.amount or new_month != old_month or new_category_id != old_category_id
     )
 
-    if budget_changed:
+    if budget_changed and tx.source != TransactionSource.statement:
         if old_category_id:
             old_bm = get_or_create_budget_month(
                 db, str(current_user.id), old_category_id, old_month
@@ -611,13 +613,19 @@ def confirm_category(
     old_month = tx.date.strftime("%Y-%m")
     new_category_id = str(body.category_id)
 
-    # Adjust budget activity.
-    if old_category_id and old_category_id != new_category_id:
-        old_bm = get_or_create_budget_month(db, str(current_user.id), old_category_id, old_month)
-        old_bm.activity -= tx.amount
-    if not old_category_id or old_category_id != new_category_id:
-        new_bm = get_or_create_budget_month(db, str(current_user.id), new_category_id, old_month)
-        new_bm.activity += tx.amount
+    # Adjust budget activity (statement transactions are excluded —
+    # their spending is already reflected in TBB via the closing balance).
+    if tx.source != TransactionSource.statement:
+        if old_category_id and old_category_id != new_category_id:
+            old_bm = get_or_create_budget_month(
+                db, str(current_user.id), old_category_id, old_month
+            )
+            old_bm.activity -= tx.amount
+        if not old_category_id or old_category_id != new_category_id:
+            new_bm = get_or_create_budget_month(
+                db, str(current_user.id), new_category_id, old_month
+            )
+            new_bm.activity += tx.amount
 
     tx.category_id = new_category_id
     tx.categorization_source = "manual"
@@ -671,19 +679,20 @@ def split_transaction(
 
     # Undo old budget activity
     month_str = tx.date.strftime("%Y-%m")
-    if tx.category_id:
-        old_bm = get_or_create_budget_month(
-            db, str(current_user.id), str(tx.category_id), month_str
-        )
-        old_bm.activity -= tx.amount
-    for old_split in tx.splits:
-        if old_split.category_id:
-            bm = get_or_create_budget_month(
-                db, str(current_user.id), str(old_split.category_id), month_str
+    if tx.source != TransactionSource.statement:
+        if tx.category_id:
+            old_bm = get_or_create_budget_month(
+                db, str(current_user.id), str(tx.category_id), month_str
             )
-            # split amounts are always positive; sign comes from parent tx type
-            sign = -1 if tx.type == "debit" else 1
-            bm.activity -= sign * old_split.amount
+            old_bm.activity -= tx.amount
+        for old_split in tx.splits:
+            if old_split.category_id:
+                bm = get_or_create_budget_month(
+                    db, str(current_user.id), str(old_split.category_id), month_str
+                )
+                # split amounts are always positive; sign comes from parent tx type
+                sign = -1 if tx.type == "debit" else 1
+                bm.activity -= sign * old_split.amount
 
     # Delete old splits
     for old_split in list(tx.splits):
@@ -700,8 +709,11 @@ def split_transaction(
                 memo=item.memo,
             )
         )
-        bm = get_or_create_budget_month(db, str(current_user.id), str(item.category_id), month_str)
-        bm.activity += sign * item.amount
+        if tx.source != TransactionSource.statement:
+            bm = get_or_create_budget_month(
+                db, str(current_user.id), str(item.category_id), month_str
+            )
+            bm.activity += sign * item.amount
 
     tx.category_id = None
     tx.is_split = True
@@ -732,7 +744,7 @@ def remove_split(
     month_str = tx.date.strftime("%Y-%m")
     sign = -1 if tx.type == "debit" else 1
     for split in list(tx.splits):
-        if split.category_id:
+        if split.category_id and tx.source != TransactionSource.statement:
             bm = get_or_create_budget_month(
                 db, str(current_user.id), str(split.category_id), month_str
             )
@@ -874,7 +886,7 @@ def delete_transaction(
             rule.is_active = False
 
     # Undo budget activity
-    if tx.category_id:
+    if tx.category_id and tx.source != TransactionSource.statement:
         month_str = tx.date.strftime("%Y-%m")
         bm = get_or_create_budget_month(db, str(current_user.id), str(tx.category_id), month_str)
         bm.activity -= tx.amount

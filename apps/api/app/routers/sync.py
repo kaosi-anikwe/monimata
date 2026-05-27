@@ -826,7 +826,7 @@ def push(
         )
         db.add(new_tx)
 
-        if new_tx.category_id:
+        if new_tx.category_id and new_tx.source != TransactionSource.statement:
             month_str = tx_date.strftime("%Y-%m")
             bm = get_or_create_budget_month(db, user_id, str(new_tx.category_id), month_str)
             bm.activity += new_tx.amount
@@ -937,7 +937,7 @@ def push(
         if "recurrence_id" in record:
             tx.recurrence_id = record["recurrence_id"]
 
-        if old_category_id != new_category_id:
+        if old_category_id != new_category_id and not is_statement:
             tx_month = tx.date.strftime("%Y-%m")
             if old_category_id:
                 old_bm = get_or_create_budget_month(db, user_id, old_category_id, tx_month)
@@ -960,7 +960,7 @@ def push(
             continue  # already gone — idempotent
 
         # Reverse budget activity before deleting the transaction row.
-        if tx.category_id:
+        if tx.category_id and tx.source != TransactionSource.statement:
             tx_month = tx.date.strftime("%Y-%m")
             bm = get_or_create_budget_month(db, user_id, str(tx.category_id), tx_month)
             bm.activity -= tx.amount
