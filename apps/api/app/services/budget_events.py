@@ -38,7 +38,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import attributes, object_session
 
 from app.models.budget import BudgetMonth
-from app.models.transaction import Transaction
+from app.models.transaction import Transaction, TransactionSource
 from app.services.budget_logic import str_to_month_date
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -135,7 +135,13 @@ def _on_transaction_insert(mapper, connection, target: Transaction) -> None:
 
     Transactions inserted with ``category_id=None`` feed TBB dynamically and
     require no BudgetMonth row update.
+
+    Statement-imported transactions are historical and excluded from budget
+    activity — their spending is already reflected in the closing balance
+    which seeds TBB via MONIMATA_STARTING_BALANCE.
     """
+    if target.source == TransactionSource.statement:
+        return
     if not target.category_id:
         return
 
@@ -152,7 +158,13 @@ def _on_transaction_update(mapper, connection, target: Transaction) -> None:
 
     Covers all re-categorisation paths: manual edits, the Tier 1-3 pipeline,
     and the LLM fallback task.
+
+    Statement-imported transactions are historical and excluded from budget
+    activity — their spending is already reflected in the closing balance
+    which seeds TBB via MONIMATA_STARTING_BALANCE.
     """
+    if target.source == TransactionSource.statement:
+        return
     cat_hist = attributes.get_history(target, "category_id")
     amt_hist = attributes.get_history(target, "amount")
 
@@ -181,6 +193,8 @@ def _on_transaction_update(mapper, connection, target: Transaction) -> None:
 @event.listens_for(Transaction, "after_delete")
 def _on_transaction_delete(mapper, connection, target: Transaction) -> None:
     """Reverse a deleted transaction's contribution to BudgetMonth activity."""
+    if target.source == TransactionSource.statement:
+        return
     if not target.category_id:
         return
 

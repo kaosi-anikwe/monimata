@@ -34,6 +34,9 @@ class NudgeTriggerType(StrEnum):
     receipt_failed = "receipt_failed"
     receipt_duplicate = "receipt_duplicate"
     statement_failed = "statement_failed"
+    ai_credential_invalid = "ai_credential_invalid"
+    llm_categorization_complete = "llm_categorization_complete"
+    llm_categorization_failed = "llm_categorization_failed"
 
 
 class NudgeScreen(StrEnum):

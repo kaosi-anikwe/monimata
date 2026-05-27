@@ -238,6 +238,23 @@ the time of writing; future entries will document incremental changes only.
 
 ## API
 
+### [0.6.1] - 2026-05-27
+
+#### Added
+
+- **Nudge types for AI events** — new nudge triggers for AI credential and LLM
+  categorization events.
+- **E2E budget test** — test for statement-imported transactions to ensure they do
+  not affect `BudgetMonth.activity`.
+
+#### Fixed
+
+- **Budget event listeners** — statement-imported transactions (`source=statement`)
+  no longer affect `BudgetMonth.activity`. Historical spending is already reflected
+  in the closing balance that seeds TBB via `MONIMATA_STARTING_BALANCE`; the
+  `after_insert`, `after_update`, and `after_delete` listeners now skip
+  statement-sourced transactions.
+
 ### [0.6.0] - 2026-05-26
 
 #### Added

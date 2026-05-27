@@ -298,10 +298,13 @@ def run_llm_categorization(
                             trigger_type="ai_credential_invalid",
                             title="AI tracking paused",
                             message=(
-                                "Your AI API key is invalid or has run out of credit."
+                                "Your AI API key is invalid or has run out of credit. "
                                 "Tap to restore."
                             ),
-                            context={},
+                            context={
+                                "nudge_type": "ai_credential_invalid",
+                                "screen": "nudges",
+                            },
                         )
                         db.commit()
                 elif notify_on_completion:
@@ -317,7 +320,10 @@ def run_llm_categorization(
                                 f"The AI provider rejected the request (HTTP {exc.status_code}). "
                                 "Please check your API key."
                             ),
-                            context={},
+                            context={
+                                "nudge_type": "llm_categorization_failed",
+                                "screen": "nudges",
+                            },
                         )
                         db.commit()
                 logger.warning(
@@ -393,6 +399,8 @@ def run_llm_categorization(
                     title="AI categorisation complete",
                     message=body,
                     context={
+                        "nudge_type": "llm_categorization_complete",
+                        "screen": "transactions",
                         "success_count": success_count,
                         "failed_count": failed_count,
                         "total": len(txs),
@@ -428,7 +436,10 @@ def run_llm_categorization(
                                 "Automated categorisation failed after multiple retries. "
                                 "Transactions remain in your review queue."
                             ),
-                            context={},
+                            context={
+                                "nudge_type": "llm_categorization_failed",
+                                "screen": "nudges",
+                            },
                         )
                         nudge_db.commit()
             except Exception:

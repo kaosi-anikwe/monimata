@@ -133,6 +133,9 @@ PUSH_SCREEN: dict[str, str] = {
     "receipt_processed": "transaction",
     "receipt_duplicate": "transaction",
     "receipt_failed": "transactions",
+    "ai_credential_invalid": "settings",
+    "llm_categorization_complete": "transactions",
+    "llm_categorization_failed": "settings",
 }
 
 
@@ -602,7 +605,7 @@ def _run_dsl_nudges(db: Session, user: User, tx: Transaction) -> None:
             message = random.choice(rule["action"]["tmpls"]).format(**context)
             raw_title = rule.get("title", "")
             title = raw_title.format(**context) if raw_title else slug.replace("_", " ").title()
-        except (KeyError, AttributeError, IndexError):
+        except (KeyError, AttributeError, IndexError, TypeError):
             logger.warning(
                 "DSL template render error: slug=%s evt=%s", slug, evt_type, exc_info=True
             )
