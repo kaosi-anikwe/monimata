@@ -1376,7 +1376,7 @@ export interface components {
      * NudgeTriggerType
      * @enum {string}
      */
-    NudgeTriggerType: "nudge" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed";
+    NudgeTriggerType: "nudge" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed" | "ai_credential_invalid" | "llm_categorization_complete" | "llm_categorization_failed";
     /**
      * OperationalNudgeContext
      * @description Base context for operational notifications.

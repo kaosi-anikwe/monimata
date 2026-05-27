@@ -147,6 +147,24 @@ const OPERATIONAL_META: Record<string, TriggerMeta> = {
     iconColor: 'brand',
     label: 'Transaction received',
   },
+  llm_categorization_complete: {
+    icon: 'sparkles-outline',
+    bubbleBg: 'successSubtle',
+    iconColor: 'brand',
+    label: 'AI categorisation done',
+  },
+  llm_categorization_failed: {
+    icon: 'alert-circle-outline',
+    bubbleBg: 'errorSubtle',
+    iconColor: 'error',
+    label: 'AI categorisation failed',
+  },
+  ai_credential_invalid: {
+    icon: 'key-outline',
+    bubbleBg: 'warningSubtle',
+    iconColor: 'warning',
+    label: 'AI key issue',
+  },
 };
 
 const DEFAULT_META: TriggerMeta = {
@@ -244,6 +262,12 @@ function buildWhySummary(nudge: Nudge): string {
       return `Failed to process your ${ctx.bank_name ?? 'bank'} statement. Please try re-uploading.`;
     case 'transaction_received':
       return `A new transaction was received from ${ctx.bank_name ?? 'your bank'}.`;
+    case 'llm_categorization_complete':
+      return `AI categorised ${(ctx as any).success_count ?? 0} transaction${((ctx as any).success_count ?? 0) !== 1 ? 's' : ''} via ${(ctx as any).provider ?? 'your AI provider'}.${(ctx as any).failed_count ? ` ${(ctx as any).failed_count} could not be categorised.` : ''}`;
+    case 'llm_categorization_failed':
+      return 'Automated categorisation failed after multiple retries. Your transactions are still in the review queue.';
+    case 'ai_credential_invalid':
+      return 'Your AI API key is invalid or has run out of credit. Update it to resume automatic categorisation.';
     default:
       return '';
   }
@@ -318,6 +342,12 @@ function getActions(nudge: Nudge): NudgeAction[] {
       return [{ label: 'View accounts', icon: 'wallet-outline', route: '/(tabs)/accounts' }];
     case 'transaction_received':
       return [{ label: 'View transactions', icon: 'list-outline', route: '/(tabs)/transactions' }];
+    case 'llm_categorization_complete':
+      return [{ label: 'View transactions', icon: 'list-outline', route: '/(tabs)/transactions' }];
+    case 'llm_categorization_failed':
+      return [{ label: 'Review queue', icon: 'list-outline', route: '/(tabs)/transactions' }];
+    case 'ai_credential_invalid':
+      return [{ label: 'Update AI key', icon: 'key-outline', route: '/ai-settings' }];
     default:
       return [];
   }
