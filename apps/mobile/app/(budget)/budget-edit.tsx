@@ -189,7 +189,7 @@ function CategoryOptionsSheet({ category, month, onClose, onNavigateTarget }: Ca
         <>
           {/* Rename */}
           <TouchableOpacity
-            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            style={[ss.ashRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}
             onPress={startRename}
             activeOpacity={0.7}
           >
@@ -203,7 +203,7 @@ function CategoryOptionsSheet({ category, month, onClose, onNavigateTarget }: Ca
 
           {/* Add / Edit target */}
           <TouchableOpacity
-            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            style={[ss.ashRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}
             onPress={() => { onNavigateTarget(category!.id); onClose(); }}
             activeOpacity={0.7}
           >
@@ -220,7 +220,7 @@ function CategoryOptionsSheet({ category, month, onClose, onNavigateTarget }: Ca
           {/* Remove target */}
           {category?.target_amount ? (
             <TouchableOpacity
-              style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+              style={[ss.ashRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}
               onPress={doRemoveTarget}
               activeOpacity={0.7}
             >
@@ -235,7 +235,7 @@ function CategoryOptionsSheet({ category, month, onClose, onNavigateTarget }: Ca
 
           {/* Hide */}
           <TouchableOpacity
-            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            style={[ss.ashRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}
             onPress={doHide}
             activeOpacity={0.7}
           >
@@ -353,7 +353,7 @@ function GroupOptionsSheet({ group, month, onClose }: GroupOptionsProps) {
       ) : (
         <>
           <TouchableOpacity
-            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            style={[ss.ashRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}
             onPress={startRename}
             activeOpacity={0.7}
           >
@@ -366,7 +366,7 @@ function GroupOptionsSheet({ group, month, onClose }: GroupOptionsProps) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[ss.ashRow, { borderBottomColor: colors.separator }]}
+            style={[ss.ashRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}
             onPress={doHide}
             activeOpacity={0.7}
           >
@@ -1174,7 +1174,6 @@ const ss = StyleSheet.create({
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.mdn,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   ashIc: {
     width: layout.iconBtnSize,

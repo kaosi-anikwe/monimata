@@ -48,7 +48,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AutoAssignSheet } from '@/components/AutoAssignSheet';
 import { BudgetWalkthrough } from '@/components/BudgetWalkthrough';
 import { TourTarget, useTour, type TourStep } from '@/components/tour';
-import { ProgressBar } from '@/components/ui';
+import { AmountDisplay, ProgressBar } from '@/components/ui';
 import { syncDatabase } from '@/database/sync';
 import { useAssignCategory, useBudget, useMoveMoney, useUnhideCategory, useUnhideGroup } from '@/hooks/useBudget';
 import { useTheme } from '@/lib/theme';
@@ -170,11 +170,9 @@ function MonthHeader({ month, tbb, onAutoAssign }: { month: string; tbb: number;
           <View style={[ms.tbbCard, { backgroundColor: tbb < 0 ? colors.darkRed : colors.darkGreen }]}>
             <View style={{ gap: spacing.xxs }}>
               <Text style={ms.tbbLbl}>To Be Budgeted</Text>
-              <Text style={[ms.tbbVal, { color: tbb < 0 ? colors.error : colors.lime }]}>
-                {formatMoney(tbb)}
-              </Text>
+              <AmountDisplay kobo={tbb} size="lg" color={tbb < 0 ? colors.error : colors.lime} />
               <Text style={ms.tbbSub}>
-                {tbb < 0 ? `Over-assigned by ${formatMoney(Math.abs(tbb))}` : 'Assign this to categories'}
+                {tbb < 0 ? <><Text>Over-assigned by </Text><AmountDisplay kobo={Math.abs(tbb)} size="xs" color={colors.white} /></> : 'Assign this to categories'}
               </Text>
             </View>
             {/* Auto-assign / Fix button */}
@@ -526,17 +524,24 @@ function AssignSheet({
               <View style={[sh.statsBox, { borderColor: colors.border }]}>
                 <View style={sh.statCell}>
                   <Text style={[sh.statLbl, { color: colors.textMeta }]}>TBB</Text>
-                  <Text style={[sh.statVal, { color: tbb < 0 ? colors.error : colors.brand }]}>
-                    {formatMoney(tbb)}
-                  </Text>
+                  <AmountDisplay kobo={tbb} size="sm" color={tbb < 0 ? colors.error : colors.brand} />
                 </View>
                 <View style={[sh.statDiv, { backgroundColor: colors.border }]} />
-                <View style={sh.statCell}>
+                <TouchableOpacity
+                  style={sh.statCell}
+                  onPress={() => {
+                    onClose();
+                    router.push(`/category-transactions?categoryId=${encodeURIComponent(category!.id)}&categoryName=${encodeURIComponent(category!.name)}` as never);
+                  }}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View transactions for ${category.name}`}
+                >
                   <Text style={[sh.statLbl, { color: colors.textMeta }]}>Activity</Text>
                   <Text style={[sh.statVal, { color: colors.textPrimary }]}>
                     {formatMoney(category.activity)}
                   </Text>
-                </View>
+                </TouchableOpacity>
                 <View style={[sh.statDiv, { backgroundColor: colors.border }]} />
                 <View style={sh.statCell}>
                   <Text style={[sh.statLbl, { color: colors.textMeta }]}>After</Text>
@@ -589,6 +594,19 @@ function AssignSheet({
                 >
                   <Text style={[sh.qfTxt, { color: colors.textSecondary }]} numberOfLines={1}>Zero out</Text>
                 </TouchableOpacity>
+                {category.available < 0 && (
+                  <TouchableOpacity
+                    style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setAssignStr(String(category.assigned + Math.abs(category.available)));
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cover overspend"
+                  >
+                    <Text style={[sh.qfTxt, { color: colors.textSecondary }]} numberOfLines={1}>Cover overspend</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[sh.qfChip, { backgroundColor: colors.cardBg, borderColor: colors.borderStrong }]}
                   onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowMove(true); setMoveStr(''); setMoveTarget(null); }}

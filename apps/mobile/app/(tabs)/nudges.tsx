@@ -165,6 +165,12 @@ const OPERATIONAL_META: Record<string, TriggerMeta> = {
     iconColor: 'warning',
     label: 'AI key issue',
   },
+  system: {
+    icon: 'information-circle-outline',
+    bubbleBg: 'infoSubtle',
+    iconColor: 'info',
+    label: 'System',
+  },
 };
 
 const DEFAULT_META: TriggerMeta = {
@@ -268,6 +274,8 @@ function buildWhySummary(nudge: Nudge): string {
       return 'Automated categorisation failed after multiple retries. Your transactions are still in the review queue.';
     case 'ai_credential_invalid':
       return 'Your AI API key is invalid or has run out of credit. Update it to resume automatic categorisation.';
+    case 'system':
+      return '';
     default:
       return '';
   }
@@ -348,6 +356,8 @@ function getActions(nudge: Nudge): NudgeAction[] {
       return [{ label: 'Review queue', icon: 'list-outline', route: '/(tabs)/transactions' }];
     case 'ai_credential_invalid':
       return [{ label: 'Update AI key', icon: 'key-outline', route: '/ai-settings' }];
+    case 'system':
+      return [];
     default:
       return [];
   }

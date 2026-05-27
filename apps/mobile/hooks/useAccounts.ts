@@ -84,6 +84,15 @@ export function useUpdateAlias() {
   });
 }
 
+export function useUpdateExcludeFromNetWorth() {
+  const qc = useQueryClient();
+  const { error } = useToast();
+  return $api.useMutation('patch', '/accounts/{account_id}/exclude-from-net-worth', {
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.accounts() }),
+    onError: () => error('Error', 'Could not update account. Try again.'),
+  });
+}
+
 export function useDeleteAccount() {
   const qc = useQueryClient();
   const { error } = useToast();

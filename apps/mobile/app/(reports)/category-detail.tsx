@@ -26,6 +26,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInUp } from 'react-native-reanimated';
@@ -34,6 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BarChart, ChartSkeleton, ListSkeleton } from '@/components/reports';
 import { AmountDisplay, Card, ScreenHeader } from '@/components/ui';
 import { useCategoryTrend } from '@/hooks/useReports';
+import { useReportAccountFilter } from '@/hooks/useReportAccountFilter';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
@@ -50,8 +52,9 @@ export default function CategoryDetailScreen() {
     categoryId: string;
     categoryName: string;
   }>();
+  const accountIds = useReportAccountFilter();
 
-  const { data, isLoading } = useCategoryTrend(categoryId ?? '');
+  const { data, isLoading } = useCategoryTrend(categoryId ?? '', undefined, accountIds);
 
   const points = data?.points ?? [];
 
@@ -101,15 +104,25 @@ export default function CategoryDetailScreen() {
                 const label = `${MONTH_LABELS_SHORT[parseInt(m, 10) - 1]} ${y}`;
                 return (
                   <Animated.View key={p.month} entering={FadeInUp.delay(i * 60).duration(300).easing(Easing.out(Easing.cubic))} style={ss.monthRow}>
-                    <Text style={[type_.body, { color: colors.textPrimary }]}>
-                      {label}
-                    </Text>
-                    <View style={ss.monthRight}>
-                      <AmountDisplay kobo={p.spent} size="xs" />
-                      <Text style={[type_.caption, { color: colors.textMeta }]}>
-                        {p.transaction_count} txns
+                    <TouchableOpacity
+                      style={ss.monthRowInner}
+                      onPress={() => {
+                        router.push(`/category-transactions?categoryId=${encodeURIComponent(categoryId ?? '')}&categoryName=${encodeURIComponent(categoryName ?? 'Category')}&month=${p.month}` as never);
+                      }}
+                      activeOpacity={0.6}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View ${label} transactions for ${categoryName}`}
+                    >
+                      <Text style={[type_.body, { color: colors.textPrimary }]}>
+                        {label}
                       </Text>
-                    </View>
+                      <View style={ss.monthRight}>
+                        <AmountDisplay kobo={p.spent} size="xs" />
+                        <Text style={[type_.caption, { color: colors.textMeta }]}>
+                          {p.transaction_count} txns
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   </Animated.View>
                 );
               })}
@@ -136,10 +149,12 @@ const ss = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   monthRow: {
+    paddingVertical: spacing.sm,
+  },
+  monthRowInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
   },
   monthRight: {
     alignItems: 'flex-end',

@@ -17,10 +17,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Polyline } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 import { useToast } from '@/components/Toast';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
 import { Button } from '@/components/ui/Button';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useCategoryGroups } from '@/hooks/useCategories';
@@ -29,7 +29,7 @@ import { useSplitTransaction, useTransaction } from '@/hooks/useTransactions';
 import { useTheme } from '@/lib/theme';
 import { layout, radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { CategoryGroup, CategoryItem } from '@/types/category';
+import type { CategoryItem } from '@/types/category';
 import { formatNaira } from '@/utils/money';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -47,72 +47,7 @@ interface SplitLine {
 }
 
 // ─── Category picker sheet ────────────────────────────────────────────────────
-
-function CategoryPickerSheet({
-  visible,
-  groups,
-  selected,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  groups: CategoryGroup[];
-  selected: CategoryItem | null;
-  onSelect: (item: CategoryItem | null) => void;
-  onClose: () => void;
-}) {
-  const colors = useTheme();
-  return (
-    <BottomSheet visible={visible} onClose={onClose} title="Category" scrollable>
-      <TouchableOpacity
-        style={[ss.pickRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator }]}
-        onPress={() => { onSelect(null); onClose(); }}
-        accessibilityRole="button"
-        accessibilityLabel="No category"
-      >
-        <Text style={[type_.body, { color: colors.textMeta, fontStyle: 'italic', flex: 1 }]}>
-          No category
-        </Text>
-        {!selected && (
-          <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
-            <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
-          </Svg>
-        )}
-      </TouchableOpacity>
-      {groups.map((g) => (
-        <View key={g.name}>
-          <View style={[ss.pickGroupHdr, { backgroundColor: colors.surface }]}>
-            <Text style={[type_.labelSm, { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 1.2 }]}>
-              {g.name}
-            </Text>
-          </View>
-          {g.categories.map((cat, i) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[
-                ss.pickRow,
-                i < g.categories.length - 1 && {
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: colors.separator,
-                },
-              ]}
-              onPress={() => { onSelect(cat); onClose(); }}
-              accessibilityRole="button"
-              accessibilityLabel={cat.name}
-            >
-              <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{cat.name}</Text>
-              {selected?.id === cat.id && (
-                <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
-                  <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
-                </Svg>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      ))}
-    </BottomSheet>
-  );
-}
+// (shared component — see components/CategoryPickerSheet.tsx)
 
 // ─── Split line row ───────────────────────────────────────────────────────────
 
@@ -427,6 +362,7 @@ export default function SplitTransactionScreen() {
         visible={pickerForLine !== null}
         groups={groups}
         selected={activePickerLine?.category ?? null}
+        showTBB={false}
         onSelect={(cat) => {
           if (pickerForLine) updateLine(pickerForLine, { category: cat });
         }}

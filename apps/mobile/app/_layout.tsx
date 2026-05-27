@@ -61,6 +61,7 @@ import { store, type RootState } from '@/store';
 import { clearAuth, restoreSession } from '@/store/authSlice';
 import { syncToCurrentMonth } from '@/store/budgetSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { hydratePreferences } from '@/store/preferencesSlice';
 import { Database } from '@nozbe/watermelondb';
 import * as QuickActions from 'expo-quick-actions';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
@@ -193,6 +194,7 @@ function RootNavigator() {
 
   useEffect(() => {
     dispatch(restoreSession());
+    hydratePreferences(dispatch);
   }, [dispatch]);
 
   useEffect(() => {

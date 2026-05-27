@@ -44,9 +44,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path, Polyline } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useToast } from '@/components/Toast';
+import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { useAccounts } from '@/hooks/useAccounts';
@@ -64,7 +65,7 @@ import {
 import { GRADIENTS, useTheme } from '@/lib/theme';
 import { layout, radius, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { CategoryGroup, CategoryItem } from '@/types/category';
+import type { CategoryItem } from '@/types/category';
 import { RECURRENCE_OPTIONS } from '@/types/recurring';
 import { computeNextDue, formatNaira } from '@/utils/money';
 import type { BankAccount, Transaction, TransactionSplit } from '@monimata/shared-types';
@@ -155,91 +156,6 @@ function DetailRow({ label, value, isLast = false }: { label: string; value: str
         {value}
       </Text>
     </View>
-  );
-}
-
-// ─── Category picker sheet ────────────────────────────────────────────────────
-
-function CategoryPickerSheet({
-  visible, groups, selected, onSelect, onClose, disableTBB = false,
-}: {
-  visible: boolean;
-  groups: CategoryGroup[];
-  selected: CategoryItem | null;
-  onSelect: (item: CategoryItem | null) => void;
-  onClose: () => void;
-  /** When true the TBB option is disabled with a warning on tap. */
-  disableTBB?: boolean;
-}) {
-  const colors = useTheme();
-  const { info: showInfo } = useToast();
-  return (
-    <BottomSheet visible={visible} onClose={onClose} title="Category" scrollable={false}>
-      <ScrollView style={{ maxHeight: 420 }}>
-        {/* TBB row */}
-        <TouchableOpacity
-          style={[
-            ss.pickRow,
-            {
-              backgroundColor: disableTBB ? colors.surface : colors.successSubtle,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              borderBottomColor: colors.separator,
-              gap: spacing.sm,
-            },
-          ]}
-          onPress={() => {
-            if (disableTBB) {
-              showInfo('Not allowed', 'Expenses cannot be assigned to To Be Budgeted.');
-            } else {
-              onSelect(null);
-              onClose();
-            }
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={disableTBB ? 'To Be Budgeted — not available for expenses' : 'Assign to To Be Budgeted'}
-        >
-          <View style={[ss.tbbBadge, { backgroundColor: disableTBB ? colors.textTertiary : colors.brand }]}>
-            <Text style={[type_.labelSm, { color: colors.white }]}>TBB</Text>
-          </View>
-          <Text style={[type_.body, { color: disableTBB ? colors.textTertiary : colors.brand, flex: 1 }]}>
-            To Be Budgeted
-          </Text>
-          {!selected && !disableTBB && (
-            <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
-              <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
-            </Svg>
-          )}
-          {disableTBB && (
-            <Ionicons name="lock-closed-outline" size={layout.iconSm} color={colors.textTertiary} />
-          )}
-        </TouchableOpacity>
-        {groups.map((g) => (
-          <View key={g.name}>
-            <View style={[ss.pickGroupHdr, { backgroundColor: colors.surface }]}>
-              <Text style={[type_.labelSm, { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 1.2 }]}>{g.name}</Text>
-            </View>
-            {g.categories.map((cat, i) => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[
-                  ss.pickRow,
-                  i < g.categories.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
-                ]}
-                onPress={() => { onSelect(cat); onClose(); }}
-                accessibilityRole="button" accessibilityLabel={cat.name}
-              >
-                <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{cat.name}</Text>
-                {selected?.id === cat.id && (
-                  <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
-                    <Polyline points="20 6 9 17 4 12" stroke={colors.brand} strokeWidth={2.5} strokeLinecap="round" />
-                  </Svg>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-      </ScrollView>
-    </BottomSheet>
   );
 }
 
@@ -443,12 +359,14 @@ function BankHeroHeader({
 
 function BankViewForm({
   tx,
+  accounts,
   categoryOptions,
   categoryMap,
   onSave,
   isSaving,
 }: {
   tx: Transaction;
+  accounts: BankAccount[];
   categoryOptions: { id: string; label: string }[];
   categoryMap: Map<string, CategoryItem>;
   onSave: (patch: { category_id: string | null; memo: string | null }) => void;
@@ -461,6 +379,10 @@ function BankViewForm({
   );
   const [memo, setMemo] = useState(tx.memo ?? '');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const account = accounts.find((a) => a.id === tx.account_id);
+  const accountLabel = account
+    ? (account.alias ?? `${account.institution} — ${account.account_name}`)
+    : undefined;
 
   useEffect(() => {
     setSelectedCategory(tx.category_id ? (categoryMap.get(tx.category_id) ?? null) : null);
@@ -472,6 +394,7 @@ function BankViewForm({
       <View style={[ss.detailCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
         <DetailRow label="Narration" value={tx.narration} />
         <DetailRow label="Date" value={formatTxDatetime(tx.date)} />
+        {accountLabel && <DetailRow label="Account" value={accountLabel} />}
         <DetailRow label="Source" value={tx.source} isLast={!tx.recurrence_id} />
         {tx.recurrence_id && <DetailRow label="Recurring" value="Yes" isLast />}
       </View>
@@ -1171,6 +1094,7 @@ export default function TransactionDetailsScreen() {
         ) : (
           <BankViewForm
             tx={tx}
+            accounts={accounts}
             categoryOptions={categoryOptions}
             categoryMap={categoryMap}
             onSave={handleSave}

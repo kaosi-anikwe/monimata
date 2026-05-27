@@ -25,20 +25,20 @@ import { $api } from '@/services/api';
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
-export function useMonthlySummary(month: string, topN = 3) {
+export function useMonthlySummary(month: string, topN = 3, accountIds?: string) {
     return $api.useQuery(
         'get',
         '/reports/monthly-summary',
-        { params: { query: { month, top_n: topN } } },
+        { params: { query: { month, top_n: topN, account_ids: accountIds } } },
         { staleTime: 60_000 },
     );
 }
 
-export function useAgeOfMoney(lookbackDays = 30) {
+export function useAgeOfMoney(lookbackDays = 30, accountIds?: string) {
     return $api.useQuery(
         'get',
         '/reports/age-of-money',
-        { params: { query: { lookback_days: lookbackDays } } },
+        { params: { query: { lookback_days: lookbackDays, account_ids: accountIds } } },
         { staleTime: 60_000 },
     );
 }
@@ -52,38 +52,38 @@ export function useAccountBalances() {
     );
 }
 
-export function useIncomeExpenseTrend(months?: number) {
+export function useIncomeExpenseTrend(months?: number, accountIds?: string) {
     return $api.useQuery(
         'get',
         '/reports/income-expense-trend',
-        { params: { query: { months } } },
+        { params: { query: { months, account_ids: accountIds } } },
         { staleTime: 60_000 },
     );
 }
 
-export function useSpendingByCategory(month: string) {
+export function useSpendingByCategory(month: string, accountIds?: string) {
     return $api.useQuery(
         'get',
         '/reports/spending-by-category',
-        { params: { query: { month } } },
+        { params: { query: { month, account_ids: accountIds } } },
         { staleTime: 60_000 },
     );
 }
 
-export function useCategoryTrend(categoryId: string, months?: number) {
+export function useCategoryTrend(categoryId: string, months?: number, accountIds?: string) {
     return $api.useQuery(
         'get',
         '/reports/category-trend',
-        { params: { query: { category_id: categoryId, months } } },
+        { params: { query: { category_id: categoryId, months, account_ids: accountIds } } },
         { enabled: !!categoryId, staleTime: 60_000 },
     );
 }
 
-export function useTopMerchants(month: string, limit = 10) {
+export function useTopMerchants(month: string, limit = 10, accountIds?: string) {
     return $api.useQuery(
         'get',
         '/reports/top-merchants',
-        { params: { query: { month, limit } } },
+        { params: { query: { month, limit, account_ids: accountIds } } },
         { staleTime: 60_000 },
     );
 }
@@ -101,11 +101,12 @@ export function useCashFlow(
     start: string,
     end: string,
     granularity: 'daily' | 'weekly' | 'monthly' = 'monthly',
+    accountIds?: string,
 ) {
     return $api.useQuery(
         'get',
         '/reports/cash-flow',
-        { params: { query: { start, end, granularity } } },
+        { params: { query: { start, end, granularity, account_ids: accountIds } } },
         { staleTime: 60_000 },
     );
 }

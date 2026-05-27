@@ -16,6 +16,12 @@
 
 import { Stack } from 'expo-router';
 
+import { ShowAmountsProvider } from '@/components/ui/AmountDisplay';
+
 export default function ReportsLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <ShowAmountsProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ShowAmountsProvider>
+  );
 }

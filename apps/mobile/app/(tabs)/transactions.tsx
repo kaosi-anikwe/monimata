@@ -27,13 +27,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -44,9 +43,8 @@ import Animated, { SlideInDown, SlideOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 
-import { useToast } from '@/components/Toast';
 import { TourTarget, useTour, type TourStep } from '@/components/tour';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
 import { Chip } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { syncDatabase } from '@/database/sync';
@@ -58,7 +56,6 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useTheme } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
-import type { CategoryGroup } from '@/types/category';
 import type { BankAccount, Transaction } from '@monimata/shared-types';
 
 import { formatNaira } from '@/utils/money';
@@ -79,6 +76,13 @@ const TRANSACTIONS_TOUR: TourStep[] = [
     tooltipSide: 'below',
     fallbackFullscreen: true,
   },
+  {
+    targetId: 'tx-first-row',
+    title: 'View category transactions',
+    body: 'Long-press a category chip to view all transactions in that category.',
+    tooltipSide: 'below',
+    fallbackFullscreen: true,
+  },
 ];
 
 // ─── Filter type ──────────────────────────────────────────────────────────────
@@ -95,90 +99,7 @@ interface DayGroup {
 }
 
 // ─── Category picker sheet ────────────────────────────────────────────────────
-
-interface CategoryPickerSheetProps {
-  visible: boolean;
-  groups: CategoryGroup[];
-  onSelect: (categoryId: string | null) => void;
-  onClose: () => void;
-  /** When true the TBB option is disabled with a warning on tap. */
-  disableTBB?: boolean;
-}
-
-function CategoryPickerSheet({ visible, groups, onSelect, onClose, disableTBB = false }: CategoryPickerSheetProps) {
-  const colors = useTheme();
-  const { info: showInfo } = useToast();
-  const sections = groups.map((g) => ({ title: g.name, data: g.categories }));
-  return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      title="Choose Category"
-      scrollable={false}
-    >
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        style={{ maxHeight: 440 }}
-        ListHeaderComponent={
-          <TouchableOpacity
-            style={[
-              ss.tbbRow,
-              {
-                backgroundColor: disableTBB ? colors.surface : colors.successSubtle,
-                borderBottomColor: colors.separator,
-              },
-            ]}
-            onPress={() => {
-              if (disableTBB) {
-                showInfo('Not allowed', 'Expenses cannot be assigned to To Be Budgeted.');
-              } else {
-                onSelect(null);
-                onClose();
-              }
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={disableTBB ? 'To Be Budgeted — not available for expenses' : 'Assign to To Be Budgeted'}
-          >
-            <View style={[ss.tbbBadge, { backgroundColor: disableTBB ? colors.textTertiary : colors.brand }]}>
-              <Text style={[type_.labelSm, { color: colors.white }]}>TBB</Text>
-            </View>
-            <Text style={[type_.body, { color: disableTBB ? colors.textTertiary : colors.brand, flex: 1 }]}>
-              To Be Budgeted
-            </Text>
-            <Ionicons
-              name={disableTBB ? 'lock-closed-outline' : 'chevron-forward'}
-              size={layout.iconSm}
-              color={disableTBB ? colors.textTertiary : colors.brand}
-            />
-          </TouchableOpacity>
-        }
-        renderSectionHeader={({ section }) => (
-          <View style={[ss.pickerGroupHeader, { backgroundColor: colors.surface }]}>
-            <Text style={[type_.labelSm, { color: colors.textMeta, textTransform: 'uppercase', letterSpacing: 1.2 }]}>
-              {section.title}
-            </Text>
-          </View>
-        )}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[ss.pickerCatRow, { borderBottomColor: colors.separator }]}
-            onPress={() => { onSelect(item.id); onClose(); }}
-            accessibilityRole="button"
-            accessibilityLabel={item.name}
-          >
-            <Text style={[type_.body, { color: colors.textPrimary, flex: 1 }]}>{item.name}</Text>
-            <View>
-              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
-                <Path d="M9 18l6-6-6-6" stroke={colors.textMeta} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-    </BottomSheet>
-  );
-}
+// (shared component — see components/CategoryPickerSheet.tsx)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -216,10 +137,11 @@ interface TxRowProps {
   accountLabel: string | null;
   onPress: () => void;
   onCategoryPress: () => void;
+  onCategoryLongPress: () => void;
   isLast: boolean;
 }
 
-function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLast }: TxRowProps) {
+function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, onCategoryLongPress, isLast }: TxRowProps) {
   const colors = useTheme();
   const isDebit = tx.type === 'debit';
   const amountColor = isDebit ? colors.error : colors.success;
@@ -267,6 +189,7 @@ function TxRow({ tx, categoryName, accountLabel, onPress, onCategoryPress, isLas
               ) : (
                 <TouchableOpacity
                   onPress={(e) => { e.stopPropagation?.(); onCategoryPress(); }}
+                  onLongPress={(e) => { e.stopPropagation?.(); onCategoryLongPress(); }}
                   hitSlop={6}
                   accessibilityRole="button"
                   accessibilityLabel="Change category"
@@ -321,9 +244,10 @@ interface DayGroupCardProps {
   accountMap: Map<string, BankAccount>;
   onTxPress: (id: string) => void;
   onCategoryPress: (id: string) => void;
+  onCategoryLongPress: (tx: Transaction) => void;
 }
 
-function DayGroupCard({ group, categoryMap, accountMap, onTxPress, onCategoryPress }: DayGroupCardProps) {
+function DayGroupCard({ group, categoryMap, accountMap, onTxPress, onCategoryPress, onCategoryLongPress }: DayGroupCardProps) {
   const colors = useTheme();
   const isNetPositive = group.net >= 0;
   const netColor = isNetPositive ? colors.success : colors.error;
@@ -356,6 +280,7 @@ function DayGroupCard({ group, categoryMap, accountMap, onTxPress, onCategoryPre
               accountLabel={accountLabel}
               onPress={() => onTxPress(tx.id)}
               onCategoryPress={() => onCategoryPress(tx.id)}
+              onCategoryLongPress={() => onCategoryLongPress(tx)}
               isLast={i === group.txs.length - 1}
             />
           );
@@ -371,11 +296,17 @@ export default function TransactionsScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { filter: filterParam } = useLocalSearchParams<{ filter?: string }>();
   const qc = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [pickerTxId, setPickerTxId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<TxFilter>('all');
+  const [activeFilter, setActiveFilter] = useState<TxFilter>(filterParam ?? 'all');
+
+  // Sync filter when navigating back with a new param
+  useEffect(() => {
+    if (filterParam) setActiveFilter(filterParam);
+  }, [filterParam]);
 
   const startTourIfUnseen = useTour();
   useFocusEffect(
@@ -695,6 +626,14 @@ export default function TransactionsScreen() {
               accountMap={accountMap}
               onTxPress={(id) => router.push(`/transaction/${id}` as never)}
               onCategoryPress={(id) => setPickerTxId(id)}
+              onCategoryLongPress={(tx) => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                const catId = tx.category_id ?? 'tbb';
+                const catName = tx.category_id
+                  ? (categoryMap.get(tx.category_id) ?? 'Category')
+                  : (tx.type === 'credit' ? 'TBB' : 'Uncategorised');
+                router.push(`/category-transactions?categoryId=${encodeURIComponent(catId)}&categoryName=${encodeURIComponent(catName)}` as never);
+              }}
             />
           </TourTarget>
         )}
@@ -735,9 +674,9 @@ export default function TransactionsScreen() {
         visible={pickerTxId !== null}
         groups={groups}
         onClose={() => setPickerTxId(null)}
-        onSelect={(catId) => {
+        onSelect={(cat) => {
           if (pickerTxId) {
-            recategorizeMutation.mutate({ txId: pickerTxId, categoryId: catId });
+            recategorizeMutation.mutate({ txId: pickerTxId, categoryId: cat?.id ?? null });
           }
           setPickerTxId(null);
         }}

@@ -387,6 +387,83 @@ export function useRemoveSplit() {
 
 
 // TODO: switch to local WatermelonDB table queries for these read operations,
+
+/**
+ * Category transactions — local-first, then falls back to server for older data.
+ * Pass a real category UUID, or 'tbb' for uncategorised (TBB) transactions.
+ */
+export function useCategoryTransactions(categoryId: string) {
+  const isTbb = categoryId === 'tbb';
+  const db = getDatabase();
+
+  // Local WatermelonDB query — paginated, sorted by date desc
+  const local = useInfiniteQuery({
+    queryKey: [...queryKeys.categoryTransactions(categoryId), 'local'] as const,
+    queryFn: async ({ pageParam = 1 }) => {
+      const condition = isTbb
+        ? Q.where('category_id', null as unknown as string)
+        : Q.where('category_id', categoryId);
+
+      const [total, items] = await Promise.all([
+        db.get<TransactionModel>('transactions').query(condition).fetchCount(),
+        db.get<TransactionModel>('transactions').query(
+          condition,
+          Q.sortBy('date', Q.desc),
+          Q.skip((pageParam - 1) * PAGE_LIMIT),
+          Q.take(PAGE_LIMIT),
+        ).fetch(),
+      ]);
+      return {
+        items: items.map(txModelToDto),
+        page: pageParam,
+        limit: PAGE_LIMIT,
+        total,
+      } as TransactionPage;
+    },
+    initialPageParam: 1,
+    getNextPageParam: (last) => {
+      const loaded = (last.page - 1) * last.limit + last.items.length;
+      return loaded < last.total ? last.page + 1 : undefined;
+    },
+  });
+
+  // Boundary: oldest local date → server only returns older transactions
+  const { data: oldestLocalDate } = useOldestLocalTransactionDate();
+  const localExhausted = !local.hasNextPage && !local.isFetchingNextPage && !local.isLoading;
+
+  // Server fallback — archived transactions for this category
+  const archived = useInfiniteQuery({
+    queryKey: [...queryKeys.categoryTransactions(categoryId), 'archived'] as const,
+    queryFn: async ({ pageParam = 1 }) => {
+      const query: Record<string, unknown> = {
+        page: pageParam,
+        limit: ARCHIVE_PAGE_LIMIT,
+        end_date: oldestLocalDate!,
+      };
+      if (isTbb) {
+        query.uncategorized = true;
+      } else {
+        query.category_id = categoryId;
+      }
+      const { data, error } = await client.GET('/transactions', {
+        params: { query: query as never },
+      });
+      if (error) throw new Error('Could not load category transactions');
+      return data as TransactionPage;
+    },
+    initialPageParam: 1,
+    getNextPageParam: (last) => {
+      const loaded = (last.page - 1) * last.limit + last.items.length;
+      return loaded < last.total ? last.page + 1 : undefined;
+    },
+    enabled: localExhausted && Boolean(oldestLocalDate),
+    staleTime: 10 * 60_000,
+  });
+
+  return { local, archived, localExhausted };
+}
+
+
 // with syncDatabase() calls in the mutations to keep the local cache up to date. 
 // This will give a much snappier UI experience and reduce load on the API, 
 // especially for the transactions list which is paginated but currently still 

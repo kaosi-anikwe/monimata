@@ -51,7 +51,8 @@ import { useTheme } from '@/lib/theme';
 import { glass, layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, formatMoney, type_ } from '@/lib/typography';
 import { onWelcomeDone } from '@/lib/welcomeBridge';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { toggleAmountsHidden } from '@/store/preferencesSlice';
 
 // ── Tour definition ──────────────────────────────────────────────────────────────
 
@@ -123,6 +124,8 @@ export default function HomeScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const user = useAppSelector((st) => st.auth.user);
+  const amountsHidden = useAppSelector((st) => st.preferences.amountsHidden);
+  const dispatch = useAppDispatch();
   const startTourIfUnseen = useTour();
   const { activeTargetId } = useTourContext();
   const scrollRef = useRef<ScrollView>(null);
@@ -181,8 +184,9 @@ export default function HomeScreen() {
     .filter(Boolean).join('').toUpperCase() || '?';
 
   // Net Worth = sum of server-computed account balances (starting_balance + all txs)
+  // Accounts flagged exclude_from_net_worth are omitted.
   const netWorth = useMemo(
-    () => (accounts ?? []).reduce((s, a) => s + a.balance, 0),
+    () => (accounts ?? []).reduce((s, a) => s + (a.exclude_from_net_worth ? 0 : a.balance), 0),
     [accounts],
   );
 
@@ -286,9 +290,19 @@ export default function HomeScreen() {
         {/* Balance card (.bal-card) — frosted glass, top-rounded only */}
         <TourTarget id="home-net-worth">
           <View style={s.balCard}>
-            <Text style={s.balLbl}>NET WORTH</Text>
+            <View style={s.balLblRow}>
+              <Text style={s.balLbl}>NET WORTH</Text>
+              <TouchableOpacity
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); dispatch(toggleAmountsHidden()); }}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+              >
+                <Ionicons name={amountsHidden ? 'eye-off-outline' : 'eye-outline'} size={type_.body.fontSize} color={glass.labelDim} />
+              </TouchableOpacity>
+            </View>
             <Text style={[s.balAmt, { color: colors.white }]}>
-              {formatMoney(netWorth)}
+              {amountsHidden ? '₦••••••' : formatMoney(netWorth)}
             </Text>
             <View style={s.balActions}>
               <TouchableOpacity
@@ -338,7 +352,13 @@ export default function HomeScreen() {
           <TourTarget id="home-this-month">
             <View style={s.statGrid}>
               {/* Income */}
-              <View style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}>
+              <TouchableOpacity
+                style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}
+                onPress={() => router.push('/(tabs)/transactions?filter=credits')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="View income transactions"
+              >
                 <View style={s.statTop}>
                   <View style={[s.statIcon, { backgroundColor: colors.successSubtle }]}>
                     <Ionicons name="arrow-down-outline" size={17} color={colors.successText} />
@@ -348,11 +368,17 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <Text style={[s.statLbl, { color: colors.textMeta }]}>Total in</Text>
-                <Text style={[s.statVal, { color: colors.textPrimary }]}>{formatMoney(totalIncome)}</Text>
-              </View>
+                <Text style={[s.statVal, { color: colors.textPrimary }]}>{amountsHidden ? '₦••••••' : formatMoney(totalIncome)}</Text>
+              </TouchableOpacity>
 
               {/* Expenses */}
-              <View style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}>
+              <TouchableOpacity
+                style={[s.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, shadow.sm]}
+                onPress={() => router.push('/(tabs)/transactions?filter=debits')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="View expense transactions"
+              >
                 <View style={s.statTop}>
                   <View style={[s.statIcon, { backgroundColor: colors.errorSubtle }]}>
                     <Ionicons name="arrow-up-outline" size={17} color={colors.error} />
@@ -362,8 +388,8 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <Text style={[s.statLbl, { color: colors.textMeta }]}>Total out</Text>
-                <Text style={[s.statVal, { color: colors.textPrimary }]}>{formatMoney(totalExpenses)}</Text>
-              </View>
+                <Text style={[s.statVal, { color: colors.textPrimary }]}>{amountsHidden ? '₦••••••' : formatMoney(totalExpenses)}</Text>
+              </TouchableOpacity>
             </View>
           </TourTarget>
         </View>
@@ -498,8 +524,8 @@ export default function HomeScreen() {
                       trackStyle={{ marginVertical: 6 }}
                     />
                     <Text style={[s.goalAmt, { color: colors.textMeta }]}>
-                      <Text style={{ color: colors.brand, ...ff(700) }}>{formatMoney(goal.available)}</Text>
-                      {' '}of {formatMoney(goal.target_amount ?? 0)}
+                      <Text style={{ color: colors.brand, ...ff(700) }}>{amountsHidden ? '₦••••••' : formatMoney(goal.available)}</Text>
+                      {' '}of {amountsHidden ? '₦••••••' : formatMoney(goal.target_amount ?? 0)}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -593,6 +619,11 @@ const s = StyleSheet.create({
     borderTopRightRadius: radius.lg,
     padding: spacing.xl,
     paddingBottom: spacing.lg + spacing.xs,
+  },
+  balLblRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   balLbl: {
     ...type_.label,

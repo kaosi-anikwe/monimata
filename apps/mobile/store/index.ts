@@ -19,16 +19,20 @@ import type { AuthState } from './authSlice';
 import authReducer from './authSlice';
 import type { BudgetState } from './budgetSlice';
 import budgetReducer from './budgetSlice';
+import type { PreferencesState } from './preferencesSlice';
+import preferencesReducer from './preferencesSlice';
 
 export const store = configureStore({
     reducer: {
         auth: authReducer,
         budget: budgetReducer,
+        preferences: preferencesReducer,
     },
 });
 
 export interface RootState {
     auth: AuthState;
     budget: BudgetState;
+    preferences: PreferencesState;
 }
 export type AppDispatch = typeof store.dispatch;

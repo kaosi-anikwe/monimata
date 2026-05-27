@@ -48,7 +48,7 @@ export type { AvatarProps, AvatarSize } from './Avatar';
 export { ProgressBar } from './ProgressBar';
 export type { ProgressBarProps, ProgressBarSize, ProgressBarState } from './ProgressBar';
 
-export { AmountDisplay } from './AmountDisplay';
+export { AmountDisplay, ShowAmountsProvider } from './AmountDisplay';
 export type { AmountDisplayProps, AmountSize } from './AmountDisplay';
 
 export { AmountInput } from './AmountInput';

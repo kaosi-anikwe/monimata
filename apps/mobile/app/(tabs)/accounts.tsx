@@ -39,6 +39,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useToast } from '@/components/Toast';
 import { TourTarget, useTour, type TourStep } from '@/components/tour';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { AmountInput } from '@/components/ui/AmountInput';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
@@ -53,6 +54,7 @@ import {
   useSupportedBanks,
   useUpdateAlias,
   useUpdateBalance,
+  useUpdateExcludeFromNetWorth,
   type AddManualAccountPayload,
 } from '@/hooks/useAccounts';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
@@ -60,7 +62,8 @@ import { useTheme } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
 import { StatementAccountNotFoundError, uploadStatement } from '@/services/api';
-import { formatNaira } from '@/utils/money';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { toggleAmountsHidden } from '@/store/preferencesSlice';
 import type { BankAccount, SupportedBank } from '@monimata/shared-types';
 
 // ─── Bank Picker Sheet ───────────────────────────────────────────────────────
@@ -768,6 +771,7 @@ interface MoreActionsSheetProps {
   onReconcile: () => void;
   onUploadStatement: () => void;
   onDelete: () => void;
+  onToggleExclude: () => void;
 }
 
 function MoreActionsSheet({
@@ -778,6 +782,7 @@ function MoreActionsSheet({
   onReconcile,
   onUploadStatement,
   onDelete,
+  onToggleExclude,
 }: MoreActionsSheetProps) {
   const colors = useTheme();
   if (!account) return null;
@@ -850,6 +855,22 @@ function MoreActionsSheet({
           showChevron
         />
 
+        {/* Exclude from Net Worth */}
+        <ListRow
+          leftIcon={
+            <Ionicons
+              name={account.exclude_from_net_worth ? 'eye-outline' : 'eye-off-outline'}
+              size={type_.body.fontSize}
+              color={colors.textSecondary}
+            />
+          }
+          iconBg={colors.surface}
+          title={account.exclude_from_net_worth ? 'Include in Net Worth' : 'Exclude from Net Worth'}
+          subtitle={account.exclude_from_net_worth ? 'Count this balance in your total' : 'Hide this balance from your total'}
+          onPress={() => action(onToggleExclude)}
+          showChevron
+        />
+
         {/* Delete */}
         <ListRow
           leftIcon={
@@ -918,9 +939,12 @@ function AccountCard({ account, onMoreActions, showTourTarget }: AccountCardProp
         </View>
 
         {/* Balance */}
-        <Text style={[ss.balanceAmt, { color: colors.textPrimary }]}>
-          {formatNaira(account.balance)}
-        </Text>
+        <AmountDisplay kobo={account.balance} size="lg" color={colors.textPrimary} />
+        {account.exclude_from_net_worth && (
+          <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2 }]}>
+            Excluded from net worth
+          </Text>
+        )}
       </View>
 
       {/* Card footer */}
@@ -960,8 +984,11 @@ export default function AccountsScreen({ showBackButton = false }: { showBackBut
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { confirm } = useToast();
+  const dispatch = useAppDispatch();
+  const amountsHidden = useAppSelector((st) => st.preferences.amountsHidden);
   const { data: accounts = [], isLoading, error, refetch } = useAccounts();
   const deleteMutation = useDeleteAccount();
+  const excludeMutation = useUpdateExcludeFromNetWorth();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -992,6 +1019,13 @@ export default function AccountsScreen({ showBackButton = false }: { showBackBut
       confirmText: 'Remove',
       confirmStyle: 'destructive',
       onConfirm: () => deleteMutation.mutate({ params: { path: { account_id: account.id } } }),
+    });
+  }
+
+  function handleToggleExclude(account: BankAccount) {
+    excludeMutation.mutate({
+      params: { path: { account_id: account.id } },
+      body: { exclude_from_net_worth: !account.exclude_from_net_worth },
     });
   }
 
@@ -1105,8 +1139,18 @@ export default function AccountsScreen({ showBackButton = false }: { showBackBut
             {/* ── Total Balance Card ── */}
             <TourTarget id="accounts-total-card">
               <View style={[ss.totalCard, { backgroundColor: colors.darkGreen }]}>
-                <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
-                <Text style={[ss.totalAmt, { color: colors.white }]}>{formatNaira(totalBalance)}</Text>
+                <View style={ss.totalLblRow}>
+                  <Text style={[ss.totalLbl, { color: colors.textInverseFaint }]}>Total Balance</Text>
+                  <TouchableOpacity
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); dispatch(toggleAmountsHidden()); }}
+                    hitSlop={12}
+                    accessibilityRole="button"
+                    accessibilityLabel={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+                  >
+                    <Ionicons name={amountsHidden ? 'eye-off-outline' : 'eye-outline'} size={type_.body.fontSize} color={colors.textInverseFaint} />
+                  </TouchableOpacity>
+                </View>
+                <AmountDisplay kobo={totalBalance} size="display" color={colors.white} />
               </View>
             </TourTarget>
 
@@ -1170,6 +1214,7 @@ export default function AccountsScreen({ showBackButton = false }: { showBackBut
         onReconcile={() => setReconcileAccount(moreAccount)}
         onUploadStatement={() => { setMoreAccount(null); setTimeout(() => setStatementAccount(moreAccount), 220); }}
         onDelete={() => moreAccount && handleDelete(moreAccount)}
+        onToggleExclude={() => { if (moreAccount) { handleToggleExclude(moreAccount); setMoreAccount(null); } }}
       />
     </View>
   );
@@ -1222,10 +1267,15 @@ const ss = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginBottom: spacing.xs,
   },
+  totalLblRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
   totalLbl: {
     ...type_.label,
     letterSpacing: 1.3,
-    marginBottom: spacing.md,
   },
   totalAmt: {
     ...type_.display,

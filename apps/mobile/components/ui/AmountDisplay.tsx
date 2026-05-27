@@ -36,11 +36,25 @@
  *   <AmountDisplay kobo={tbb} size="lg" color={colors.lime} />
  */
 
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { StyleProp, Text, TextStyle } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
 import { ff, formatMoney, FormatMoneyOptions, type_ } from '@/lib/typography';
+import { useAppSelector } from '@/store/hooks';
+
+// ─── Privacy override ────────────────────────────────────────────────────────
+
+const PrivacyOverrideCtx = createContext(false);
+
+/**
+ * Wrap a subtree with this provider to force all nested `<AmountDisplay>`
+ * instances to show real values regardless of the global privacy preference.
+ * Useful for report screens where masking amounts doesn't make sense.
+ */
+export function ShowAmountsProvider({ children }: { children: React.ReactNode }) {
+  return <PrivacyOverrideCtx.Provider value>{children}</PrivacyOverrideCtx.Provider>;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +101,9 @@ export function AmountDisplay({
   compact = false,
 }: AmountDisplayProps) {
   const colors = useTheme();
+  const forceShow = useContext(PrivacyOverrideCtx);
+  const globalHidden = useAppSelector((st) => st.preferences.amountsHidden);
+  const amountsHidden = forceShow ? false : globalHidden;
 
   let resolvedColor = color ?? colors.textPrimary;
   if (colorize && !color) {
@@ -95,7 +112,7 @@ export function AmountDisplay({
     else resolvedColor = colors.textMeta;
   }
 
-  const formatted = formatMoney(kobo, { symbol, decimals, sign, compact });
+  const formatted = amountsHidden ? '₦••••••' : formatMoney(kobo, { symbol, decimals, sign, compact });
 
   return (
     <Text

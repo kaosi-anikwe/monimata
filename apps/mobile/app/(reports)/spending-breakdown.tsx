@@ -38,6 +38,7 @@ import {
 } from '@/components/reports';
 import { AmountDisplay, ListRow, ScreenHeader } from '@/components/ui';
 import { useSpendingByCategory } from '@/hooks/useReports';
+import { useReportAccountFilter } from '@/hooks/useReportAccountFilter';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { formatMoney } from '@/lib/typography';
@@ -56,8 +57,9 @@ export default function SpendingBreakdownScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const [month, setMonth] = useState(currentMonth);
+  const accountIds = useReportAccountFilter();
 
-  const { data, isLoading } = useSpendingByCategory(month);
+  const { data, isLoading } = useSpendingByCategory(month, accountIds);
 
   const categories = data?.categories ?? [];
   const totalSpent = data?.total_spent ?? 0;

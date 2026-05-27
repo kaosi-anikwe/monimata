@@ -34,6 +34,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListSkeleton, MonthPicker } from '@/components/reports';
 import { AmountDisplay, ScreenHeader } from '@/components/ui';
 import { useTopMerchants } from '@/hooks/useReports';
+import { useReportAccountFilter } from '@/hooks/useReportAccountFilter';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
 import { formatMoney, type_ } from '@/lib/typography';
@@ -49,8 +50,9 @@ export default function TopMerchantsScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const [month, setMonth] = useState(currentMonth);
+  const accountIds = useReportAccountFilter();
 
-  const { data, isLoading } = useTopMerchants(month);
+  const { data, isLoading } = useTopMerchants(month, 10, accountIds);
 
   const merchants = data?.merchants ?? [];
 

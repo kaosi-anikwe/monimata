@@ -28,6 +28,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, { Easing, FadeInUp } from 'react-native-reanimated';
@@ -40,11 +41,13 @@ import {
   SnapshotSkeleton,
   StatCardSkeleton,
 } from '@/components/reports';
+import { ReportAccountFilterSheet } from '@/components/ReportAccountFilterSheet';
 import {
   AmountDisplay,
   Card,
   ScreenHeader,
 } from '@/components/ui';
+import { useReportAccountFilter } from '@/hooks/useReportAccountFilter';
 import {
   useAccountBalances,
   useAgeOfMoney,
@@ -52,7 +55,8 @@ import {
 } from '@/hooks/useReports';
 import { useTheme } from '@/lib/theme';
 import { radius, spacing } from '@/lib/tokens';
-import { formatMoney, type_ } from '@/lib/typography';
+import { ff, formatMoney, type_ } from '@/lib/typography';
+import { useAppSelector } from '@/store/hooks';
 
 function currentMonth(): string {
   const d = new Date();
@@ -79,9 +83,13 @@ export default function ReportsHomeScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const [month, setMonth] = useState(currentMonth);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const accountIds = useReportAccountFilter();
+  const excluded = useAppSelector((st) => st.preferences.reportExcludedAccountIds);
+  const hasFilter = excluded.length > 0;
 
-  const summary = useMonthlySummary(month);
-  const ageOfMoney = useAgeOfMoney();
+  const summary = useMonthlySummary(month, 3, accountIds);
+  const ageOfMoney = useAgeOfMoney(30, accountIds);
   const balances = useAccountBalances();
 
   const isRefreshing = summary.isRefetching || ageOfMoney.isRefetching || balances.isRefetching;
@@ -120,6 +128,20 @@ export default function ReportsHomeScreen() {
         title="Reports"
         onBack={() => router.back()}
         paddingTop={insets.top + 14}
+        rightSlot={
+          <TouchableOpacity onPress={() => setFilterVisible(true)} hitSlop={10}>
+            <Ionicons
+              name={hasFilter ? 'funnel' : 'funnel-outline'}
+              size={20}
+              color={hasFilter ? colors.brand : colors.white}
+            />
+          </TouchableOpacity>
+        }
+      />
+
+      <ReportAccountFilterSheet
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
       />
 
       <MonthPicker selected={month} onSelect={setMonth} />

@@ -34,6 +34,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AreaChart, ChartSkeleton, SegmentedControl } from '@/components/reports';
 import { AmountDisplay, Card, ScreenHeader } from '@/components/ui';
 import { useCashFlow } from '@/hooks/useReports';
+import { useReportAccountFilter } from '@/hooks/useReportAccountFilter';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
@@ -63,10 +64,11 @@ export default function CashFlowScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const [granularity, setGranularity] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const accountIds = useReportAccountFilter();
 
-  const start = monthsAgo(120);
+  const start = monthsAgo(6);
   const end = currentMonth();
-  const { data, isLoading } = useCashFlow(start, end, granularity);
+  const { data, isLoading } = useCashFlow(start, end, granularity, accountIds);
 
   const points = data?.points ?? [];
 
@@ -76,7 +78,7 @@ export default function CashFlowScreen() {
       const [, m] = p.period.split('-');
       label = MONTH_LABELS_SHORT[parseInt(m, 10) - 1];
     } else if (p.period.length > 5) {
-      label = p.period.slice(5); // trim year for compact labels
+      label = p.period.slice(5);
     }
     return {
       label,
@@ -118,7 +120,7 @@ export default function CashFlowScreen() {
         ) : (
           <Animated.View entering={FadeIn.duration(400)} style={{ overflow: 'visible' }}>
             <Card style={ss.card}>
-              <AreaChart data={chartData} height={220} />
+              <AreaChart data={chartData} height={220} visiblePoints={6} />
             </Card>
           </Animated.View>
         )}
@@ -139,20 +141,33 @@ export default function CashFlowScreen() {
           </View>
         </View>
 
-        {/* Summary pills */}
+        {/* Summary rows */}
         {!isLoading && points.length > 0 && (
-          <Animated.View entering={FadeInUp.delay(200).duration(300).easing(Easing.out(Easing.cubic))} style={[ss.pillRow, { overflow: 'visible' }]}>
-            <Card style={ss.pillCard}>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Total In</Text>
-              <AmountDisplay kobo={totalIn} size="xs" color={colors.brandBright} />
-            </Card>
-            <Card style={ss.pillCard}>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Total Out</Text>
-              <AmountDisplay kobo={totalOut} size="xs" color={colors.error} />
-            </Card>
-            <Card style={ss.pillCard}>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Net</Text>
-              <AmountDisplay kobo={totalNet} size="xs" colorize />
+          <Animated.View entering={FadeInUp.delay(200).duration(300).easing(Easing.out(Easing.cubic))} style={{ overflow: 'visible' }}>
+            <Card style={ss.summaryCard}>
+              <View style={ss.summaryRow}>
+                <View style={ss.summaryLabel}>
+                  <View style={[ss.legendDot, { backgroundColor: colors.brandBright }]} />
+                  <Text style={[type_.body, { color: colors.textSecondary }]}>Total Inflow</Text>
+                </View>
+                <AmountDisplay kobo={totalIn} size="md" color={colors.brandBright} />
+              </View>
+              <View style={[ss.summaryDivider, { backgroundColor: colors.border }]} />
+              <View style={ss.summaryRow}>
+                <View style={ss.summaryLabel}>
+                  <View style={[ss.legendDot, { backgroundColor: colors.error }]} />
+                  <Text style={[type_.body, { color: colors.textSecondary }]}>Total Outflow</Text>
+                </View>
+                <AmountDisplay kobo={totalOut} size="md" color={colors.error} />
+              </View>
+              <View style={[ss.summaryDivider, { backgroundColor: colors.border }]} />
+              <View style={ss.summaryRow}>
+                <View style={ss.summaryLabel}>
+                  <View style={[ss.legendDot, { backgroundColor: colors.info }]} />
+                  <Text style={[type_.body, { color: colors.textSecondary }]}>Net</Text>
+                </View>
+                <AmountDisplay kobo={totalNet} size="md" colorize />
+              </View>
             </Card>
           </Animated.View>
         )}
@@ -192,14 +207,22 @@ const ss = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-  pillRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
+  summaryCard: {
+    marginHorizontal: spacing.lg,
+    padding: spacing.md,
   },
-  pillCard: {
-    flex: 1,
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  summaryLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  summaryDivider: {
+    height: StyleSheet.hairlineWidth,
   },
 });

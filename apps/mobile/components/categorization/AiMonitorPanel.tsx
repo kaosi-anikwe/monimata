@@ -65,7 +65,7 @@ function fmtTokens(n: number): string {
 }
 
 function fmtPct(n: number): string {
-  return `${Math.round(n)}%`;
+  return `${Math.round(n * 100)}%`;
 }
 
 // ─── AiMonitorPanel ───────────────────────────────────────────────────────────
@@ -73,8 +73,8 @@ function fmtPct(n: number): string {
 export function AiMonitorPanel({ data }: AiMonitorPanelProps) {
   const colors = useTheme();
 
-  const offlineProgress = Math.min(data.offline_success_rate / 100, 1);
-  const llmProgress = Math.min(data.llm_handled_pct / 100, 1);
+  const offlineProgress = Math.min(data.offline_success_rate, 1);
+  const llmProgress = Math.min(data.llm_handled_pct, 1);
 
   return (
     <View

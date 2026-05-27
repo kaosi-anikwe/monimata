@@ -36,6 +36,13 @@ export interface paths {
      */
     patch: operations["update_alias_accounts__account_id__alias_patch"];
   };
+  "/accounts/{account_id}/exclude-from-net-worth": {
+    /**
+     * Update Exclude From Net Worth
+     * @description Toggle whether this account is excluded from the net-worth calculation.
+     */
+    patch: operations["update_exclude_from_net_worth_accounts__account_id__exclude_from_net_worth_patch"];
+  };
   "/accounts/{account_id}/balance": {
     /**
      * Update Manual Balance
@@ -79,6 +86,17 @@ export interface paths {
      * user can categorise hundreds of transactions in a handful of taps.
      */
     get: operations["list_clusters_transactions_clusters_get"];
+  };
+  "/transactions/clusters/{cluster_key}": {
+    /**
+     * List Cluster Transactions
+     * @description Return paginated transactions belonging to a specific cluster.
+     *
+     * The server re-derives cluster membership by finding all unique
+     * cleaned_narrations within Levenshtein threshold of ``cluster_key``,
+     * then returns matching uncategorised transactions.
+     */
+    get: operations["list_cluster_transactions_transactions_clusters__cluster_key__get"];
   };
   "/transactions/clusters/categorize": {
     /**
@@ -723,6 +741,11 @@ export interface components {
       last_synced_at?: string | null;
       /** Is Active */
       is_active: boolean;
+      /**
+       * Exclude From Net Worth
+       * @default false
+       */
+      exclude_from_net_worth?: boolean;
       /** Deleted At */
       deleted_at?: string | null;
       /**
@@ -1376,7 +1399,7 @@ export interface components {
      * NudgeTriggerType
      * @enum {string}
      */
-    NudgeTriggerType: "nudge" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed" | "ai_credential_invalid" | "llm_categorization_complete" | "llm_categorization_failed";
+    NudgeTriggerType: "nudge" | "system" | "transaction_received" | "statement_received" | "statement_processed" | "receipt_received" | "receipt_processed" | "receipt_failed" | "receipt_duplicate" | "statement_failed" | "ai_credential_invalid" | "llm_categorization_complete" | "llm_categorization_failed";
     /**
      * OperationalNudgeContext
      * @description Base context for operational notifications.
@@ -1851,6 +1874,11 @@ export interface components {
       /** Alias */
       alias: string;
     };
+    /** UpdateExcludeFromNetWorthRequest */
+    UpdateExcludeFromNetWorthRequest: {
+      /** Exclude From Net Worth */
+      exclude_from_net_worth: boolean;
+    };
     /** UpdateManualBalanceRequest */
     UpdateManualBalanceRequest: {
       /**
@@ -2011,6 +2039,36 @@ export interface operations {
     };
   };
   /**
+   * Update Exclude From Net Worth
+   * @description Toggle whether this account is excluded from the net-worth calculation.
+   */
+  update_exclude_from_net_worth_accounts__account_id__exclude_from_net_worth_patch: {
+    parameters: {
+      path: {
+        account_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateExcludeFromNetWorthRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["BankAccountResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
    * Update Manual Balance
    * @description Update the balance of a manual account via an adjustment transaction.
    *
@@ -2147,6 +2205,39 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["ClustersResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * List Cluster Transactions
+   * @description Return paginated transactions belonging to a specific cluster.
+   *
+   * The server re-derives cluster membership by finding all unique
+   * cleaned_narrations within Levenshtein threshold of ``cluster_key``,
+   * then returns matching uncategorised transactions.
+   */
+  list_cluster_transactions_transactions_clusters__cluster_key__get: {
+    parameters: {
+      query?: {
+        page?: number;
+        limit?: number;
+      };
+      path: {
+        cluster_key: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["TransactionListResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -3090,6 +3181,8 @@ export interface operations {
         /** @description YYYY-MM */
         month: string;
         top_n?: number;
+        /** @description Comma-separated account UUIDs to include */
+        account_ids?: string | null;
       };
     };
     responses: {
@@ -3117,6 +3210,8 @@ export interface operations {
       query?: {
         /** @description Months to look back; omit for all history */
         months?: number | null;
+        /** @description Comma-separated account UUIDs to include */
+        account_ids?: string | null;
       };
     };
     responses: {
@@ -3143,6 +3238,8 @@ export interface operations {
     parameters: {
       query: {
         month: string;
+        /** @description Comma-separated account UUIDs to include */
+        account_ids?: string | null;
       };
     };
     responses: {
@@ -3171,6 +3268,8 @@ export interface operations {
         category_id: string;
         /** @description Months to look back; omit for all history */
         months?: number | null;
+        /** @description Comma-separated account UUIDs to include */
+        account_ids?: string | null;
       };
     };
     responses: {
@@ -3197,6 +3296,8 @@ export interface operations {
       query: {
         month: string;
         limit?: number;
+        /** @description Comma-separated account UUIDs to include */
+        account_ids?: string | null;
       };
     };
     responses: {
@@ -3251,6 +3352,8 @@ export interface operations {
         /** @description End YYYY-MM */
         end: string;
         granularity?: components["schemas"]["Granularity"];
+        /** @description Comma-separated account UUIDs to include */
+        account_ids?: string | null;
       };
     };
     responses: {
@@ -3311,6 +3414,8 @@ export interface operations {
       query?: {
         /** @description Days to average over */
         lookback_days?: number;
+        /** @description Comma-separated account UUIDs to include */
+        account_ids?: string | null;
       };
     };
     responses: {

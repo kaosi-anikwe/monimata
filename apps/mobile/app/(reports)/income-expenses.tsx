@@ -34,6 +34,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BarChart, ChartSkeleton } from '@/components/reports';
 import { AmountDisplay, Card, ScreenHeader } from '@/components/ui';
 import { useIncomeExpenseTrend } from '@/hooks/useReports';
+import { useReportAccountFilter } from '@/hooks/useReportAccountFilter';
 import { useTheme } from '@/lib/theme';
 import { spacing } from '@/lib/tokens';
 import { type_ } from '@/lib/typography';
@@ -46,8 +47,9 @@ const MONTH_LABELS_SHORT = [
 export default function IncomeExpensesScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+  const accountIds = useReportAccountFilter();
 
-  const { data, isLoading } = useIncomeExpenseTrend();
+  const { data, isLoading } = useIncomeExpenseTrend(undefined, accountIds);
 
   const points = data?.points ?? [];
 
@@ -110,20 +112,33 @@ export default function IncomeExpensesScreen() {
           </View>
         </View>
 
-        {/* Summary pills */}
+        {/* Summary rows */}
         {!isLoading && points.length > 0 && (
-          <Animated.View entering={FadeInUp.delay(200).duration(300).easing(Easing.out(Easing.cubic))} style={[ss.pillRow, { overflow: 'visible' }]}>
-            <Card style={ss.pillCard}>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Total In</Text>
-              <AmountDisplay kobo={totalIncome} size="xs" color={colors.brandBright} />
-            </Card>
-            <Card style={ss.pillCard}>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Total Out</Text>
-              <AmountDisplay kobo={totalExpenses} size="xs" color={colors.error} />
-            </Card>
-            <Card style={ss.pillCard}>
-              <Text style={[type_.caption, { color: colors.textMeta }]}>Net</Text>
-              <AmountDisplay kobo={totalNet} size="xs" colorize />
+          <Animated.View entering={FadeInUp.delay(200).duration(300).easing(Easing.out(Easing.cubic))} style={{ overflow: 'visible' }}>
+            <Card style={ss.summaryCard}>
+              <View style={ss.summaryRow}>
+                <View style={ss.summaryLabel}>
+                  <View style={[ss.legendDot, { backgroundColor: colors.brandBright }]} />
+                  <Text style={[type_.body, { color: colors.textSecondary }]}>Total Income</Text>
+                </View>
+                <AmountDisplay kobo={totalIncome} size="md" color={colors.brandBright} />
+              </View>
+              <View style={[ss.summaryDivider, { backgroundColor: colors.border }]} />
+              <View style={ss.summaryRow}>
+                <View style={ss.summaryLabel}>
+                  <View style={[ss.legendDot, { backgroundColor: colors.error }]} />
+                  <Text style={[type_.body, { color: colors.textSecondary }]}>Total Expenses</Text>
+                </View>
+                <AmountDisplay kobo={totalExpenses} size="md" color={colors.error} />
+              </View>
+              <View style={[ss.summaryDivider, { backgroundColor: colors.border }]} />
+              <View style={ss.summaryRow}>
+                <View style={ss.summaryLabel}>
+                  <View style={[ss.legendDot, { backgroundColor: colors.info }]} />
+                  <Text style={[type_.body, { color: colors.textSecondary }]}>Net</Text>
+                </View>
+                <AmountDisplay kobo={totalNet} size="md" colorize />
+              </View>
             </Card>
           </Animated.View>
         )}
@@ -159,14 +174,22 @@ const ss = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-  pillRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
+  summaryCard: {
+    marginHorizontal: spacing.lg,
+    padding: spacing.md,
   },
-  pillCard: {
-    flex: 1,
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  summaryLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  summaryDivider: {
+    height: StyleSheet.hairlineWidth,
   },
 });
