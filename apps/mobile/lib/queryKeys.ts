@@ -51,6 +51,7 @@ export const queryKeys = {
 
   // ── Categorization ────────────────────────────────────────────────────
   clusters: () => ['get', '/transactions/clusters'] as const,
+  clusterTransactions: (key: string) => ['get', '/transactions/clusters', key] as const,
   reviewQueue: () => ['get', '/transactions/review-queue'] as const,
   // Prefix key — matches any GET /transactions?... query (used for the
   // local-queue approach in categorize-queue where all uncategorised

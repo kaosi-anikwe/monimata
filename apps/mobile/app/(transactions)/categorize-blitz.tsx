@@ -187,6 +187,10 @@ export default function CategorizeBlitzScreen() {
     [],
   );
 
+  const handleCardPress = useCallback((clusterKey: string) => {
+    router.push(`/cluster-detail?key=${encodeURIComponent(clusterKey)}` as never);
+  }, []);
+
   const renderClusterCard = useCallback(
     ({ item: cluster }: ListRenderItemInfo<(typeof visibleClusters)[number]>) => (
       <ClusterCard
@@ -196,9 +200,10 @@ export default function CategorizeBlitzScreen() {
         onSkip={() => handleSkip(cluster.key)}
         pendingCategoryId={pendingMap.get(cluster.key)}
         onMorePress={() => handleOpenSearch(cluster.key)}
+        onPress={handleCardPress}
       />
     ),
-    [groups, handleCategorize, handleSkip, pendingMap, handleOpenSearch],
+    [groups, handleCategorize, handleSkip, pendingMap, handleOpenSearch, handleCardPress],
   );
 
   // ── Render ──────────────────────────────────────────────────────────────

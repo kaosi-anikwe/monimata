@@ -34,7 +34,7 @@
  */
 
 import React, { memo, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   FadeInDown,
   FadeOutUp,
@@ -71,6 +71,8 @@ export interface ClusterCardProps {
   pendingCategoryId?: string;
   /** Opens the CategorySearchSheet with this cluster pre-selected. */
   onMorePress: () => void;
+  /** Called when the user taps the card body (header/narration area). */
+  onPress?: (clusterKey: string) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -94,6 +96,7 @@ export const ClusterCard = memo(function ClusterCard({
   onSkip,
   pendingCategoryId,
   onMorePress,
+  onPress,
 }: ClusterCardProps) {
   const colors = useTheme();
 
@@ -116,27 +119,33 @@ export const ClusterCard = memo(function ClusterCard({
           { backgroundColor: colors.cardBg },
         ]}
       >
-        {/* ── Header ── */}
-        <View style={ss.headerRow}>
-          <Text
-            style={[type_.h1Sm, { color: colors.textPrimary, flex: 1 }]}
-          >
-            {displayName}
-          </Text>
-          <Badge variant="neutral" size="sm">
-            {cluster.count} · {formatMoney(cluster.total_amount, { compact: true })}
-          </Badge>
-        </View>
+        {/* ── Tappable header area ── */}
+        <Pressable
+          onPress={onPress ? () => onPress(cluster.key) : undefined}
+          style={({ pressed }) => pressed && onPress ? { opacity: 0.7 } : undefined}
+        >
+          {/* ── Header ── */}
+          <View style={ss.headerRow}>
+            <Text
+              style={[type_.h1Sm, { color: colors.textPrimary, flex: 1 }]}
+            >
+              {displayName}
+            </Text>
+            <Badge variant="neutral" size="sm">
+              {cluster.count} · {formatMoney(cluster.total_amount, { compact: true })}
+            </Badge>
+          </View>
 
-        {/* ── Narration preview ── */}
-        {narrationPreview.length > 0 && (
-          <Text
-            style={[type_.body, { color: colors.textMeta, marginBottom: spacing.xl }]}
-            numberOfLines={2}
-          >
-            {narrationPreview}
-          </Text>
-        )}
+          {/* ── Narration preview ── */}
+          {narrationPreview.length > 0 && (
+            <Text
+              style={[type_.body, { color: colors.textMeta, marginBottom: spacing.xl }]}
+              numberOfLines={2}
+            >
+              {narrationPreview}
+            </Text>
+          )}
+        </Pressable>
 
         {/* ── Quick-assign chips ── */}
         <CategoryChipRow

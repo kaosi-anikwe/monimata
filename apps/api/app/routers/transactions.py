@@ -275,6 +275,67 @@ def list_clusters(
     )
 
 
+# ── GET /transactions/clusters/{key} ────────────────────────────────────────
+
+
+@router.get("/clusters/{cluster_key}", response_model=TransactionListResponse)
+def list_cluster_transactions(
+    cluster_key: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(30, ge=1, le=100),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TransactionListResponse:
+    """Return paginated transactions belonging to a specific cluster.
+
+    The server re-derives cluster membership by finding all unique
+    cleaned_narrations within Levenshtein threshold of ``cluster_key``,
+    then returns matching uncategorised transactions.
+    """
+    from sqlalchemy import text
+
+    from app.services.categorization.clustering import find_cluster_members
+
+    # Fetch unique uncategorised narrations to compare against cluster_key.
+    unique_narrations: list[str] = [
+        r[0]
+        for r in db.execute(
+            text("""
+                SELECT DISTINCT cleaned_narration
+                FROM transactions
+                WHERE user_id = :uid
+                  AND category_id IS NULL
+                  AND cleaned_narration IS NOT NULL
+                  AND cleaned_narration <> ''
+            """),
+            {"uid": str(current_user.id)},
+        ).fetchall()
+    ]
+
+    members = find_cluster_members(cluster_key, unique_narrations)
+    if not members:
+        return TransactionListResponse.model_validate(
+            {"items": [], "total": 0, "page": page, "limit": limit}
+        )
+
+    query = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == str(current_user.id),
+            Transaction.category_id.is_(None),
+            Transaction.cleaned_narration.in_(members),
+        )
+        .order_by(Transaction.date.desc(), Transaction.created_at.desc())
+    )
+
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+
+    return TransactionListResponse.model_validate(
+        {"items": items, "total": total, "page": page, "limit": limit}
+    )
+
+
 # ── POST /transactions/clusters/categorize ──────────────────────────────────
 
 

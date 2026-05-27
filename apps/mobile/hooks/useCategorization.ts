@@ -29,11 +29,12 @@
  *    swallowed silently.
  */
 
-import { useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useToast } from '@/components/Toast';
 import { queryKeys } from '@/lib/queryKeys';
-import { $api } from '@/services/api';
+import client, { $api } from '@/services/api';
+import type { Transaction } from '@monimata/shared-types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ── CATEGORIZATION — Read queries ────────────────────────────────────────────
@@ -82,6 +83,33 @@ export function useReviewQueue() {
 export function useUncategorisedQueue() {
   return $api.useQuery('get', '/transactions', {
     params: { query: { uncategorized: true, limit: 100 } },
+  });
+}
+
+/**
+ * Paginated transactions for a specific cluster, identified by its key.
+ *
+ * Calls GET /transactions/clusters/{cluster_key}?page=N&limit=30.
+ * Returns full TransactionResponse items for the cluster detail screen.
+ */
+export function useClusterTransactions(clusterKey: string) {
+  return useInfiniteQuery<{ items: Transaction[]; total: number; page: number; limit: number }>({
+    queryKey: queryKeys.clusterTransactions(clusterKey),
+    queryFn: async ({ pageParam }) => {
+      // Path exists at runtime — regenerate OpenAPI types to resolve type error.
+      const { data, error } = await (client as any).GET(
+        '/transactions/clusters/{cluster_key}',
+        { params: { path: { cluster_key: clusterKey }, query: { page: pageParam as number, limit: 30 } } },
+      );
+      if (error) throw new Error('Failed to fetch cluster transactions');
+      return data as { items: Transaction[]; total: number; page: number; limit: number };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const fetched = lastPage.page * lastPage.limit;
+      return fetched < lastPage.total ? lastPage.page + 1 : undefined;
+    },
+    staleTime: 5 * 60_000,
   });
 }
 
