@@ -35,11 +35,11 @@
  *   CategorySearchSheet (modal overlay, mounted once)
  */
 
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategorizationProgress } from '@/components/categorization/CategorizationProgress';
@@ -168,6 +168,39 @@ export default function CategorizeBlitzScreen() {
     [activeClusterKey, handleCategorize],
   );
 
+  // ── Render helpers ──────────────────────────────────────────────────────
+
+  const handleOpenSearch = useCallback((clusterKey: string) => {
+    setActiveClusterKey(clusterKey);
+    setSearchVisible(true);
+  }, []);
+
+  // Stable reference for FlashList extraData — triggers re-render only when
+  // the maps/sets actually change.
+  const extraData = useMemo(
+    () => ({ pendingMap, dismissedKeys, skippedKeys }),
+    [pendingMap, dismissedKeys, skippedKeys],
+  );
+
+  const keyExtractor = useCallback(
+    (item: (typeof visibleClusters)[number]) => item.key,
+    [],
+  );
+
+  const renderClusterCard = useCallback(
+    ({ item: cluster }: ListRenderItemInfo<(typeof visibleClusters)[number]>) => (
+      <ClusterCard
+        cluster={cluster}
+        groups={groups}
+        onCategorize={handleCategorize}
+        onSkip={() => handleSkip(cluster.key)}
+        pendingCategoryId={pendingMap.get(cluster.key)}
+        onMorePress={() => handleOpenSearch(cluster.key)}
+      />
+    ),
+    [groups, handleCategorize, handleSkip, pendingMap, handleOpenSearch],
+  );
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   const isEmpty =
@@ -188,12 +221,12 @@ export default function CategorizeBlitzScreen() {
 
       {isLoading ? (
         /* ── Loading state ── */
-        <ScrollView contentContainerStyle={ss.scrollContent}>
+        <View style={ss.scrollContent}>
           <CategorizationProgress remaining={0} total={0} />
           {[0, 1, 2].map((i) => (
             <ClusterCardSkeleton key={i} />
           ))}
-        </ScrollView>
+        </View>
       ) : isError ? (
         /* ── Network error state ── */
         <EmptyState
@@ -222,44 +255,24 @@ export default function CategorizeBlitzScreen() {
         />
       ) : (
         /* ── Cluster list ── */
-        <ScrollView
-          contentContainerStyle={[
-            ss.scrollContent,
-            { paddingBottom: insets.bottom + spacing.xxxl },
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={ss.listContainer}>
           <CategorizationProgress
             remaining={visibleClusters.length}
             total={initialTotal}
           />
 
-          {/* Each card gets its own layout wrapper so LinearTransition's
-               transform never conflicts with the card's entering/exiting
-               transforms (Reanimated requires separate nodes for each). */}
-          <View>
-            {visibleClusters.map((cluster) => (
-              <Animated.View
-                key={cluster.key}
-                layout={LinearTransition.springify().damping(28)}
-                style={{ overflow: 'visible' }}
-              >
-                <ClusterCard
-                  cluster={cluster}
-                  groups={groups}
-                  onCategorize={handleCategorize}
-                  onSkip={() => handleSkip(cluster.key)}
-                  pendingCategoryId={pendingMap.get(cluster.key)}
-                  onMorePress={() => {
-                    setActiveClusterKey(cluster.key);
-                    setSearchVisible(true);
-                  }}
-                />
-              </Animated.View>
-            ))}
-          </View>
-        </ScrollView>
+          <FlashList
+            data={visibleClusters}
+            renderItem={renderClusterCard}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={{
+              paddingBottom: insets.bottom + spacing.xxxl,
+            }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            extraData={extraData}
+          />
+        </View>
       )}
 
       {/* ── Category search sheet (mounted once, toggled by state) ── */}
@@ -280,6 +293,10 @@ export default function CategorizeBlitzScreen() {
 const ss = StyleSheet.create({
   root: { flex: 1 },
   scrollContent: {
+    paddingTop: spacing.lg,
+  },
+  listContainer: {
+    flex: 1,
     paddingTop: spacing.lg,
   },
   emptyState: {

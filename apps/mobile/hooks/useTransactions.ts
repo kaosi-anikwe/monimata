@@ -88,25 +88,118 @@ export function useTransactions() {
   });
 }
 
+/**
+ * Fetch the oldest transaction date in the local WatermelonDB cache.
+ * Used as the boundary so server queries only return older (archived) data.
+ */
+export function useOldestLocalTransactionDate() {
+  return useQuery({
+    queryKey: ['oldest-local-tx-date'],
+    queryFn: async () => {
+      const db = getDatabase();
+      const oldest = await db
+        .get<TransactionModel>('transactions')
+        .query(Q.sortBy('date', Q.asc), Q.take(1))
+        .fetch();
+      if (!oldest.length) return null;
+      // Return the day before the oldest local tx to avoid boundary overlap
+      const d = new Date(oldest[0].date);
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    },
+  });
+}
+
+const ARCHIVE_PAGE_LIMIT = 30;
+
+/**
+ * Infinite query for archived transactions from the server.
+ * Only fetches transactions older than the local cache boundary.
+ * Enabled once local pages are exhausted.
+ */
+export function useArchivedTransactions(endDate: string | null, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.archivedTransactions(endDate ?? ''),
+    queryFn: async ({ pageParam = 1 }) => {
+      const { data, error } = await client.GET('/transactions', {
+        params: { query: { page: pageParam, limit: ARCHIVE_PAGE_LIMIT, end_date: endDate! } },
+      });
+      if (error) throw new Error('Could not load archived transactions');
+      return data as TransactionPage;
+    },
+    initialPageParam: 1,
+    getNextPageParam: (last) => {
+      const loaded = (last.page - 1) * last.limit + last.items.length;
+      return loaded < last.total ? last.page + 1 : undefined;
+    },
+    enabled: enabled && Boolean(endDate),
+    staleTime: 10 * 60_000, // archived data rarely changes — cache 10 min
+  });
+}
+
+/**
+ * Server-side search for transactions matching a query string.
+ * Searches narration, cleaned narration, and category name.
+ * Uses endDate boundary to avoid duplicating local results.
+ */
+export function useSearchTransactions(searchQuery: string, endDate: string | null) {
+  const trimmed = searchQuery.trim();
+  return useInfiniteQuery({
+    queryKey: queryKeys.searchTransactions(trimmed, endDate),
+    queryFn: async ({ pageParam = 1 }) => {
+      const { data, error } = await client.GET('/transactions', {
+        params: {
+          query: {
+            page: pageParam,
+            limit: ARCHIVE_PAGE_LIMIT,
+            q: trimmed,
+            ...(endDate ? { end_date: endDate } : {}),
+          },
+        },
+      });
+      if (error) throw new Error('Could not search transactions');
+      return data as TransactionPage;
+    },
+    initialPageParam: 1,
+    getNextPageParam: (last) => {
+      const loaded = (last.page - 1) * last.limit + last.items.length;
+      return loaded < last.total ? last.page + 1 : undefined;
+    },
+    enabled: trimmed.length >= 2,
+    staleTime: 5 * 60_000, // search results cached 5 min
+  });
+}
+
 export function useRecategorize() {
   const qc = useQueryClient();
   const { error } = useToast();
   return useMutation({
     mutationFn: async ({ txId, categoryId }: { txId: string; categoryId: string | null }) => {
       const db = getDatabase();
-      await db.write(async () => {
-        const tx = await db.get<TransactionModel>('transactions').find(txId);
-        await tx.update(t => {
-          t.categoryId = categoryId;
-          t.updatedAt = new Date();
+      try {
+        await db.write(async () => {
+          const tx = await db.get<TransactionModel>('transactions').find(txId);
+          await tx.update(t => {
+            t.categoryId = categoryId;
+            t.updatedAt = new Date();
+          });
         });
-      });
-      syncDatabase().catch(console.warn);
+        syncDatabase().catch(console.warn);
+      } catch {
+        // Not in local DB — patch directly on server (archived transaction)
+        const { error: apiError } = await client.PATCH('/transactions/{tx_id}', {
+          params: { path: { tx_id: txId } },
+          body: { category_id: categoryId },
+        });
+        if (apiError) throw new Error('Could not update category');
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: ['budget'] });
       qc.invalidateQueries({ queryKey: ['monthly-flow'] });
+      qc.invalidateQueries({ queryKey: ['archived-transactions'] });
+      qc.invalidateQueries({ queryKey: ['search-transactions'] });
     },
     onError: () => error('Error', 'Could not update category.'),
   });
@@ -117,10 +210,20 @@ export function useTransaction(txId: string) {
     queryKey: ['transaction', txId],
     queryFn: async () => {
       const db = getDatabase();
-      const tx = await db.get<TransactionModel>('transactions').find(txId);
-      return txModelToDto(tx);
+      try {
+        const tx = await db.get<TransactionModel>('transactions').find(txId);
+        return txModelToDto(tx);
+      } catch {
+        // Not in local DB — fetch from server (archived transaction)
+        const { data, error } = await client.GET('/transactions/{tx_id}', {
+          params: { path: { tx_id: txId } },
+        });
+        if (error) throw new Error('Transaction not found');
+        return data as Transaction;
+      }
     },
     enabled: Boolean(txId),
+    staleTime: 5 * 60_000, // cache individual tx lookups 5 min
   });
 }
 
@@ -167,25 +270,37 @@ export function useUpdateTransaction() {
   return useMutation({
     mutationFn: async ({ txId, body }: { txId: string; body: Partial<ManualTransactionBody> & { memo?: string | null } }) => {
       const db = getDatabase();
-      await db.write(async () => {
-        const tx = await db.get<TransactionModel>('transactions').find(txId);
-        await tx.update(t => {
-          if (body.date !== undefined) t.date = new Date(body.date as string);
-          if (body.amount !== undefined) t.amount = body.amount as number;
-          if (body.narration !== undefined) t.narration = body.narration as string;
-          if (body.type !== undefined) t.type = body.type as string;
-          if (body.category_id !== undefined) t.categoryId = body.category_id ?? null;
-          if (body.memo !== undefined) t.memo = body.memo ?? null;
-          t.updatedAt = new Date();
+      try {
+        await db.write(async () => {
+          const tx = await db.get<TransactionModel>('transactions').find(txId);
+          await tx.update(t => {
+            if (body.date !== undefined) t.date = new Date(body.date as string);
+            if (body.amount !== undefined) t.amount = body.amount as number;
+            if (body.narration !== undefined) t.narration = body.narration as string;
+            if (body.type !== undefined) t.type = body.type as string;
+            if (body.category_id !== undefined) t.categoryId = body.category_id ?? null;
+            if (body.memo !== undefined) t.memo = body.memo ?? null;
+            t.updatedAt = new Date();
+          });
         });
-      });
-      syncDatabase().catch(console.warn);
+        syncDatabase().catch(console.warn);
+      } catch {
+        // Not in local DB — patch directly on server (archived transaction)
+        const { error: apiError } = await client.PATCH('/transactions/{tx_id}', {
+          params: { path: { tx_id: txId } },
+          body,
+        });
+        if (apiError) throw new Error('Could not update transaction');
+      }
     },
-    onSuccess: (_data, _vars) => {
+    onSuccess: (_data, { txId }) => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
+      qc.invalidateQueries({ queryKey: ['transaction', txId] });
       qc.invalidateQueries({ queryKey: ['budget'] });
       qc.invalidateQueries({ queryKey: ['monthly-flow'] });
       qc.invalidateQueries({ queryKey: queryKeys.netWorth() });
+      qc.invalidateQueries({ queryKey: ['archived-transactions'] });
+      qc.invalidateQueries({ queryKey: ['search-transactions'] });
     },
     onError: () => error('Error', 'Could not update transaction.'),
   });
@@ -329,17 +444,27 @@ export function useDeleteTransaction() {
   return useMutation({
     mutationFn: async (txId: string) => {
       const db = getDatabase();
-      await db.write(async () => {
-        const tx = await db.get<TransactionModel>('transactions').find(txId);
-        await tx.markAsDeleted();
-      });
-      syncDatabase().catch(console.warn);
+      try {
+        await db.write(async () => {
+          const tx = await db.get<TransactionModel>('transactions').find(txId);
+          await tx.markAsDeleted();
+        });
+        syncDatabase().catch(console.warn);
+      } catch {
+        // Not in local DB — delete directly on server (archived transaction)
+        const { error: apiError } = await client.DELETE('/transactions/{tx_id}', {
+          params: { path: { tx_id: txId } },
+        });
+        if (apiError) throw new Error('Could not delete transaction');
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.transactions() });
       qc.invalidateQueries({ queryKey: ['budget'] });
       qc.invalidateQueries({ queryKey: ['monthly-flow'] });
       qc.invalidateQueries({ queryKey: queryKeys.netWorth() });
+      qc.invalidateQueries({ queryKey: ['archived-transactions'] });
+      qc.invalidateQueries({ queryKey: ['search-transactions'] });
     },
     onError: () => error('Error', 'Could not delete transaction.'),
   });

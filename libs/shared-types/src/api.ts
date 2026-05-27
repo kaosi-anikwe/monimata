@@ -2115,6 +2115,8 @@ export interface operations {
         /** @description YYYY-MM-DD */
         end_date?: string | null;
         uncategorized?: boolean | null;
+        /** @description Search narration, cleaned narration, or category name */
+        q?: string | null;
       };
     };
     responses: {

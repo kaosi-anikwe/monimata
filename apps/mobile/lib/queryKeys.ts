@@ -35,6 +35,8 @@ export const queryKeys = {
   // ── WatermelonDB-backed (semantic keys) ────────────────────────────────
   budget: (month: string) => ['budget', month] as const,
   transactions: () => ['transactions'] as const,
+  archivedTransactions: (endDate: string) => ['archived-transactions', endDate] as const,
+  searchTransactions: (q: string, endDate: string | null) => ['search-transactions', q, endDate] as const,
   monthlyFlow: (month: string) => ['monthly-flow', month] as const,
   netWorth: () => ['net-worth'] as const,
   categoryGroups: () => ['category-groups'] as const,

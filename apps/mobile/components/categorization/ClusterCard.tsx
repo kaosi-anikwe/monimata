@@ -33,7 +33,7 @@
  * Also exports ClusterCardSkeleton for the loading state.
  */
 
-import React, { useEffect } from 'react';
+import React, { memo, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -87,7 +87,7 @@ const MAX_NARRATIONS = 3;
 
 // ─── ClusterCard ─────────────────────────────────────────────────────────────
 
-export function ClusterCard({
+export const ClusterCard = memo(function ClusterCard({
   cluster,
   groups,
   onCategorize,
@@ -159,7 +159,7 @@ export function ClusterCard({
       </View>
     </Animated.View>
   );
-}
+});
 
 // ─── ClusterCardSkeleton ──────────────────────────────────────────────────────
 

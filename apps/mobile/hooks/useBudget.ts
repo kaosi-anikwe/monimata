@@ -27,6 +27,7 @@ import TransactionModel from '@/database/models/Transaction';
 import { syncDatabase } from '@/database/sync';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAppSelector } from '@/store/hooks';
+import client from '@/services/api';
 import type { BudgetCategory, BudgetGroup, BudgetResponse } from '@monimata/shared-types';
 
 // ── Budget logic (mirrors apps/api/app/services/budget_logic.py) ─────────────
@@ -172,13 +173,41 @@ export function useBudget(month: string) {
         db.get<BudgetMonthModel>('budget_months')
           .query(Q.where('month', Q.oneOf(tbbMonths)))
           .fetch(),
-        // All transactions this month — used for live per-category activity
-        // and total_debit (all debits, categorised or not).
+        // All non-statement transactions this month — used for live per-category
+        // activity and total_debit. Statement transactions are excluded because
+        // their spending is already reflected in the starting balance (TBB seed).
         db.get<TransactionModel>('transactions').query(
           Q.where('date', Q.gte(currentBounds.start)),
           Q.where('date', Q.lt(currentBounds.end)),
+          Q.where('source', Q.notEq('statement')),
         ).fetch(),
       ]);
+
+      // ── Server fallback for archived months ───────────────────────────────
+      // If there are no budget_months AND no transactions for this month
+      // locally, the data is outside the local cache — fetch from server.
+      if (bmCurrent.length === 0 && allMonthTxns.length === 0) {
+        const monthParam = month.slice(0, 7); // "YYYY-MM-01" → "YYYY-MM"
+        const { data, error } = await client.GET('/budget', {
+          params: { query: { month: monthParam } },
+        });
+        if (!error && data) {
+          return {
+            month: data.month,
+            tbb: data.tbb,
+            groups: data.groups.map((g) => ({
+              ...g,
+              id: String(g.id),
+              categories: g.categories.map((c) => ({
+                ...c,
+                id: String(c.id),
+              })),
+            })),
+            total_debit: data.total_debit ?? 0,
+          } as BudgetResponse;
+        }
+        // If server fetch fails, fall through to local computation (empty month)
+      }
 
       const bmCurrentMap = new Map(bmCurrent.map((b) => [b.categoryId, b]));
       const targetMap = new Map(targets.map((t) => [t.categoryId, t]));
@@ -262,6 +291,9 @@ export function useBudget(month: string) {
 
       return { month, tbb, groups: groupRows, total_debit: totalDebit };
     },
+    // Server-fetched archived months benefit from a longer staleTime since
+    // the data is historical. Local months are invalidated on mutation anyway.
+    staleTime: 5 * 60_000,
   });
 }
 

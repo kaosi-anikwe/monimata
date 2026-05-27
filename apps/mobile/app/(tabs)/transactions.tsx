@@ -53,7 +53,7 @@ import { syncDatabase } from '@/database/sync';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategoryGroups } from '@/hooks/useCategories';
 import { useClusters } from '@/hooks/useCategorization';
-import { useRecategorize, useTransactions } from '@/hooks/useTransactions';
+import { useRecategorize, useTransactions, useOldestLocalTransactionDate, useArchivedTransactions, useSearchTransactions } from '@/hooks/useTransactions';
 import { queryKeys } from '@/lib/queryKeys';
 import { useTheme } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
@@ -392,9 +392,9 @@ export default function TransactionsScreen() {
     data: txPages,
     isLoading,
     error,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
+    fetchNextPage: fetchNextLocalPage,
+    hasNextPage: hasNextLocalPage,
+    isFetchingNextPage: isFetchingNextLocalPage,
   } = useTransactions();
 
   const { data: groups = [] } = useCategoryGroups();
@@ -402,6 +402,24 @@ export default function TransactionsScreen() {
   const recategorizeMutation = useRecategorize();
   const { data: clustersData } = useClusters();
   const showBanner = (clustersData?.total_uncategorised ?? 0) > 0;
+
+  // ── Archived / server-side data hooks ───────────────────────────────────
+  const { data: oldestLocalDate } = useOldestLocalTransactionDate();
+  const localExhausted = !hasNextLocalPage && !isFetchingNextLocalPage && !isLoading;
+
+  const {
+    data: archivedPages,
+    fetchNextPage: fetchNextArchivedPage,
+    hasNextPage: hasNextArchivedPage,
+    isFetchingNextPage: isFetchingNextArchivedPage,
+  } = useArchivedTransactions(oldestLocalDate ?? null, localExhausted);
+
+  const {
+    data: searchPages,
+    fetchNextPage: fetchNextSearchPage,
+    hasNextPage: hasNextSearchPage,
+    isFetchingNextPage: isFetchingNextSearchPage,
+  } = useSearchTransactions(search, oldestLocalDate ?? null);
 
   function handleBannerPress() {
     const clusters = clustersData?.clusters ?? [];
@@ -443,10 +461,30 @@ export default function TransactionsScreen() {
     setRefreshing(false);
   }, [qc]);
 
-  const allTx = useMemo(
+  // ── Merge local + archived transactions ─────────────────────────────────
+  const localTx = useMemo(
     () => txPages?.pages.flatMap((p) => p.items) ?? [],
     [txPages],
   );
+
+  const archivedTx = useMemo(
+    () => archivedPages?.pages.flatMap((p) => p.items) ?? [],
+    [archivedPages],
+  );
+
+  const serverSearchTx = useMemo(
+    () => searchPages?.pages.flatMap((p) => p.items) ?? [],
+    [searchPages],
+  );
+
+  // When searching: local filtered results + server search results (no overlap due to end_date boundary)
+  // When scrolling: local transactions + archived server transactions (sequential, no overlap)
+  const allTx = useMemo(() => {
+    if (search.trim()) {
+      return [...localTx, ...serverSearchTx];
+    }
+    return [...localTx, ...archivedTx];
+  }, [localTx, archivedTx, serverSearchTx, search]);
 
   const pickerTx = useMemo(
     () => (pickerTxId ? allTx.find((tx) => tx.id === pickerTxId) ?? null : null),
@@ -460,6 +498,11 @@ export default function TransactionsScreen() {
       result = result.filter((tx) => {
         if (tx.narration.toLowerCase().includes(q)) return true;
         if (tx.memo?.toLowerCase().includes(q)) return true;
+        // Match category name
+        if (tx.category_id) {
+          const catName = categoryMap.get(tx.category_id);
+          if (catName?.toLowerCase().includes(q)) return true;
+        }
         // Match amount: strip currency symbols/commas and compare against kobo or naira string
         const absNaira = (Math.abs(tx.amount) / 100).toFixed(2);
         if (absNaira.includes(q) || String(Math.abs(tx.amount)).includes(q)) return true;
@@ -476,7 +519,38 @@ export default function TransactionsScreen() {
       result = result.filter((tx) => tx.account_id === activeFilter);
     }
     return result;
-  }, [allTx, search, activeFilter]);
+  }, [allTx, search, activeFilter, categoryMap]);
+
+  // ── Unified infinite scroll controls ─────────────────────────────────────
+  const hasNextPage = search.trim()
+    ? (hasNextLocalPage || hasNextSearchPage)
+    : (hasNextLocalPage || hasNextArchivedPage);
+
+  const isFetchingNextPage = search.trim()
+    ? (isFetchingNextLocalPage || isFetchingNextSearchPage)
+    : (isFetchingNextLocalPage || isFetchingNextArchivedPage);
+
+  const fetchNextPage = useCallback(() => {
+    if (search.trim()) {
+      // When searching: exhaust local pages first, then fetch server search pages
+      if (hasNextLocalPage && !isFetchingNextLocalPage) {
+        fetchNextLocalPage();
+      } else if (hasNextSearchPage && !isFetchingNextSearchPage) {
+        fetchNextSearchPage();
+      }
+    } else {
+      // Normal scroll: exhaust local pages first, then fetch archived pages
+      if (hasNextLocalPage && !isFetchingNextLocalPage) {
+        fetchNextLocalPage();
+      } else if (hasNextArchivedPage && !isFetchingNextArchivedPage) {
+        fetchNextArchivedPage();
+      }
+    }
+  }, [
+    search, hasNextLocalPage, isFetchingNextLocalPage, fetchNextLocalPage,
+    hasNextArchivedPage, isFetchingNextArchivedPage, fetchNextArchivedPage,
+    hasNextSearchPage, isFetchingNextSearchPage, fetchNextSearchPage,
+  ]);
 
   const dayGroups = useMemo((): DayGroup[] => {
     const map = new Map<string, Transaction[]>();

@@ -38,7 +38,6 @@ import { Platform } from 'react-native';
 import { useSelector } from 'react-redux';
 
 import { useToast } from '@/components/Toast';
-import { getDatabase } from '@/database';
 import { registerPromptSetter, resetBridgeForUser } from '@/lib/notifPromptBridge';
 import { lightColors } from '@/lib/theme';
 import type { NudgePushData } from '@/types/nudge';
@@ -93,13 +92,8 @@ export function usePushNotifications(): PushNotificationConsent {
     switch (screen) {
       case 'transaction':
         if (typeof data.transaction_id === 'string') {
-          try {
-            await getDatabase().get('transactions').find(data.transaction_id);
-            router.push(`/transaction/${data.transaction_id}` as never);
-            return;
-          } catch {
-            // Transaction not in local DB — fall through to transactions list
-          }
+          router.push(`/transaction/${data.transaction_id}` as never);
+          return;
         }
         router.push('/(tabs)/transactions');
         break;
