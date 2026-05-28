@@ -83,6 +83,9 @@ def _null_category_net_flow_in_month(db: Session, user_id: str, month: str) -> i
     balance; the individual historical rows have source=statement and must not
     also feed TBB — doing so causes past-month salary credits to compound
     forward via max(0, TBB(prev)), inflating TBB far beyond the real balance.
+    Subsequent statement uploads inject a Balance Reconciliation (source=system)
+    transaction equal to the net balance delta so TBB stays in sync with
+    reality without compounding individual rows.
 
     Categorised transactions are excluded — they route through category
     activity instead.

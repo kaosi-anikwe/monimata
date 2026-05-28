@@ -756,6 +756,105 @@ def process_bank_statement(
             len(updated_ids),
         )
 
+        # ── Reconciliation for subsequent uploads ─────────────────────────
+        # On subsequent uploads the closing balance is the user’s actual cash
+        # but individual statement rows are excluded from TBB.  We compute
+        # the pre-closing TBB contribution (system txs always, other non-
+        # statement null-cat txs only if dated <= closing) and insert a
+        # reconciliation system transaction for the shortfall.  Post-closing
+        # transactions (manual debits, bank alerts) stack on top naturally.
+        #
+        # Staleness guard: only reconcile when the recon_anchor (most recent
+        # balance_after) comes from THIS import.  If a previous import had a
+        # later closing date, this is a back-dated statement — skip.
+        this_import_ids = set(inserted_ids) | set(updated_ids)
+        if not is_fresh_account and this_import_ids:
+            recon_anchor = (
+                db.query(Transaction)
+                .filter(
+                    Transaction.account_id == account_id,
+                    Transaction.balance_after.isnot(None),
+                )
+                .order_by(Transaction.date.desc())
+                .first()
+            )
+            if (
+                recon_anchor is not None
+                and recon_anchor.balance_after is not None
+                and str(recon_anchor.id) in this_import_ids
+            ):
+                from sqlalchemy import func as _func_recon
+
+                new_closing: int = recon_anchor.balance_after
+                closing_date = recon_anchor.date
+
+                # Pre-closing TBB contribution:
+                # 1) System txs (MSB, previous reconciliations) — always,
+                #    regardless of date (they are balance adjustments).
+                system_contribution: int = (
+                    db.query(_func_recon.coalesce(_func_recon.sum(Transaction.amount), 0))
+                    .filter(
+                        Transaction.account_id == account_id,
+                        Transaction.category_id.is_(None),
+                        Transaction.source == TransactionSource.system,
+                    )
+                    .scalar()
+                    or 0
+                )
+                # 2) Non-system, non-statement, null-cat txs dated on or
+                #    before the closing date (bank alerts, manual entries
+                #    that pre-date the statement).
+                non_system_pre_closing: int = (
+                    db.query(_func_recon.coalesce(_func_recon.sum(Transaction.amount), 0))
+                    .filter(
+                        Transaction.account_id == account_id,
+                        Transaction.category_id.is_(None),
+                        Transaction.source.notin_(
+                            [
+                                TransactionSource.statement,
+                                TransactionSource.system,
+                            ]
+                        ),
+                        Transaction.date <= closing_date,
+                    )
+                    .scalar()
+                    or 0
+                )
+                pre_closing_tbb = system_contribution + non_system_pre_closing
+                reconciliation_amount = new_closing - pre_closing_tbb
+                if reconciliation_amount != 0:
+                    db.add(
+                        Transaction(
+                            user_id=user_id,
+                            account_id=account_id,
+                            date=closing_date,
+                            amount=reconciliation_amount,
+                            narration="Balance Reconciliation",
+                            cleaned_narration="balance reconciliation",
+                            type="credit" if reconciliation_amount > 0 else "debit",
+                            category_id=None,
+                            source=TransactionSource.system,
+                        )
+                    )
+                    db.commit()
+                    logger.info(
+                        "process_bank_statement: reconciliation tx "
+                        "amount=%d (closing=%d pre_closing_tbb=%d) "
+                        "account=%s",
+                        reconciliation_amount,
+                        new_closing,
+                        pre_closing_tbb,
+                        account_id,
+                    )
+            elif recon_anchor is not None and str(recon_anchor.id) not in this_import_ids:
+                logger.info(
+                    "process_bank_statement: skipping reconciliation — "
+                    "statement is older than existing closing date %s "
+                    "account=%s",
+                    recon_anchor.date,
+                    account_id,
+                )
+
         # ── Synthetic MONIMATA_STARTING_BALANCE for first-time imports ─────
         # On the first statement upload the closing balance is seeded as a
         # NULL-category credit so it feeds the TBB pool directly (the "clean
@@ -775,12 +874,12 @@ def process_bank_statement(
             closing_balance: int | None = (
                 anchor_for_sb.balance_after if anchor_for_sb is not None else None
             )
-            if closing_balance and closing_balance > 0:
+            if anchor_for_sb and closing_balance and closing_balance > 0:
                 db.add(
                     Transaction(
                         user_id=user_id,
                         account_id=account_id,
-                        date=datetime.now(UTC),
+                        date=anchor_for_sb.date,
                         amount=closing_balance,
                         narration="Starting Balance",
                         cleaned_narration="starting balance",
@@ -799,11 +898,13 @@ def process_bank_statement(
 
         # ── Anchor starting_balance to the bank's closing balance ─────────
         # Find the most recent transaction that carries a balance_after value;
-        # that is the bank's authoritative closing balance for this account.
-        # Recompute starting_balance so that:
-        #   starting_balance + SUM(all transactions) == bank closing balance
-        # This keeps computed_balance in perfect sync with the bank regardless
-        # of how many historical transactions we hold.
+        # that is the bank's authoritative closing balance at that point in
+        # time.  Recompute starting_balance so that:
+        #   starting_balance + SUM(tx WHERE date <= anchor) == balance_after
+        # This means:
+        #   displayed = balance_after + SUM(tx WHERE date > anchor)
+        # Post-anchor transactions (manual debits, bank alerts) correctly
+        # adjust the displayed balance instead of being absorbed.
         anchor_tx = (
             db.query(Transaction)
             .filter(
@@ -816,13 +917,16 @@ def process_bank_statement(
         if anchor_tx is not None and anchor_tx.balance_after is not None:
             from sqlalchemy import func as _func
 
-            total_sum: int = (
+            sum_up_to_anchor: int = (
                 db.query(_func.sum(Transaction.amount))
-                .filter(Transaction.account_id == account_id)
+                .filter(
+                    Transaction.account_id == account_id,
+                    Transaction.date <= anchor_tx.date,
+                )
                 .scalar()
                 or 0
             )
-            new_starting = anchor_tx.balance_after - total_sum
+            new_starting = anchor_tx.balance_after - sum_up_to_anchor
             if account.starting_balance != new_starting:
                 logger.info(
                     "process_bank_statement: anchoring starting_balance old=%d new=%d account=%s",
