@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = ""  # e.g. "MoniMata <no-reply@moni-mata.ng>"
+    SMTP_FROM: str = ""  # e.g. "MoniMata <no-reply@monimata.ng>"
     SMTP_USE_TLS: bool = True  # STARTTLS on port 587; set False for SSL-only (port 465)
 
     # ── Environment ───────────────────────────────────────────────────────────

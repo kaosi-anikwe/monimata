@@ -62,7 +62,7 @@ apps/api/
 │   │   ├── budget_events.py        # SQLAlchemy event listeners — BudgetMonth.activity sync
 │   │   ├── nudge_engine.py         # Nudge trigger evaluation, quiet hours, fatigue limits
 │   │   ├── push_service.py         # Expo push notification delivery
-│   │   ├── email_service.py        # Transactional email (registration, alerts)
+│   │   ├── email.py                # Transactional email (registration, alerts)
 │   │   ├── llm.py                  # BYOK LLM client for Tier 4 categorisation + nudge copy
 │   │   ├── categorization/
 │   │   │   ├── __init__.py         # clean_narration() + the full tiered categorisation pipeline

@@ -30,49 +30,30 @@ completes.
 
 from __future__ import annotations
 
-import base64
 import logging
-from typing import cast
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import CurrentUser, get_current_user
 from app.core.limiter import limiter
-from app.models.bank_account import BankAccount
-from app.services.ingestion import identify_statement
+from app.services.upload import (
+    StatementAccountNotFound,
+    StatementValidationError,
+    detect_mime,
+    enqueue_receipt,
+    enqueue_statement,
+    resolve_statement_auto,
+    resolve_statement_directed,
+    validate_bank_slug,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Maximum file size accepted (5 MB)
 _MAX_FILE_BYTES = 5 * 1024 * 1024
-
-
-def _detect_mime(content: bytes) -> str | None:
-    """Return the MIME type inferred from *content* magic bytes, or ``None``.
-
-    We do **not** trust the ``Content-Type`` header because mobile HTTP
-    clients often set it from the file extension, which can be wrong or
-    missing.  Checking the actual bytes is the only reliable approach.
-
-    Recognised signatures
-    ---------------------
-    - ``FF D8 FF``               → image/jpeg
-    - ``89 50 4E 47``            → image/png
-    - ``52 49 46 46 … 57 45 42 50`` → image/webp  (RIFF…WEBP)
-    - ``25 50 44 46``            → application/pdf (%PDF)
-    """
-    if content[:3] == b"\xff\xd8\xff":
-        return "image/jpeg"
-    if content[:4] == b"\x89PNG":
-        return "image/png"
-    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
-        return "image/webp"
-    if content[:4] == b"%PDF":
-        return "application/pdf"
-    return None
 
 
 @router.post("/receipt", status_code=status.HTTP_202_ACCEPTED)
@@ -84,15 +65,9 @@ async def upload_receipt(
 ) -> dict:
     """Upload a transaction receipt image or PDF for background import.
 
-    The bank and account are identified automatically from the file — the
-    client does not need to specify either.  The file is processed in a
-    Celery background task; the transaction appears once processing
-    completes.
-
     Supported formats: JPEG, PNG, WebP, PDF (max 5 MB).
     Returns ``{"status": "accepted"}`` immediately.
     """
-    # ── Read & size check ─────────────────────────────────────────────────────
     content = await file.read()
     if not content:
         raise HTTPException(
@@ -105,26 +80,14 @@ async def upload_receipt(
             detail="File must be smaller than 5 MB.",
         )
 
-    # ── Magic-byte MIME guard ─────────────────────────────────────────────────
-    # The Content-Type header from mobile clients is set by the HTTP library
-    # (often from the file extension) and cannot be trusted.  Inspect the
-    # actual bytes instead.
-    mime = _detect_mime(content)
-    if mime is None:
+    if detect_mime(content) is None:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Unsupported file type. Accepted: JPEG, PNG, WebP, PDF.",
         )
 
-    # ── Enqueue background task ───────────────────────────────────────────────
-    # Bank + account identification happens inside the task (via identify_receipt)
-    # so the client doesn't need to know which bank the receipt belongs to.
-    image_b64 = base64.b64encode(content).decode()
     try:
-        from app.worker.celery_app import CeleryTask
-        from app.worker.tasks import process_receipt
-
-        cast(CeleryTask, process_receipt).delay(image_b64, str(current_user.id))
+        enqueue_receipt(content, str(current_user.id))
     except Exception:
         logger.exception("uploads.receipt: failed to enqueue process_receipt")
         raise HTTPException(
@@ -132,11 +95,6 @@ async def upload_receipt(
             detail="Failed to enqueue receipt processing.",
         )
 
-    logger.info(
-        "uploads.receipt: queued user=%s size=%d",
-        current_user.id,
-        len(content),
-    )
     return {"status": "accepted"}
 
 
@@ -145,20 +103,18 @@ async def upload_receipt(
 async def upload_statement(
     request: Request,
     file: UploadFile = File(...),
+    bank_slug: str | None = Form(None),
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Upload a bank statement PDF for background import.
 
-    The statement is parsed to extract all transactions it contains.
-    The bank and account are identified from the PDF itself — the client
-    does not need to specify either.  The account must already exist in
-    MoniMata; if it is not found, a 404 is returned.
+    If *bank_slug* is provided the router routes directly to that bank's
+    parser.  If omitted the bank is auto-detected from the PDF content.
 
     Accepted formats: PDF only (max 5 MB).
     Returns ``{"status": "accepted"}`` immediately.
     """
-    # ── Read & size check ─────────────────────────────────────────────────────
     content = await file.read()
     if not content:
         raise HTTPException(
@@ -171,77 +127,45 @@ async def upload_statement(
             detail="File must be smaller than 5 MB.",
         )
 
-    # ── PDF-only guard (magic bytes) ─────────────────────────────────────────
     if content[:4] != b"%PDF":
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Only PDF bank statements are supported.",
         )
 
-    # ── Identify bank from statement content ────────────────────────────────
-    result = identify_statement(content)
-    if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=(
-                "Could not identify the bank from this statement. "
-                "Make sure it is an unmodified PDF statement from a supported bank."
-            ),
-        )
-    account_number, bank_slug = result
-
-    # ── Verify ownership: find the matching account for this user ────────────
-    # Decrypt stored account numbers and compare against the one extracted
-    # from the statement.  Prevents importing another user's statement even
-    # if both use the same bank.
-    from app.core.security import decrypt_pii
-
-    account = None
-    for candidate in (
-        db.query(BankAccount)
-        .filter(
-            BankAccount.user_id == str(current_user.id),
-            BankAccount.bank_slug == bank_slug,
-            BankAccount.deleted_at.is_(None),
-        )
-        .all()
-    ):
-        if candidate.account_number is None:
-            continue
+    # ── Validate explicit bank_slug when provided ────────────────────────────
+    if bank_slug is not None:
         try:
-            if decrypt_pii(candidate.account_number) == account_number:
-                account = candidate
-                break
-        except Exception:
-            logger.warning(
-                "uploads.statement: could not decrypt account_number for account=%s",
-                candidate.id,
+            validate_bank_slug(bank_slug)
+        except StatementValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.detail
             )
 
-    if account is None:
-        logger.warning(
-            "uploads.statement: no %s account matching number=%s for user=%s",
-            bank_slug,
-            account_number[-4:],
-            current_user.id,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                "No matching account found. "
-                "Add the account in MoniMata before uploading its statement."
-            ),
-        )
-
-    # ── Enqueue background processing ─────────────────────────────────────
-    filename = file.filename or f"{bank_slug}_statement.pdf"
-    pdf_b64 = base64.b64encode(content).decode()
+    # ── Resolve account ──────────────────────────────────────────────────────
     try:
-        from app.worker.celery_app import CeleryTask
-        from app.worker.tasks import process_bank_statement
+        if bank_slug is not None:
+            account, pdf_password = resolve_statement_directed(db, content, bank_slug, current_user)
+            resolved_bank_slug = bank_slug
+        else:
+            account, resolved_bank_slug, pdf_password = resolve_statement_auto(
+                db, content, current_user
+            )
+    except StatementValidationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except StatementAccountNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.detail)
 
-        cast(CeleryTask, process_bank_statement).delay(
-            pdf_b64, filename, bank_slug, str(account.id), str(current_user.id)
+    # ── Enqueue background processing ────────────────────────────────────────
+    filename = file.filename or f"{resolved_bank_slug}_statement.pdf"
+    try:
+        enqueue_statement(
+            content,
+            filename,
+            resolved_bank_slug,
+            str(account.id),
+            str(current_user.id),
+            pdf_password,
         )
     except Exception:
         logger.exception("uploads.statement: failed to enqueue process_bank_statement")
@@ -250,11 +174,4 @@ async def upload_statement(
             detail="Failed to enqueue statement processing.",
         )
 
-    logger.info(
-        "uploads.statement: queued bank=%s account=%s user=%s size=%d",
-        bank_slug,
-        account.id,
-        current_user.id,
-        len(content),
-    )
     return {"status": "accepted"}

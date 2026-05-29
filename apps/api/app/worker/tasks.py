@@ -590,6 +590,7 @@ def process_bank_statement(
     bank_slug: str,
     account_id: str,
     user_id: str,
+    password: str = "",
 ) -> None:
     """Parse a bank statement PDF and upsert its transactions.
 
@@ -629,7 +630,7 @@ def process_bank_statement(
             return
 
         try:
-            parsed_txns = parse_statement(pdf_bytes, filename, bank_slug)
+            parsed_txns = parse_statement(pdf_bytes, filename, bank_slug, password)
         except (UnsupportedBankError, UnsupportedChannelError, ValueError) as exc:
             logger.warning(
                 "process_bank_statement: parse failed bank=%s account=%s: %s",

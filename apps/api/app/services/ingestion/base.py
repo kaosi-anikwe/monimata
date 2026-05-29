@@ -91,8 +91,12 @@ class StatementBankParser(Protocol):
         ``ValueError`` if the file format is unrecognised or corrupt.
     """
 
-    def identify(self, content: bytes, email_body: str) -> tuple[str, str] | None: ...
-    def parse(self, content: bytes, filename: str) -> list[ParsedTransaction]: ...
+    def identify(
+        self, content: bytes, email_body: str, password: str = ""
+    ) -> tuple[str, str] | None: ...
+    def parse(
+        self, content: bytes, filename: str, password: str = ""
+    ) -> list[ParsedTransaction]: ...
 
 
 class ReceiptBankParser(Protocol):

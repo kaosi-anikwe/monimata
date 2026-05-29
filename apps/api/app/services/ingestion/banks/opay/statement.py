@@ -48,7 +48,7 @@ from typing import TypedDict
 
 import pdfplumber
 
-from app.services.ingestion.base import ParsedTransaction
+from app.services.ingestion.base import ParsedTransaction, StatementBankParser
 from app.services.ingestion.registry import BankInfo, register_statement_parser
 
 # ── OPay statement identification signals ───────────────────────────────────
@@ -365,8 +365,10 @@ def _parse_row(
 # ── parser ───────────────────────────────────────────────────────────────────
 
 
-class _OPayStatementParser:
-    def identify(self, content: bytes, email_body: str) -> tuple[str, str] | None:
+class _OPayStatementParser(StatementBankParser):
+    def identify(
+        self, content: bytes, email_body: str, password: str = ""
+    ) -> tuple[str, str] | None:
         """Return ``(account_number, 'opay')`` if this file is an OPay statement.
 
         Detection strategy (both must pass):
@@ -398,7 +400,7 @@ class _OPayStatementParser:
 
         return (account_number, "opay")
 
-    def parse(self, content: bytes, filename: str) -> list[ParsedTransaction]:
+    def parse(self, content: bytes, filename: str, password: str = "") -> list[ParsedTransaction]:
         """Parse an OPay wallet account statement PDF.
 
         Strategy

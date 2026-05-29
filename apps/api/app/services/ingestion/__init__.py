@@ -63,8 +63,10 @@ from app.services.ingestion.channels.receipt import (
 )
 from app.services.ingestion.channels.statement import (
     UnsupportedChannelError,
+    derive_statement_password,
     identify_statement,
     parse_statement,
+    register_statement_password_fn,
 )
 from app.services.ingestion.registry import BankInfo, is_bank_supported, list_supported_banks
 
@@ -87,6 +89,8 @@ __all__ = [
     # Statement channel
     "parse_statement",
     "identify_statement",
+    "derive_statement_password",
+    "register_statement_password_fn",
     # Receipt channel
     "identify_receipt",
     "parse_receipt",
