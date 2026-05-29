@@ -48,8 +48,12 @@ the user's accounts without knowing the direction in advance.
 
 from __future__ import annotations
 
+import io
 import re
 from datetime import UTC, datetime, timedelta, timezone
+
+import pytesseract
+from PIL import Image, ImageFilter
 
 from app.services.ingestion.base import ParsedTransaction, ReceiptBankParser
 from app.services.ingestion.channels.receipt import extract_text
@@ -138,6 +142,28 @@ def _from_account_suffix(from_raw: str) -> str | None:
     return runs[-1] if runs else None
 
 
+def _extract_text_enhanced(content: bytes) -> str:
+    """Re-OCR an image with 3× upscaling + sharpening.
+
+    The default 2× greyscale OCR (used by ``extract_text``) sometimes
+    renders the masked ``*****NNNNN`` "From:" digits as noise letters
+    (e.g. ``tRABE SH SI5`` instead of ``***** 35395``).  A second pass
+    at 3× with a sharpen filter reliably recovers the digit suffix.
+
+    Only used as a fallback inside ``identify()`` when the default OCR
+    fails to yield a usable From suffix; ``parse()`` continues to use the
+    default OCR which preserves the full Reference No field.
+    """
+    if content[:4] == b"%PDF":
+        return extract_text(content)
+
+    img = Image.open(io.BytesIO(content)).convert("L")
+    w, h = img.size
+    img = img.resize((w * 3, h * 3), Image.Resampling.LANCZOS)
+    img = img.filter(ImageFilter.SHARPEN)
+    return pytesseract.image_to_string(img, config="--oem 3 --psm 6")
+
+
 def _account_matches(account_number: str, field_value: str) -> bool:
     """Return True if *field_value* refers to *account_number*.
 
@@ -167,6 +193,11 @@ class _FirstBankReceiptParser(ReceiptBankParser):
         and the last 4 digits of the full "Account No:" field (credit side).
         Both are returned so the task can match either without knowing the
         transaction direction upfront.
+
+        When the default 2× OCR fails to yield a usable digit suffix from the
+        masked "From:" field (common with JPEG screenshots where asterisks
+        get rendered as noise letters), a second pass with 3× upscaling and
+        sharpening is attempted to recover the digits.
         """
         text = extract_text(image_bytes)
         lower = text.lower()
@@ -176,13 +207,20 @@ class _FirstBankReceiptParser(ReceiptBankParser):
         suffixes: list[str] = []
 
         # Masked sender account — last digit run ≥ 4 digits from the From value.
-        # Works for both clean OCR ('*****35395' → '35395') and degraded OCR
-        # where asterisks become noise ('AEE S 5395' → '5395').
         from_m = _FROM_RE.search(text)
+        from_suffix: str | None = None
         if from_m:
-            suffix = _from_account_suffix(from_m.group(1).strip())
-            if suffix:
-                suffixes.append(suffix)
+            from_suffix = _from_account_suffix(from_m.group(1).strip())
+
+        # If the default OCR didn't yield a From suffix, try enhanced OCR.
+        if from_suffix is None:
+            enhanced = _extract_text_enhanced(image_bytes)
+            from_m2 = _FROM_RE.search(enhanced)
+            if from_m2:
+                from_suffix = _from_account_suffix(from_m2.group(1).strip())
+
+        if from_suffix:
+            suffixes.append(from_suffix)
 
         # Full beneficiary account — last 4 digits
         acct_m = _ACCOUNT_NO_RE.search(text)
@@ -248,6 +286,17 @@ class _FirstBankReceiptParser(ReceiptBankParser):
             is_debit = True
         elif acct_m and _account_matches(account_number, acct_m.group(1).strip()):
             is_debit = False
+
+        # Fallback: re-OCR with enhanced settings when the masked "From:"
+        # digits were garbled by the default 2× pass.
+        if is_debit is None:
+            enhanced = _extract_text_enhanced(image_bytes)
+            from_m2 = _FROM_RE.search(enhanced)
+            acct_m2 = _ACCOUNT_NO_RE.search(enhanced)
+            if from_m2 and _account_matches(account_number, from_m2.group(1).strip()):
+                is_debit = True
+            elif acct_m2 and _account_matches(account_number, acct_m2.group(1).strip()):
+                is_debit = False
 
         if is_debit is None:
             return None

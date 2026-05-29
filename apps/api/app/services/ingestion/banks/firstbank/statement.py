@@ -46,7 +46,7 @@ import hashlib
 import io
 import re
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 import pdfplumber
 
@@ -89,20 +89,56 @@ _ACCT_NUM_RE = re.compile(r"Account\s+No[:\s]+(\d{10})")
 
 # ── Column layout ────────────────────────────────────────────────────────────
 # FirstBank PDFs use no grid lines; every column is identified by the
-# x-midpoint of each word.  Column x-edges (in PDF points) were measured
-# from the header row of the statement (y ≈ 338.9 on page 1):
+# x-midpoint of each word.  Two layout variants exist:
 #
-#   TransDate(61) | Reference(107) | Transaction Details(164) |
-#   ValueDate(312) | Deposit(390) | Withdrawal(435) | Balance(510)
-_COL_EDGES: list[float] = [52, 107, 164, 312, 390, 435, 510, 565]
+# Layout A (password-protected statements, circa early 2026):
+#   TransDate | Reference | Transaction Details |
+#   ValueDate | Deposit | Withdrawal | Balance
+#
+# Layout B (unprotected statements, current):
+#   Trans Date | Ref. Number | Transaction Details |
+#   Value Date | Withdrawal(DR) | Deposit(CR) | Balance
+#
+# The column ORDER of Withdrawal / Deposit is swapped between layouts.
+# Detection: if the first-page header contains "Withdrawal(DR)" the PDF
+# uses Layout B; otherwise Layout A.
 
-_COL_TRANS_DATE = 0
-_COL_REFERENCE = 1
-_COL_DETAILS = 2
-_COL_VALUE_DATE = 3
-_COL_DEPOSIT = 4
-_COL_WITHDRAWAL = 5
-_COL_BALANCE = 6
+
+class _Layout(TypedDict):
+    col_edges: list[float]
+    trans_date: int
+    reference: int
+    details: int
+    value_date: int
+    deposit: int
+    withdrawal: int
+    balance: int
+
+
+# Layout A: Deposit before Withdrawal (password-protected variant).
+_LAYOUT_A: _Layout = {
+    "col_edges": [52, 107, 164, 312, 390, 435, 510, 565],
+    "trans_date": 0,
+    "reference": 1,
+    "details": 2,
+    "value_date": 3,
+    "deposit": 4,
+    "withdrawal": 5,
+    "balance": 6,
+}
+
+# Layout B: Withdrawal(DR) before Deposit(CR) (unprotected variant).
+_LAYOUT_B: _Layout = {
+    "col_edges": [45, 106, 158, 314, 366, 425, 484, 545],
+    "trans_date": 0,
+    "reference": 1,
+    "details": 2,
+    "value_date": 3,
+    "withdrawal": 4,
+    "deposit": 5,
+    "balance": 6,
+}
+
 _N_COLS = 7
 
 # y-tolerance for grouping words into the same row.
@@ -112,32 +148,36 @@ _Y_TOL = 3.0
 _MAX_MERGE = 30.0
 
 # Crop boxes (x0, y0, x1, y1) used to skip non-transaction content.
-# Page 1 has a caution block, account summary, table header, and a
-# "Balance B/F" sentinel before the first real transaction row.
-_CROP_P1 = (0, 362, 595, 842)
+# Page 1 data start varies by layout; we use the more conservative value
+# that skips the summary block in both variants.
+_CROP_P1_A = (0, 362, 595, 842)
+_CROP_P1_B = (0, 385, 595, 842)
 _CROP_REST = (0, 30, 595, 842)
 
-# Anchor rows have a valid DD-MON-YY date in the TransDate cell.
-_TRANS_DATE_RE = re.compile(r"^\d{2}-[A-Z]{3}-\d{2}$", re.IGNORECASE)
+# Anchor rows have a valid date in the TransDate cell.
+# Supports both DD-MON-YY (23-JAN-26) and DD-Mon-YYYY (23-Jan-2026).
+_TRANS_DATE_RE = re.compile(r"^\d{2}-[A-Za-z]{3}-(\d{2}|\d{4})$")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _col_index(x_mid: float) -> int | None:
-    for i in range(len(_COL_EDGES) - 1):
-        if _COL_EDGES[i] <= x_mid < _COL_EDGES[i + 1]:
+def _col_index(x_mid: float, edges: list[float]) -> int | None:
+    for i in range(len(edges) - 1):
+        if edges[i] <= x_mid < edges[i + 1]:
             return i
     return None
 
 
 def _extract_page_rows(
     words: list[dict],
+    layout: _Layout,
 ) -> list[tuple[float, list[str]]]:
     """Group *words* into rows by y-coordinate; assign each word to a column.
 
     Returns ``[(y, [cell0…cell6]), …]`` sorted by ascending y.
     """
+    edges = layout["col_edges"]
     y_buckets: dict[float, list[dict]] = {}
     for w in sorted(words, key=lambda w: (w["top"], w["x0"])):
         rk = next((k for k in y_buckets if abs(w["top"] - k) <= _Y_TOL), w["top"])
@@ -148,7 +188,7 @@ def _extract_page_rows(
         row: list[str] = [""] * _N_COLS
         for w in y_buckets[rk]:
             x_mid = (w["x0"] + w["x1"]) / 2
-            ci = _col_index(x_mid)
+            ci = _col_index(x_mid, edges)
             if ci is not None:
                 row[ci] = (row[ci] + " " + w["text"]).strip()
         result.append((rk, row))
@@ -157,16 +197,16 @@ def _extract_page_rows(
 
 def _merge_continuations(
     rows: list[tuple[float, list[str]]],
+    layout: _Layout,
 ) -> list[list[str]]:
     """Merge continuation rows (no date in TransDate) into their nearest anchor.
 
     Only continuations that appear *below* an anchor and within *_MAX_MERGE*
     points are merged; orphaned continuations are dropped.
     """
+    td = layout["trans_date"]
     anchors: list[tuple[int, float]] = [
-        (i, y)
-        for i, (y, row) in enumerate(rows)
-        if _TRANS_DATE_RE.match(row[_COL_TRANS_DATE].strip())
+        (i, y) for i, (y, row) in enumerate(rows) if _TRANS_DATE_RE.match(row[td].strip())
     ]
     if not anchors:
         return []
@@ -174,7 +214,7 @@ def _merge_continuations(
     result: dict[int, list[str]] = {ai: list(rows[ai][1]) for ai, _ in anchors}
 
     for _, (y, row) in enumerate(rows):
-        if _TRANS_DATE_RE.match(row[_COL_TRANS_DATE].strip()) or not any(row):
+        if _TRANS_DATE_RE.match(row[td].strip()) or not any(row):
             continue
         # Find the nearest anchor that is strictly above this continuation.
         above = [(ai, ay) for ai, ay in anchors if ay < y]
@@ -184,7 +224,7 @@ def _merge_continuations(
         if y - anchor_y > _MAX_MERGE:
             continue
         a_row = result[ai]
-        for col in (_COL_REFERENCE, _COL_DETAILS):
+        for col in (layout["reference"], layout["details"]):
             piece = row[col].strip()
             if piece:
                 a_row[col] = (a_row[col] + " " + piece).strip()
@@ -204,7 +244,7 @@ def _naira_to_kobo(s: str) -> int | None:
         if "." in s:
             integer, decimal = s.split(".", 1)
             decimal = decimal.ljust(2, "0")[:2]
-            return int(integer) * 100 + int(decimal)
+            return int(integer or "0") * 100 + int(decimal)
         return int(s) * 100
     except (ValueError, AttributeError):
         return None
@@ -230,31 +270,38 @@ def _synthetic_ref(
 def _parse_row(
     row: list[str],
     account_last4: str | None,
+    layout: _Layout,
 ) -> ParsedTransaction | None:
     """Convert a merged row into a ``ParsedTransaction``, or ``None`` to skip."""
-    trans_date_str = row[_COL_TRANS_DATE].strip()
+    trans_date_str = row[layout["trans_date"]].strip()
     if not trans_date_str:
         return None
 
-    try:
-        txn_date = datetime.strptime(trans_date_str, "%d-%b-%y").replace(tzinfo=_WAT)
-    except ValueError:
+    # Try both date formats: DD-Mon-YYYY (23-Jan-2026) and DD-MON-YY (23-JAN-26).
+    txn_date = None
+    for fmt in ("%d-%b-%Y", "%d-%b-%y"):
+        try:
+            txn_date = datetime.strptime(trans_date_str, fmt).replace(tzinfo=_WAT)
+            break
+        except ValueError:
+            continue
+    if txn_date is None:
         return None
 
     # Build narration from Reference + Transaction Details.
-    ref_cell = row[_COL_REFERENCE].strip()
-    details_cell = row[_COL_DETAILS].strip()
+    ref_cell = row[layout["reference"]].strip()
+    details_cell = row[layout["details"]].strip()
     narration_parts = [p for p in (ref_cell, details_cell) if p]
     narration = " ".join(narration_parts) or None
 
-    deposit_k = _naira_to_kobo(row[_COL_DEPOSIT])
-    withdrawal_k = _naira_to_kobo(row[_COL_WITHDRAWAL])
-    balance_k = _naira_to_kobo(row[_COL_BALANCE])
+    deposit_k = _naira_to_kobo(row[layout["deposit"]])
+    withdrawal_k = _naira_to_kobo(row[layout["withdrawal"]])
+    balance_k = _naira_to_kobo(row[layout["balance"]])
 
-    if deposit_k is not None:
-        txn_type, amount = "credit", deposit_k
-    elif withdrawal_k is not None:
+    if withdrawal_k is not None and withdrawal_k > 0:
         txn_type, amount = "debit", withdrawal_k
+    elif deposit_k is not None and deposit_k > 0:
+        txn_type, amount = "credit", deposit_k
     else:
         return None
 
@@ -348,18 +395,23 @@ class _FirstBankStatementParser(StatementBankParser):
 
         try:
             with pdfplumber.open(io.BytesIO(content), **open_kwargs) as pdf:
-                account_number = _extract_account_number(pdf.pages[0].extract_text() or "")
+                page1_text = pdf.pages[0].extract_text() or ""
+                account_number = _extract_account_number(page1_text)
                 account_last4 = account_number[-4:] if account_number else None
+
+                # Detect layout variant from page 1 header.
+                layout = _LAYOUT_B if "Withdrawal(DR)" in page1_text else _LAYOUT_A
+                crop_p1 = _CROP_P1_B if layout is _LAYOUT_B else _CROP_P1_A
 
                 results: list[ParsedTransaction] = []
                 for page_idx, page in enumerate(pdf.pages):
-                    crop_box = _CROP_P1 if page_idx == 0 else _CROP_REST
+                    crop_box = crop_p1 if page_idx == 0 else _CROP_REST
                     words = page.crop(crop_box).extract_words()
                     if not words:
                         continue
-                    rows = _extract_page_rows(words)
-                    for row in _merge_continuations(rows):
-                        txn = _parse_row(row, account_last4)
+                    rows = _extract_page_rows(words, layout)
+                    for row in _merge_continuations(rows, layout):
+                        txn = _parse_row(row, account_last4, layout)
                         if txn is not None:
                             results.append(txn)
         except Exception as exc:
