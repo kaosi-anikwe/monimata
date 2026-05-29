@@ -512,9 +512,17 @@ export interface paths {
      * @description Upload a bank statement PDF for background import.
      *
      * The statement is parsed to extract all transactions it contains.
-     * The bank and account are identified from the PDF itself — the client
-     * does not need to specify either.  The account must already exist in
-     * MoniMata; if it is not found, a 404 is returned.
+     *
+     * If *bank_slug* is provided the router routes directly to that bank's
+     * parser — bypassing auto-detection.  This is required for
+     * password-protected statements (e.g. FirstBank) where the PDF cannot be
+     * read without knowing the account number first.
+     *
+     * If *bank_slug* is omitted the bank and account are identified
+     * automatically from the PDF content (auto-detect flow, as before).
+     *
+     * The account must already exist in MoniMata; if it is not found a 404 is
+     * returned.
      *
      * Accepted formats: PDF only (max 5 MB).
      * Returns ``{"status": "accepted"}`` immediately.
@@ -763,6 +771,8 @@ export interface components {
     Body_upload_statement_uploads_statement_post: {
       /** File */
       file: string;
+      /** Bank Slug */
+      bank_slug?: string | null;
     };
     /** BudgetCategoryPerformance */
     BudgetCategoryPerformance: {
@@ -3750,9 +3760,17 @@ export interface operations {
    * @description Upload a bank statement PDF for background import.
    *
    * The statement is parsed to extract all transactions it contains.
-   * The bank and account are identified from the PDF itself — the client
-   * does not need to specify either.  The account must already exist in
-   * MoniMata; if it is not found, a 404 is returned.
+   *
+   * If *bank_slug* is provided the router routes directly to that bank's
+   * parser — bypassing auto-detection.  This is required for
+   * password-protected statements (e.g. FirstBank) where the PDF cannot be
+   * read without knowing the account number first.
+   *
+   * If *bank_slug* is omitted the bank and account are identified
+   * automatically from the PDF content (auto-detect flow, as before).
+   *
+   * The account must already exist in MoniMata; if it is not found a 404 is
+   * returned.
    *
    * Accepted formats: PDF only (max 5 MB).
    * Returns ``{"status": "accepted"}`` immediately.

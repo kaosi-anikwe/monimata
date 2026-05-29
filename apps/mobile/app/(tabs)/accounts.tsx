@@ -61,6 +61,7 @@ import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useTheme } from '@/lib/theme';
 import { layout, radius, shadow, spacing } from '@/lib/tokens';
 import { ff, type_ } from '@/lib/typography';
+import { formatNaira } from '@/utils/money';
 import { StatementAccountNotFoundError, uploadStatement } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { toggleAmountsHidden } from '@/store/preferencesSlice';
@@ -652,6 +653,7 @@ function UploadStatementSheet({ account, onClose }: UploadStatementSheetProps) {
       await uploadStatement(
         { uri: file.uri, mimeType: 'application/pdf', name: file.name },
         (fraction) => { setProgress(Math.min(fraction * 0.9, 0.9)); },
+        account?.bank_slug,
       );
       setProgress(1);
       setUploadState('done');

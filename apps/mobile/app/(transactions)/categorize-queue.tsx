@@ -45,11 +45,11 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FadeInRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CategorySearchSheet } from '@/components/categorization/CategorySearchSheet';
+import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
 import { ReviewCard, ReviewCardSkeleton } from '@/components/categorization/ReviewCard';
-import { SwipeDirectionHint } from '@/components/categorization/SwipeDirectionHint';
 import { useToast } from '@/components/Toast';
 import { Badge, EmptyState, ScreenHeader } from '@/components/ui';
+import { useCategoryGroups } from '@/hooks/useCategories';
 import { useConfirmCategory, useReviewQueue, useUncategorisedQueue } from '@/hooks/useCategorization';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 import { useTheme } from '@/lib/theme';
@@ -74,6 +74,7 @@ export default function CategorizeQueueScreen() {
   // Review-queue endpoint is kept for AI suggestions only (matched by tx ID).
   const { data: queueData } = useReviewQueue();
   const confirmMutation = useConfirmCategory();
+  const { data: groups = [] } = useCategoryGroups();
 
   // ── Local queue state ───────────────────────────────────────────────────────────────
   // Array of TransactionResponse sorted oldest-first. Defer moves to back;
@@ -322,18 +323,17 @@ export default function CategorizeQueueScreen() {
         </View>
       )}
 
-      {/* ── First-session gesture overlay ── */}
-      <SwipeDirectionHint />
-
       {/* ── Category search sheet ── */}
-      <CategorySearchSheet
+      <CategoryPickerSheet
         visible={searchVisible}
+        groups={groups}
         onClose={() => setSearchVisible(false)}
-        onSelect={(categoryId) => {
+        onSelect={(cat) => {
           setSearchVisible(false);
-          handleSearchSelect(categoryId);
+          handleSearchSelect(cat?.id ?? null);
         }}
         disableTBB={(currentTx?.amount ?? 0) < 0}
+        searchable
       />
     </View>
   );

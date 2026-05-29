@@ -43,7 +43,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategorizationProgress } from '@/components/categorization/CategorizationProgress';
-import { CategorySearchSheet } from '@/components/categorization/CategorySearchSheet';
+import { CategoryPickerSheet } from '@/components/CategoryPickerSheet';
 import { ClusterCard, ClusterCardSkeleton } from '@/components/categorization/ClusterCard';
 import { useToast } from '@/components/Toast';
 import { EmptyState, ScreenHeader } from '@/components/ui';
@@ -281,13 +281,15 @@ export default function CategorizeBlitzScreen() {
       )}
 
       {/* ── Category search sheet (mounted once, toggled by state) ── */}
-      <CategorySearchSheet
+      <CategoryPickerSheet
         visible={searchVisible}
+        groups={groups}
         onClose={() => {
           setSearchVisible(false);
           setActiveClusterKey(null);
         }}
-        onSelect={(categoryId) => handleSearchSelect(categoryId)}
+        onSelect={(cat) => handleSearchSelect(cat?.id ?? null)}
+        searchable
       />
     </View>
   );

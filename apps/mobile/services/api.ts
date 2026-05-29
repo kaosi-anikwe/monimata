@@ -400,6 +400,7 @@ export async function uploadReceipt(
  *
  * @param file       Local file info ({ uri, mimeType, name }). Must be application/pdf.
  * @param onProgress Callback receiving a fraction 0 → 1 as bytes transmit.
+ * @param bankSlug   Optional bank slug to help the backend identify the bank.
  */
 export class StatementAccountNotFoundError extends Error {
     constructor() {
@@ -411,10 +412,12 @@ export class StatementAccountNotFoundError extends Error {
 export async function uploadStatement(
     file: UploadReceiptFile,
     onProgress?: (fraction: number) => void,
+    bankSlug?: string | null,
 ): Promise<void> {
     let token = await getAccessToken().catch(() => null);
     const fd = new FormData();
     fd.append('file', { uri: file.uri, type: file.mimeType, name: file.name } as unknown as Blob);
+    if (bankSlug) fd.append('bank_slug', bankSlug);
 
     let { status, responseText } = await xhrSend(`${BASE_URL}/uploads/statement`, fd, token, onProgress, 120_000);
 
