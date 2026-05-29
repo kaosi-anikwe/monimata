@@ -13,6 +13,24 @@ Git tags follow the pattern `mobile/vX.Y.Z` and `api/vX.Y.Z`.
 
 ## Mobile App
 
+### [0.7.1] - 2026-05-29
+
+#### Changed
+
+- **Unified category picker** — replaced `CategorySearchSheet` with
+  `CategoryPickerSheet` across the categorise-blitz and categorise-queue
+  screens. `CategoryPickerSheet` now accepts a `searchable` prop that renders
+  a live-filtered search bar above the category list.
+- **Statement upload** — `uploadStatement` now sends `bank_slug` in the
+  multipart form data so the backend can identify the bank without parsing
+  the PDF first.
+
+#### Removed
+
+- `CategorySearchSheet` component (`components/categorization/`) — superseded
+  by the searchable `CategoryPickerSheet`.
+- `SwipeDirectionHint` component (`components/categorization/`) — unused.
+
 ### [0.7.0] - 2026-05-27
 
 #### Added
@@ -278,6 +296,32 @@ the time of writing; future entries will document incremental changes only.
 ---
 
 ## API
+
+### [0.7.1] - 2026-05-29
+
+#### Added
+
+- **FirstBank statement parser** — new parser for FirstBank PDF statements
+  with password-protected PDF support (last 5 digits of account number).
+  Includes email alert parser enhancements and a dedicated receipt parser
+  for FirstBank.
+- **Statement upload `bank_slug`** — `POST /uploads/statement` now accepts an
+  optional `bank_slug` field in the multipart body, allowing the client to
+  hint the issuing bank for faster and more reliable parser selection.
+- **Balance reconciliation on repeat uploads** — when a subsequent statement
+  is uploaded for an account that already has transactions, the processor
+  reconciles the account balance against the statement's opening balance and
+  creates an adjustment transaction if they diverge.
+
+#### Changed
+
+- **Upload & webhook service extraction** — business logic extracted from
+  `routers/uploads.py` and `routers/webhooks.py` into `services/upload.py`
+  and `services/webhook.py`, keeping routers thin.
+- **Base statement parser interface** — `StatementBankParser.identify()` and
+  `parse()` now accept an optional `password` parameter. Banks can register
+  a password derivation function for encrypted PDFs.
+- Renamed `services/email_service.py` → `services/email.py`.
 
 ### [0.7.0] - 2026-05-27
 
