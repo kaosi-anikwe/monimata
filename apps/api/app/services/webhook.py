@@ -58,16 +58,19 @@ GMAIL_REQUESTER_RE = re.compile(
 # ─── Sender resolution ───────────────────────────────────────────────────────
 
 
-def resolve_sender(direct_sender: str, body: str) -> str:
+def resolve_sender(direct_sender: str, body: str, html: str = "") -> str:
     """
     Return the effective bank sender email.
 
-    Three strategies, tried in order:
+    Four strategies, tried in order:
 
     1. Direct match — the webhook ``from`` field is already a known bank domain.
     2. Content probe — try all registered parsers against the body.
     3. Manual-forward scan — look for a ``From:`` header line inside a
        forwarded-message block.
+    4. HTML domain scan — when body is empty/unhelpful (e.g. FirstBank
+       statement emails that only have HTML content), extract email addresses
+       from the HTML and check for known bank domains.
     """
     if get_bank_by_email_domain(direct_sender) is not None:
         return direct_sender
@@ -92,6 +95,22 @@ def resolve_sender(direct_sender: str, body: str) -> str:
                 candidate,
             )
             return candidate
+
+    # Fallback: scan HTML for known bank domains.  Covers emails like
+    # FirstBank statements that have body=null and all content in HTML.
+    # Bank domains may appear as email addresses (user@bank.com) or in URLs
+    # (https://www.bank.com), so we check the raw HTML text directly against
+    # every registered bank domain.
+    if html:
+        bank = get_bank_by_email_domain(html)
+        if bank is not None:
+            synthetic = f"no-reply@{next(iter(bank.email_domains), bank.slug)}"
+            logger.debug(
+                "resolve_sender: HTML domain scan matched bank=%s for sender=%s",
+                bank.slug,
+                direct_sender,
+            )
+            return synthetic
 
     return direct_sender
 

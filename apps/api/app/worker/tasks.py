@@ -770,11 +770,15 @@ def process_bank_statement(
         # later closing date, this is a back-dated statement — skip.
         this_import_ids = set(inserted_ids) | set(updated_ids)
         if not is_fresh_account and this_import_ids:
+            # Only consider statement rows for reconciliation — bank alert
+            # txs also carry balance_after but represent a single-tx snapshot,
+            # not a full-period closing balance.
             recon_anchor = (
                 db.query(Transaction)
                 .filter(
                     Transaction.account_id == account_id,
                     Transaction.balance_after.isnot(None),
+                    Transaction.source == TransactionSource.statement,
                 )
                 .order_by(Transaction.date.desc())
                 .first()
@@ -868,6 +872,7 @@ def process_bank_statement(
                 .filter(
                     Transaction.account_id == account_id,
                     Transaction.balance_after.isnot(None),
+                    Transaction.source == TransactionSource.statement,
                 )
                 .order_by(Transaction.date.desc())
                 .first()

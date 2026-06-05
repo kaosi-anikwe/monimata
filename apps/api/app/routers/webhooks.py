@@ -64,7 +64,11 @@ async def bank_alert_webhook(
     html: str = data.get("html") or ""
 
     attachments: list[dict] = data.get("attachments") or []
-    pdf_attachments = [a for a in attachments if a.get("mimeType") == "application/pdf"]
+    pdf_attachments = [
+        a
+        for a in attachments
+        if a.get("mimeType") in ["application/pdf", "application/octet-stream"]
+    ]
 
     # ── Gmail forwarding-verification intercept ───────────────────────────────
     gmail_result = handle_gmail_verification(sender, recipient, body, html)
@@ -72,7 +76,7 @@ async def bank_alert_webhook(
         return gmail_result
 
     # ── Resolve sender & recipient ────────────────────────────────────────────
-    effective_sender = resolve_sender(sender, body)
+    effective_sender = resolve_sender(sender, body, html)
     if effective_sender != sender:
         logger.info(
             "bank_alert_webhook: resolved forwarded sender %s → %s", sender, effective_sender
