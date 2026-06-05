@@ -22,9 +22,9 @@ export interface Env {
     WEBHOOK_SECRET: string;
     /** Sentry DSN for error reporting */
     SENTRY_DSN: string;
+    /** API base URL (default: https://api.monimata.ng) */
+    API_BASE_URL?: string;
 }
-
-const API_URL = 'https://test.monimata.ng/webhooks/bank-alerts';
 
 function arrayBufferToBase64(buffer: string | ArrayBuffer | Uint8Array): string {
     if (typeof buffer === 'string') return btoa(buffer);
@@ -44,6 +44,7 @@ export default withSentry(
     }),
     {
         async email(message: ForwardableEmailMessage, env: Env, _ctx: ExecutionContext) {
+            const apiUrl = `${env.API_BASE_URL ?? 'https://api.monimata.ng'}/webhooks/bank-alerts`;
             const parser = new PostalMime();
 
             const rawEmail = await new Response(message.raw).arrayBuffer();
@@ -64,7 +65,7 @@ export default withSentry(
                 })),
             };
 
-            const response = await fetch(API_URL, {
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
