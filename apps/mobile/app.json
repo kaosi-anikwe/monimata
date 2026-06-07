@@ -2,7 +2,7 @@
   "expo": {
     "name": "MoniMata",
     "slug": "monimata-mobile",
-    "version": "0.7.1",
+    "version": "0.8.0",
     "orientation": "portrait",
     "scheme": "monimata-mobile",
     "userInterfaceStyle": "automatic",
