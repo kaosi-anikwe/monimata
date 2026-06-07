@@ -13,6 +13,42 @@ Git tags follow the pattern `mobile/vX.Y.Z` and `api/vX.Y.Z`.
 
 ## Mobile App
 
+### [0.8.0] - 2026-06-07
+
+#### Added
+
+- **Gmail Filter Setup screen** (`(profile)/gmail-filter`) — step-by-step guide
+  for setting up Gmail email forwarding. Displays the user's personalised
+  forwarding address with a one-tap copy button. Downloads a ready-to-import
+  Gmail filter XML file via the native folder picker (SAF on Android, Files on
+  iOS) scoped to the user's selected bank accounts.
+
+#### Changed
+
+- **Account card redesign** — removed the card footer and "Manual" badge;
+  more-actions button (⋮) moved to the top-right corner alongside the bank
+  info. Account number is now displayed inline with the account type
+  (`SAVINGS  ·  3167435395`). Balance amount sits directly below the bank
+  info with consistent vertical spacing.
+- **Accounts scroll** — bottom content padding now uses safe area insets
+  (`tabBarHeight + insets.bottom + spacing.lg`), matching the nudges screen.
+- **Categorise queue — infinite fetch** — `useUncategorisedQueue` switched
+  from a single-page query to `useInfiniteQuery`; the screen auto-fetches all
+  remaining pages before initialising the local queue, so users with more than
+  100 uncategorised transactions see the complete queue.
+- **Profile screen** — display name in the avatar row truncates with an
+  ellipsis when it overflows rather than wrapping.
+- **Email parser** — API base URL is now read from the `INBOUND_API_URL`
+  environment variable instead of being hard-coded, enabling environment-specific
+  deployments without a code change.
+
+#### Fixed
+
+- **Transaction account change not reflected** — `useUpdateTransaction` was
+  not writing `account_id` to the local WatermelonDB record. Updating an
+  account on a manual transaction now persists immediately in the local DB and
+  is queued for sync.
+
 ### [0.7.1] - 2026-05-29
 
 #### Changed
@@ -296,6 +332,45 @@ the time of writing; future entries will document incremental changes only.
 ---
 
 ## API
+
+### [0.8.0] - 2026-06-07
+
+#### Added
+
+- **Gmail filter endpoint** — `GET /accounts/gmail-filter` generates a Gmail
+  filter XML file that auto-forwards bank alert emails to the user's MoniMata
+  forwarding address. Accepts one or more `bank_slugs` query parameters; creates
+  one filter rule per (bank, subject-keyword) pair to work correctly with Gmail's
+  phrase-containment matching.
+- **Transaction type filter** — `GET /transactions` now accepts a `type` query
+  parameter (`debit` | `credit` | `all`) for client-side type filtering.
+
+#### Fixed
+
+- **FirstBank statement parser — dual-layout support** — the parser previously
+  only handled password-protected statements (Layout A: Deposit column before
+  Withdrawal). Unprotected current statements use Layout B, which reverses the
+  column order (`Withdrawal(DR)` before `Deposit(CR)`) and has different column
+  x-edges and page-1 crop offsets. The parser now auto-detects the layout from
+  the first-page header text and applies the correct column mapping.
+- **FirstBank date format** — the transaction-date regex now accepts both
+  `DD-MON-YY` (e.g. `23-JAN-26`) and `DD-Mon-YYYY` (e.g. `23-Jan-2026`).
+- **FirstBank receipt OCR fallback** — Tesseract OCR is now attempted when
+  pdfplumber extraction yields no usable text, improving parse reliability for
+  image-based receipt PDFs.
+- **Webhook sender resolution — HTML domain scan** — added a fourth sender
+  resolution strategy that scans the raw HTML body for known bank domains.
+  Covers FirstBank statement delivery emails whose body field is empty/null and
+  all content is in HTML, which previously caused the sender to remain
+  unresolved.
+- **PDF attachment detection** — the webhook now accepts attachments with MIME
+  type `application/octet-stream` in addition to `application/pdf`, handling
+  email clients that send PDFs without a specific content type.
+- **Balance reconciliation anchor** — statement reconciliation now filters to
+  `source = statement` transactions only when looking for the closing balance
+  anchor. Previously, bank-alert transactions (which carry `balance_after` as a
+  single-transaction snapshot, not a period closing balance) could be selected
+  as the anchor, producing incorrect reconciliation adjustments.
 
 ### [0.7.1] - 2026-05-29
 
