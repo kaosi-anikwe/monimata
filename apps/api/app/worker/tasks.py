@@ -357,9 +357,6 @@ def run_llm_categorization(
                 tx.categorization_source = "llm"
                 tx.category_confidence = min(confidence, 100)
                 success_count += 1
-            else:
-                tx.categorization_source = "llm"
-                tx.category_confidence = 0
 
             db.add(
                 UserAiUsageLog(

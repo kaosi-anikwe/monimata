@@ -146,6 +146,43 @@ def find_account_by_number(
     return None
 
 
+def find_account_by_last4(
+    db: Session, user_id: str, bank_slug: str, last4: str
+) -> BankAccount | None:
+    """Match by the trailing digits of the decrypted account number.
+
+    Used by the email-alert path where the parser only extracts the masked
+    suffix (e.g. "316XXXX395" → "395").  Falls back to the first matching
+    account for the bank if no suffix match is found.
+    """
+    from app.core.security import decrypt_pii
+
+    candidates = (
+        db.query(BankAccount)
+        .filter(
+            BankAccount.user_id == user_id,
+            BankAccount.bank_slug == bank_slug,
+            BankAccount.deleted_at.is_(None),
+        )
+        .all()
+    )
+
+    for candidate in candidates:
+        if candidate.account_number is None:
+            continue
+        try:
+            if decrypt_pii(candidate.account_number).endswith(last4):
+                return candidate
+        except Exception:
+            logger.warning(
+                "find_account_by_last4: could not decrypt account_number for account=%s",
+                candidate.id,
+            )
+
+    # No suffix match — return the first account for this bank if only one exists.
+    return candidates[0] if len(candidates) == 1 else None
+
+
 # ─── Gmail verification ──────────────────────────────────────────────────────
 
 
@@ -394,15 +431,18 @@ def handle_email_alert(
         logger.warning("handle_email_alert: unrecognised sender=%s", effective_sender)
         return {"status": "skipped", "reason": "unknown_sender"}
 
-    account = (
-        db.query(BankAccount)
-        .filter(
-            BankAccount.user_id == str(user.id),
-            BankAccount.bank_slug == bank_info.slug,
-            BankAccount.deleted_at.is_(None),
+    if alert.account_last4:
+        account = find_account_by_last4(db, str(user.id), bank_info.slug, alert.account_last4)
+    else:
+        account = (
+            db.query(BankAccount)
+            .filter(
+                BankAccount.user_id == str(user.id),
+                BankAccount.bank_slug == bank_info.slug,
+                BankAccount.deleted_at.is_(None),
+            )
+            .first()
         )
-        .first()
-    )
     if account is None:
         logger.warning("handle_email_alert: no %s account for user=%s", bank_info.slug, user.id)
         return {"status": "skipped", "reason": "no_matching_account"}
