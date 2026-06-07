@@ -14,12 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import { Directory } from 'expo-file-system';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useToast } from '@/components/Toast';
 import { syncDatabase } from '@/database/sync';
 import { queryKeys } from '@/lib/queryKeys';
-import { $api } from '@/services/api';
+import { $api, authFetch } from '@/services/api';
 
 export interface AddManualAccountPayload {
   institution: string;
@@ -114,5 +115,42 @@ export function useReconcile() {
     },
     onError: () => error('Error', 'Could not reconcile account. Try again.'),
   });
+}
+
+// ─── Gmail Filter ─────────────────────────────────────────────────────────────
+
+/**
+ * Downloads the Gmail filter XML for the given bank slugs using
+ * File.downloadFileAsync (the current expo-file-system API), then opens the
+ * native share sheet so the user can save the file to their desktop for
+ * import into Gmail Settings.
+ *
+ * Returns the raw XML string so callers can show a confirmation step before
+ * prompting for a save location.
+ */
+export async function fetchGmailFilterXml(bankSlugs: string[]): Promise<string> {
+  const baseUrl = process.env.EXPO_PUBLIC_API_URL;
+  const qs = bankSlugs.map((s) => `bank_slugs=${encodeURIComponent(s)}`).join('&');
+  const url = `${baseUrl}/accounts/gmail-filter?${qs}`;
+
+  const res = await authFetch(url);
+  if (!res.ok) throw new Error(`Server returned ${res.status}`);
+  return res.text();
+}
+
+/**
+ * Opens the native folder picker and writes the given XML to
+ * `monimata-gmail-filter.xml` in the chosen directory.
+ *
+ * Returns the saved file URI.
+ */
+export async function saveGmailFilterXml(xml: string): Promise<string> {
+  // Let the user choose where to save the file.
+  // Uses ACTION_OPEN_DOCUMENT_TREE (SAF) on Android, Files picker on iOS.
+  const dir = await Directory.pickDirectoryAsync();
+  const file = dir.createFile('monimata-gmail-filter.xml', 'application/xml');
+  file.write(xml);
+
+  return file.uri;
 }
 
