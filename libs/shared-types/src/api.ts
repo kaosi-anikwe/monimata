@@ -1850,6 +1850,11 @@ export interface components {
       /** Memo */
       memo: string | null;
     };
+    /**
+     * TransactionTypeFilter
+     * @enum {string}
+     */
+    TransactionTypeFilter: "debit" | "credit" | "all";
     /** UnderfundedCategoryResponse */
     UnderfundedCategoryResponse: {
       /**
@@ -2202,6 +2207,7 @@ export interface operations {
         /** @description YYYY-MM-DD */
         end_date?: string | null;
         uncategorized?: boolean | null;
+        type?: components["schemas"]["TransactionTypeFilter"];
         /** @description Search narration, cleaned narration, or category name */
         q?: string | null;
       };

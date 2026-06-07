@@ -278,6 +278,7 @@ export function useUpdateTransaction() {
             if (body.amount !== undefined) t.amount = body.amount as number;
             if (body.narration !== undefined) t.narration = body.narration as string;
             if (body.type !== undefined) t.type = body.type as string;
+            if (body.account_id !== undefined) t.accountId = body.account_id as string;
             if (body.category_id !== undefined) t.categoryId = body.category_id ?? null;
             if (body.memo !== undefined) t.memo = body.memo ?? null;
             t.updatedAt = new Date();
