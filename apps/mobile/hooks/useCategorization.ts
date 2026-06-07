@@ -81,8 +81,20 @@ export function useReviewQueue() {
  * Large limit is intentional — categorisation sessions rarely exceed 200 items.
  */
 export function useUncategorisedQueue() {
-  return $api.useQuery('get', '/transactions', {
-    params: { query: { uncategorized: true, limit: 100 } },
+  return useInfiniteQuery<{ items: Transaction[]; total: number; page: number; limit: number }>({
+    queryKey: queryKeys.uncategorisedQueue(),
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await (client as any).GET('/transactions', {
+        params: { query: { uncategorized: true, limit: 100, page: pageParam as number } },
+      });
+      if (error) throw new Error('Failed to fetch uncategorised transactions');
+      return data as { items: Transaction[]; total: number; page: number; limit: number };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const fetched = lastPage.page * lastPage.limit;
+      return fetched < lastPage.total ? lastPage.page + 1 : undefined;
+    },
   });
 }
 

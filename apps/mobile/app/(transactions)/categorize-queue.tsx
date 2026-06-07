@@ -70,7 +70,14 @@ export default function CategorizeQueueScreen() {
 
   // ── Data ──────────────────────────────────────────────────────────────────────────────
   // Full list of uncategorised transactions — fetched once, managed locally.
-  const { data: txListData, isLoading } = useUncategorisedQueue();
+  const { data: txListData, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useUncategorisedQueue();
+
+  // Auto-fetch remaining pages so the local queue contains every item.
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const isFullyLoaded = !isLoading && !hasNextPage && !isFetchingNextPage;
   // Review-queue endpoint is kept for AI suggestions only (matched by tx ID).
   const { data: queueData } = useReviewQueue();
   const confirmMutation = useConfirmCategory();
@@ -88,14 +95,14 @@ export default function CategorizeQueueScreen() {
 
   // Initialise the queue once from the fetched list (oldest-first).
   useEffect(() => {
-    if (!initialised && txListData?.items) {
-      const sorted = [...txListData.items].sort(
+    if (!initialised && isFullyLoaded && txListData?.pages) {
+      const sorted = [...txListData.pages.flatMap((p) => p.items)].sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       );
       setQueue(sorted);
       setInitialised(true);
     }
-  }, [txListData, initialised]);
+  }, [txListData, initialised, isFullyLoaded]);
 
   // ── Derived current item ───────────────────────────────────────────────────────────
   const currentTx = queue[0] ?? null;
@@ -177,7 +184,7 @@ export default function CategorizeQueueScreen() {
 
   // ── Derived values ──────────────────────────────────────────────────────
   const remainingCount = queue.length;
-  const isEmpty = !isLoading && initialised && queue.length === 0;
+  const isEmpty = isFullyLoaded && initialised && queue.length === 0;
 
   useStatusBarStyle('light');
 
@@ -198,7 +205,7 @@ export default function CategorizeQueueScreen() {
         paddingTop={insets.top + spacing.md}
       />
 
-      {isLoading ? (
+      {!isFullyLoaded ? (
         /* ── Loading state ── */
         <View style={[ss.deckContainer, { paddingBottom: insets.bottom + spacing.xl }]}>
           <ReviewCardSkeleton />
