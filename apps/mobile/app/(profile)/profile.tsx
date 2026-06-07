@@ -57,7 +57,7 @@ export default function ProfileScreen() {
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((s) => s.auth);
-  const { confirm, info } = useToast();
+  const { confirm } = useToast();
   const { isEnrolled, isEnabled: biometricEnabled, toggleEnabled: toggleBiometric } = useBiometricLock();
 
   const streakScale = useRef(new Animated.Value(1)).current;
@@ -93,10 +93,6 @@ export default function ProfileScreen() {
     });
   }
 
-  function comingSoon(feature: string) {
-    info(feature, 'This feature is coming soon!');
-  }
-
   return (
     <View style={[ss.root, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
@@ -117,8 +113,8 @@ export default function ProfileScreen() {
               name={user ? `${user.first_name} ${user.last_name}` : undefined}
               size="lg"
             />
-            <View>
-              <Text style={[ss.profName, { color: colors.white }]}>
+            <View style={ss.avTextWrap}>
+              <Text style={[ss.profName, { color: colors.white }]} numberOfLines={1} ellipsizeMode="tail">
                 {user ? `${user.first_name} ${user.last_name}` : 'Hey there'}
               </Text>
               {user?.email ? (
@@ -208,6 +204,14 @@ export default function ProfileScreen() {
             title="Notification Settings"
             subtitle="Tone, frequency, quiet hours"
             onPress={() => router.push('/notification-settings')}
+            showChevron
+          />
+          <ListRow
+            iconBg={colors.surface}
+            leftIcon={<Ionicons name="mail-outline" size={17} color={colors.brand} />}
+            title="Gmail Filter Setup"
+            subtitle="Auto-forward bank alerts to MoniMata"
+            onPress={() => router.push('/gmail-filter' as never)}
             showChevron
             separator={isEnrolled}
           />
@@ -397,6 +401,11 @@ function makeStyles(colors: ReturnType<typeof useTheme>) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
+      flex: 1,
+      marginRight: spacing.sm,
+    },
+    avTextWrap: {
+      flex: 1,
     },
     hdrTopRow: {
       flexDirection: 'row',

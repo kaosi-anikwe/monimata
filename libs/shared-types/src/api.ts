@@ -15,6 +15,22 @@ export interface paths {
      */
     get: operations["supported_banks_accounts_supported_banks_get"];
   };
+  "/accounts/gmail-filter": {
+    /**
+     * Gmail Filter
+     * @description Generate a Gmail filter XML file that auto-forwards bank alert emails.
+     *
+     * Accepts one or more ``bank_slugs`` query parameters (e.g.
+     * ``?bank_slugs=gtbank&bank_slugs=access``).  Returns an XML file that the
+     * user can import into Gmail Settings → Filters to automatically forward
+     * matching bank alert emails to their MoniMata forwarding address.
+     *
+     * One filter rule is created per (bank, subject keyword) pair so that
+     * Gmail's literal ``subject`` matching works correctly with phrase
+     * containment (quoted keywords).
+     */
+    get: operations["gmail_filter_accounts_gmail_filter_get"];
+  };
   "/accounts/manual": {
     /**
      * Add Manual Account
@@ -446,22 +462,8 @@ export interface paths {
      * Bank Alert Webhook
      * @description Receives parsed bank-alert emails forwarded by the Cloudflare email-worker.
      *
-     * Security: constant-time comparison against BANK_ALERT_WEBHOOK_SECRET.
-     * The endpoint returns 403 (not 401) to avoid leaking auth scheme details.
-     *
      * Payload shape (set by the email-worker):
      *     { "to": str, "from": str, "subject": str|null, "body": str|null, "html": str|null }
-     *
-     * Processing pipeline:
-     *     1. Verify shared secret.
-     *     2. Parse body → ParsedBankAlert.
-     *     3. Resolve recipient username → User.
-     *     4. Resolve institution → BankAccount.
-     *     5. Deduplicate via external_ref.
-     *     6. Insert Transaction row.
-     *     7. Update BankAccount.last_synced_at.
-     *     8. Enqueue categorize_transactions Celery task.
-     *     9. Notify user via WebSocket.
      */
     post: operations["bank_alert_webhook_webhooks_bank_alerts_post"];
   };
@@ -496,11 +498,6 @@ export interface paths {
      * Upload Receipt
      * @description Upload a transaction receipt image or PDF for background import.
      *
-     * The bank and account are identified automatically from the file — the
-     * client does not need to specify either.  The file is processed in a
-     * Celery background task; the transaction appears once processing
-     * completes.
-     *
      * Supported formats: JPEG, PNG, WebP, PDF (max 5 MB).
      * Returns ``{"status": "accepted"}`` immediately.
      */
@@ -511,18 +508,8 @@ export interface paths {
      * Upload Statement
      * @description Upload a bank statement PDF for background import.
      *
-     * The statement is parsed to extract all transactions it contains.
-     *
      * If *bank_slug* is provided the router routes directly to that bank's
-     * parser — bypassing auto-detection.  This is required for
-     * password-protected statements (e.g. FirstBank) where the PDF cannot be
-     * read without knowing the account number first.
-     *
-     * If *bank_slug* is omitted the bank and account are identified
-     * automatically from the PDF content (auto-detect flow, as before).
-     *
-     * The account must already exist in MoniMata; if it is not found a 404 is
-     * returned.
+     * parser.  If omitted the bank is auto-detected from the PDF content.
      *
      * Accepted formats: PDF only (max 5 MB).
      * Returns ``{"status": "accepted"}`` immediately.
@@ -1975,6 +1962,38 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["SupportedBankResponse"][];
+        };
+      };
+    };
+  };
+  /**
+   * Gmail Filter
+   * @description Generate a Gmail filter XML file that auto-forwards bank alert emails.
+   *
+   * Accepts one or more ``bank_slugs`` query parameters (e.g.
+   * ``?bank_slugs=gtbank&bank_slugs=access``).  Returns an XML file that the
+   * user can import into Gmail Settings → Filters to automatically forward
+   * matching bank alert emails to their MoniMata forwarding address.
+   *
+   * One filter rule is created per (bank, subject keyword) pair so that
+   * Gmail's literal ``subject`` matching works correctly with phrase
+   * containment (quoted keywords).
+   */
+  gmail_filter_accounts_gmail_filter_get: {
+    parameters: {
+      query: {
+        bank_slugs: string[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -3566,22 +3585,8 @@ export interface operations {
    * Bank Alert Webhook
    * @description Receives parsed bank-alert emails forwarded by the Cloudflare email-worker.
    *
-   * Security: constant-time comparison against BANK_ALERT_WEBHOOK_SECRET.
-   * The endpoint returns 403 (not 401) to avoid leaking auth scheme details.
-   *
    * Payload shape (set by the email-worker):
    *     { "to": str, "from": str, "subject": str|null, "body": str|null, "html": str|null }
-   *
-   * Processing pipeline:
-   *     1. Verify shared secret.
-   *     2. Parse body → ParsedBankAlert.
-   *     3. Resolve recipient username → User.
-   *     4. Resolve institution → BankAccount.
-   *     5. Deduplicate via external_ref.
-   *     6. Insert Transaction row.
-   *     7. Update BankAccount.last_synced_at.
-   *     8. Enqueue categorize_transactions Celery task.
-   *     9. Notify user via WebSocket.
    */
   bank_alert_webhook_webhooks_bank_alerts_post: {
     parameters: {
@@ -3724,11 +3729,6 @@ export interface operations {
    * Upload Receipt
    * @description Upload a transaction receipt image or PDF for background import.
    *
-   * The bank and account are identified automatically from the file — the
-   * client does not need to specify either.  The file is processed in a
-   * Celery background task; the transaction appears once processing
-   * completes.
-   *
    * Supported formats: JPEG, PNG, WebP, PDF (max 5 MB).
    * Returns ``{"status": "accepted"}`` immediately.
    */
@@ -3759,18 +3759,8 @@ export interface operations {
    * Upload Statement
    * @description Upload a bank statement PDF for background import.
    *
-   * The statement is parsed to extract all transactions it contains.
-   *
    * If *bank_slug* is provided the router routes directly to that bank's
-   * parser — bypassing auto-detection.  This is required for
-   * password-protected statements (e.g. FirstBank) where the PDF cannot be
-   * read without knowing the account number first.
-   *
-   * If *bank_slug* is omitted the bank and account are identified
-   * automatically from the PDF content (auto-detect flow, as before).
-   *
-   * The account must already exist in MoniMata; if it is not found a 404 is
-   * returned.
+   * parser.  If omitted the bank is auto-detected from the PDF content.
    *
    * Accepted formats: PDF only (max 5 MB).
    * Returns ``{"status": "accepted"}`` immediately.

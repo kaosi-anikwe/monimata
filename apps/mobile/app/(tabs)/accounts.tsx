@@ -25,7 +25,6 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -208,9 +207,6 @@ const bps = StyleSheet.create({
 });
 
 // ── Tour definition ─────────────────────────────────────────────────────
-
-/** Knowledge Hub article that walks users through email-forwarding setup. */
-const HUB_EMAIL_SETUP_URL = 'https://monimata.ng/guides/email-setup';
 
 const ACCOUNTS_TOUR: TourStep[] = [
   {
@@ -912,8 +908,8 @@ function AccountCard({ account, onMoreActions, showTourTarget }: AccountCardProp
       ]}
     >
       {/* Card top section */}
-      <View style={[ss.cardTop, { borderBottomColor: colors.border }]}>
-        {/* Bank info row */}
+      <View style={ss.cardTop}>
+        {/* Bank info row + more actions */}
         <View style={ss.cardRow}>
           <View style={ss.bankInfo}>
             <View style={[ss.bankIc, { backgroundColor: colors.surface }]}>
@@ -923,58 +919,33 @@ function AccountCard({ account, onMoreActions, showTourTarget }: AccountCardProp
                 color={colors.textMeta}
               />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={[type_.label, { color: colors.textPrimary }]}>{account.institution}</Text>
-              <Text style={[type_.caption, { color: colors.textMeta, marginTop: 1 }]}>
+              <Text style={[type_.caption, { color: colors.textMeta, marginTop: spacing.xxs }]}>
                 {account.account_type}
+                {account.account_number ? `  ·  ${account.account_number}` : null}
               </Text>
             </View>
           </View>
-          <View
-            style={[
-              ss.badge,
-              { backgroundColor: colors.purpleSubtle, borderColor: colors.purpleBorder },
-            ]}
-          >
-            <Text style={[ss.badgeText, { color: colors.purple }]}>Manual</Text>
-          </View>
+          <TourTarget id={showTourTarget ? 'accounts-card-more' : `card-more-${account.id}`}>
+            <TouchableOpacity
+              style={[ss.moreBtn, { backgroundColor: colors.surface }]}
+              onPress={onMoreActions}
+              accessibilityRole="button"
+              accessibilityLabel="More options"
+            >
+              <Ionicons name="ellipsis-vertical" size={type_.bodyXl.fontSize} color={colors.textMeta} />
+            </TouchableOpacity>
+          </TourTarget>
         </View>
 
         {/* Balance */}
-        <AmountDisplay kobo={account.balance} size="lg" color={colors.textPrimary} />
+        <AmountDisplay kobo={account.balance} size="lg" color={colors.textPrimary} style={{ marginTop: spacing.sm }} />
         {account.exclude_from_net_worth && (
           <Text style={[type_.caption, { color: colors.textMeta, marginTop: 2 }]}>
             Excluded from net worth
           </Text>
         )}
-      </View>
-
-      {/* Card footer */}
-      <View
-        style={[
-          ss.cardFooter,
-          {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-          },
-        ]}
-      >
-        <View style={ss.footerBtns}>
-          <TourTarget id={showTourTarget ? 'accounts-card-more' : `card-more-${account.id}`}>
-            <TouchableOpacity
-              style={[ss.footerBtnMore, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-              onPress={onMoreActions}
-              accessibilityRole="button"
-              accessibilityLabel="More options"
-            >
-              <Svg width={type_.body.fontSize} height={type_.body.fontSize} viewBox="0 0 24 24" fill="none">
-                <Circle cx={12} cy={5} r={1.5} fill={colors.textMeta} />
-                <Circle cx={12} cy={12} r={1.5} fill={colors.textMeta} />
-                <Circle cx={12} cy={19} r={1.5} fill={colors.textMeta} />
-              </Svg>
-            </TouchableOpacity>
-          </TourTarget>
-        </View>
       </View>
     </View>
   );
@@ -1104,7 +1075,11 @@ export default function AccountsScreen({ showBackButton = false }: { showBackBut
       </View>
 
       <ScrollView
-        contentContainerStyle={[ss.scroll, accounts.length === 0 && { flex: 1 }]}
+        contentContainerStyle={[
+          ss.scroll,
+          accounts.length === 0 && { flex: 1 },
+          { paddingBottom: layout.tabBarHeight + Math.max(insets.bottom, 4) + spacing.lg },
+        ]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
         }
@@ -1128,9 +1103,9 @@ export default function AccountsScreen({ showBackButton = false }: { showBackBut
             </Button>
             <TouchableOpacity
               style={ss.emailFwdBtn}
-              onPress={() => Linking.openURL(HUB_EMAIL_SETUP_URL)}
-              accessibilityRole="link"
-              accessibilityLabel="Set up email forwarding on our website"
+              onPress={() => router.push('/gmail-filter' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Set up Gmail email forwarding"
             >
               <Ionicons name="mail-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
               <Text style={[ss.emailFwdBtnTxt, { color: colors.brand }]}>Set up email forwarding →</Text>
@@ -1169,9 +1144,9 @@ export default function AccountsScreen({ showBackButton = false }: { showBackBut
             {/* ── Email forwarding promo ── */}
             <TouchableOpacity
               style={[ss.emailFwdCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-              onPress={() => Linking.openURL(HUB_EMAIL_SETUP_URL)}
-              accessibilityRole="link"
-              accessibilityLabel="Set up email forwarding to auto-import transactions"
+              onPress={() => router.push('/gmail-filter' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Set up Gmail filters to auto-import transactions"
             >
               <View style={[ss.emailFwdIc, { backgroundColor: colors.surface }]}>
                 <Ionicons name="mail-outline" size={type_.bodyXl.fontSize} color={colors.brand} />
@@ -1179,10 +1154,10 @@ export default function AccountsScreen({ showBackButton = false }: { showBackBut
               <View style={{ flex: 1 }}>
                 <Text style={[ss.emailFwdTitle, { color: colors.textPrimary }]}>Import via email alerts</Text>
                 <Text style={[ss.emailFwdSub, { color: colors.textMeta }]}>
-                  Forward bank alerts to auto-import transactions. Setup guide on our website.
+                  Download a Gmail filter file to auto-forward bank alerts to MoniMata.
                 </Text>
               </View>
-              <Ionicons name="open-outline" size={type_.bodyXl.fontSize} color={colors.textTertiary} />
+              <Ionicons name="chevron-forward" size={type_.bodyXl.fontSize} color={colors.textTertiary} />
             </TouchableOpacity>
 
             <View style={{ height: spacing.xxl + 60 }} />
@@ -1307,16 +1282,22 @@ const ss = StyleSheet.create({
   },
   cardTop: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
   },
   cardRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  bankInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.smd },
+  bankInfo: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.smd, flex: 1, marginRight: spacing.sm },
+  cardMeta: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    marginTop: 2,
+  },
   bankIc: {
     width: layout.avatarMd,
     height: layout.avatarMd,
@@ -1325,13 +1306,6 @@ const ss = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  badge: {
-    borderRadius: radius.xs,
-    borderWidth: 1,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  badgeText: { ...type_.labelSm },
 
   balanceAmt: {
     ...type_.displayMd,
@@ -1343,6 +1317,15 @@ const ss = StyleSheet.create({
     gap: spacing.xs,
   },
   syncDot: { width: spacing.xxs, height: spacing.xxs, borderRadius: spacing.xs, flexShrink: 0 },
+
+  moreBtn: {
+    width: layout.avatarSm,
+    height: layout.avatarSm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.xs,
+    flexShrink: 0,
+  },
 
   // Card footer  — matches .acct-footer
   cardFooter: {
