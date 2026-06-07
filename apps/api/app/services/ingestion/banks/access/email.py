@@ -67,6 +67,10 @@ class _AccessBankEmailParser(EmailBankParser):
 
 
 register_email_parser(
-    BankInfo(slug="access", display_name="Access Bank"),
+    BankInfo(
+        slug="access",
+        display_name="Access Bank",
+        email_subject_keywords=frozenset({"Transaction Alert", "Credit Alert", "Debit Alert"}),
+    ),
     _AccessBankEmailParser(),
 )

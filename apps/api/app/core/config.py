@@ -32,7 +32,6 @@ class Settings(BaseSettings):
 
     # ── JWT ───────────────────────────────────────────────────────────────────
     # The public engine only needs the PUBLIC KEY to verify tokens.
-    # The private key lives exclusively on console.monimata.ng.
     JWT_PUBLIC_KEY: str = ""  # base64-encoded public key
     JWT_ALGORITHM: str = "RS256"
 
@@ -58,6 +57,9 @@ class Settings(BaseSettings):
     # ── Email-worker webhook ──────────────────────────────────────────────────
     # Shared secret that the Cloudflare email-worker sends in X-MoniMata-Secret.
     BANK_ALERT_WEBHOOK_SECRET: str = ""
+
+    # Domain used for alert forwarding addresses (<username>@<domain>).
+    DOMAIN: str = "monimata.ng"
 
     # ── Outbound SMTP ─────────────────────────────────────────────────────────
     SMTP_HOST: str = ""

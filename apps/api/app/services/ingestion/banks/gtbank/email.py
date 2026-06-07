@@ -69,6 +69,10 @@ class _GTBankEmailParser(EmailBankParser):
 
 
 register_email_parser(
-    BankInfo(slug="gtbank", display_name="GTBank"),
+    BankInfo(
+        slug="gtbank",
+        display_name="GTBank",
+        email_subject_keywords=frozenset({"Transaction Alert", "Credit Alert", "Debit Alert"}),
+    ),
     _GTBankEmailParser(),
 )

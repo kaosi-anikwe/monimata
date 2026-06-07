@@ -69,6 +69,11 @@ class BankInfo:
     """Sender email domains that identify this bank's alert emails.
     Populated automatically by ``register_email_parser()``."""
 
+    email_subject_keywords: frozenset[str] = field(default_factory=frozenset)
+    """Subject-line keywords that identify alert and statement emails from
+    this bank.  Used to generate Gmail filter ``subject`` criteria so only
+    relevant emails are forwarded (e.g. ``"Transaction Alert"``)."""
+
 
 # ── Internal registry state ─────────────────────────────────────────────────
 
@@ -153,6 +158,11 @@ def list_supported_banks() -> list[BankInfo]:
     frontend.  A bank that has no registered parsers will not appear here.
     """
     return sorted(_BANKS.values(), key=lambda b: b.display_name)
+
+
+def get_bank(slug: str) -> BankInfo | None:
+    """Return the ``BankInfo`` for *slug*, or ``None`` if not registered."""
+    return _BANKS.get(slug)
 
 
 def is_bank_supported(slug: str) -> bool:

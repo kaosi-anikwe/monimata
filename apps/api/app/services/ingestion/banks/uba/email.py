@@ -66,6 +66,10 @@ class _UBAEmailParser(EmailBankParser):
 
 
 register_email_parser(
-    BankInfo(slug="uba", display_name="UBA"),
+    BankInfo(
+        slug="uba",
+        display_name="UBA",
+        email_subject_keywords=frozenset({"Transaction Alert", "Credit Alert", "Debit Alert"}),
+    ),
     _UBAEmailParser(),
 )

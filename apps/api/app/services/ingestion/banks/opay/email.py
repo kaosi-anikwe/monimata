@@ -166,6 +166,10 @@ class _OPayEmailParser(EmailBankParser):
 
 
 register_email_parser(
-    BankInfo(slug="opay", display_name="OPay"),
+    BankInfo(
+        slug="opay",
+        display_name="OPay",
+        email_subject_keywords=frozenset({"Transfer Successful", "Statement"}),
+    ),
     _OPayEmailParser(),
 )

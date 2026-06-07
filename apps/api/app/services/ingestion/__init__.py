@@ -68,7 +68,12 @@ from app.services.ingestion.channels.statement import (
     parse_statement,
     register_statement_password_fn,
 )
-from app.services.ingestion.registry import BankInfo, is_bank_supported, list_supported_banks
+from app.services.ingestion.registry import (
+    BankInfo,
+    get_bank,
+    is_bank_supported,
+    list_supported_banks,
+)
 
 __all__ = [
     # Base types
@@ -78,6 +83,7 @@ __all__ = [
     "ReceiptBankParser",
     # Registry
     "BankInfo",
+    "get_bank",
     "is_bank_supported",
     "list_supported_banks",
     # Exceptions

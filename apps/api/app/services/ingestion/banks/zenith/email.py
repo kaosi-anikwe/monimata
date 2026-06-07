@@ -68,6 +68,12 @@ class _ZenithEmailParser(EmailBankParser):
 
 
 register_email_parser(
-    BankInfo(slug="zenith", display_name="Zenith Bank"),
+    BankInfo(
+        slug="zenith",
+        display_name="Zenith Bank",
+        email_subject_keywords=frozenset(
+            {"Transaction Alert", "Credit Alert", "Debit Alert", "e-Alert"}
+        ),
+    ),
     _ZenithEmailParser(),
 )

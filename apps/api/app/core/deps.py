@@ -17,9 +17,6 @@
 """
 FastAPI dependency: extract the current user identity from the Authorization header.
 
-The public engine verifies JWT tokens using the PUBLIC key only.
-It cannot mint tokens — that responsibility belongs to console.monimata.ng.
-
 Returns a lightweight stateless CurrentUser extracted from the signed token
 claims.
 """

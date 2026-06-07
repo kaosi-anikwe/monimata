@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from xml.etree.ElementTree import fromstring
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -19,6 +21,66 @@ class TestSupportedBanks:
             assert "slug" in data[0]
             assert "name" in data[0]
             assert "channels" in data[0]
+
+
+class TestGmailFilter:
+    def test_returns_xml_for_valid_bank(self, client: TestClient):
+        resp = client.get("/accounts/gmail-filter", params={"bank_slugs": ["gtbank"]})
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/xml"
+        assert "monimata-gmail-filter.xml" in resp.headers["content-disposition"]
+
+        root = fromstring(resp.content)
+        ns = {"atom": "http://www.w3.org/2005/Atom", "apps": "http://schemas.google.com/apps/2006"}
+
+        # One entry per subject keyword — each has from, subject, forwardTo
+        entries = root.findall(".//atom:entry", ns)
+        assert len(entries) > 0
+
+        # Check first entry has the expected structure
+        first_props = entries[0].findall("apps:property", ns)
+        first_map: dict[str, str] = {str(p.get("name")): str(p.get("value")) for p in first_props}
+        assert first_map["forwardTo"] == "testuser@monimata.ng"
+        assert "gtbank.com" in first_map["from"]
+        assert first_map["shouldNeverSpam"] == "true"
+        # subject should be a quoted phrase
+        assert first_map["subject"].startswith('"')
+        assert first_map["subject"].endswith('"')
+
+        # All entries should have subject keywords for this bank
+        all_subjects = {
+            str(p.get("value"))
+            for entry in entries
+            for p in entry.findall("apps:property", ns)
+            if p.get("name") == "subject"
+        }
+        assert '"Transaction Alert"' in all_subjects
+
+    def test_multiple_banks(self, client: TestClient):
+        resp = client.get("/accounts/gmail-filter", params={"bank_slugs": ["gtbank", "access"]})
+        assert resp.status_code == 200
+        root = fromstring(resp.content)
+        ns = {"atom": "http://www.w3.org/2005/Atom", "apps": "http://schemas.google.com/apps/2006"}
+        entries = root.findall(".//atom:entry", ns)
+
+        # Should have entries for both banks
+        all_from = {
+            str(p.get("value"))
+            for entry in entries
+            for p in entry.findall("apps:property", ns)
+            if p.get("name") == "from"
+        }
+        assert any("gtbank.com" in v for v in all_from)
+        assert any("accessbankplc.com" in v for v in all_from)
+
+    def test_invalid_bank_slug(self, client: TestClient):
+        resp = client.get("/accounts/gmail-filter", params={"bank_slugs": ["nonexistent"]})
+        assert resp.status_code == 400
+        assert "Unsupported bank" in resp.json()["detail"]
+
+    def test_missing_bank_slugs(self, client: TestClient):
+        resp = client.get("/accounts/gmail-filter")
+        assert resp.status_code == 422
 
 
 class TestListAccounts:

@@ -22,23 +22,28 @@ automatically via forwarded bank alert emails or by manual entry in the app.
 
 Endpoints
 ─────────
-  POST   /accounts/manual          Create a manual account
-  GET    /accounts                 List live (non-deleted) accounts
-  PATCH  /accounts/{id}/alias      Update the display alias
-  PATCH  /accounts/{id}/balance    Update manual balance
-  DELETE /accounts/{id}            Soft-delete
+  GET    /accounts/supported-banks  List banks supported for ingestion
+  GET    /accounts/gmail-filter     Download Gmail filter XML for auto-forwarding
+  POST   /accounts/manual           Create a manual account
+  GET    /accounts                  List live (non-deleted) accounts
+  PATCH  /accounts/{id}/alias       Update the display alias
+  PATCH  /accounts/{id}/balance     Update manual balance
+  DELETE /accounts/{id}             Soft-delete
 """
 
 from __future__ import annotations
 
 import logging
+import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import CurrentUser, get_current_user
 from app.core.security import encrypt_pii
@@ -54,7 +59,8 @@ from app.schemas.accounts import (
     UpdateExcludeFromNetWorthRequest,
     UpdateManualBalanceRequest,
 )
-from app.services.ingestion import list_supported_banks
+from app.services.ingestion import get_bank, list_supported_banks
+from app.services.ingestion.registry import BankInfo
 from app.ws_manager import notify_user
 
 logger = logging.getLogger(__name__)
@@ -79,6 +85,64 @@ def supported_banks() -> list[SupportedBankResponse]:
         )
         for bank in list_supported_banks()
     ]
+
+
+# ── GET /accounts/gmail-filter ──────────────────────────────────────────────
+
+
+@router.get("/gmail-filter", response_class=Response)
+def gmail_filter(
+    bank_slugs: list[str] = Query(..., alias="bank_slugs"),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> Response:
+    """Generate a Gmail filter XML file that auto-forwards bank alert emails.
+
+    Accepts one or more ``bank_slugs`` query parameters (e.g.
+    ``?bank_slugs=gtbank&bank_slugs=access``).  Returns an XML file that the
+    user can import into Gmail Settings → Filters to automatically forward
+    matching bank alert emails to their MoniMata forwarding address.
+
+    One filter rule is created per (bank, subject keyword) pair so that
+    Gmail's literal ``subject`` matching works correctly with phrase
+    containment (quoted keywords).
+    """
+    if not current_user.username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username is required to generate a forwarding filter.",
+        )
+
+    # Validate slugs and collect BankInfo objects
+    banks: list[BankInfo] = []
+    for slug in bank_slugs:
+        bank = get_bank(slug)
+        if bank is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported bank: {slug}",
+            )
+        if "email" not in bank.channels:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{bank.display_name} does not support email alert ingestion.",
+            )
+        if not bank.email_domains:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No email sender domains found for {bank.display_name}.",
+            )
+        banks.append(bank)
+
+    forwarding_address = f"{current_user.username}@{settings.DOMAIN}"
+    xml_bytes = _build_gmail_filter_xml(banks, forwarding_address)
+
+    return Response(
+        content=xml_bytes,
+        media_type="application/xml",
+        headers={
+            "Content-Disposition": "attachment; filename=monimata-gmail-filter.xml",
+        },
+    )
 
 
 # ── POST /accounts/manual ─────────────────────────────────────────────────────
@@ -396,3 +460,54 @@ def _get_live_account_or_404(db: Session, account_id: str, user_id: str) -> Bank
     if not account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return account
+
+
+_ATOM_NS = "http://www.w3.org/2005/Atom"
+_APPS_NS = "http://schemas.google.com/apps/2006"
+
+ET.register_namespace("", _ATOM_NS)
+ET.register_namespace("apps", _APPS_NS)
+
+
+def _build_gmail_filter_xml(
+    banks: list[BankInfo],
+    forwarding_address: str,
+) -> bytes:
+    """Build a Gmail-importable Atom XML filter file.
+
+    Creates one ``<entry>`` per (bank, subject keyword) pair.  Each entry
+    uses the ``subject`` property with a **quoted phrase** for containment
+    matching — Gmail treats ``"Transfer Successful"`` as "subject contains
+    this exact phrase".  Separate entries avoid the ``OR`` limitation in
+    Gmail's ``subject`` property.
+    """
+    feed = ET.Element(f"{{{_ATOM_NS}}}feed")
+    title = ET.SubElement(feed, f"{{{_ATOM_NS}}}title")
+    title.text = "MoniMata Bank Alert Filters"
+
+    for bank in banks:
+        from_value = " OR ".join(sorted(bank.email_domains))
+
+        for keyword in sorted(bank.email_subject_keywords):
+            entry = ET.SubElement(feed, f"{{{_ATOM_NS}}}entry")
+
+            category = ET.SubElement(entry, f"{{{_ATOM_NS}}}category")
+            category.set("term", "filter")
+
+            entry_title = ET.SubElement(entry, f"{{{_ATOM_NS}}}title")
+            entry_title.text = "Mail Filter"
+
+            ET.SubElement(entry, f"{{{_ATOM_NS}}}content")
+
+            ET.SubElement(entry, f"{{{_APPS_NS}}}property", name="from", value=from_value)
+            ET.SubElement(entry, f"{{{_APPS_NS}}}property", name="subject", value=f'"{keyword}"')
+            ET.SubElement(
+                entry, f"{{{_APPS_NS}}}property", name="forwardTo", value=forwarding_address
+            )
+            ET.SubElement(entry, f"{{{_APPS_NS}}}property", name="shouldNeverSpam", value="true")
+
+    tree = ET.ElementTree(feed)
+    ET.indent(tree, space="  ")
+
+    xml_bytes = ET.tostring(feed, encoding="unicode").encode("utf-8")
+    return b'<?xml version="1.0" encoding="UTF-8"?>\n' + xml_bytes

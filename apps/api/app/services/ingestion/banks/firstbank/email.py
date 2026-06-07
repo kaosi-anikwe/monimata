@@ -197,6 +197,12 @@ class _FirstBankEmailParser(EmailBankParser):
 
 
 register_email_parser(
-    BankInfo(slug="firstbank", display_name="First Bank"),
+    BankInfo(
+        slug="firstbank",
+        display_name="First Bank",
+        email_subject_keywords=frozenset(
+            {"FirstBank Alert on Your Account", "Electronic Account Statement", "Monthly Statement"}
+        ),
+    ),
     _FirstBankEmailParser(),
 )
