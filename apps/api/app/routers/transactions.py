@@ -44,6 +44,7 @@ from app.schemas.transactions import (
     TransactionPatchRequest,
     TransactionResponse,
     TransactionSplitRequest,
+    TransactionTypeFilter,
 )
 from app.services.budget_logic import get_or_create_budget_month
 
@@ -149,6 +150,7 @@ def list_transactions(
     start_date: str | None = Query(None, description="YYYY-MM-DD"),
     end_date: str | None = Query(None, description="YYYY-MM-DD"),
     uncategorized: bool | None = Query(None),
+    type: TransactionTypeFilter = Query(TransactionTypeFilter.debit),
     q: str | None = Query(
         None, description="Search narration, cleaned narration, or category name"
     ),
@@ -160,6 +162,9 @@ def list_transactions(
         .filter(Transaction.user_id == str(current_user.id))
         .order_by(Transaction.date.desc(), Transaction.created_at.desc())
     )
+
+    if type != TransactionTypeFilter.all:
+        query = query.filter(Transaction.type == type.value)
 
     if account_id:
         query = query.filter(Transaction.account_id == str(account_id))

@@ -17,12 +17,19 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.models.transaction import TransactionSource
+
+
+class TransactionTypeFilter(str, Enum):
+    debit = "debit"
+    credit = "credit"
+    all = "all"
 
 
 class TransactionSplitResponse(BaseModel):
