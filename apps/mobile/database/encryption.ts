@@ -31,7 +31,8 @@
  *
  * ANDROID — android/app/build.gradle:
  *   dependencies {
- *     implementation "net.zetetic:android-database-sqlcipher:4.5.4"
+ *     implementation 'net.zetetic:sqlcipher-android:4.16.0@aar'
+ *     implementation 'androidx.sqlite:sqlite:2.6.2'
  *     implementation "androidx.sqlite:sqlite:2.3.1"
  *   }
  *   Then pass `encryptionKey` to the SQLiteAdapter in database/index.ts (see comment there).
