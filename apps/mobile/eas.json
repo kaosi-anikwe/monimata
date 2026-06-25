@@ -17,7 +17,7 @@
         "buildType": "app-bundle"
       },
       "ios": {
-        "enterpriseProvisioning": "universal"
+        "distribution": "store"
       }
     },
     "github-release": {
@@ -29,6 +29,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "anikwehenryasa@gmail.com",
+        "ascAppId": "6784310745",
+        "appleTeamId": "JCK59Q896D"
+      }
+    }
   }
 }

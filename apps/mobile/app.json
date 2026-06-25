@@ -13,6 +13,9 @@
         "light": "./assets/icons/ios-light.png",
         "dark": "./assets/icons/ios-dark.png",
         "tinted": "./assets/icons/ios-tinted.png"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -75,6 +78,7 @@
       ],
       "./plugins/withWatermelonDBJSI",
       "./plugins/withSQLCipher",
+      "./plugins/withSQLCipherIOS",
       "./plugins/withMonorepoRoot",
       [
         "expo-share-intent",
