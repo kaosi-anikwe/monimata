@@ -30,6 +30,9 @@
   },
   "submit": {
     "production": {
+      "android": {
+        "releaseStatus": "completed"
+      },
       "ios": {
         "appleId": "anikwehenryasa@gmail.com",
         "ascAppId": "6784310745",
