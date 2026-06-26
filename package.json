@@ -14,7 +14,7 @@
     "typescript": "^5.9.2"
   },
   "workspaces": [
-    "apps/*",
+    "apps/mobile",
     "libs/*"
   ],
   "dependencies": {
