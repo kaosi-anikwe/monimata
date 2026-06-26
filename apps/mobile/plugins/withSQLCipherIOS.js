@@ -1,21 +1,13 @@
 /**
  * Config plugin to wire SQLCipher into the iOS build for WatermelonDB.
  *
- * WatermelonDB's podspec links against the system `sqlite3` library. This plugin
- * modifies the generated Podfile to:
- *
+ * Modifies the generated Podfile to:
  *   1. Add `pod 'SQLCipher'` as a dependency.
- *   2. Use a `pre_install` hook to remove 'sqlite3' from WatermelonDB's link
- *      libraries so it doesn't conflict with SQLCipher.
- *   3. Use a `post_install` hook to inject the required SQLCipher compiler
- *      defines into the WatermelonDB Xcode target.
+ *   2. Inject SQLCipher compiler defines into the WatermelonDB Xcode target
+ *      via a post_install hook.
  *
- * The encryptionKey is passed at runtime via database/index.ts — no changes
- * needed on the JS side once this plugin is applied.
- *
- * References:
- *   https://watermelondb.dev/docs/Installation#ios-installation
- *   https://www.zetetic.net/sqlcipher/sqlcipher-for-ios/
+ * Note: The old pre_install `libraries.delete('sqlite3')` hack is omitted —
+ * it broke on CocoaPods 1.16.x. SQLCipher 4.x is a full drop-in for sqlite3.
  */
 
 const { withDangerousMod } = require("@expo/config-plugins");
@@ -43,62 +35,74 @@ const withSQLCipherIOS = (config) =>
 
       // ── 1. Add SQLCipher pod ───────────────────────────────────────────────
       if (!contents.includes("pod 'SQLCipher'")) {
-        // Insert after the `use_react_native!` call
+        // Insert after the closing `)` of the multi-line `use_react_native!(...)` call
         contents = contents.replace(
-          /(use_react_native!.*?\n)/s,
-          `$1\n  # SQLCipher — AES-256 at-rest encryption for WatermelonDB\n  pod 'SQLCipher', :modular_headers => true\n`,
+          /(use_react_native!\([\s\S]*?\))/,
+          "$1\n\n  # SQLCipher — AES-256 at-rest encryption for WatermelonDB\n  pod 'SQLCipher', :modular_headers => true",
         );
       }
 
-      // ── 2. pre_install — strip sqlite3 from WatermelonDB link libraries ───
-      const preInstallBlock = `
-        # SQLCipher: remove sqlite3 from WatermelonDB so SQLCipher's libsqlcipher is used instead
-        pre_install do |installer|
-          installer.pod_targets.each do |pod|
-            if pod.name == 'WatermelonDB'
-              def pod.build_type
-                Pod::BuildType.static_library
-              end
-              pod.instance_variable_get(:@spec).libraries.delete('sqlite3')
-            end
-          end
-        end
-        `;
-      if (!contents.includes("SQLCipher: remove sqlite3")) {
-        // Insert before the first `target` block
-        contents = contents.replace(
-          /(^target .+? do)/m,
-          `${preInstallBlock}\n$1`,
-        );
-      }
-
-      // ── 3. post_install — inject SQLCipher compiler flags into WatermelonDB
-      const flagsSnippet = `
-        # SQLCipher: inject compiler defines into WatermelonDB target
-        if target.name == 'WatermelonDB'
-          target.build_configurations.each do |config|
-            config.build_settings['OTHER_CFLAGS'] = '$(inherited) ${SQLCIPHER_FLAGS}'
-            config.build_settings['OTHER_CPLUSPLUSFLAGS'] = '$(inherited) ${SQLCIPHER_FLAGS}'
-          end
-        end`;
+      // ── 2. post_install — inject SQLCipher compiler flags into WatermelonDB
+      // Use line-by-line depth counting to find the post_install block's real
+      // closing `end` (a simple "last end" regex breaks when other blocks like
+      // ShareExtension appear after post_install in the Podfile).
+      const targetsEachBlock = [
+        "  # SQLCipher: inject compiler defines into WatermelonDB target",
+        "  installer.pods_project.targets.each do |target|",
+        "    if target.name == 'WatermelonDB'",
+        "      target.build_configurations.each do |config|",
+        "        config.build_settings['OTHER_CFLAGS'] = '$(inherited) " +
+          SQLCIPHER_FLAGS +
+          "'",
+        "        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = '$(inherited) " +
+          SQLCIPHER_FLAGS +
+          "'",
+        // Point WatermelonDB's compiler at SQLCipher's sqlite3.h instead of the system one
+        "        config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) $(PODS_ROOT)/SQLCipher'",
+        "      end",
+        "    end",
+        "  end",
+      ].join("\n");
 
       if (!contents.includes("SQLCipher: inject compiler defines")) {
         if (contents.includes("post_install do |installer|")) {
-          // Append inside existing post_install block
-          contents = contents.replace(
-            /(post_install do \|installer\|)([\s\S]*?)(^end)/m,
-            (_, open, body, close) =>
-              `${open}${body}  installer.pods_project.targets.each do |target|${flagsSnippet}\n  end\n${close}`,
+          const lines = contents.split("\n");
+          const startLine = lines.findIndex((l) =>
+            l.trim().startsWith("post_install do"),
           );
+          if (startLine !== -1) {
+            let depth = 1;
+            let closingLine = -1;
+            for (let i = startLine + 1; i < lines.length; i++) {
+              const t = lines[i].trim();
+              if (
+                /\bdo\s*(\|[^|]*\|)?\s*$/.test(t) ||
+                /^(def|class|module|begin|case|if|unless|while|until|for)\b/.test(
+                  t,
+                )
+              ) {
+                depth++;
+              }
+              if (/^end\b/.test(t)) {
+                depth--;
+                if (depth === 0) {
+                  closingLine = i;
+                  break;
+                }
+              }
+            }
+            if (closingLine !== -1) {
+              lines.splice(closingLine, 0, targetsEachBlock);
+              contents = lines.join("\n");
+            }
+          }
         } else {
-          // Add a new post_install block before the last `end`
-          const postInstallBlock = `
-            post_install do |installer|
-                installer.pods_project.targets.each do |target|${flagsSnippet}
-                end
-            end
-            `;
-          contents = contents.replace(/(\nend\s*$)/, `\n${postInstallBlock}$1`);
+          // No post_install block yet — append one.
+          contents =
+            contents.trimEnd() +
+            "\n\npost_install do |installer|\n" +
+            targetsEachBlock +
+            "\nend\n";
         }
       }
 
